@@ -1,6 +1,6 @@
 # Shared Contracts
 
-These are the four data shapes every skill, the orchestrator, the
+These are the data shapes every skill, the orchestrator, the
 Reviewer/Critic, and the frontend must agree on. They're documented here
 — before any per-skill requirements or implementation issues — specifically
 so that agents working different issues in parallel converge on the same
@@ -9,18 +9,31 @@ shapes instead of each inventing their own.
 The JSON Schema files under [`/schemas`](../../schemas) are the actual
 source of truth (used to validate payloads and generate Go structs / TS
 types). This document explains the *why* behind each field and how the
-four contracts relate to each other — read it before writing code against
+contracts relate to each other — read it before writing code against
 them.
+
+**Note on completeness:** this list has grown as gaps got caught —
+`HoldingsSnapshot` and `LiabilitiesSnapshot` were added after being
+referenced informally elsewhere in the docs without ever being
+formalized. If you find a data shape multiple components depend on that
+isn't listed here, that's a signal to add it, not to invent a local
+shape.
 
 ## How they relate
 
 ```
-Goals & Onboarding
-        │
-        ▼
+HoldingsSnapshot          LiabilitiesSnapshot
+(current state)            (current state)
+        │                          │
+        └──────────┬───────────────┘
+                    │ read by
+                    ▼
+          Goals & Onboarding
+                    │
+                    ▼
   Investment Policy Statement (IPS)  ◄──────────────┐
         │                                            │
-        │ read by                                    │ read by
+        │ read by (IPS + Holdings)                   │ read by
         ▼                                            │
 Portfolio Analysis ── drift ──► Action Drafting       │
                                        │               │
@@ -43,7 +56,42 @@ Portfolio Analysis ── drift ──► Action Drafting       │
 Every step above that changes state → Audit Log Entry
 ```
 
-## 1. Investment Policy Statement (IPS)
+## 1. Holdings Snapshot
+
+Current portfolio positions. **Current-state, not versioned** — unlike
+the IPS, this gets overwritten as holdings change rather than
+superseded. Read by Goals & Onboarding (feasibility-checking goals
+against what's actually there) and Portfolio Analysis (drift
+calculation).
+
+`asset_class` on each position must match one of the IPS's
+`target_allocation` asset classes, or drift comparison has nothing to
+compare against.
+
+See [`holdings.schema.json`](../../schemas/holdings.schema.json).
+
+## 2. Liabilities Snapshot
+
+Current debts — credit cards, mortgage, other loans. **Also
+current-state, not versioned.** Added after being referenced informally
+(risk tolerance, liquidity needs) without ever being captured anywhere:
+neither the IPS schema nor the Goals & Onboarding interview asked about
+what a user owes, only what they hold and want.
+
+This is deliberately **not derived from Chase transaction data** — a
+transaction feed shows payments happening, not the interest rate or
+outstanding balance behind them. It has to be self-reported during the
+Goals & Onboarding interview.
+
+`interest_rate_percent` exists specifically so a future Reviewer rule
+could reasonably flag "you're carrying 22% APR debt while proposing to
+buy more equity" — not built yet, but the field is there because this is
+exactly the kind of thing a real risk-capacity assessment (as opposed to
+risk *tolerance*) should account for.
+
+See [`liabilities.schema.json`](../../schemas/liabilities.schema.json).
+
+## 3. Investment Policy Statement (IPS)
 
 The reference plan. Produced once by Goals & Onboarding, revisited on
 drift or major life events. **Append-only, like the ADRs** — a change to
@@ -67,7 +115,7 @@ Notable fields:
 
 See [`ips.schema.json`](../../schemas/ips.schema.json).
 
-## 2. Proposed Action
+## 4. Proposed Action
 
 What Action Drafting produces, what the Reviewer validates, and what a
 human ultimately approves or rejects. Deliberately narrow in this version
@@ -86,7 +134,7 @@ Notable fields:
 
 See [`proposed-action.schema.json`](../../schemas/proposed-action.schema.json).
 
-## 3. Reviewer Verdict
+## 5. Reviewer Verdict
 
 The Reviewer/Critic's output. **Itemized, not a single pass/fail** —
 `rule_results` lists every rule checked, each with its own pass/fail and
@@ -110,7 +158,7 @@ IPS's own thresholds) to need a human.
 
 See [`reviewer-verdict.schema.json`](../../schemas/reviewer-verdict.schema.json).
 
-## 4. Audit Log Entry
+## 6. Audit Log Entry
 
 One entry per governance-relevant event — not just approvals. Emitted for
 proposals drafted, reviews completed, approvals granted/rejected,

@@ -17,8 +17,12 @@ full picture before making non-trivial changes.
   the root planner at runtime. Changing these changes what the product
   does. Any change here should trace back to `docs/spec/01-functional.md`.
 - **`/.agent/skills`** — engineering-practice skills for *you*, the coding
-  agent working on this repo. Read these before writing code. They cover
-  code conciseness, unit testing, and coverage expectations.
+  agent working on this repo. Read these before writing code or reviewing changes. They cover:
+  - `code-coverage` — coverage targets and signal interpretation
+  - `code-review` — two-axis review (Standards and Spec) using parallel sub-agents
+  - `codebase-design` — module deepening, seam discipline, and interface design ("Design It Twice")
+  - `concise-code` — code conciseness and avoiding premature abstraction
+  - `unit-testing` — table-driven tests, fakes, and path coverage
 
 ## Repo map
 
@@ -49,9 +53,10 @@ npm run test -- --coverage
 
 ## Before writing code
 
-1. Read `.agent/skills/concise-code/SKILL.md`,
-   `.agent/skills/unit-testing/SKILL.md`, and
-   `.agent/skills/code-coverage/SKILL.md`.
+1. Read the relevant engineering-practice skills in `.agent/skills/`:
+   - `.agent/skills/concise-code/SKILL.md`, `.agent/skills/unit-testing/SKILL.md`, and `.agent/skills/code-coverage/SKILL.md` before writing or editing code.
+   - `.agent/skills/code-review/SKILL.md` when reviewing code changes against repo standards and specs.
+   - `.agent/skills/codebase-design/SKILL.md` when designing or refactoring module boundaries and interfaces.
 2. If the change affects what the system does, check it against
    `docs/spec/01-functional.md` first — update the spec, don't let code
    drift from it silently.
