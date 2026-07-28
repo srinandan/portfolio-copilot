@@ -41,32 +41,44 @@ live-revocation demo than static agent-level config would have been.
 
 ## Constraints
 - **Pre-GA.** Personal-use/demo is an accepted use case here.
-- **Agent Registry team shipped skill versioning** —
-  directly usable for composing per-turn tool lists from specific
-  authorized skill versions, and closely analogous to Google's own Skill
-  Registry (`skills/{name}/skill_versions/{version}`).
+- **Agent Registry recently shipped skill revisions** — directly usable
+  for composing per-turn tool lists from specific authorized skill
+  revisions. See [ADR-0006](0006-agent-registry-api-alignment.md) for
+  the real API this project now aligns to (`agentregistry.googleapis.com`),
+  which supersedes an earlier, less accurate reference to a different
+  Google product ("Skill Registry" under Gemini Enterprise Agent
+  Platform).
 
-## Open question: where does trade execution happen?
-Two options, not yet decided:
+## Decision: trade execution stays in the orchestrator's own ADK code
 
-1. **Keep it in the orchestrator's own trusted Go code** (leaning this
-   way). By approval time the action is fully specified — there's no
-   reasoning benefit to routing it through an autonomous harness — and
-   Google's own security guidance warns against granting an agent
-   credentials beyond what a given step needs. A plain Alpaca API call
-   from trusted code has less surface area than attaching a write-capable
-   MCP tool to a Pre-GA sandbox.
-2. **Delegate to Antigravity on the one approved call**, attaching the
-   Alpaca MCP tool only for that turn via the same per-interaction
-   override mechanism. Would let the demo show Antigravity completing the
-   full plan→research→execute lifecycle inside one harness, if that
-   narrative is worth the tradeoff.
+**Resolved.** Execution is never delegated to Antigravity, on any call,
+under any circumstance. By approval time the action is fully specified —
+there's no reasoning benefit to routing it through an autonomous harness
+— and Google's own security guidance warns against granting an agent
+credentials beyond what a given step needs. A plain Alpaca API call from
+trusted Go code has less surface area than attaching a write-capable MCP
+tool to a Pre-GA sandbox, even for a single call.
 
-## Consequences (if adopted)
-- Antigravity never holds write credentials during Plan/Research,
-  regardless of which way the open question resolves
-- Real Chase/portfolio data must not be routed through the Managed Agents
-  sandbox (Pre-GA terms); scope this integration to Research or synthetic
-  data
+Concretely: Action Drafting (see its `SKILL.md`) never holds an
+order-placement credential — only a read-only quote credential for
+`estimated_price_usd`. The orchestrator is the only component in this
+project that ever calls Alpaca's order-placement endpoint, and only
+after Reviewer pass + human approval.
+
+The alternative considered (delegate to Antigravity on the one approved
+call, attaching the Alpaca MCP tool for that turn only) was rejected —
+not because it wouldn't work, but because it buys a narrative beat
+("Antigravity completes the full lifecycle") at the cost of a real
+security property (the sandbox never touches write credentials, full
+stop) for no functional benefit.
+
+## Consequences
+- Antigravity never holds write credentials, at any point, not just
+  during Plan/Research — this is now unconditional, not contingent on
+  which way an open question resolved
+- Real Chase/portfolio data must not be routed through the Managed
+  Agents sandbox (Pre-GA terms); scope that integration to Research or
+  synthetic data
 - Adds a second execution pathway (ADK-direct skills vs. Interactions
-  API-delegated skills) to reason about and document per-skill
+  API-delegated skills) to reason about and document per-skill — Action
+  Drafting is ADK-direct; Research is the Interactions API candidate

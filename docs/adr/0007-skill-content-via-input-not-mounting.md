@@ -47,10 +47,14 @@ Don't use the sandbox skill-mounting mechanism at all. Instead:
   subdirectories, so this isn't a live blocker, but it would force the
   mounting question back open if a future skill needs an executable
   script.
-- **Lower-confidence alternative, not adopted, worth periodic
-  re-checking:** an `inline` source type appears in general Gemini API
-  documentation (not confirmed on the Gemini Enterprise Agent Platform
-  surface specifically) that might allow real mounting of live-resolved
-  content without the scripts/assets limitation. If that's confirmed
-  available, it would be a strict upgrade over this decision — revisit
-  then.
+- **`inline` source type checked and ruled out.** It appears in general
+  Gemini API documentation, but is confirmed **not available** on
+  Managed Agents as offered through GCP (Gemini Enterprise Agent
+  Platform) — that surface only supports `skill_registry` and `gcs`, per
+  the Context section above. This isn't a gap to keep re-checking; it's
+  resolved. Passing skill content via `input` (or another
+  request-scoped field) is the only viable live-resolution path on the
+  GCP surface today, which makes this ADR's decision the settled answer
+  for this project, not a stand-in for a better option pending
+  verification.
+
