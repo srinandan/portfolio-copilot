@@ -41,9 +41,21 @@ func (l *LiabilitiesSnapshot) Validate() bool {
 		return false
 	}
 	for _, liab := range l.Liabilities {
-		if liab.LiabilityID == "" || liab.Type == "" || liab.BalanceUSD < 0 || liab.MinimumPaymentUSD < 0 {
+		if liab.LiabilityID == "" || liab.BalanceUSD < 0 || liab.MinimumPaymentUSD < 0 {
+			return false
+		}
+		switch liab.Type {
+		case LiabilityTypeCreditCard, LiabilityTypeMortgage, LiabilityTypeAutoLoan, LiabilityTypeStudentLoan, LiabilityTypeHELOC, LiabilityTypeOther:
+		default:
+			return false
+		}
+		if liab.InterestRatePercent != nil && *liab.InterestRatePercent < 0 {
 			return false
 		}
 	}
+	if l.TotalLiabilitiesUSD != nil && *l.TotalLiabilitiesUSD < 0 {
+		return false
+	}
 	return true
 }
+

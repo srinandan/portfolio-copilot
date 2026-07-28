@@ -6,11 +6,11 @@ import (
 
 // Position represents a single portfolio position holding in HoldingsSnapshot.
 type Position struct {
-	Ticker         string   `json:"ticker"`
-	Quantity       float64  `json:"quantity"`
-	AssetClass     string   `json:"asset_class"`
-	MarketValueUSD float64  `json:"market_value_usd"`
-	AccountType    *string  `json:"account_type,omitempty"` // taxable, retirement
+	Ticker         string       `json:"ticker"`
+	Quantity       float64      `json:"quantity"`
+	AssetClass     string       `json:"asset_class"`
+	MarketValueUSD float64      `json:"market_value_usd"`
+	AccountType    *AccountType `json:"account_type,omitempty"` // taxable, retirement
 }
 
 // HoldingsSnapshot represents current portfolio holdings.
@@ -32,6 +32,20 @@ func (h *HoldingsSnapshot) Validate() bool {
 		if pos.Ticker == "" || pos.Quantity < 0 || pos.AssetClass == "" || pos.MarketValueUSD < 0 {
 			return false
 		}
+		if pos.AccountType != nil {
+			switch *pos.AccountType {
+			case AccountTypeTaxable, AccountTypeRetirement:
+			default:
+				return false
+			}
+		}
+	}
+	if h.CashUSD != nil && *h.CashUSD < 0 {
+		return false
+	}
+	if h.TotalValueUSD != nil && *h.TotalValueUSD < 0 {
+		return false
 	}
 	return true
 }
+

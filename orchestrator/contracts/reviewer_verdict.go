@@ -29,6 +29,12 @@ func (v *ReviewerVerdict) Validate() bool {
 	if v.VerdictID == "" || v.ActionID == "" || v.ReviewedAt.IsZero() {
 		return false
 	}
+	if v.IPSVersionCheckedAgainst.IPSID == "" || v.IPSVersionCheckedAgainst.Version < 1 {
+		return false
+	}
+	if v.ReviewerSkillVersion.SkillName == "" || v.ReviewerSkillVersion.SkillVersion == "" {
+		return false
+	}
 	if len(v.RuleResults) == 0 {
 		return false
 	}
@@ -39,3 +45,4 @@ func (v *ReviewerVerdict) Validate() bool {
 	}
 	return true
 }
+
