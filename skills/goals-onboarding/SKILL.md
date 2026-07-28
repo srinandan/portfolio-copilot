@@ -8,27 +8,157 @@ status: draft
 
 ## Purpose
 
-Interviews the user for risk tolerance, goals, time horizon, and constraints; ingests holdings and spending history; produces an Investment Policy Statement (IPS) written to long-term memory.
+Interviews the user for risk tolerance, goals, time horizon, and
+constraints; ingests current holdings and Chase spending history; produces
+an [`InvestmentPolicyStatement`](../../schemas/ips.schema.json) — the
+reference plan every other skill and the Reviewer/Critic reads against.
+
+This is the only skill in this project with no path to financial
+execution. It reads context and writes policy; it never drafts or
+executes a trade. Keep it that way — don't add tool scopes here that
+belong to Action Drafting.
+
+## When this skill runs
+
+| Trigger | Meaning | Result |
+|---|---|---|
+| `initial` | No active IPS exists for this user | Creates version 1 |
+| `life_event` | User reports a change (new goal, changed timeline, etc.) mid-conversation | Creates version N+1 |
+| `drift_review` | Portfolio Analysis reports drift the current IPS bands don't account for, and recommends revisiting | Creates version N+1, pre-filled with prior answers for the user to confirm or change |
+
+The decision to *invoke* this skill (e.g. noticing a life-event mention)
+is the root planner's, not this skill's own — this skill only defines
+what it does once invoked, per [ADR-0004](../../docs/adr/0004-dynamic-planning-over-fixed-pipeline.md).
 
 ## Inputs
 
-TODO: define inputs (schema / source)
+| Field | Source | Required |
+|---|---|---|
+| `user_id` | Orchestrator | Yes |
+| `trigger` | Orchestrator (`initial` \| `life_event` \| `drift_review`) | Yes |
+| `existing_ips_ref` | Firestore — active IPS for this user, if any | Required when `trigger != initial` |
+| Current holdings | Firestore, read-only | Yes — informs feasibility discussion (e.g. a goal the current portfolio can't plausibly reach) |
+| Chase transaction history | BigQuery, read-only, aggregated | Yes — informs liquidity needs (spending patterns, existing reserve) |
+| Interview responses | User, gathered interactively during the skill's own multi-turn conversation | Yes |
 
-## Outputs
+The interview itself is multi-turn and not turn-by-turn specified here —
+that's an implementation detail. What's specified is the mapping from
+interview content to IPS fields, below.
 
-TODO: define outputs (schema)
+## Interview → IPS field mapping
+
+**Goals.** Free-form goal name, target amount, target date — one or more.
+Each becomes a `goals[]` entry. Reality-check against current holdings +
+savings rate (derived from Chase data); if a goal's target is
+implausible given the timeline, flag it to the user during the interview
+— don't silently accept or silently block.
+
+**Risk tolerance.** Not asked directly ("are you conservative or
+aggressive?") — derived deterministically from two questions, so the
+mapping is testable rather than a judgment call buried in a prompt:
+
+1. Time horizon in years (for the primary goal)
+2. Reaction to a hypothetical 20% portfolio drawdown: `sell` / `hold` /
+   `buy_more`
+
+| time_horizon_years | drawdown_reaction | → risk_tolerance |
+|---|---|---|
+| ≥ 15 | `hold` or `buy_more` | `aggressive` |
+| ≥ 7 | `hold` or `buy_more` | `moderate` |
+| any | `sell` | `conservative` |
+| < 7 | `hold` or `buy_more` | `moderate` |
+
+**Time horizon.** Directly from the primary goal's target date.
+
+**Liquidity needs.** `reserve_months` asked directly; `known_upcoming_expenses_usd`
+summed from user-reported near-term expenses.
+
+**Target allocation.** Propose default bands per risk tier (below) as a
+starting point; user can override any band before confirming. Never
+finalize without an explicit confirmation step — this is the one place
+in the skill where the interactive interview itself functions as the
+approval gate, since there's no separate Reviewer/HITL step for policy
+changes (only for trades).
+
+| risk_tolerance | Default target (min–max band) |
+|---|---|
+| `conservative` | equity 30% (20–40), bonds 60% (50–70), cash 10% (5–15) |
+| `moderate` | equity 60% (50–70), bonds 30% (20–40), cash 10% (5–15) |
+| `aggressive` | equity 85% (75–95), bonds 10% (0–20), cash 5% (0–10) |
+
+**Constraints.** `excluded_tickers`/`excluded_sectors` asked directly
+(optional, default empty). `concentration_limit_percent` defaults to 15,
+user-overridable. `account_type` and `tax_loss_harvesting_enabled` asked
+directly.
+
+**Approval thresholds.** `approval_required_above_usd` and
+`approval_required_above_percent` — asked directly, with a suggested
+default (e.g. $1,000 or 5% of portfolio, whichever is lower) the user can
+adjust.
+
+## Output
+
+One [`InvestmentPolicyStatement`](../../schemas/ips.schema.json) instance,
+written to Firestore.
+
+**Versioning invariant:** exactly one document with `status: "active"` per
+`ips_id` at any time.
+
+- `trigger: initial` → write version 1, `status: "active"`.
+- `trigger: life_event` or `drift_review` → write version N+1 with
+  `status: "active"`, **and** update the previous active version's
+  document: `status → "superseded"`, `superseded_by → "{ips_id}:v{N+1}"`.
+  These two writes happen together — never leave two active versions, or
+  zero.
+
+A summarized version (risk tolerance, goals, key constraints — not the
+full document) is also pushed to Vertex AI Memory Bank for semantic
+recall in future sessions.
+
+## Failure mode: incomplete interview
+
+If the user abandons the interview before all required IPS fields are
+answered, **no document is written.** Partial state is never persisted —
+a half-complete IPS would fail schema validation, and a document that
+doesn't validate against `ips.schema.json` should never exist in
+Firestore. Resume from where the user left off on the next invocation
+rather than starting over, if practical.
 
 ## Tools / permissions required
 
-TODO: list MCP servers, APIs, or read/write scopes this skill needs
+- Firestore: read `holdings`, read `ips` (existing active version), write
+  `ips`
+- BigQuery: read `chase_transactions` (aggregate queries only)
+- Vertex AI Memory Bank: write (summarized preferences)
+- **No** trade-execution tools, no Alpaca access, no write access outside
+  the above. This skill's tool surface should never grow to overlap with
+  Action Drafting's.
 
 ## Registry metadata
 
 - Registered as: `projects/{project}/locations/{location}/skills/goals-onboarding`
 - Version: 0.1.0 (draft — not yet registered)
-- Approval scope: TODO
+- Approval scope: `read:holdings,read:spending,read:ips,write:ips,write:memory`
 
-## Notes
+## Acceptance criteria
 
-Stub generated from the functional spec (docs/spec/01-functional.md).
-Fill in before registering with the Agent Registry.
+1. `trigger: initial`, no existing IPS → produces exactly one IPS
+   document, version 1, `status: active`, valid against `ips.schema.json`
+2. `trigger: life_event` or `drift_review` with an existing active IPS →
+   produces version N+1 `active`; previous version flips to `superseded`
+   with `superseded_by` set; exactly one active version exists afterward
+3. Interview abandoned mid-way → zero documents written
+4. `risk_tolerance` is set via the mapping table above for every tested
+   `(time_horizon_years, drawdown_reaction)` combination — not free-form
+5. Default `target_allocation` bands match the risk-tier table and are
+   overridable before the write occurs
+6. Emits `AuditLogEntry` records: `skill_invoked` at start, `ips_created`
+   (initial) or `ips_superseded` (revision) on write — see
+   [`audit-log-entry.schema.json`](../../schemas/audit-log-entry.schema.json)
+
+## Non-goals
+
+The risk-tolerance mapping above is a simplified deterministic heuristic
+for demo purposes — it is not a licensed suitability assessment and
+shouldn't be presented as one. See project-level non-goals in
+[`00-overview.md`](../../docs/spec/00-overview.md).

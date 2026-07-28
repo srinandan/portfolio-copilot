@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://portfolio-copilot/schemas/proposed-action.schema.json",
+  "title": "ProposedAction",
+  "description": "What Action Drafting produces, the Reviewer validates, and a human approves or rejects. Never carries execution authority on its own.",
+  "type": "object",
+  "required": [
+    "action_id",
+    "session_id",
+    "type",
+    "ticker",
+    "side",
+    "quantity",
+    "order_type",
+    "rationale",
+    "ips_version_referenced",
+    "proposed_by_skill_version",
+    "status",
+    "created_at"
+  ],
+  "properties": {
+    "action_id": { "type": "string" },
+    "session_id": {
+      "type": "string",
+      "description": "The orchestrator session/interaction this proposal was produced in."
+    },
+
+    "type": {
+      "type": "string",
+      "enum": ["trade"],
+      "description": "Deliberately narrow. Extend only when a second real action type exists."
+    },
+
+    "ticker": { "type": "string" },
+    "side": { "type": "string", "enum": ["buy", "sell"] },
+    "quantity": { "type": "number", "exclusiveMinimum": 0 },
+    "order_type": { "type": "string", "enum": ["market", "limit"] },
+    "limit_price_usd": {
+      "type": ["number", "null"],
+      "description": "Required if order_type is 'limit', otherwise null."
+    },
+    "estimated_price_usd": { "type": "number", "exclusiveMinimum": 0 },
+    "estimated_value_usd": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "quantity * estimated_price_usd, computed at drafting time for display and Reviewer sanity-checks."
+    },
+
+    "rationale": {
+      "type": "string",
+      "description": "Why the agent is proposing this — shown to the human in the approval card and kept for audit."
+    },
+    "supporting_research_refs": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": []
+    },
+
+    "ips_version_referenced": {
+      "type": "object",
+      "required": ["ips_id", "version"],
+      "properties": {
+        "ips_id": { "type": "string" },
+        "version": { "type": "integer" }
+      },
+      "description": "Which exact IPS version this proposal was checked against. The Reviewer's stale-version rule compares this to the currently active IPS."
+    },
+    "proposed_by_skill_version": {
+      "type": "object",
+      "required": ["skill_name", "skill_version"],
+      "properties": {
+        "skill_name": { "type": "string" },
+        "skill_version": { "type": "string" },
+        "registry_entry_id": { "type": "string" }
+      }
+    },
+
+    "status": {
+      "type": "string",
+      "enum": [
+        "drafted",
+        "reviewed_pass",
+        "reviewed_fail",
+        "pending_approval",
+        "approved",
+        "rejected",
+        "executed",
+        "failed"
+      ]
+    },
+
+    "created_at": { "type": "string", "format": "date-time" }
+  }
+}
