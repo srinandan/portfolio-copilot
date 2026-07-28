@@ -41,7 +41,7 @@ live-revocation demo than static agent-level config would have been.
 
 ## Constraints
 - **Pre-GA.** Personal-use/demo is an accepted use case here.
-- **Nandan's Agent Registry team recently shipped skill versioning** —
+- **Agent Registry team shipped skill versioning** —
   directly usable for composing per-turn tool lists from specific
   authorized skill versions, and closely analogous to Google's own Skill
   Registry (`skills/{name}/skill_versions/{version}`).
