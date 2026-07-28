@@ -58,4 +58,3 @@ func (l *LiabilitiesSnapshot) Validate() bool {
 	}
 	return true
 }
-

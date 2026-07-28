@@ -45,4 +45,3 @@ func (v *ReviewerVerdict) Validate() bool {
 	}
 	return true
 }
-

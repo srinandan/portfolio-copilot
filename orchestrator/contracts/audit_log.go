@@ -67,4 +67,3 @@ func (ale *AuditLogEntry) Validate() bool {
 	}
 	return true
 }
-

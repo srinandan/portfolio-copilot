@@ -184,4 +184,3 @@ func (ips *InvestmentPolicyStatement) Validate() bool {
 	}
 	return true
 }
-

@@ -129,4 +129,3 @@ func (pa *ProposedAction) Validate() bool {
 	}
 	return true
 }
-

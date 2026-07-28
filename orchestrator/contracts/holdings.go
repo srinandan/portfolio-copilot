@@ -48,4 +48,3 @@ func (h *HoldingsSnapshot) Validate() bool {
 	}
 	return true
 }
-
