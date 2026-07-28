@@ -1,0 +1,48 @@
+---
+name: code-coverage
+version: 0.1.0
+audience: coding-agent
+---
+
+# Code coverage
+
+Coverage is a signal for finding untested code, not a target to write
+tests against. Don't add a test whose only purpose is moving the number.
+
+## Targets
+
+- `orchestrator/`, `gateway/` (Go): **80% line coverage**, measured with
+  `go test ./... -coverprofile=coverage.out && go tool cover
+  -func=coverage.out`
+- `frontend/` (Vue/TS): **60% line coverage**, advisory rather than
+  enforced — UI code has a lower ratio of logic to markup, so the number
+  is less meaningful here
+- The Reviewer/Critic and HITL approval path specifically: treat as
+  needing coverage closer to 100%, regardless of the module-wide target —
+  this is the governance surface the whole demo depends on being
+  trustworthy
+
+## Exclusions
+
+Don't count against the target, and don't chase coverage on:
+- Generated code
+- `main.go` / wiring and dependency-injection setup with no branching logic
+- Thin wrappers around external SDKs with no logic of their own
+
+## Where enforced
+
+CI gate, once `infra/` CI config exists (not yet built — see repo status
+in the root `README.md`). Until then, run coverage locally before opening
+a PR:
+
+```bash
+go test ./... -cover
+npm run test -- --coverage
+```
+
+## When coverage drops
+
+Treat a coverage regression as a prompt to ask "what code just got added
+without a test," not as a number to patch. If the honest answer is "this
+line genuinely doesn't need a test" (e.g. a trivial getter), that's a
+valid outcome — say so in the PR rather than padding with a low-value test.
