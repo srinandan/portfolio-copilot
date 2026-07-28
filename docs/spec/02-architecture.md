@@ -11,7 +11,7 @@ decision below, see the linked ADRs.
 | Agent implementation | Go, ADK 2.0 dynamic workflows | [0001](../adr/0001-go-over-python-for-agents.md) |
 | Root orchestration | ADK `DynamicNode` (programmatic control flow, not static graph) | [0004](../adr/0004-dynamic-planning-over-fixed-pipeline.md) |
 | Analytical data | BigQuery (Chase transactions) | [0002](../adr/0002-bigquery-plus-firestore-split.md) |
-| Transactional data | Firestore (IPS, holdings, audit log) | [0002](../adr/0002-bigquery-plus-firestore-split.md) |
+| Transactional data | Firestore (IPS, holdings, liabilities, audit log) | [0002](../adr/0002-bigquery-plus-firestore-split.md) |
 | Session state | Vertex AI Sessions | — |
 | Long-term memory | Vertex AI Memory Bank | — |
 | Deployment / runtime | Vertex AI Agent Engine (Agent Runtime) | — |
@@ -27,9 +27,9 @@ Analysis can showcase NL-to-SQL analytics (trend/aggregation questions),
 which Firestore's point-read model doesn't support well.
 
 **Firestore** — everything transactional and structural: the IPS document,
-portfolio holdings, and the approval/audit log. Needs millisecond reads,
-real transactional writes, and row-level concurrency control — none of
-which BigQuery is built for.
+portfolio holdings, current liabilities, and the approval/audit log.
+Needs millisecond reads, real transactional writes, and row-level
+concurrency control — none of which BigQuery is built for.
 
 **Vertex AI Memory Bank** — long-term *soft* memory: preferences, summarized
 past interactions, semantic recall (e.g. "rejected trimming AAPL in

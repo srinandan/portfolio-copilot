@@ -30,10 +30,13 @@ with its own `SKILL.md`.
 
 ### Goals & Onboarding
 Interviews the user for risk tolerance, goals, time horizon, and
-constraints. Ingests current holdings and Chase spending history. Produces
-an **Investment Policy Statement (IPS)** — a structured artifact written to
-long-term memory — that becomes the reference plan for everything else.
-Runs once at onboarding, revisited on drift or major life events.
+constraints. Ingests current holdings, current liabilities, and Chase
+spending history. Produces an **Investment Policy Statement (IPS)** — a
+structured artifact written to long-term memory — that becomes the
+reference plan for everything else, and captures a current
+**Liabilities Snapshot** alongside it (debt data self-reported, since
+it isn't derivable from Chase transactions). Runs once at onboarding,
+revisited on drift or major life events.
 
 ### Spending Analysis
 Analyzes Chase transaction data (BigQuery). Categorizes spend, flags
