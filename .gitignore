@@ -1,0 +1,41 @@
+# --- Go (orchestrator/, gateway/) ---
+orchestrator/bin/
+gateway/bin/
+*.exe
+*.test
+*.out
+coverage.out
+coverage.html
+
+# --- Node / Vue (frontend/) ---
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+npm-debug.log*
+yarn-error.log*
+
+# --- Terraform (infra/) ---
+infra/.terraform/
+infra/*.tfstate
+infra/*.tfstate.*
+infra/.terraform.lock.hcl
+infra/*.tfvars
+!infra/*.tfvars.example
+
+# --- Secrets / credentials — never commit these ---
+*.env
+.env.*
+!.env.example
+*-key.json
+*-credentials.json
+service-account*.json
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+# --- Logs ---
+*.log
