@@ -1,7 +1,15 @@
 ---
 name: goals-onboarding
-version: 0.1.0
-status: draft
+description: >-
+  Interviews the user for risk tolerance, goals, time horizon, and
+  constraints; ingests holdings and Chase spending history; produces an
+  Investment Policy Statement (IPS) written to long-term memory. Use when
+  onboarding a new user with no active IPS, when the user reports a life
+  event affecting their goals, or when Portfolio Analysis recommends a
+  drift-triggered policy review.
+metadata:
+  version: "0.1.0"
+  status: draft
 ---
 
 # goals-onboarding
@@ -136,8 +144,10 @@ rather than starting over, if practical.
 
 ## Registry metadata
 
-- Registered as: `projects/{project}/locations/{location}/skills/goals-onboarding`
-- Version: 0.1.0 (draft — not yet registered)
+- Registered as: `projects/{project}/locations/{location}/skills/private-goals-onboarding`
+  (self-registered skills are namespaced under the `private-` publisher
+  prefix — see [ADR-0006](../../docs/adr/0006-agent-registry-api-alignment.md))
+- Skill revision: 0.1.0 (draft — not yet registered)
 - Approval scope: `read:holdings,read:spending,read:ips,write:ips,write:memory`
 
 ## Acceptance criteria

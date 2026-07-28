@@ -31,9 +31,9 @@ pipeline stages.
 ## Why this is the actual differentiator
 Most agent demos hardcode the agent graph — a human designed the org
 chart in advance. Dynamic discovery-and-compose at plan time is rare, and
-it's a direct expression of the author's professional focus (agent skill
-governance), not a generic finance demo with governance added after the
-fact. It also produces genuinely different, more compelling demo moments:
+it makes this project a genuine demonstration of agent skill governance,
+not a generic finance demo with governance added after the fact. It also
+produces genuinely different, more compelling demo moments:
 
 - A visible planning trace: "goal received → queried registry → N skills
   available, 1 requires elevated approval scope → composed plan →

@@ -1,7 +1,13 @@
 ---
 name: portfolio-analysis
-version: 0.1.0
-status: draft
+description: >-
+  Measures current holdings against the active Investment Policy
+  Statement's target allocation and reports drift. Use when checking
+  portfolio health, before considering a rebalance, or when the root
+  planner needs current drift to decide whether Action Drafting should run.
+metadata:
+  version: "0.1.0"
+  status: draft
 ---
 
 # portfolio-analysis
@@ -24,8 +30,8 @@ TODO: list MCP servers, APIs, or read/write scopes this skill needs
 
 ## Registry metadata
 
-- Registered as: `projects/{project}/locations/{location}/skills/portfolio-analysis`
-- Version: 0.1.0 (draft — not yet registered)
+- Registered as: `projects/{project}/locations/{location}/skills/private-portfolio-analysis`
+- Skill revision: 0.1.0 (draft — not yet registered)
 - Approval scope: TODO
 
 ## Notes

@@ -41,10 +41,13 @@ live-revocation demo than static agent-level config would have been.
 
 ## Constraints
 - **Pre-GA.** Personal-use/demo is an accepted use case here.
-- **Nandan's Agent Registry team recently shipped skill versioning** —
-  directly usable for composing per-turn tool lists from specific
-  authorized skill versions, and closely analogous to Google's own Skill
-  Registry (`skills/{name}/skill_versions/{version}`).
+- **Agent Registry recently shipped skill revisions** — directly usable
+  for composing per-turn tool lists from specific authorized skill
+  revisions. See [ADR-0006](0006-agent-registry-api-alignment.md) for
+  the real API this project now aligns to (`agentregistry.googleapis.com`),
+  which supersedes an earlier, less accurate reference to a different
+  Google product ("Skill Registry" under Gemini Enterprise Agent
+  Platform).
 
 ## Open question: where does trade execution happen?
 Two options, not yet decided:

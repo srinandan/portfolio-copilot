@@ -1,7 +1,14 @@
 ---
 name: action-drafting
-version: 0.1.0
-status: draft
+description: >-
+  Drafts a specific proposed trade (ticker, side, quantity, order type)
+  via Alpaca's paper-trading drafting surface, referencing the active
+  Investment Policy Statement. Use only after Research and Portfolio
+  Analysis have provided sufficient context — never grants execution
+  capability itself.
+metadata:
+  version: "0.1.0"
+  status: draft
 ---
 
 # action-drafting
@@ -24,8 +31,8 @@ TODO: list MCP servers, APIs, or read/write scopes this skill needs
 
 ## Registry metadata
 
-- Registered as: `projects/{project}/locations/{location}/skills/action-drafting`
-- Version: 0.1.0 (draft — not yet registered)
+- Registered as: `projects/{project}/locations/{location}/skills/private-action-drafting`
+- Skill revision: 0.1.0 (draft — not yet registered)
 - Approval scope: TODO
 
 ## Notes

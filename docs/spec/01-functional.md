@@ -71,12 +71,14 @@ This is also the layer that must catch the adversarial test scenario (see
 
 ## Skills and governance
 
-- Skills follow the `SKILL.md` convention, tied to the author's Agent
-  Registry skill governance work
-- Skill mounts may be sourced from the custom Agent Registry and/or
-  Google's Skill Registry, which supports skill versioning and pinning
-  (`skills/{name}/skill_versions/{version}`)
-- Every action in the audit trail is traceable to: skill name + version,
+- Skills follow the Agent Skills open standard (`SKILL.md` +
+  YAML frontmatter)
+- Skills are sourced from Google Cloud's **Agent Registry**
+  (`agentregistry.googleapis.com`) — see
+  [ADR-0006](../adr/0006-agent-registry-api-alignment.md) for resource
+  naming and the lifecycle-state mechanism this project uses for live
+  revocation
+- Every action in the audit trail is traceable to: skill name + revision,
   registry entry, and approval scope
 
 ## Demo scenarios (acceptance criteria)
