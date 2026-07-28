@@ -1,7 +1,13 @@
 ---
 name: spending-analysis
-version: 0.1.0
-status: draft
+description: >-
+  Analyzes Chase transaction data via BigQuery — categorizes spend, flags
+  anomalies, answers trend questions via natural-language-to-SQL. Use when
+  the user asks about spending patterns, budget categories, or wants a
+  trend explained (e.g. "why did dining spend jump in June").
+metadata:
+  version: "0.1.0"
+  status: draft
 ---
 
 # spending-analysis
@@ -24,8 +30,8 @@ TODO: list MCP servers, APIs, or read/write scopes this skill needs
 
 ## Registry metadata
 
-- Registered as: `projects/{project}/locations/{location}/skills/spending-analysis`
-- Version: 0.1.0 (draft — not yet registered)
+- Registered as: `projects/{project}/locations/{location}/skills/private-spending-analysis`
+- Skill revision: 0.1.0 (draft — not yet registered)
 - Approval scope: TODO
 
 ## Notes

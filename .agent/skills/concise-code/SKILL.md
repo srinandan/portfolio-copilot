@@ -1,7 +1,12 @@
 ---
 name: concise-code
-version: 0.1.0
-audience: coding-agent
+description: >-
+  Engineering conventions for concise, maintainable code — avoiding
+  premature abstraction, dead code, and swallowed errors. Use when
+  writing or reviewing any Go, TypeScript, or Vue code in this repository.
+metadata:
+  audience: coding-agent
+  version: "0.1.0"
 ---
 
 # Concise code

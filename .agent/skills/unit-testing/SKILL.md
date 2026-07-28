@@ -1,7 +1,13 @@
 ---
 name: unit-testing
-version: 0.1.0
-audience: coding-agent
+description: >-
+  Testing conventions for this repo — table-driven Go tests, fakes for
+  external calls, coverage expectations for golden and error paths. Use
+  when writing or reviewing any new function, handler, or component with
+  logic beyond pure markup.
+metadata:
+  audience: coding-agent
+  version: "0.1.0"
 ---
 
 # Unit testing

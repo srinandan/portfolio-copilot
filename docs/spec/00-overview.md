@@ -3,9 +3,10 @@
 ## What this is
 
 Portfolio Copilot is a personal finance/investment assistant, built to
-demonstrate Gemini Enterprise Agent Platform capabilities — specifically the
-kind of **registry-driven dynamic planning** that's the focus of the author's
-professional work on agent skill governance.
+demonstrate Gemini Enterprise Agent Platform capabilities — specifically
+**registry-driven dynamic planning**, an approach to agent skill
+governance where capabilities are discovered and composed at runtime
+rather than hardcoded.
 
 It is a personal-use demo. It is not a business solution, not multi-tenant,
 and not intended for production or commercial use.

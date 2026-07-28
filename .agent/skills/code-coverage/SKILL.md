@@ -1,7 +1,12 @@
 ---
 name: code-coverage
-version: 0.1.0
-audience: coding-agent
+description: >-
+  Coverage targets and exclusions for this repo, and why coverage should
+  be treated as a signal rather than a target. Use when assessing whether
+  a change has adequate test coverage, or when coverage drops in CI.
+metadata:
+  audience: coding-agent
+  version: "0.1.0"
 ---
 
 # Code coverage
