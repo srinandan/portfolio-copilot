@@ -1,42 +1,61 @@
 # Portfolio Copilot
 
-A personal finance/investment assistant, built as a demo of Gemini Enterprise
-Agent Platform capabilities — specifically **registry-driven dynamic
-planning**: a single root agent that discovers and composes its own plan at
-runtime from whatever skills it's currently authorized to use, rather than a
-hardcoded multi-agent pipeline.
+Portfolio Copilot is a personal finance and investing assistant that
+plans its own next move.
 
-This is a personal-use demo project, not a production system.
+Instead of following a fixed script, a single agent looks at your goal,
+checks what it's currently allowed to do, and decides for itself how to
+get there — pulling in research, checking your portfolio, drafting a
+trade if one's warranted. Nothing happens with your money without your
+sign-off, and every decision it makes is traceable back to exactly which
+capability made it, and why.
 
-## Start here
+## Why try it
 
-- [`docs/spec/00-overview.md`](docs/spec/00-overview.md) — vision, demo narrative, what "done" looks like
-- [`docs/spec/01-functional.md`](docs/spec/01-functional.md) — what the system does
-- [`docs/spec/02-architecture.md`](docs/spec/02-architecture.md) — tech stack and deployment topology
-- [`docs/adr/`](docs/adr/) — architecture decisions, with alternatives considered
+- **It plans, it doesn't run a script.** Ask it something and watch it
+  work out, in the moment, what it needs to check and do — not a
+  hardcoded pipeline of steps that runs the same way every time.
+- **You can revoke what it's allowed to do, live, mid-conversation** —
+  and watch it adapt on the very next step. No restart, no error.
+- **Nothing happens with your money without you approving it first.**
+  Proposed trades are drafted, checked against your own stated
+  investment policy, and only ever executed after you say yes.
+- **It's a real demonstration of agent governance**, not a slide about
+  it — every action is traceable to the exact skill, version, and
+  approval that authorized it.
 
-## Repo layout
+This is a personal project and demo, built on Google Cloud's Gemini
+Enterprise Agent Platform — not a product, not investment advice, and not
+connected to a real brokerage (trades run through Alpaca's paper trading
+API).
 
-```
-portfolio-copilot/
-├── AGENTS.md            Instructions for any coding agent working in this repo
-├── docs/{spec,adr}/     Spec-driven design docs
-├── orchestrator/        Go, ADK root planner (DynamicNode)
-├── skills/              Runtime skills for the deployed agent (Agent Registry-facing)
-├── .agent/skills/       Engineering-practice skills for coding agents (this repo)
-├── gateway/             Go API gateway (Cloud Run)
-├── frontend/            TypeScript + Vue.js (Cloud Run)
-└── infra/               Terraform
-```
+## Get started
 
-**Note:** `skills/` and `.agent/skills/` are not the same thing. `skills/`
-defines what the *product* can do (registered with the Agent Registry,
-discovered by the root planner at runtime). `.agent/skills/` defines how
-*code in this repo* should be written (concise, tested, covered) — see
-[`AGENTS.md`](AGENTS.md).
+Setup instructions live in [`install/`](install/). *(Coming soon — the
+install path will be filled in once the agent itself is built.)*
+
+## Learn more
+
+How it's built, and the reasoning behind the key decisions: see
+[`docs/spec/`](docs/spec/) and [`docs/adr/`](docs/adr/).
+Contributor / coding-agent instructions: see [`AGENTS.md`](AGENTS.md).
 
 ## Status
 
 Architecture and functional spec drafted. Implementation not yet started.
-See ADRs for decisions still open (notably ADR-0005, the Managed Agents
-execute-step question).
+
+## Built With
+
+This application was built with the assistance of [Stitch](https://stitch.withgoogle.com/) and [Jules](https://jules.google.com).
+
+## Contributing
+
+Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for details on how to contribute to this project.
+
+## Support
+
+This demo is *NOT* endorsed by Google or Google Cloud. The repo is intended for educational/hobbyists use only.
+
+## License
+
+This project is licensed under the terms of the [LICENSE](./LICENSE) file.

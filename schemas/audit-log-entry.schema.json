@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://portfolio-copilot/schemas/audit-log-entry.schema.json",
+  "title": "AuditLogEntry",
+  "description": "One entry per governance-relevant event. This is what makes 'traceable to skill version, registry entry, and approval scope' true rather than aspirational.",
+  "type": "object",
+  "required": [
+    "log_id",
+    "event_type",
+    "timestamp",
+    "actor"
+  ],
+  "properties": {
+    "log_id": { "type": "string" },
+
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "skill_invoked",
+        "skill_revoked",
+        "ips_created",
+        "ips_superseded",
+        "action_proposed",
+        "review_completed",
+        "approval_requested",
+        "approval_granted",
+        "approval_rejected",
+        "action_executed",
+        "action_failed"
+      ]
+    },
+    "timestamp": { "type": "string", "format": "date-time" },
+
+    "actor": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": { "type": "string", "enum": ["agent", "human"] },
+        "user_id": {
+          "type": "string",
+          "description": "Set when actor.type is 'human'."
+        },
+        "skill_name": {
+          "type": "string",
+          "description": "Set when actor.type is 'agent'."
+        },
+        "skill_version": { "type": "string" },
+        "registry_entry_id": { "type": "string" },
+        "approval_scope": {
+          "type": "string",
+          "description": "The authorization scope this skill/action was operating under at the time."
+        }
+      }
+    },
+
+    "related_action_id": {
+      "type": ["string", "null"],
+      "description": "ProposedAction.action_id, when this event relates to one."
+    },
+    "related_ips_version": {
+      "type": ["object", "null"],
+      "properties": {
+        "ips_id": { "type": "string" },
+        "version": { "type": "integer" }
+      }
+    },
+
+    "detail": {
+      "type": "string",
+      "description": "Human-readable description of what happened."
+    }
+  }
+}
