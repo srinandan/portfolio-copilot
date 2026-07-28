@@ -3,8 +3,8 @@ name: action-drafting
 description: >-
   Drafts a specific proposed trade (ticker, side, quantity, order type)
   via Alpaca's paper-trading drafting surface, referencing the active
-  Investment Policy Statement. Use only after Research and Portfolio
-  Analysis have provided sufficient context — never grants execution
+  Investment Policy Statement. Use only after Portfolio Analysis and
+  Research have provided sufficient context — never grants execution
   capability itself.
 metadata:
   version: "0.1.0"
@@ -15,27 +15,120 @@ metadata:
 
 ## Purpose
 
-Drafts a specific proposed trade (e.g. sell N shares of X, buy N shares of Y) via Alpaca's paper trading drafting surface. No execution capability at this stage.
+Turns a drift signal plus research context into a specific, fully
+-specified [`ProposedAction`](../../schemas/proposed-action.schema.json).
+This skill's authority ends at `status: "drafted"` — it never executes,
+and per [ADR-0005](../../docs/adr/0005-managed-agents-hybrid-evaluation.md)
+(resolved), it never will, regardless of how other skills in this
+project are implemented.
+
+## When this skill runs
+
+- Portfolio Analysis reports `rebalance_recommended: true` and the root
+  planner decides to act on it
+- User directly requests a specific trade be evaluated
+
+Action Drafting doesn't invoke itself — the root planner decides to call
+it, same as every other skill, per
+[ADR-0004](../../docs/adr/0004-dynamic-planning-over-fixed-pipeline.md).
 
 ## Inputs
 
-TODO: define inputs (schema / source)
+| Field | Source | Required |
+|---|---|---|
+| Drift Report | Portfolio Analysis (transient, not persisted — see that skill's `SKILL.md`) | Yes |
+| Research Brief(s) | Research (transient, not persisted) | Recommended, not strictly required — see failure mode below |
+| Active [`InvestmentPolicyStatement`](../../schemas/ips.schema.json) | Firestore, read-only | Yes |
+| [`HoldingsSnapshot`](../../schemas/holdings.schema.json) | Firestore, read-only | Yes |
+| Current quote | Alpaca, read-only market data endpoint | Yes — for `estimated_price_usd` |
 
-## Outputs
+## Drafting logic (deterministic, testable)
 
-TODO: define outputs (schema)
+Given an over-allocated asset class from the Drift Report:
+
+```
+trim_amount_usd = current_asset_class_value_usd
+                   - (target_percent / 100 * total_value_usd)
+```
+
+Trims back to the IPS's `target_percent`, not merely back inside the
+band — bringing a position to just inside `max_percent` would put it at
+immediate risk of drifting out again on the next small market move.
+
+**Ticker selection when an asset class has multiple positions:** selects
+the single position with the largest market value in that asset class.
+Tax-lot optimization, partial-position splitting across multiple
+tickers, and gain/loss-aware selection are explicitly out of scope for
+this version — a simple, explainable rule beats a sophisticated one that
+can't be justified in the `rationale` field a human has to review.
+
+## Pre-check, before drafting (defense in depth)
+
+The Reviewer/Critic is the enforcement backstop, but this skill doesn't
+knowingly draft a trade it already knows would fail review:
+
+- Never proposes a ticker in `excluded_tickers` or a sector in
+  `excluded_sectors`
+- Never proposes a trade that would push the resulting position above
+  `concentration_limit_percent`
+
+If the only mathematically-indicated trade would violate either, this
+skill declines to draft rather than proposing something it expects the
+Reviewer to reject — surfaces the conflict to the user instead (e.g.
+"rebalancing would require trimming an excluded ticker — resolve the
+exclusion or accept the drift").
+
+## Output
+
+One [`ProposedAction`](../../schemas/proposed-action.schema.json),
+`status: "drafted"`. `ips_version_referenced` is always the IPS version
+active *at drafting time* — if the IPS changes between drafting and
+review, the Reviewer's stale-version rule catches it, this skill doesn't
+need to. `rationale` cites both the drift figures and any Research Brief
+consulted; `supporting_research_refs` lists their `research_run_id`s.
+
+## Failure mode: no research available
+
+If Research was invoked but returned `confidence: low`, this skill still
+drafts — the human approval gate exists precisely for judgment calls
+under uncertainty — but the low confidence is stated plainly in
+`rationale`, not smoothed over. If Research wasn't invoked at all (e.g.
+a small, band-boundary rebalance where research adds little), that's a
+noted omission in `rationale`, not a silent gap.
+
+## Failure mode: no rebalance warranted
+
+If no asset class is out of band and the user didn't request a specific
+trade, this skill drafts nothing. An empty result is a valid, correct
+output — never invent a trade to have something to show.
 
 ## Tools / permissions required
 
-TODO: list MCP servers, APIs, or read/write scopes this skill needs
+- Alpaca: **read-only** quote/market-data endpoint only
+- Firestore: read `holdings`, read `ips`
+- **No** Alpaca order-placement credential, ever. Per the resolved
+  ADR-0005 decision, only the orchestrator's own trusted code ever calls
+  Alpaca's execution endpoint, after Reviewer pass and human approval.
 
 ## Registry metadata
 
 - Registered as: `projects/{project}/locations/{location}/skills/private-action-drafting`
 - Skill revision: 0.1.0 (draft — not yet registered)
-- Approval scope: TODO
+- Approval scope: `read:holdings,read:ips,read:market_data_quote,write:proposed_action`
 
-## Notes
+## Acceptance criteria
 
-Stub generated from the functional spec (docs/spec/01-functional.md).
-Fill in before registering with the Agent Registry.
+1. Trim quantity brings the over-allocated asset class to exactly
+   `target_percent`, not merely back inside the band — verified against
+   hand-calculated values
+2. Never drafts a trade in `excluded_tickers`/`excluded_sectors` — tested
+   directly, not only relied on via the Reviewer
+3. Never drafts a trade pushing a resulting position over
+   `concentration_limit_percent`
+4. `ips_version_referenced` always matches the IPS version active at
+   drafting time
+5. No asset class out of band, no direct user request → zero
+   `ProposedAction`s drafted
+6. This skill's credential set never includes Alpaca order-placement
+   access — enforced at the tool-provisioning level, not just documented
+7. Emits an `action_proposed` `AuditLogEntry` on every successful draft
