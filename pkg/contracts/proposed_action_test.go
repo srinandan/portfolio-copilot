@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"portfolio-copilot/orchestrator/contracts"
+	"portfolio-copilot/pkg/contracts"
 )
 
 func TestProposedActionRoundTripAndValidation(t *testing.T) {

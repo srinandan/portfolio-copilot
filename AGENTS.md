@@ -25,7 +25,9 @@ full picture before making non-trivial changes.
 ```
 docs/{spec,adr}/   Spec-driven design — read before changing architecture
 skills/            Runtime skills (Agent Registry-facing, see above)
-orchestrator/      Python — ADK root planner (DynamicNode), deployed to Agent Runtime
+orchestrator/      Python — ADK root planner (DynamicNode), deployed to Agent Runtime (currently empty, awaiting Python)
+pkg/               Go — contracts, BigQuery, Agent Registry client, Firestore store
+                    (library code for gateway/; not consumed by orchestrator's Python)
 gateway/           Go — API gateway (Cloud Run) — not an agent, unaffected by orchestrator's language
 frontend/          TypeScript + Vue.js (Cloud Run)
 infra/             Terraform
