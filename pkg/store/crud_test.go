@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"portfolio-copilot/orchestrator/contracts"
+	"portfolio-copilot/pkg/contracts"
 )
 
 // setupTestClient ensures the Firestore emulator is running and sets up a client.
@@ -83,6 +83,45 @@ func TestUpdateIPSTransaction(t *testing.T) {
 		}
 		if len(docs) != 1 {
 			t.Fatalf("expected 1 active doc, got %d", len(docs))
+		}
+	})
+
+	t.Run("persisted field names match schema (raw document check)", func(t *testing.T) {
+		docs, err := c.fs.Collection(collectionIPS).
+			Where("ips_id", "==", "userA_ips").
+			Where("status", "==", contracts.IPSStatusActive).
+			Documents(ctx).GetAll()
+		if err != nil {
+			t.Fatalf("query failed: %v", err)
+		}
+		if len(docs) != 1 {
+			t.Fatalf("expected 1 active doc, got %d", len(docs))
+		}
+
+		// Bypass the Go struct entirely — read the raw persisted map.
+		raw := docs[0].Data()
+
+		// Documented schema field names (schemas/ips.schema.json) must
+		// actually be present in what's stored.
+		expectedFields := []string{
+			"ips_id", "user_id", "version", "status", "effective_date",
+			"risk_tolerance", "time_horizon_years", "target_allocation",
+			"constraints", "created_at",
+		}
+		for _, field := range expectedFields {
+			if _, ok := raw[field]; !ok {
+				t.Errorf("expected persisted document to contain field %q, but it was missing. raw keys: %v", field, raw)
+			}
+		}
+
+		// Go's default PascalCase field names must NOT be present — this
+		// is the specific regression the firestore struct tags fix guards
+		// against. If this ever fails, someone removed a `firestore:` tag.
+		unexpectedFields := []string{"IPSID", "UserID", "Status", "RiskTolerance", "TargetAllocation"}
+		for _, field := range unexpectedFields {
+			if _, ok := raw[field]; ok {
+				t.Errorf("persisted document contains Go field name %q instead of the documented schema name — firestore struct tags regression", field)
+			}
 		}
 	})
 

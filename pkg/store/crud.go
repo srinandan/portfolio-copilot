@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"cloud.google.com/go/firestore"
-	"portfolio-copilot/orchestrator/contracts"
+	"portfolio-copilot/pkg/contracts"
 )
 
 const (

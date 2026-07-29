@@ -83,7 +83,7 @@ diverge even though the client code implementing them does.
   (deployability)
 
 ## Follow-up work this creates (not resolved by this ADR itself)
-- Port `orchestrator/contracts/*.go` to Pydantic models
+- Port `pkg/contracts/*.go` to Pydantic models
 - Port the Agent Registry client to Python (once restored per the F1–F4
   sanity check — it doesn't currently exist on `main` regardless of
   language)

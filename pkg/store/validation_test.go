@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"portfolio-copilot/orchestrator/contracts"
+	"portfolio-copilot/pkg/contracts"
 )
 
 // We can test validation completely offline without a Firestore emulator.
