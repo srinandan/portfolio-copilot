@@ -9,7 +9,7 @@ import (
 
 	"cloud.google.com/go/firestore"
 	"github.com/xeipuuv/gojsonschema"
-	"orchestrator/contracts"
+	"portfolio-copilot/orchestrator/contracts"
 )
 
 //go:embed schemas/*.schema.json

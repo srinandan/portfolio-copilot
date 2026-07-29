@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"orchestrator/contracts"
+	"portfolio-copilot/orchestrator/contracts"
 )
 
 // setupTestClient ensures the Firestore emulator is running and sets up a client.
@@ -77,7 +77,7 @@ func TestUpdateIPSTransaction(t *testing.T) {
 		}
 
 		// Verify exactly one active document
-		docs, err := c.fs.Collection(collectionIPS).Where("IPSID", "==", "userA_ips").Where("Status", "==", contracts.IPSStatusActive).Documents(ctx).GetAll()
+		docs, err := c.fs.Collection(collectionIPS).Where("ips_id", "==", "userA_ips").Where("status", "==", contracts.IPSStatusActive).Documents(ctx).GetAll()
 		if err != nil {
 			t.Fatalf("query failed: %v", err)
 		}
@@ -94,7 +94,7 @@ func TestUpdateIPSTransaction(t *testing.T) {
 		}
 
 		// Verify new document is active
-		docs, err := c.fs.Collection(collectionIPS).Where("IPSID", "==", "userA_ips").Where("Status", "==", contracts.IPSStatusActive).Documents(ctx).GetAll()
+		docs, err := c.fs.Collection(collectionIPS).Where("ips_id", "==", "userA_ips").Where("status", "==", contracts.IPSStatusActive).Documents(ctx).GetAll()
 		if err != nil {
 			t.Fatalf("query failed: %v", err)
 		}

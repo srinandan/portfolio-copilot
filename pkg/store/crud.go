@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"cloud.google.com/go/firestore"
-	"orchestrator/contracts"
+	"portfolio-copilot/orchestrator/contracts"
 )
 
 const (
@@ -93,8 +93,8 @@ func (c *Client) UpdateIPS(ctx context.Context, newIPS *contracts.InvestmentPoli
 	err := c.fs.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
 		// 1. Find the currently active IPS for this ips_id
 		query := c.fs.Collection(collectionIPS).
-			Where("IPSID", "==", newIPS.IPSID).
-			Where("Status", "==", contracts.IPSStatusActive).
+			Where("ips_id", "==", newIPS.IPSID).
+			Where("status", "==", contracts.IPSStatusActive).
 			Limit(1)
 
 		docs, err := tx.Documents(query).GetAll()

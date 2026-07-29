@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"orchestrator/contracts"
+	"portfolio-copilot/orchestrator/contracts"
 )
 
 func TestInvestmentPolicyStatementRoundTripAndValidation(t *testing.T) {
@@ -389,6 +389,40 @@ func TestInvestmentPolicyStatementRoundTripAndValidation(t *testing.T) {
 				TargetAllocation:             []contracts.AllocationBand{{AssetClass: "equity", TargetPercent: 100, MinPercent: 0, MaxPercent: 100}},
 				ApprovalRequiredAbovePercent: ptrFloat64(105),
 				CreatedAt:                    now,
+			},
+			expectedValid: false,
+		},
+		{
+			name: "AllocationBand with min_percent > target_percent (invalid)",
+			input: contracts.InvestmentPolicyStatement{
+				IPSID:            "ips_123",
+				UserID:           "user_123",
+				Version:          1,
+				Status:           contracts.IPSStatusDraft,
+				EffectiveDate:    "2026-07-28",
+				RiskTolerance:    contracts.RiskToleranceModerate,
+				TimeHorizonYears: 10,
+				TargetAllocation: []contracts.AllocationBand{
+					{AssetClass: "equity", TargetPercent: 60, MinPercent: 70, MaxPercent: 80},
+				},
+				CreatedAt: now,
+			},
+			expectedValid: false,
+		},
+		{
+			name: "AllocationBand with target_percent > max_percent (invalid)",
+			input: contracts.InvestmentPolicyStatement{
+				IPSID:            "ips_123",
+				UserID:           "user_123",
+				Version:          1,
+				Status:           contracts.IPSStatusDraft,
+				EffectiveDate:    "2026-07-28",
+				RiskTolerance:    contracts.RiskToleranceModerate,
+				TimeHorizonYears: 10,
+				TargetAllocation: []contracts.AllocationBand{
+					{AssetClass: "equity", TargetPercent: 60, MinPercent: 40, MaxPercent: 50},
+				},
+				CreatedAt: now,
 			},
 			expectedValid: false,
 		},
