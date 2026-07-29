@@ -26,7 +26,7 @@ config set once and left alone. This is a stronger mechanism for the
 live-revocation demo than static agent-level config would have been.
 
 ## Proposed design
-- **Root planner stays the Go/ADK orchestrator.** It queries the
+- **Root planner stays the Python/ADK orchestrator.** It queries the
   registry, decides what's authorized, and is the only thing that ever
   invokes Reviewer/Critic, human approval, and (see open question below)
   trade execution.
@@ -56,7 +56,7 @@ under any circumstance. By approval time the action is fully specified —
 there's no reasoning benefit to routing it through an autonomous harness
 — and Google's own security guidance warns against granting an agent
 credentials beyond what a given step needs. A plain Alpaca API call from
-trusted Go code has less surface area than attaching a write-capable MCP
+trusted orchestrator code has less surface area than attaching a write-capable MCP
 tool to a Pre-GA sandbox, even for a single call.
 
 Concretely: Action Drafting (see its `SKILL.md`) never holds an

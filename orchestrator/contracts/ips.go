@@ -41,61 +41,61 @@ const (
 
 // Goal represents a financial goal in InvestmentPolicyStatement.
 type Goal struct {
-	Name            string  `json:"name"`
-	TargetAmountUSD float64 `json:"target_amount_usd"`
-	TargetDate      string  `json:"target_date"` // format: date (e.g., YYYY-MM-DD)
+	Name            string  `json:"name" firestore:"name"`
+	TargetAmountUSD float64 `json:"target_amount_usd" firestore:"target_amount_usd"`
+	TargetDate      string  `json:"target_date" firestore:"target_date"` // format: date (e.g., YYYY-MM-DD)
 }
 
 // LiquidityNeeds represents liquidity needs of a user.
 type LiquidityNeeds struct {
-	ReserveMonths            *float64 `json:"reserve_months,omitempty"`
-	KnownUpcomingExpensesUSD *float64 `json:"known_upcoming_expenses_usd,omitempty"`
+	ReserveMonths            *float64 `json:"reserve_months,omitempty" firestore:"reserve_months,omitempty"`
+	KnownUpcomingExpensesUSD *float64 `json:"known_upcoming_expenses_usd,omitempty" firestore:"known_upcoming_expenses_usd,omitempty"`
 }
 
 // AllocationBand represents a target allocation band for an asset class.
 type AllocationBand struct {
-	AssetClass    string  `json:"asset_class"`
-	TargetPercent float64 `json:"target_percent"`
-	MinPercent    float64 `json:"min_percent"`
-	MaxPercent    float64 `json:"max_percent"`
+	AssetClass    string  `json:"asset_class" firestore:"asset_class"`
+	TargetPercent float64 `json:"target_percent" firestore:"target_percent"`
+	MinPercent    float64 `json:"min_percent" firestore:"min_percent"`
+	MaxPercent    float64 `json:"max_percent" firestore:"max_percent"`
 }
 
 // Constraints represents constraints on investment policies.
 type Constraints struct {
-	ExcludedTickers           []string     `json:"excluded_tickers,omitempty"`
-	ExcludedSectors           []string     `json:"excluded_sectors,omitempty"`
-	ConcentrationLimitPercent float64      `json:"concentration_limit_percent"`
-	TaxLossHarvestingEnabled  *bool        `json:"tax_loss_harvesting_enabled,omitempty"`
-	AccountType               *AccountType `json:"account_type,omitempty"` // taxable, retirement
+	ExcludedTickers           []string     `json:"excluded_tickers,omitempty" firestore:"excluded_tickers,omitempty"`
+	ExcludedSectors           []string     `json:"excluded_sectors,omitempty" firestore:"excluded_sectors,omitempty"`
+	ConcentrationLimitPercent float64      `json:"concentration_limit_percent" firestore:"concentration_limit_percent"`
+	TaxLossHarvestingEnabled  *bool        `json:"tax_loss_harvesting_enabled,omitempty" firestore:"tax_loss_harvesting_enabled,omitempty"`
+	AccountType               *AccountType `json:"account_type,omitempty" firestore:"account_type,omitempty"` // taxable, retirement
 }
 
 // RebalancingRules represents rules for portfolio rebalancing.
 type RebalancingRules struct {
-	TriggerType              *RebalancingTriggerType `json:"trigger_type,omitempty"` // threshold, calendar, both
-	DriftThresholdPercent    *float64                `json:"drift_threshold_percent,omitempty"`
-	RebalancingFrequencyDays *int                    `json:"rebalancing_frequency_days,omitempty"`
+	TriggerType              *RebalancingTriggerType `json:"trigger_type,omitempty" firestore:"trigger_type,omitempty"` // threshold, calendar, both
+	DriftThresholdPercent    *float64                `json:"drift_threshold_percent,omitempty" firestore:"drift_threshold_percent,omitempty"`
+	RebalancingFrequencyDays *int                    `json:"rebalancing_frequency_days,omitempty" firestore:"rebalancing_frequency_days,omitempty"`
 }
 
 // InvestmentPolicyStatement represents the reference plan produced by Goals & Onboarding.
 // Append-only: a change creates a new version rather than editing in place.
 type InvestmentPolicyStatement struct {
-	IPSID                        string            `json:"ips_id"`
-	UserID                       string            `json:"user_id"`
-	Version                      int               `json:"version"`
-	Status                       IPSStatus         `json:"status"` // draft, active, superseded
-	SupersededBy                 *string           `json:"superseded_by,omitempty"`
-	EffectiveDate                string            `json:"effective_date"` // format: date
-	RiskTolerance                RiskTolerance     `json:"risk_tolerance"` // conservative, moderate, aggressive
-	TimeHorizonYears             int               `json:"time_horizon_years"`
-	Goals                        []Goal            `json:"goals,omitempty"`
-	LiquidityNeeds               *LiquidityNeeds   `json:"liquidity_needs,omitempty"`
-	TargetAllocation             []AllocationBand  `json:"target_allocation"`
-	Constraints                  Constraints       `json:"constraints"`
-	RebalancingRules             *RebalancingRules `json:"rebalancing_rules,omitempty"`
-	ApprovalRequiredAboveUSD     *float64          `json:"approval_required_above_usd,omitempty"`
-	ApprovalRequiredAbovePercent *float64          `json:"approval_required_above_percent,omitempty"`
-	CreatedAt                    time.Time         `json:"created_at"`
-	UpdatedAt                    *time.Time        `json:"updated_at,omitempty"`
+	IPSID                        string            `json:"ips_id" firestore:"ips_id"`
+	UserID                       string            `json:"user_id" firestore:"user_id"`
+	Version                      int               `json:"version" firestore:"version"`
+	Status                       IPSStatus         `json:"status" firestore:"status"` // draft, active, superseded
+	SupersededBy                 *string           `json:"superseded_by,omitempty" firestore:"superseded_by,omitempty"`
+	EffectiveDate                string            `json:"effective_date" firestore:"effective_date"` // format: date
+	RiskTolerance                RiskTolerance     `json:"risk_tolerance" firestore:"risk_tolerance"` // conservative, moderate, aggressive
+	TimeHorizonYears             int               `json:"time_horizon_years" firestore:"time_horizon_years"`
+	Goals                        []Goal            `json:"goals,omitempty" firestore:"goals,omitempty"`
+	LiquidityNeeds               *LiquidityNeeds   `json:"liquidity_needs,omitempty" firestore:"liquidity_needs,omitempty"`
+	TargetAllocation             []AllocationBand  `json:"target_allocation" firestore:"target_allocation"`
+	Constraints                  Constraints       `json:"constraints" firestore:"constraints"`
+	RebalancingRules             *RebalancingRules `json:"rebalancing_rules,omitempty" firestore:"rebalancing_rules,omitempty"`
+	ApprovalRequiredAboveUSD     *float64          `json:"approval_required_above_usd,omitempty" firestore:"approval_required_above_usd,omitempty"`
+	ApprovalRequiredAbovePercent *float64          `json:"approval_required_above_percent,omitempty" firestore:"approval_required_above_percent,omitempty"`
+	CreatedAt                    time.Time         `json:"created_at" firestore:"created_at"`
+	UpdatedAt                    *time.Time        `json:"updated_at,omitempty" firestore:"updated_at,omitempty"`
 }
 
 // IsActive returns true if the status of the IPS is active.
@@ -148,6 +148,9 @@ func (ips *InvestmentPolicyStatement) Validate() bool {
 			return false
 		}
 		if allocation.MaxPercent < 0 || allocation.MaxPercent > 100 {
+			return false
+		}
+		if allocation.MinPercent > allocation.TargetPercent || allocation.TargetPercent > allocation.MaxPercent {
 			return false
 		}
 	}

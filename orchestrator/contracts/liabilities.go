@@ -18,21 +18,21 @@ const (
 
 // Liability represents a single debt entry in LiabilitiesSnapshot.
 type Liability struct {
-	LiabilityID         string        `json:"liability_id"`
-	Type                LiabilityType `json:"type"`
-	Description         *string       `json:"description,omitempty"`
-	BalanceUSD          float64       `json:"balance_usd"`
-	InterestRatePercent *float64      `json:"interest_rate_percent,omitempty"`
-	MinimumPaymentUSD   float64       `json:"minimum_payment_usd"`
+	LiabilityID         string        `json:"liability_id" firestore:"liability_id"`
+	Type                LiabilityType `json:"type" firestore:"type"`
+	Description         *string       `json:"description,omitempty" firestore:"description,omitempty"`
+	BalanceUSD          float64       `json:"balance_usd" firestore:"balance_usd"`
+	InterestRatePercent *float64      `json:"interest_rate_percent,omitempty" firestore:"interest_rate_percent,omitempty"`
+	MinimumPaymentUSD   float64       `json:"minimum_payment_usd" firestore:"minimum_payment_usd"`
 }
 
 // LiabilitiesSnapshot represents current debts (credit cards, mortgage, other loans).
 // Parallel to HoldingsSnapshot — not versioned/append-only.
 type LiabilitiesSnapshot struct {
-	UserID              string      `json:"user_id"`
-	AsOf                time.Time   `json:"as_of"`
-	Liabilities         []Liability `json:"liabilities"`
-	TotalLiabilitiesUSD *float64    `json:"total_liabilities_usd,omitempty"`
+	UserID              string      `json:"user_id" firestore:"user_id"`
+	AsOf                time.Time   `json:"as_of" firestore:"as_of"`
+	Liabilities         []Liability `json:"liabilities" firestore:"liabilities"`
+	TotalLiabilitiesUSD *float64    `json:"total_liabilities_usd,omitempty" firestore:"total_liabilities_usd,omitempty"`
 }
 
 // Validate returns true if the liabilities snapshot meets basic validation rules.
