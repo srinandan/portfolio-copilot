@@ -1,7 +1,11 @@
 # ADR-0001: Go over Python for the agent implementation
 
 ## Status
-Accepted
+**Superseded by [ADR-0008](0008-python-for-orchestrator.md).** The
+capability-parity verification below was accurate for what it tested —
+it just tested the wrong thing. Agent Runtime's deployment contract
+turned out to be Python-only, which capability parity on ADK features
+doesn't help with. Preserved here as the historical record, not deleted.
 
 ## Context
 ADK 2.0 supports both Python and Go. Python is the reference

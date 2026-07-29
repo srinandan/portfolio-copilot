@@ -8,15 +8,15 @@ decision below, see the linked ADRs.
 
 | Layer | Choice | ADR |
 |---|---|---|
-| Agent implementation | Go, ADK 2.0 dynamic workflows | [0001](../adr/0001-go-over-python-for-agents.md) |
+| Agent implementation | **Python**, ADK 2.0 dynamic workflows | [0008](../adr/0008-python-for-orchestrator.md) (supersedes [0001](../adr/0001-go-over-python-for-agents.md)) |
 | Root orchestration | ADK `DynamicNode` (programmatic control flow, not static graph) | [0004](../adr/0004-dynamic-planning-over-fixed-pipeline.md) |
 | Analytical data | BigQuery (Chase transactions) | [0002](../adr/0002-bigquery-plus-firestore-split.md) |
-| Transactional data | Firestore (IPS, holdings, liabilities, audit log) | [0002](../adr/0002-bigquery-plus-firestore-split.md) |
+| Transactional data | Firestore (IPS, holdings, liabilities, audit log) — separate Go and Python clients, see [0008](../adr/0008-python-for-orchestrator.md) | [0002](../adr/0002-bigquery-plus-firestore-split.md) |
 | Session state | Vertex AI Sessions | — |
 | Long-term memory | Vertex AI Memory Bank | — |
-| Deployment / runtime | Vertex AI Agent Engine (Agent Runtime) | — |
+| Deployment / runtime | Vertex AI Agent Runtime (Agent Engine) — Python custom-agent contract | [0008](../adr/0008-python-for-orchestrator.md) |
 | Frontend | TypeScript + Vue.js, Cloud Run | [0003](../adr/0003-standalone-ui-not-agentspace.md) |
-| API gateway | Go, Cloud Run | [0003](../adr/0003-standalone-ui-not-agentspace.md) |
+| API gateway | **Go** (unaffected by the Python pivot — not an agent), Cloud Run | [0003](../adr/0003-standalone-ui-not-agentspace.md), [0008](../adr/0008-python-for-orchestrator.md) |
 | Trade execution (paper) | Alpaca API | — |
 | Execution layer (evaluating) | Managed Agents API / Antigravity, via Interactions API | [0005](../adr/0005-managed-agents-hybrid-evaluation.md) |
 
@@ -49,7 +49,7 @@ API Gateway (Go, Cloud Run)
   — approval-write path (Firestore audit log + execution trigger)
         │
         ▼
-Root Orchestrator (Go, ADK, Agent Engine)
+Root Orchestrator (Python, ADK, Agent Runtime)
   — queries Agent Registry at runtime
   — composes plan dynamically (DynamicNode)
   — owns Reviewer/Critic + HITL + final execution
@@ -65,11 +65,16 @@ for why.
 
 ## Language
 
-Go, for both the orchestrator and the agents themselves. Verified before
-committing: ADK 2.0 has full Go/Python parity on the specific capabilities
-this project needs — dynamic workflows (both v2.0.0), Memory Bank (Go since
-v0.1.0), Agent Engine deployment (Go since v1.2.0), and A2A (exposing +
-consuming quickstarts exist for Go). See [ADR-0001](../adr/0001-go-over-python-for-agents.md).
+**Python for the orchestrator and skill logic; Go for the gateway.**
+The original choice was Go throughout, verified for capability parity
+with Python on ADK 2.0's dynamic workflows, Memory Bank, Agent Engine
+deployment, and A2A — all confirmed available in Go. That parity turned
+out not to be the deciding factor: Agent Runtime's deployment contract
+is documented as Python-only (a class-based contract, not a generic
+container interface), which no amount of Go-side feature parity solves.
+The gateway isn't an agent and never touches that contract, so it stays
+Go. See [ADR-0008](../adr/0008-python-for-orchestrator.md), which
+supersedes [ADR-0001](../adr/0001-go-over-python-for-agents.md).
 
 ## Lifecycle
 

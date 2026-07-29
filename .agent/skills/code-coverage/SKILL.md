@@ -1,12 +1,13 @@
 ---
 name: code-coverage
 description: >-
-  Coverage targets and exclusions for this repo, and why coverage should
-  be treated as a signal rather than a target. Use when assessing whether
-  a change has adequate test coverage, or when coverage drops in CI.
+  Coverage targets and exclusions for this repo (Python for the
+  orchestrator, Go for the gateway), and why coverage should be treated
+  as a signal rather than a target. Use when assessing whether a change
+  has adequate test coverage, or when coverage drops in CI.
 metadata:
   audience: coding-agent
-  version: "0.1.0"
+  version: "0.2.0"
 ---
 
 # Code coverage
@@ -16,7 +17,9 @@ tests against. Don't add a test whose only purpose is moving the number.
 
 ## Targets
 
-- `orchestrator/`, `gateway/` (Go): **80% line coverage**, measured with
+- `orchestrator/` (Python): **80% line coverage**, measured with
+  `pytest --cov=orchestrator --cov-report=term-missing`
+- `gateway/` (Go): **80% line coverage**, measured with
   `go test ./... -coverprofile=coverage.out && go tool cover
   -func=coverage.out`
 - `frontend/` (Vue/TS): **60% line coverage**, advisory rather than
@@ -31,7 +34,8 @@ tests against. Don't add a test whose only purpose is moving the number.
 
 Don't count against the target, and don't chase coverage on:
 - Generated code
-- `main.go` / wiring and dependency-injection setup with no branching logic
+- `main.go` / `__main__.py` / wiring and dependency-injection setup with
+  no branching logic
 - Thin wrappers around external SDKs with no logic of their own
 
 ## Where enforced
@@ -41,8 +45,9 @@ in the root `README.md`). Until then, run coverage locally before opening
 a PR:
 
 ```bash
-go test ./... -cover
-npm run test -- --coverage
+pytest --cov            # orchestrator/
+go test ./... -cover    # gateway/
+npm run test -- --coverage    # frontend/
 ```
 
 ## When coverage drops

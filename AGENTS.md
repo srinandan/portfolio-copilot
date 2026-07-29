@@ -17,24 +17,26 @@ full picture before making non-trivial changes.
   the root planner at runtime. Changing these changes what the product
   does. Any change here should trace back to `docs/spec/01-functional.md`.
 - **`/.agent/skills`** — engineering-practice skills for *you*, the coding
-  agent working on this repo. Read these before writing code or reviewing changes. They cover:
-  - `code-coverage` — coverage targets and signal interpretation
-  - `code-review` — two-axis review (Standards and Spec) using parallel sub-agents
-  - `codebase-design` — module deepening, seam discipline, and interface design ("Design It Twice")
-  - `concise-code` — code conciseness and avoiding premature abstraction
-  - `unit-testing` — table-driven tests, fakes, and path coverage
+  agent working on this repo. Read these before writing code. They cover
+  code conciseness, unit testing, and coverage expectations.
 
 ## Repo map
 
 ```
 docs/{spec,adr}/   Spec-driven design — read before changing architecture
 skills/            Runtime skills (Agent Registry-facing, see above)
-orchestrator/      Go — ADK root planner (DynamicNode)
-gateway/           Go — API gateway (Cloud Run)
+orchestrator/      Python — ADK root planner (DynamicNode), deployed to Agent Runtime
+gateway/           Go — API gateway (Cloud Run) — not an agent, unaffected by orchestrator's language
 frontend/          TypeScript + Vue.js (Cloud Run)
 infra/             Terraform
 .agent/skills/     Engineering-practice skills (this repo's coding agent, see above)
 ```
+
+**Language note:** orchestrator is Python (Agent Runtime's deployment
+contract is Python-only — see
+[ADR-0008](docs/adr/0008-python-for-orchestrator.md)); gateway is Go,
+since it isn't an agent and never touches that contract. Don't assume
+one language across the whole repo.
 
 ## Build & test
 
@@ -42,7 +44,11 @@ Not yet implemented — filling in as each component is scaffolded.
 Expected shape:
 
 ```bash
-# orchestrator/, gateway/ (Go)
+# orchestrator/ (Python)
+pip install -e ".[dev]"
+pytest --cov
+
+# gateway/ (Go)
 go build ./...
 go test ./... -cover
 
@@ -53,10 +59,9 @@ npm run test -- --coverage
 
 ## Before writing code
 
-1. Read the relevant engineering-practice skills in `.agent/skills/`:
-   - `.agent/skills/concise-code/SKILL.md`, `.agent/skills/unit-testing/SKILL.md`, and `.agent/skills/code-coverage/SKILL.md` before writing or editing code.
-   - `.agent/skills/code-review/SKILL.md` when reviewing code changes against repo standards and specs.
-   - `.agent/skills/codebase-design/SKILL.md` when designing or refactoring module boundaries and interfaces.
+1. Read `.agent/skills/concise-code/SKILL.md`,
+   `.agent/skills/unit-testing/SKILL.md`, and
+   `.agent/skills/code-coverage/SKILL.md`.
 2. If the change affects what the system does, check it against
    `docs/spec/01-functional.md` first — update the spec, don't let code
    drift from it silently.

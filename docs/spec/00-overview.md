@@ -43,7 +43,7 @@ live, in-session behaviors — not slides.
 
 ## What "done" looks like
 
-- Root planner (Go, ADK 2.0 dynamic workflows) queries the Agent Registry
+- Root planner (Python, ADK 2.0 dynamic workflows) queries the Agent Registry
   and composes a plan with no hardcoded skill roster
 - At least one skill wired end-to-end: goal → plan → research → proposed
   action → Reviewer → human approval → execution
