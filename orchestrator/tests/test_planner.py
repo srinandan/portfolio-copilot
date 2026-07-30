@@ -5,6 +5,7 @@ from google.adk.workflow import node, Workflow
 from google.adk.runners import Runner
 from src.orchestrator.planner import root_planner
 from google.adk.sessions.in_memory_session_service import InMemorySessionService
+from google.adk.memory.in_memory_memory_service import InMemoryMemoryService
 from typing import Any
 from google.genai.types import UserContent, Part
 
@@ -40,12 +41,13 @@ async def test_checkpointing():
     )
 
     session_service = InMemorySessionService()
-    runner = Runner(app_name="test_app", agent=agent, session_service=session_service, auto_create_session=True)
+    memory_service = InMemoryMemoryService()
+    runner = Runner(app_name="test_app", agent=agent, session_service=session_service, memory_service=memory_service, auto_create_session=True)
 
     session_id = "test_session_123"
 
     # --- FIRST RUN ---
-    response_stream = runner.run_async(user_id="user_123", session_id=session_id, new_message=UserContent("start_goal"))
+    response_stream = runner.run_async(user_id="user_123", session_id=session_id, new_message=UserContent(parts=[Part.from_text(text="start_goal")]))
 
     events = []
     async for event in response_stream:
@@ -92,9 +94,10 @@ async def test_root_planner_trace():
         edges=[("START", root_planner)],
     )
     session_service = InMemorySessionService()
-    runner = Runner(app_name="test_app", agent=agent, session_service=session_service, auto_create_session=True)
+    memory_service = InMemoryMemoryService()
+    runner = Runner(app_name="test_app", agent=agent, session_service=session_service, memory_service=memory_service, auto_create_session=True)
 
-    response_stream = runner.run_async(user_id="user_123", session_id="session_456", new_message=UserContent("test_goal"))
+    response_stream = runner.run_async(user_id="user_123", session_id="session_456", new_message=UserContent(parts=[Part.from_text(text="test_goal")]))
 
     events = []
     async for event in response_stream:
