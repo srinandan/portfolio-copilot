@@ -1,7 +1,13 @@
 # ADR-0007: Resolve skill content via the orchestrator, pass as per-call input — not sandbox mounting
 
 ## Status
-Accepted
+Accepted. Mechanism refined by
+[ADR-0009](0009-managed-agent-native-class.md): the *principle* here
+(skill content resolved fresh from Agent Registry, never statically
+mounted) is unchanged, but for Research specifically, "pass via the
+Interactions API's `input` field" became "construct a fresh
+`ManagedAgent(description=...)` node each cycle" once ADK's native
+wrapper became the implementation path.
 
 ## Context
 Managed Agents API's skill-mounting mechanism (`base_environment.sources`,

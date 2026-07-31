@@ -1,8 +1,12 @@
 # ADR-0005: Evaluating Managed Agents API as an execution layer
 
 ## Status
-**Proposed / not yet committed.** Documented here specifically because
-it's a live tradeoff with a genuinely open question, not settled fact.
+**Accepted.** Originally proposed as a live tradeoff, not settled fact —
+now acted on: [ADR-0009](0009-managed-agent-native-class.md) implements
+Research using this approach, via ADK's native `ManagedAgent` class
+rather than the hand-rolled Interactions API calls originally envisioned
+here. The decisions below (execution stays local, HITL via orchestrator
+turn boundaries) are unchanged by that refinement.
 
 ## Context
 Google's Managed Agents API (Pre-GA) lets you build an autonomous agent —
