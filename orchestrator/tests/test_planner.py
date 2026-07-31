@@ -3,6 +3,8 @@ from google.adk import Context
 from google.adk.events import RequestInput
 from google.adk.workflow import node, Workflow
 from google.adk.runners import Runner
+from unittest.mock import patch, AsyncMock
+from orchestrator.registry_client import Skill
 from src.orchestrator.planner import root_planner
 from google.adk.sessions.in_memory_session_service import InMemorySessionService
 from google.adk.memory.in_memory_memory_service import InMemoryMemoryService
@@ -97,11 +99,18 @@ async def test_root_planner_trace():
     memory_service = InMemoryMemoryService()
     runner = Runner(app_name="test_app", agent=agent, session_service=session_service, memory_service=memory_service, auto_create_session=True)
 
-    response_stream = runner.run_async(user_id="user_123", session_id="session_456", new_message=UserContent(parts=[Part.from_text(text="test_goal")]))
+    with patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list:
+        mock_list.return_value = [
+            Skill(name="research", target_state="TARGET_STATE_ACTIVE", default_revision="rev1"),
+            Skill(name="action_drafting", target_state="TARGET_STATE_ACTIVE", default_revision="rev2"),
+        ]
 
-    events = []
-    async for event in response_stream:
-        events.append(event)
+        response_stream = runner.run_async(user_id="user_123", session_id="session_456", new_message=UserContent(parts=[Part.from_text(text="test_goal")]))
 
-    last_event = events[-1]
-    assert last_event.output == ["research_completed", "action_drafting_completed"]
+        events = []
+        async for event in response_stream:
+            events.append(event)
+
+        last_event = events[-1]
+        assert last_event.output == ["research_completed", "action_drafting_completed"]
+

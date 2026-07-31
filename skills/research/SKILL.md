@@ -20,14 +20,17 @@ with no access to the user's private data at all, by design (see
 Isolation, below). Output feeds Action Drafting's `rationale` and
 `supporting_research_refs`.
 
-This is the named candidate skill for execution via Managed Agents API
-per [ADR-0005](../../docs/adr/0005-managed-agents-hybrid-evaluation.md)
-and [ADR-0007](../../docs/adr/0007-skill-content-via-input-not-mounting.md)
+This is the named candidate skill for execution via Managed Agents API,
+implemented using ADK's native `ManagedAgent` class (see
+[ADR-0009](../../docs/adr/0009-managed-agent-native-class.md), which
+refines [ADR-0005](../../docs/adr/0005-managed-agents-hybrid-evaluation.md)
+and [ADR-0007](../../docs/adr/0007-skill-content-via-input-not-mounting.md))
 — it was chosen specifically *because* it never touches sensitive data,
 which is what makes it safe to route through a Pre-GA sandbox in the
-first place. If implemented that way, this skill's content (this file)
-is what the orchestrator resolves and injects into each Interactions API
-call's `input`, per ADR-0007 — not statically configured.
+first place. The orchestrator constructs a fresh `ManagedAgent` node
+each planning cycle, with this file's content resolved from the Agent
+Registry as its `description` — not statically configured, and not a
+long-lived instance reused across cycles.
 
 ## Isolation
 
@@ -76,7 +79,11 @@ reflect that uncertainty in its own `rationale`, not paper over it.
 
 ## Tools / permissions required
 
-- Web search / external market-data APIs, read-only
+- `google_search` (ADK/`ManagedAgent` built-in, server-side) — no custom
+  MCP server. `ManagedAgent` doesn't support MCP tools at all; see
+  [ADR-0009](../../docs/adr/0009-managed-agent-native-class.md) for why
+  this is sufficient for what this skill actually needs, not just a
+  limitation worked around.
 - **No** Firestore, **no** BigQuery, **no** trade-execution tools of any
   kind. This is the strictest tool surface of any skill in this project.
 
@@ -95,3 +102,8 @@ reflect that uncertainty in its own `rationale`, not paper over it.
    gap statement, not a fabricated conclusion
 3. Every `ResearchBrief` has a `research_run_id` that Action Drafting
    can cite verbatim in `supporting_research_refs`
+4. The `ManagedAgent` node is constructed fresh each planning cycle,
+   with `description` resolved from the Agent Registry at that moment —
+   not a long-lived instance built once and reused. A revoked skill
+   should be absent from the *next* cycle's construction, verified the
+   same way as the project's other live-revocation behavior.

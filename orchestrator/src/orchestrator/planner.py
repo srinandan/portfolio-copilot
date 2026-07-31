@@ -3,16 +3,20 @@ from typing import Any
 from google.adk import Context
 from google.adk.workflow import node, Workflow
 from google.genai.types import UserContent, Part
+from .registry_client import AgentRegistryClient
 
 @node(name="get_skills", rerun_on_resume=False)
 async def get_skills_from_registry(ctx: Context, node_input: Any):
     """Queries the Agent Registry for available skills."""
-    project_id = os.environ.get("PROJECT_ID", "dummy-project")
+    project_id = os.environ.get("PROJECT_ID") or os.environ.get("GOOGLE_CLOUD_PROJECT") or "dummy-project"
     location = os.environ.get("GOOGLE_CLOUD_LOCATION", "global")
 
     print(f"Goal received: {node_input}")
     print(f"Queried registry in {project_id}/{location}")
-    return ["research", "action_drafting"]
+    client = AgentRegistryClient(project_id=project_id, location=location)
+    skills = await client.list_authorized_skills()
+    return [s.name for s in skills]
+
 
 @node(name="dummy_skill_execution", rerun_on_resume=False)
 async def dummy_skill_execution(ctx: Context, node_input: Any):
