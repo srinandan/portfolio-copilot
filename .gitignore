@@ -14,13 +14,6 @@ frontend/.vite/
 npm-debug.log*
 yarn-error.log*
 
-# --- Terraform (infra/) ---
-infra/.terraform/
-infra/*.tfstate
-infra/*.tfstate.*
-infra/.terraform.lock.hcl
-infra/*.tfvars
-!infra/*.tfvars.example
 
 # --- Secrets / credentials — never commit these ---
 *.env
