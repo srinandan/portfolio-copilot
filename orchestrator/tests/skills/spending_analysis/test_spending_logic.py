@@ -1,5 +1,7 @@
 import pytest
-from orchestrator.skills.spending_analysis.logic import is_anomalous, calculate_savings_rate, calculate_reserve_months
+
+from orchestrator.skills.spending_analysis.logic import calculate_reserve_months, calculate_savings_rate, is_anomalous
+
 
 @pytest.mark.parametrize("current, avg, expected", [
     (500, 300, True),

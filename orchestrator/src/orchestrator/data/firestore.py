@@ -1,19 +1,18 @@
-import os
 import json
-from typing import Optional, Any, Dict
+import os
+from typing import Any
 
 from google.auth.credentials import AnonymousCredentials
 from google.cloud import firestore
 from google.cloud.firestore_v1.transaction import Transaction
 
 from ..contracts import (
-    HoldingsSnapshot,
-    LiabilitiesSnapshot,
     AuditLogEntry,
+    HoldingsSnapshot,
     InvestmentPolicyStatement,
     IPSStatus,
+    LiabilitiesSnapshot,
 )
-
 
 COLLECTION_HOLDINGS = "holdings"
 COLLECTION_LIABILITIES = "liabilities"
@@ -22,7 +21,7 @@ COLLECTION_IPS = "ips"
 
 
 class FirestoreClient:
-    def __init__(self, project: Optional[str] = None):
+    def __init__(self, project: str | None = None):
         self.project = project or os.environ.get("PROJECT_ID") or os.environ.get("GOOGLE_CLOUD_PROJECT") or "test-project"
 
         # In test environments (emulator), we need to handle credentials differently
@@ -32,12 +31,12 @@ class FirestoreClient:
         else:
             self.db = firestore.Client(project=self.project)
 
-    def _dict_factory(self, obj: Any) -> Dict[str, Any]:
+    def _dict_factory(self, obj: Any) -> dict[str, Any]:
         """Convert a Pydantic model to a dict, handling dates/enums properly for Firestore."""
         # We rely on Pydantic's model_dump with mode="json" to serialize enums/dates to primitives.
         return json.loads(obj.model_dump_json(exclude_none=True))
 
-    def get_holdings(self, user_id: str) -> Optional[HoldingsSnapshot]:
+    def get_holdings(self, user_id: str) -> HoldingsSnapshot | None:
         """Gets the holdings snapshot for a given user."""
         doc_ref = self.db.collection(COLLECTION_HOLDINGS).document(user_id)
         doc = doc_ref.get()
@@ -56,7 +55,7 @@ class FirestoreClient:
         data = self._dict_factory(snapshot)
         doc_ref.set(data)
 
-    def get_liabilities(self, user_id: str) -> Optional[LiabilitiesSnapshot]:
+    def get_liabilities(self, user_id: str) -> LiabilitiesSnapshot | None:
         """Gets the liabilities snapshot for a given user."""
         doc_ref = self.db.collection(COLLECTION_LIABILITIES).document(user_id)
         doc = doc_ref.get()
@@ -71,7 +70,7 @@ class FirestoreClient:
         data = self._dict_factory(entry)
         doc_ref.set(data)
 
-    def get_active_ips(self, ips_id: str) -> Optional[InvestmentPolicyStatement]:
+    def get_active_ips(self, ips_id: str) -> InvestmentPolicyStatement | None:
         """Gets the currently active IPS for a given ips_id."""
         query = (
             self.db.collection(COLLECTION_IPS)

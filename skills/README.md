@@ -6,27 +6,28 @@ This directory contains the runtime skills for **Portfolio Copilot**, discovered
 
 | Skill | Description | Evaluation Suite |
 |---|---|---|
-| [`goals-onboarding/`](goals-onboarding/) | Conducts user onboarding interview, maps risk tolerance, and synthesizes active IPS and Liabilities snapshots. | [`EVAL.txtpb`](goals-onboarding/EVAL.txtpb) |
-| [`portfolio-analysis/`](portfolio-analysis/) | Evaluates current portfolio holdings against active IPS target bands and computes drift. | [`EVAL.txtpb`](portfolio-analysis/EVAL.txtpb) |
-| [`action-drafting/`](action-drafting/) | Drafts specific rebalancing orders (`status: drafted`) obeying concentration limits and exclusion rules. | [`EVAL.txtpb`](action-drafting/EVAL.txtpb) |
-| [`spending-analysis/`](spending-analysis/) | Translates spending questions into read-only, user-scoped BigQuery SQL queries and detects anomalies. | [`EVAL.txtpb`](spending-analysis/EVAL.txtpb) |
-| [`research/`](research/) | Gathers external market context with strict data isolation via Google Search grounding. | [`EVAL.txtpb`](research/EVAL.txtpb) |
+| [`goals-onboarding/`](goals-onboarding/) | Conducts user onboarding interview, maps risk tolerance, and synthesizes active IPS and Liabilities snapshots. | [`goals_onboarding.evalset.json`](goals-onboarding/goals_onboarding.evalset.json) |
+| [`portfolio-analysis/`](portfolio-analysis/) | Evaluates current portfolio holdings against active IPS target bands and computes drift. | [`portfolio_analysis.evalset.json`](portfolio-analysis/portfolio_analysis.evalset.json) |
+| [`action-drafting/`](action-drafting/) | Drafts specific rebalancing orders (`status: drafted`) obeying concentration limits and exclusion rules. | [`action_drafting.evalset.json`](action-drafting/action_drafting.evalset.json) |
+| [`spending-analysis/`](spending-analysis/) | Translates spending questions into read-only, user-scoped BigQuery SQL queries and detects anomalies. | [`spending_analysis.evalset.json`](spending-analysis/spending_analysis.evalset.json) |
+| [`research/`](research/) | Gathers external market context with strict data isolation via Google Search grounding. | [`research.evalset.json`](research/research.evalset.json) |
 
-## Skill Evaluation with Evalin
+## Skill Evaluation with Native ADK
 
-Skills are evaluated using Google's **[evalin](https://g3doc.corp.google.com/learning/gemini/agents/evaluation/evalin/README.md?cl=head)** framework. Each skill folder contains an `EVAL.txtpb` defining golden cases, boundary conditions, and guardrail validations.
+Skills are evaluated using Google's native **Agent Development Kit (ADK)** evaluation framework. Each skill folder contains an `.evalset.json` file defining golden cases, boundary conditions, and guardrail validations adhering to ADK's `EvalSet` schema.
 
 ### Running Evaluations
 
-To run an evaluation for a specific skill:
+To run an evaluation using the ADK CLI or doc-only evaluation pass:
 
 ```bash
-evalin run skills/portfolio-analysis/EVAL.txtpb \
-  --with-vs-without-skills \
-  --runs=3 \
-  --max-parallel=30 \
-  --model=flash \
-  --judge=flash
+# ADK CLI
+uv run --project orchestrator adk eval \
+  skills/portfolio-analysis \
+  skills/portfolio-analysis/portfolio_analysis.evalset.json
+
+# Documentation-Only Agent Pass
+PYTHONPATH=. uv run --project orchestrator python -m evals.runner skills/portfolio-analysis
 ```
 
-For full evaluation guidelines, see [`docs/evals.md`](../docs/evals.md).
+For full evaluation architecture and guidelines, see [`docs/evals.md`](../docs/evals.md).

@@ -1,8 +1,9 @@
 import os
 import re
-from typing import Optional, List, Dict, Any
+from typing import Any, Dict, List, Optional
 
 from google.cloud import bigquery
+
 
 class BigQueryClient:
     def __init__(self, project: Optional[str] = None):

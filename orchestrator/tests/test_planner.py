@@ -1,15 +1,17 @@
+from typing import Any
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
 from google.adk import Context
 from google.adk.events import RequestInput
-from google.adk.workflow import node, Workflow
-from google.adk.runners import Runner
-from unittest.mock import patch, AsyncMock, MagicMock
-from src.orchestrator.registry_client import Skill
-from src.orchestrator.planner import root_planner
-from google.adk.sessions.in_memory_session_service import InMemorySessionService
 from google.adk.memory.in_memory_memory_service import InMemoryMemoryService
-from typing import Any
-from google.genai.types import UserContent, Part
+from google.adk.runners import Runner
+from google.adk.sessions.in_memory_session_service import InMemorySessionService
+from google.adk.workflow import Workflow, node
+from google.genai.types import Part, UserContent
+
+from src.orchestrator.planner import root_planner
+from src.orchestrator.registry_client import Skill
 
 execution_count = 0
 
@@ -71,19 +73,28 @@ async def test_checkpointing():
     assert interrupt_id is not None, "Did not find request_input interrupt"
 
     # --- SECOND RUN (RESUME) ---
+    response_part = Part.from_function_response(
+        name="adk_request_input",
+        response={"interruptId": interrupt_id, "payload": "approved"},
+    )
+    response_part.function_response.id = interrupt_id
+
     response_stream = runner.run_async(
         user_id="user_123",
         session_id=session_id,
         invocation_id=last_event.invocation_id,
-        new_message=UserContent(parts=[Part.from_function_response(name="adk_request_input", response={"interruptId": interrupt_id, "payload": "approved"})])
+        new_message=UserContent(parts=[response_part]),
     )
 
     events2 = []
     async for event in response_stream:
         events2.append(event)
 
-    if events2:
-        assert events2[-1].output == {"count": "Count: 1", "approval": "approved"}
+    assert len(events2) > 0, "resume produced no events"
+    assert events2[-1].output == {
+        "count": "Count: 1",
+        "approval": {"interruptId": interrupt_id, "payload": "approved"},
+    }
 
     # Crucially, execution_count MUST still be 1 (checkpointing bypassed running counter_node)
     assert execution_count == 1
@@ -101,8 +112,8 @@ async def test_root_planner_trace():
 
     with patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list:
         mock_list.return_value = [
-            Skill(name="research", target_state="TARGET_STATE_ACTIVE", default_revision="rev1"),
-            Skill(name="action_drafting", target_state="TARGET_STATE_ACTIVE", default_revision="rev2"),
+            Skill(name="projects/test-project/locations/test-location/skills/research", target_state="TARGET_STATE_ACTIVE", default_revision="rev1"),
+            Skill(name="projects/test-project/locations/test-location/skills/action_drafting", target_state="TARGET_STATE_ACTIVE", default_revision="rev2"),
         ]
 
         response_stream = runner.run_async(user_id="user_123", session_id="session_456", new_message=UserContent(parts=[Part.from_text(text="test_goal")]))
@@ -112,7 +123,10 @@ async def test_root_planner_trace():
             events.append(event)
 
         last_event = events[-1]
-        assert last_event.output == ["research_completed", "action_drafting_completed"]
+        assert last_event.output == [
+            "projects/test-project/locations/test-location/skills/research_completed",
+            "projects/test-project/locations/test-location/skills/action_drafting_completed",
+        ]
 
 
 @pytest.mark.asyncio
@@ -132,7 +146,7 @@ async def test_root_planner_json_input():
         mock_db.return_value = mock_db_instance
 
         mock_list.return_value = [
-            Skill(name="private-goals-onboarding", target_state="TARGET_STATE_ACTIVE", default_revision="rev1"),
+            Skill(name="projects/test-project/locations/test-location/skills/private-goals-onboarding", target_state="TARGET_STATE_ACTIVE", default_revision="rev1"),
         ]
 
         # Use valid json input payload as string text part to cover that branch properly
@@ -153,10 +167,54 @@ async def test_root_planner_json_input():
 
 
 @pytest.mark.asyncio
+async def test_root_planner_dispatches_goals_onboarding_with_realistic_name():
+    """Verify planner extracts short name from full resource path and invokes goals_onboarding_skill."""
+    agent = Workflow(
+        name="test_root",
+        edges=[("START", root_planner)],
+    )
+    session_service = InMemorySessionService()
+    memory_service = InMemoryMemoryService()
+    runner = Runner(app_name="test_app", agent=agent, session_service=session_service, memory_service=memory_service, auto_create_session=True)
+
+    with patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list, \
+         patch("src.orchestrator.skills.goals_onboarding.FirestoreClient") as mock_db:
+
+        mock_db_instance = MagicMock()
+        mock_db.return_value = mock_db_instance
+
+        mock_list.return_value = [
+            Skill(
+                name="projects/test-proj-123/locations/us-central1/skills/private-goals-onboarding",
+                target_state="TARGET_STATE_ACTIVE",
+                default_revision="rev-v1",
+            ),
+        ]
+
+        response_stream = runner.run_async(
+            user_id="user_123",
+            session_id="session_456",
+            new_message=UserContent(parts=[Part.from_text(text='{"user_id": "u4", "trigger": "initial"}')]),
+        )
+
+        events = []
+        async for event in response_stream:
+            events.append(event)
+
+        def has_request_input(e):
+            if e.content and e.content.parts:
+                for p in e.content.parts:
+                    if p.function_call and p.function_call.name == "adk_request_input":
+                        return True
+            return False
+
+        assert any(has_request_input(e) for e in events)
+
+
+@pytest.mark.asyncio
 async def test_root_planner_invalid_json():
-    import asyncio
-    from google.adk.workflow import Workflow
     from google.adk.runners import Runner
+    from google.adk.workflow import Workflow
 
     agent = Workflow(
         name="test_root",
@@ -169,10 +227,59 @@ async def test_root_planner_invalid_json():
     with patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list, \
          patch("src.orchestrator.skills.goals_onboarding.FirestoreClient") as mock_db:
 
-        mock_db_instance = MagicMock()
-        mock_db.return_value = mock_db_instance
-        mock_list.return_value = [Skill(name="private-goals-onboarding", target_state="TARGET_STATE_ACTIVE", default_revision="rev1")]
-
         response_stream = runner.run_async(user_id="user_123", session_id="s1", new_message=UserContent(parts=[Part.from_text(text="invalid json {")]))
         events = [e async for e in response_stream]
         assert len(events) > 0
+
+
+@pytest.mark.asyncio
+async def test_root_planner_dispatches_research_managed_agent():
+    """Verify planner retrieves dynamic skill content for research and instantiates/runs ManagedAgent."""
+    agent = Workflow(
+        name="test_root",
+        edges=[("START", root_planner)],
+    )
+    session_service = InMemorySessionService()
+    memory_service = InMemoryMemoryService()
+    runner = Runner(
+        app_name="test_app",
+        agent=agent,
+        session_service=session_service,
+        memory_service=memory_service,
+        auto_create_session=True,
+    )
+
+    with patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list, \
+         patch("src.orchestrator.planner.AgentRegistryClient.get_skill_content", new_callable=AsyncMock) as mock_get_content, \
+         patch("src.orchestrator.planner.ManagedAgent._run_async_impl") as mock_managed_run:
+
+        from google.adk.events import Event
+
+        async def fake_research_stream(ctx):
+            yield Event(author="research", output="market research report generated")
+
+        mock_managed_run.side_effect = fake_research_stream
+
+        mock_list.return_value = [
+            Skill(
+                name="projects/test-proj/locations/us-central1/skills/private-research",
+                target_state="TARGET_STATE_ACTIVE",
+                default_revision="rev-research-1",
+            ),
+        ]
+        mock_get_content.return_value = "# Market Research Skill\nPerform market analysis."
+
+        response_stream = runner.run_async(
+            user_id="user_123",
+            session_id="session_456",
+            new_message=UserContent(parts=[Part.from_text(text='{"user_id": "u5"}')]),
+        )
+
+        events = []
+        async for event in response_stream:
+            events.append(event)
+
+        mock_get_content.assert_awaited_once_with("research")
+        last_event = events[-1]
+        assert "research_result: market research report generated" in last_event.output
+

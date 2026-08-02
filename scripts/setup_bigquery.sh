@@ -14,14 +14,26 @@ TABLE_NAME="chase_transactions"
 echo "Setting up BigQuery in project $PROJECT_ID..."
 
 # Create dataset if it doesn't exist
-bq mk --project_id="$PROJECT_ID" --dataset --force=false "${DATASET_NAME}" || echo "Dataset ${DATASET_NAME} already exists."
+if ! bq show --project_id="$PROJECT_ID" "${DATASET_NAME}" &>/dev/null; then
+  echo "Creating BigQuery dataset: ${DATASET_NAME}"
+  bq mk --project_id="$PROJECT_ID" --dataset --label=app:portfolio-copilot "${DATASET_NAME}"
+else
+  echo "Dataset ${DATASET_NAME} already exists. Ensuring labels..."
+  bq update --project_id="$PROJECT_ID" --set_label=app:portfolio-copilot "${DATASET_NAME}" 2>/dev/null || true
+fi
 
 # Create table
-bq mk \
-  --project_id="$PROJECT_ID" \
-  --table \
-  --force=false \
-  "${DATASET_NAME}.${TABLE_NAME}" \
-  user_id:STRING,transaction_date:DATE,amount:FLOAT64,description:STRING,raw_category:STRING,normalized_category:STRING || echo "Table ${TABLE_NAME} already exists."
+if ! bq show --project_id="$PROJECT_ID" "${DATASET_NAME}.${TABLE_NAME}" &>/dev/null; then
+  echo "Creating BigQuery table: ${DATASET_NAME}.${TABLE_NAME}"
+  bq mk \
+    --project_id="$PROJECT_ID" \
+    --table \
+    --label=app:portfolio-copilot \
+    "${DATASET_NAME}.${TABLE_NAME}" \
+    user_id:STRING,transaction_date:DATE,amount:FLOAT64,description:STRING,raw_category:STRING,normalized_category:STRING
+else
+  echo "Table ${TABLE_NAME} already exists. Ensuring labels..."
+  bq update --project_id="$PROJECT_ID" --set_label=app:portfolio-copilot "${DATASET_NAME}.${TABLE_NAME}" 2>/dev/null || true
+fi
 
 echo "BigQuery setup complete."

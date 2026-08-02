@@ -1,13 +1,13 @@
-from typing import Any, Dict
 from datetime import datetime, timezone
+from typing import Any
 
 from google.adk import Context
-from google.adk.workflow import node
 from google.adk.events import RequestInput
+from google.adk.workflow import node
 
-from ...data.firestore import FirestoreClient
 from ...data.bigquery import BigQueryClient
-from .logic import is_anomalous, calculate_savings_rate, calculate_reserve_months
+from ...data.firestore import FirestoreClient
+from .logic import calculate_reserve_months, calculate_savings_rate, is_anomalous
 
 
 @node(name="spending_analysis_skill", rerun_on_resume=True)

@@ -1,9 +1,11 @@
 import io
 import zipfile
-import pytest
-import httpx
 from unittest.mock import MagicMock, patch
-from orchestrator.registry_client import AgentRegistryClient, Skill, GoogleAuth
+
+import httpx
+import pytest
+
+from orchestrator.registry_client import AgentRegistryClient, GoogleAuth, Skill
 
 
 def create_zip(files: dict[str, str | bytes]) -> bytes:

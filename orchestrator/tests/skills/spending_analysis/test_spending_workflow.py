@@ -1,9 +1,11 @@
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
-from google.adk.events import RequestInput
 from google.adk import Context
+from google.adk.events import RequestInput
 
 from orchestrator.skills.spending_analysis.__init__ import spending_analysis_skill
+
 
 @pytest.fixture
 def mock_context():

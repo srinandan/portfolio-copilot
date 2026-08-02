@@ -1,12 +1,12 @@
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel
 
 
 class EventType(str, Enum):
     SKILL_INVOKED = "skill_invoked"
+    SKILL_INVOCATION_FAILED = "skill_invocation_failed"
     SKILL_REVOKED = "skill_revoked"
     IPS_CREATED = "ips_created"
     IPS_SUPERSEDED = "ips_superseded"
@@ -26,11 +26,11 @@ class ActorType(str, Enum):
 
 class Actor(BaseModel):
     type: ActorType
-    user_id: Optional[str] = None
-    skill_name: Optional[str] = None
-    skill_version: Optional[str] = None
-    registry_entry_id: Optional[str] = None
-    approval_scope: Optional[str] = None
+    user_id: str | None = None
+    skill_name: str | None = None
+    skill_version: str | None = None
+    registry_entry_id: str | None = None
+    approval_scope: str | None = None
 
 
 class RelatedIPSVersion(BaseModel):
@@ -43,6 +43,6 @@ class AuditLogEntry(BaseModel):
     event_type: EventType
     timestamp: datetime
     actor: Actor
-    related_action_id: Optional[str] = None
-    related_ips_version: Optional[RelatedIPSVersion] = None
-    detail: Optional[str] = None
+    related_action_id: str | None = None
+    related_ips_version: RelatedIPSVersion | None = None
+    detail: str | None = None

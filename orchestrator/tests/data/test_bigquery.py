@@ -1,6 +1,9 @@
+from unittest.mock import MagicMock, patch
+
 import pytest
+
 from orchestrator.data.bigquery import BigQueryClient
-from unittest.mock import patch, MagicMock
+
 
 @patch('google.cloud.bigquery.Client')
 def test_validate_and_execute_nl_sql_valid_query(mock_client):

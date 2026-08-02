@@ -1,6 +1,6 @@
 module portfolio-copilot
 
-go 1.25.0
+go 1.25.12
 
 require (
 	cloud.google.com/go/bigquery v1.79.0

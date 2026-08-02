@@ -1,0 +1,54 @@
+name: Skill Evaluations
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'skills/**'
+      - 'evals/**'
+      - '.github/workflows/skill-evals.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'skills/**'
+      - 'evals/**'
+      - '.github/workflows/skill-evals.yml'
+  workflow_dispatch:
+
+jobs:
+  evaluate-skills:
+    name: Evaluate Skills & Generate Report
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync --project orchestrator
+
+      - name: Run skill eval unit tests
+        run: |
+          uv run --project orchestrator pytest orchestrator/tests/test_skill_evalsets.py
+
+      - name: Evaluate skills and publish report
+        env:
+          PYTHONPATH: .
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          if [ -n "$GEMINI_API_KEY" ]; then
+            uv run --project orchestrator python -m evals.report --llm-judge
+          else
+            uv run --project orchestrator python -m evals.report
+          fi
+

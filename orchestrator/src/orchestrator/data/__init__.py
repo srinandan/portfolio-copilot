@@ -1,5 +1,5 @@
-from .firestore import FirestoreClient
 from .bigquery import BigQueryClient
+from .firestore import FirestoreClient
 
 __all__ = [
     "FirestoreClient",
