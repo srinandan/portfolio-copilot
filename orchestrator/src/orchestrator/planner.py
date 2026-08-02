@@ -1,9 +1,11 @@
 import os
+import json
 from typing import Any
 from google.adk import Context
 from google.adk.workflow import node, Workflow
 from google.genai.types import UserContent, Part
 from .registry_client import AgentRegistryClient
+from .skills.goals_onboarding import goals_onboarding_skill
 
 @node(name="get_skills", rerun_on_resume=False)
 async def get_skills_from_registry(ctx: Context, node_input: Any):
@@ -27,12 +29,9 @@ async def dummy_skill_execution(ctx: Context, node_input: Any):
 @node(name="memory_interaction", rerun_on_resume=False)
 async def memory_interaction(ctx: Context, node_input: Any):
     """Reads and writes to the memory bank to satisfy acceptance criteria."""
-
-    # Write a placeholder fact by generating memory from events
     print("Writing placeholder fact to memory bank via add_events_to_memory...")
     part = Part.from_text(text="User prefers low-risk investments")
     placeholder_fact = UserContent(parts=[part])
-
     try:
         await ctx.add_events_to_memory(events=[placeholder_fact])
     except NotImplementedError:
@@ -40,7 +39,6 @@ async def memory_interaction(ctx: Context, node_input: Any):
     except Exception as e:
         print(f"Warning: add_events_to_memory failed: {e}")
 
-    # Read it back (Memory Bank semantic search)
     print("Reading from memory bank...")
     try:
         search_results = await ctx.search_memory("investment preferences")
@@ -62,10 +60,29 @@ async def root_planner(ctx: Context, node_input: Any):
     skills = await ctx.run_node(get_skills_from_registry, node_input=node_input)
     print(f"Available skills: {skills}")
 
+    # Simple extraction of user_id from node_input or default
+    user_id = "default_user"
+    trigger = "initial"
+    if isinstance(node_input, dict):
+        user_id = node_input.get("user_id", user_id)
+        trigger = node_input.get("trigger", trigger)
+    elif isinstance(node_input, str):
+        try:
+            parsed = json.loads(node_input)
+            user_id = parsed.get("user_id", user_id)
+            trigger = parsed.get("trigger", trigger)
+        except json.JSONDecodeError:
+            pass
+
     results = []
     for skill in skills:
-        result = await ctx.run_node(dummy_skill_execution, node_input=skill)
-        results.append(result)
+        if skill == "private-goals-onboarding":
+            print(f"Executing native skill: {skill}")
+            result = await ctx.run_node(goals_onboarding_skill, node_input={"user_id": user_id, "trigger": trigger})
+            results.append(f"goals_onboarding_result: {result}")
+        else:
+            result = await ctx.run_node(dummy_skill_execution, node_input=skill)
+            results.append(result)
 
     return results
 
