@@ -1,0 +1,5 @@
+# osv-scanner.toml - Configuration for OSV-Scanner
+
+[[IgnoredVulns]]
+id = "GO-2026-5932"
+reason = "No fixed version available upstream yet in golang.org/x/crypto"
