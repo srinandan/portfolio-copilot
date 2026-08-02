@@ -1,0 +1,41 @@
+# proto-file: learning/gemini/agents/evaluation/evalin/proto/eval_suite.proto
+# proto-message: EvalSuite
+# txtpbfmt: wrap_strings_after_newlines
+
+name: "portfolio-analysis"
+description: "Evaluation suite for the portfolio-analysis runtime skill in Portfolio Copilot."
+
+eval_cases: {
+  name: "basic_drift_calculation"
+  description: "Calculates asset class allocation drift against active IPS target bands and correctly identifies rebalance need."
+  prompt: "How is my portfolio doing? Check if my current holdings have drifted from my investment policy target allocation."
+  expected_output: "Provides a structured drift report showing current allocation percentages per asset class (equity, fixed income, cash) compared to IPS target and min/max bands, calculates drift amounts, and sets rebalance_recommended to true if out of band."
+}
+
+eval_cases: {
+  name: "within_bands_no_rebalance"
+  description: "When all asset classes are within IPS min/max tolerance bands, verifies rebalance_recommended is false."
+  prompt: "Analyze my portfolio drift. My equity is at 62% (target 60%, band 50-70%), fixed income is at 28% (target 30%, band 20-40%), and cash is at 10% (target 10%, band 5-15%)."
+  expected_output: "Reports that all asset classes are in-band (in_band: true, drift_amount_percent: 0) and states rebalance_recommended: false without generating unnecessary rebalancing alerts."
+}
+
+eval_cases: {
+  name: "unclassified_asset_reporting"
+  description: "Ensures holdings in unmapped asset classes are captured under unclassified_value_usd and not silently omitted from total value."
+  prompt: "I hold $10,000 in physical gold and $5,000 in crypto in addition to my $85,000 stock and bond portfolio. Run portfolio analysis against my standard equity/bond/cash IPS."
+  expected_output: "Calculates total portfolio value including the gold and crypto positions ($100,000 total), explicitly reports $15,000 under unclassified_value_usd, and computes standard allocation percentages relative to the true total."
+}
+
+eval_cases: {
+  name: "missing_active_ips_refusal"
+  description: "Gracefully declines to compute drift when no active Investment Policy Statement exists."
+  prompt: "Run portfolio drift analysis for user user_new_123 who just registered and has no IPS on file."
+  expected_output: "Declines to calculate drift, clearly explains that an active Investment Policy Statement is required, and directs the user or planner to complete the goals onboarding skill first."
+}
+
+eval_cases: {
+  name: "boundary_drift_threshold"
+  description: "Tests precise boundary condition where drift exactly equals the IPS drift_threshold_percent."
+  prompt: "My IPS has a 5.0% drift threshold. Equity allocation has drifted by exactly 5.0% outside the allowed band. Should a rebalance be triggered?"
+  expected_output: "Evaluates the threshold condition deterministically, reporting that the drift has reached the configured threshold and flagging rebalance_recommended accordingly."
+}
