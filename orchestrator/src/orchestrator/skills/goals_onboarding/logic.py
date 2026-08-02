@@ -1,5 +1,6 @@
-from typing import List
+
 from ...contracts.ips import RiskTolerance, TargetAllocation
+
 
 def calculate_risk_tolerance(time_horizon_years: int, drawdown_reaction: str) -> RiskTolerance:
     """
@@ -16,7 +17,7 @@ def calculate_risk_tolerance(time_horizon_years: int, drawdown_reaction: str) ->
     else:
         return RiskTolerance.MODERATE
 
-def get_default_allocation_bands(risk_tolerance: RiskTolerance) -> List[TargetAllocation]:
+def get_default_allocation_bands(risk_tolerance: RiskTolerance) -> list[TargetAllocation]:
     """
     Proposes default bands per risk tier as a starting point.
     """

@@ -1,15 +1,17 @@
+from typing import Any
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
 from google.adk import Context
 from google.adk.events import RequestInput
-from google.adk.workflow import node, Workflow
-from google.adk.runners import Runner
-from unittest.mock import patch, AsyncMock, MagicMock
-from src.orchestrator.registry_client import Skill
-from src.orchestrator.planner import root_planner
-from google.adk.sessions.in_memory_session_service import InMemorySessionService
 from google.adk.memory.in_memory_memory_service import InMemoryMemoryService
-from typing import Any
-from google.genai.types import UserContent, Part
+from google.adk.runners import Runner
+from google.adk.sessions.in_memory_session_service import InMemorySessionService
+from google.adk.workflow import Workflow, node
+from google.genai.types import Part, UserContent
+
+from src.orchestrator.planner import root_planner
+from src.orchestrator.registry_client import Skill
 
 execution_count = 0
 
@@ -202,9 +204,8 @@ async def test_root_planner_dispatches_goals_onboarding_with_realistic_name():
 
 @pytest.mark.asyncio
 async def test_root_planner_invalid_json():
-    import asyncio
-    from google.adk.workflow import Workflow
     from google.adk.runners import Runner
+    from google.adk.workflow import Workflow
 
     agent = Workflow(
         name="test_root",

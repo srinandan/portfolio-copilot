@@ -1,10 +1,10 @@
 """Agent Registry REST client."""
 
 import io
-import os
 import zipfile
 from dataclasses import dataclass
 from typing import Any
+
 import httpx
 from google.auth import default as google_auth_default
 from google.auth.transport.requests import Request as GoogleAuthRequest

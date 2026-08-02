@@ -1,6 +1,5 @@
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -24,7 +23,7 @@ class OrderType(str, Enum):
 class SkillVersionRef(BaseModel):
     skill_name: str
     skill_version: str
-    registry_entry_id: Optional[str] = None
+    registry_entry_id: str | None = None
 
 
 class ActionStatus(str, Enum):
@@ -46,11 +45,11 @@ class ProposedAction(BaseModel):
     side: Side
     quantity: float = Field(gt=0)
     order_type: OrderType
-    limit_price_usd: Optional[float] = None
+    limit_price_usd: float | None = None
     estimated_price_usd: float = Field(gt=0)
     estimated_value_usd: float = Field(gt=0)
     rationale: str
-    supporting_research_refs: List[str] = Field(default_factory=list)
+    supporting_research_refs: list[str] = Field(default_factory=list)
     ips_version_referenced: RelatedIPSVersion
     proposed_by_skill_version: SkillVersionRef
     status: ActionStatus

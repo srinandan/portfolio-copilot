@@ -2,14 +2,17 @@ from orchestrator.logger import get_logger
 
 logger = get_logger(__name__)
 
-import os
 import json
+import os
 from typing import Any
+
 from google.adk import Context
-from google.adk.workflow import node, Workflow
-from google.genai.types import UserContent, Part
+from google.adk.workflow import Workflow, node
+from google.genai.types import Part, UserContent
+
 from .registry_client import AgentRegistryClient
 from .skills.goals_onboarding import goals_onboarding_skill
+
 
 @node(name="get_skills", rerun_on_resume=False)
 async def get_skills_from_registry(ctx: Context, node_input: Any):

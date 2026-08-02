@@ -1,6 +1,11 @@
 import pytest
+
 from src.orchestrator.contracts.ips import RiskTolerance
-from src.orchestrator.skills.goals_onboarding.logic import calculate_risk_tolerance, get_default_allocation_bands
+from src.orchestrator.skills.goals_onboarding.logic import (
+    calculate_risk_tolerance,
+    get_default_allocation_bands,
+)
+
 
 @pytest.mark.parametrize("time_horizon, reaction, expected", [
     (15, "buy_more", RiskTolerance.AGGRESSIVE),

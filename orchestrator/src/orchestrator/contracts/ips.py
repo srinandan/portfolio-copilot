@@ -1,6 +1,5 @@
 from datetime import date, datetime
 from enum import Enum
-from typing import List, Optional
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -24,8 +23,8 @@ class Goal(BaseModel):
 
 
 class LiquidityNeeds(BaseModel):
-    reserve_months: Optional[float] = Field(default=None, ge=0)
-    known_upcoming_expenses_usd: Optional[float] = Field(default=None, ge=0)
+    reserve_months: float | None = Field(default=None, ge=0)
+    known_upcoming_expenses_usd: float | None = Field(default=None, ge=0)
 
 
 class TargetAllocation(BaseModel):
@@ -47,11 +46,11 @@ class AccountType(str, Enum):
 
 
 class Constraints(BaseModel):
-    excluded_tickers: List[str] = Field(default_factory=list)
-    excluded_sectors: List[str] = Field(default_factory=list)
+    excluded_tickers: list[str] = Field(default_factory=list)
+    excluded_sectors: list[str] = Field(default_factory=list)
     concentration_limit_percent: float = Field(ge=0, le=100)
     tax_loss_harvesting_enabled: bool = False
-    account_type: Optional[AccountType] = None
+    account_type: AccountType | None = None
 
 
 class TriggerType(str, Enum):
@@ -61,9 +60,9 @@ class TriggerType(str, Enum):
 
 
 class RebalancingRules(BaseModel):
-    trigger_type: Optional[TriggerType] = None
-    drift_threshold_percent: Optional[float] = Field(default=None, ge=0)
-    rebalancing_frequency_days: Optional[int] = Field(default=None, ge=1)
+    trigger_type: TriggerType | None = None
+    drift_threshold_percent: float | None = Field(default=None, ge=0)
+    rebalancing_frequency_days: int | None = Field(default=None, ge=1)
 
 
 class InvestmentPolicyStatement(BaseModel):
@@ -71,24 +70,24 @@ class InvestmentPolicyStatement(BaseModel):
     user_id: str
     version: int = Field(ge=1)
     status: IPSStatus
-    superseded_by: Optional[str] = None
+    superseded_by: str | None = None
     effective_date: date  # Kept as str to match json schema (or date), let's use date and pydantic will handle it
     risk_tolerance: RiskTolerance
     time_horizon_years: int = Field(ge=0)
 
-    goals: Optional[List[Goal]] = None
-    liquidity_needs: Optional[LiquidityNeeds] = None
+    goals: list[Goal] | None = None
+    liquidity_needs: LiquidityNeeds | None = None
 
-    target_allocation: List[TargetAllocation]
+    target_allocation: list[TargetAllocation]
     constraints: Constraints
 
-    rebalancing_rules: Optional[RebalancingRules] = None
+    rebalancing_rules: RebalancingRules | None = None
 
-    approval_required_above_usd: Optional[float] = Field(default=None, ge=0)
-    approval_required_above_percent: Optional[float] = Field(default=None, ge=0, le=100)
+    approval_required_above_usd: float | None = Field(default=None, ge=0)
+    approval_required_above_percent: float | None = Field(default=None, ge=0, le=100)
 
     created_at: datetime
-    updated_at: Optional[datetime] = None
+    updated_at: datetime | None = None
 
 class RelatedIPSVersion(BaseModel):
     ips_id: str

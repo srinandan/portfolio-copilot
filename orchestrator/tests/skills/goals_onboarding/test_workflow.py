@@ -1,11 +1,14 @@
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
+from google.adk.memory.in_memory_memory_service import InMemoryMemoryService
 from google.adk.runners import Runner
 from google.adk.sessions.in_memory_session_service import InMemorySessionService
-from google.adk.memory.in_memory_memory_service import InMemoryMemoryService
 from google.adk.workflow import Workflow, node
-from google.genai.types import UserContent, Part
+from google.genai.types import Part, UserContent
+
 from src.orchestrator.skills.goals_onboarding import goals_onboarding_skill
+
 
 # In ADK, we must return the result of run_node for the suspend/resume to bubble up correctly
 @node(name="start_wrapper", rerun_on_resume=True)
@@ -87,7 +90,9 @@ def test_mocking():
     assert True
 
 from unittest.mock import AsyncMock
+
 from src.orchestrator.contracts import IPSStatus, RiskTolerance
+
 
 @pytest.mark.asyncio
 async def test_goals_onboarding_skill_direct_call():

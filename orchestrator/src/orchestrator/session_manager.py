@@ -3,10 +3,18 @@ from orchestrator.logger import get_logger
 logger = get_logger(__name__)
 
 import os
-import asyncio
-from typing import Optional
-from google.adk.sessions import BaseSessionService, VertexAiSessionService, InMemorySessionService
-from google.adk.memory import BaseMemoryService, VertexAiMemoryBankService, InMemoryMemoryService
+
+from google.adk.memory import (
+    BaseMemoryService,
+    InMemoryMemoryService,
+    VertexAiMemoryBankService,
+)
+from google.adk.sessions import (
+    BaseSessionService,
+    InMemorySessionService,
+    VertexAiSessionService,
+)
+
 
 class SessionManager:
     """Manages Session and Memory Bank configuration for the orchestrator."""
@@ -19,7 +27,7 @@ class SessionManager:
         # Use Vertex AI services by default, fallback to InMemory for tests
         if use_in_memory or not self.agent_engine_id:
             self.session_service: BaseSessionService = InMemorySessionService()
-            self.memory_service: Optional[BaseMemoryService] = InMemoryMemoryService()
+            self.memory_service: BaseMemoryService | None = InMemoryMemoryService()
             if not use_in_memory:
                  logger.warning("AGENT_ENGINE_ID not set, falling back to InMemorySessionService and InMemoryMemoryService.")
         else:
@@ -33,7 +41,7 @@ class SessionManager:
                 agent_engine_id=self.agent_engine_id
             )
 
-    async def get_or_create_session(self, app_name: str, user_id: str, session_id: Optional[str] = None):
+    async def get_or_create_session(self, app_name: str, user_id: str, session_id: str | None = None):
         if session_id:
             try:
                 session = await self.session_service.get_session(app_name=app_name, user_id=user_id, session_id=session_id)

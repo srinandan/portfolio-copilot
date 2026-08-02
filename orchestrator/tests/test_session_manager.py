@@ -1,9 +1,12 @@
-import pytest
 import os
-from unittest.mock import patch, AsyncMock, MagicMock
-from src.orchestrator.session_manager import SessionManager
-from google.adk.sessions.in_memory_session_service import InMemorySessionService
+from unittest.mock import AsyncMock, patch
+
+import pytest
 from google.adk.memory.in_memory_memory_service import InMemoryMemoryService
+from google.adk.sessions.in_memory_session_service import InMemorySessionService
+
+from src.orchestrator.session_manager import SessionManager
+
 
 @pytest.mark.asyncio
 async def test_session_manager_in_memory():

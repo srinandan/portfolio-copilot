@@ -3,27 +3,25 @@ from orchestrator.logger import get_logger
 logger = get_logger(__name__)
 
 import uuid
-import json
 from datetime import datetime, timezone
-from typing import Any, Dict
+from typing import Any
 
 from google.adk import Context
 from google.adk.events import RequestInput
 from google.adk.workflow import node
-from google.genai.types import UserContent, Part
+from google.genai.types import Part, UserContent
 
-from ...data.firestore import FirestoreClient
+from ...contracts.audit_log import Actor, ActorType, AuditLogEntry, EventType
 from ...contracts.ips import (
+    Constraints,
+    Goal,
     InvestmentPolicyStatement,
     IPSStatus,
-    RiskTolerance,
-    Goal,
     LiquidityNeeds,
     TargetAllocation,
-    Constraints
 )
 from ...contracts.liabilities import LiabilitiesSnapshot, Liability, LiabilityType
-from ...contracts.audit_log import AuditLogEntry, EventType, Actor, ActorType
+from ...data.firestore import FirestoreClient
 from .logic import calculate_risk_tolerance, get_default_allocation_bands
 
 
