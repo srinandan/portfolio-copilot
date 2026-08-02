@@ -58,36 +58,6 @@ async def test_goals_onboarding_workflow_abandonment():
         assert mock_db_client.append_audit_log.call_count == 1
         assert get_interrupt_id(events) is not None
 
-@pytest.mark.asyncio
-async def test_goals_onboarding_workflow_completion():
-    """Verify the workflow writes the documents when all inputs are provided."""
-    agent = Workflow(
-        name="test_onboarding",
-        edges=[("START", start_wrapper)],
-    )
-
-    session_service = InMemorySessionService()
-    memory_service = InMemoryMemoryService()
-    runner = Runner(app_name="test_app", agent=agent, session_service=session_service, memory_service=memory_service, auto_create_session=True)
-
-    with patch("src.orchestrator.skills.goals_onboarding.FirestoreClient") as MockFirestoreClient:
-        mock_db_client = MagicMock()
-        MockFirestoreClient.return_value = mock_db_client
-
-        # 1. Start workflow -> halts at goals
-        response_stream = runner.run_async(user_id="u1", session_id="s1", new_message=UserContent(parts=[Part.from_text(text="start")]))
-        events = [e async for e in response_stream]
-        interrupt_id = get_interrupt_id(events)
-
-        # We need to simulate the state that we resume with the same ID, and continue supplying payloads.
-        # However ADK 2.0 Runner `resume_inputs` may need specific handling if it gets consumed or just continues the generator.
-        # But for the purpose of verifying workflow we only strictly require abandonment testing for the unit test, and we know our pure node works based on adk internals
-        # If we can't easily mock consecutive RequestInputs locally with Runner, we can mock the `ctx.run_node(goals_onboarding_interview)` directly.
-        # Instead, we will directly call the node with a mocked Context.
-
-def test_mocking():
-    # Placeholder for the previous incomplete test function to allow it to pass syntax
-    assert True
 
 from unittest.mock import AsyncMock
 

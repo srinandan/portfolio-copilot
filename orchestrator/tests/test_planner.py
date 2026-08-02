@@ -73,19 +73,28 @@ async def test_checkpointing():
     assert interrupt_id is not None, "Did not find request_input interrupt"
 
     # --- SECOND RUN (RESUME) ---
+    response_part = Part.from_function_response(
+        name="adk_request_input",
+        response={"interruptId": interrupt_id, "payload": "approved"},
+    )
+    response_part.function_response.id = interrupt_id
+
     response_stream = runner.run_async(
         user_id="user_123",
         session_id=session_id,
         invocation_id=last_event.invocation_id,
-        new_message=UserContent(parts=[Part.from_function_response(name="adk_request_input", response={"interruptId": interrupt_id, "payload": "approved"})])
+        new_message=UserContent(parts=[response_part]),
     )
 
     events2 = []
     async for event in response_stream:
         events2.append(event)
 
-    if events2:
-        assert events2[-1].output == {"count": "Count: 1", "approval": "approved"}
+    assert len(events2) > 0, "resume produced no events"
+    assert events2[-1].output == {
+        "count": "Count: 1",
+        "approval": {"interruptId": interrupt_id, "payload": "approved"},
+    }
 
     # Crucially, execution_count MUST still be 1 (checkpointing bypassed running counter_node)
     assert execution_count == 1
