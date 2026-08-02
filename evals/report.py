@@ -1,20 +1,21 @@
 """Evaluates all runtime skills, validates their EvalSets, and generates a structured Markdown report."""
 
+import argparse
 import os
 import sys
 from pathlib import Path
 from typing import Any
 
-from google.adk.evaluation.eval_set import EvalSet
-
 from evals.doc_only_agent import build_doc_only_agent
+from evals.runner import load_skill_evalset, run_doc_only_eval
 
 
-def evaluate_skills(skills_dir: Path) -> list[dict[str, Any]]:
+def evaluate_skills(skills_dir: Path, use_llm_judge: bool = False) -> list[dict[str, Any]]:
     """Evaluates all skills in the skills directory.
 
     Args:
         skills_dir: Directory containing skill subdirectories.
+        use_llm_judge: Whether to run full LLM judge inference.
 
     Returns:
         List of skill report dictionaries.
@@ -37,6 +38,8 @@ def evaluate_skills(skills_dir: Path) -> list[dict[str, Any]]:
             "case_count": 0,
             "cases": [],
             "status": "PASS",
+            "mode": "heuristic",
+            "score": None,
             "errors": [],
         }
 
@@ -57,8 +60,7 @@ def evaluate_skills(skills_dir: Path) -> list[dict[str, Any]]:
             report["errors"].append("Missing *.evalset.json")
         else:
             try:
-                evalset_text = evalset_files[0].read_text(encoding="utf-8")
-                evalset = EvalSet.model_validate_json(evalset_text)
+                evalset = load_skill_evalset(skill_path)
                 report["case_count"] = len(evalset.eval_cases)
 
                 for c in evalset.eval_cases:
@@ -85,41 +87,74 @@ def evaluate_skills(skills_dir: Path) -> list[dict[str, Any]]:
                 report["status"] = "FAIL"
                 report["errors"].append(f"Invalid EvalSet JSON: {e}")
 
-        # Validate doc-only agent construction
-        if report["has_skill_md"]:
+        # Validate doc-only agent construction and execute evaluation pass
+        if report["has_skill_md"] and report["has_evalset"] and report["status"] != "FAIL":
             try:
                 agent = build_doc_only_agent(skill_path)
                 if not agent.instruction:
                     report["status"] = "FAIL"
                     report["errors"].append("Doc-only agent instruction is empty")
+                else:
+                    eval_result = run_doc_only_eval(
+                        skill_path,
+                        use_llm_judge=use_llm_judge,
+                        print_detailed_results=False,
+                    )
+                    report["status"] = eval_result.status
+                    report["mode"] = eval_result.mode
+                    report["score"] = eval_result.score
+                    if eval_result.status == "FAIL":
+                        report["errors"].append("Heuristic / judge rubrics failed")
             except Exception as e:
                 report["status"] = "FAIL"
-                report["errors"].append(f"Doc-only agent build error: {e}")
+                report["errors"].append(f"Doc-only agent evaluation error: {e}")
 
         reports.append(report)
 
     return reports
 
 
-def generate_markdown_report(reports: list[dict[str, Any]]) -> str:
+def generate_markdown_report(reports: list[dict[str, Any]], use_llm_judge: bool = False) -> str:
     """Generates GitHub-flavored markdown report from evaluation results."""
     total_skills = len(reports)
     passed_skills = sum(1 for r in reports if r["status"] == "PASS")
+    skipped_skills = sum(1 for r in reports if r["status"] == "SKIPPED_NO_KEY")
+    failed_skills = sum(1 for r in reports if r["status"] == "FAIL")
     total_cases = sum(r["case_count"] for r in reports)
+
+    has_key = bool(os.environ.get("GEMINI_API_KEY"))
 
     md = []
     md.append("# 🎯 Skill Evaluation & Validation Report\n")
-    md.append(f"**Total Skills:** {total_skills} | **Passed:** {passed_skills}/{total_skills} | **Total Eval Cases:** {total_cases}\n")
+
+    # Honest status banner when LLM judge is skipped or run heuristically
+    if not has_key:
+        md.append(
+            f"> [!WARNING]\n"
+            f"> ⚠️ {total_cases} rubrics evaluated heuristically; LLM judge skipped (no `GEMINI_API_KEY` in PR context).\n"
+        )
+    elif use_llm_judge:
+        md.append("> [!NOTE]\n> 🚀 Evaluated with full LLM-judge inference.\n")
+
+    md.append(f"**Total Skills:** {total_skills} | **Passed:** {passed_skills}/{total_skills} | **Skipped:** {skipped_skills} | **Failed:** {failed_skills} | **Total Cases:** {total_cases}\n")
 
     # Summary table
     md.append("## Summary\n")
-    md.append("| Skill | Status | Cases | Doc Size | EvalSet File |")
-    md.append("|---|:---:|:---:|:---:|---|")
+    md.append("| Skill | Status | Mode | Score | Cases | Doc Size | EvalSet File |")
+    md.append("|---|:---:|:---:|:---:|:---:|:---:|---|")
     for r in reports:
-        status_badge = "✅ PASS" if r["status"] == "PASS" else "❌ FAIL"
+        if r["status"] == "PASS":
+            status_badge = "✅ PASS"
+        elif r["status"] == "SKIPPED_NO_KEY":
+            status_badge = "⚠️ SKIPPED (NO KEY)"
+        else:
+            status_badge = "❌ FAIL"
+
+        mode_badge = "🤖 LLM Judge" if r["mode"] == "llm_judge" else "🔍 Heuristic"
+        score_str = f"{r['score']:.0%}" if r["score"] is not None else "N/A"
         doc_size = f"{r['skill_md_chars']:,} chars" if r["has_skill_md"] else "N/A"
         eval_file = r["evalset_file"] or "None"
-        md.append(f"| `{r['name']}` | {status_badge} | {r['case_count']} | {doc_size} | `{eval_file}` |")
+        md.append(f"| `{r['name']}` | {status_badge} | {mode_badge} | {score_str} | {r['case_count']} | {doc_size} | `{eval_file}` |")
 
     # Details per skill
     md.append("\n## Detailed Skill Evaluation Suites\n")
@@ -149,11 +184,19 @@ def generate_markdown_report(reports: list[dict[str, Any]]) -> str:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Generate Skill Evaluation Report.")
+    parser.add_argument(
+        "--llm-judge",
+        action="store_true",
+        help="Enable full LLM judge inference if GEMINI_API_KEY is available",
+    )
+    args = parser.parse_args()
+
     repo_root = Path(__file__).resolve().parent.parent
     skills_dir = repo_root / "skills"
 
-    reports = evaluate_skills(skills_dir)
-    md_report = generate_markdown_report(reports)
+    reports = evaluate_skills(skills_dir, use_llm_judge=args.llm_judge)
+    md_report = generate_markdown_report(reports, use_llm_judge=args.llm_judge)
 
     print(md_report)
 
@@ -164,8 +207,8 @@ def main() -> None:
             f.write(md_report + "\n")
         print(f"\nWritten evaluation report to $GITHUB_STEP_SUMMARY ({step_summary_file})")
 
-    # Exit non-zero if any skill failed
-    any_failed = any(r["status"] != "PASS" for r in reports)
+    # Exit non-zero only if any skill failed
+    any_failed = any(r["status"] == "FAIL" for r in reports)
     if any_failed:
         sys.exit(1)
 

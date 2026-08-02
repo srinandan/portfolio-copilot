@@ -44,5 +44,11 @@ jobs:
       - name: Evaluate skills and publish report
         env:
           PYTHONPATH: .
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          uv run --project orchestrator python -m evals.report
+          if [ -n "$GEMINI_API_KEY" ]; then
+            uv run --project orchestrator python -m evals.report --llm-judge
+          else
+            uv run --project orchestrator python -m evals.report
+          fi
+
