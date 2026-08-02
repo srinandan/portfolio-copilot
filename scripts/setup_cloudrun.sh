@@ -69,9 +69,19 @@ gcloud run deploy portfolio-copilot-gateway \
   --region="$REGION" \
   --service-account="$GATEWAY_SA" \
   --set-labels="app=portfolio-copilot,component=gateway" \
-  --allow-unauthenticated \
+  --no-allow-unauthenticated \
   --max-instances=1 \
   --quiet || echo "Failed to deploy portfolio-copilot-gateway"
+
+# Grant frontend SA permission to invoke the gateway service (ADR-0013)
+echo "Granting roles/run.invoker to portfolio-copilot-frontend-sa on portfolio-copilot-gateway..."
+gcloud run services add-iam-policy-binding portfolio-copilot-gateway \
+  --project="$PROJECT_ID" \
+  --region="$REGION" \
+  --member="serviceAccount:$FRONTEND_SA" \
+  --role="roles/run.invoker" \
+  --condition=None \
+  --quiet || echo "Failed to bind invoker role to frontend-sa"
 
 echo "Deploying Cloud Run service: portfolio-copilot-frontend"
 gcloud run deploy portfolio-copilot-frontend \
@@ -80,7 +90,7 @@ gcloud run deploy portfolio-copilot-frontend \
   --region="$REGION" \
   --service-account="$FRONTEND_SA" \
   --set-labels="app=portfolio-copilot,component=frontend" \
-  --allow-unauthenticated \
+  --no-allow-unauthenticated \
   --max-instances=1 \
   --quiet || echo "Failed to deploy portfolio-copilot-frontend"
 
