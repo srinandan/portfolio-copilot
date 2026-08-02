@@ -6,6 +6,14 @@ gateway/bin/
 *.out
 coverage.out
 coverage.html
+# --- Python (orchestrator/, scripts/) ---
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
 
 # --- Node / Vue (frontend/) ---
 frontend/node_modules/

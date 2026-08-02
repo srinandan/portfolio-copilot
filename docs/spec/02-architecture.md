@@ -15,6 +15,7 @@ decision below, see the linked ADRs.
 | Session state | Vertex AI Sessions | — |
 | Long-term memory | Vertex AI Memory Bank | — |
 | Deployment / runtime | Vertex AI Agent Runtime (Agent Engine) — Python custom-agent contract | [0008](../adr/0008-python-for-orchestrator.md) |
+| Deployment identities | Dedicated Cloud Run SAs (`gateway-sa`, `frontend-sa`) + Agent Identity (`orchestrator`) | [0011](../adr/0011-least-privilege-identities.md) |
 | Frontend | TypeScript + Vue.js, Cloud Run | [0003](../adr/0003-standalone-ui-not-agentspace.md) |
 | API gateway | **Go** (unaffected by the Python pivot — not an agent), Cloud Run | [0003](../adr/0003-standalone-ui-not-agentspace.md), [0008](../adr/0008-python-for-orchestrator.md) |
 | Trade execution (paper) | Alpaca API | — |
@@ -62,6 +63,14 @@ Skills (discovered/composed per session)
 The frontend is a standalone custom UI, not built on Gemini
 Enterprise/Agentspace — see [ADR-0003](../adr/0003-standalone-ui-not-agentspace.md)
 for why.
+
+## Deployment identities
+
+Every deployed component operates under a least-privilege, scoped identity (see [ADR-0011](../adr/0011-least-privilege-identities.md)):
+- **`gateway-sa`** (Cloud Run): Granted `roles/datastore.user` (Firestore audit log + holdings) and `roles/bigquery.dataViewer` (fan-out chart queries). Does not have Secret Manager access.
+- **`frontend-sa`** (Cloud Run): Dedicated service account with zero additional GCP IAM roles (communicates strictly with the Gateway API).
+- **`orchestrator` Agent Identity** (Agent Runtime): Uses SPIFFE-based per-agent cryptographic identity with `roles/datastore.user`, `roles/bigquery.dataViewer`, and `roles/secretmanager.secretAccessor` (Alpaca API credentials). The Agent Platform Service Agent holds deployment-time secret accessor permissions.
+
 
 ## Language
 

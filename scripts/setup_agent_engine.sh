@@ -15,12 +15,57 @@ echo "Setting up Agent Engine in project $PROJECT_ID ($REGION)..."
 # Enable Vertex AI API
 gcloud services enable aiplatform.googleapis.com --project="$PROJECT_ID"
 
-# We use the python script to deploy the reasoning engine
-# We check if uv is available (since this repo seems to use uv for python, based on AGENTS.md)
+# 1. Grant Secret Manager access to Agent Platform Service Agent
+# Per Agent Runtime docs: secrets used as environment variables are fetched during deployment
+# by the Agent Platform Service Agent (service-PROJECT_NUMBER@gcp-sa-aiplatform.iam.gserviceaccount.com).
+PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format="value(projectNumber)" 2>/dev/null || echo "")
+if [ -n "$PROJECT_NUMBER" ]; then
+  AI_SERVICE_AGENT="service-${PROJECT_NUMBER}@gcp-sa-aiplatform.iam.gserviceaccount.com"
+  echo "Granting Secret Manager access to Agent Platform Service Agent ($AI_SERVICE_AGENT)..."
+  gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+    --member="serviceAccount:${AI_SERVICE_AGENT}" \
+    --role="roles/secretmanager.secretAccessor" \
+    --condition=None \
+    --quiet || echo "Warning: Failed to grant Secret Manager access to AI Service Agent $AI_SERVICE_AGENT"
+fi
+
+# 2. Grant project-level least-privilege IAM roles to Agent Runtime Agent Identities
+if [ -n "$PROJECT_NUMBER" ]; then
+  ORG_ID=$(gcloud projects describe "$PROJECT_ID" --format="value(parent.id)" 2>/dev/null || echo "")
+  PARENT_TYPE=$(gcloud projects describe "$PROJECT_ID" --format="value(parent.type)" 2>/dev/null || echo "")
+
+  if [ "$PARENT_TYPE" = "organization" ] && [ -n "$ORG_ID" ]; then
+    PRINCIPAL_SET="principalSet://agents.global.org-${ORG_ID}.system.id.goog/attribute.platformContainer/aiplatform/projects/${PROJECT_NUMBER}"
+  else
+    PRINCIPAL_SET="principalSet://agents.global.project-${PROJECT_NUMBER}.system.id.goog/attribute.platformContainer/aiplatform/projects/${PROJECT_NUMBER}"
+  fi
+
+  echo "Configuring IAM policy bindings for Agent Identities ($PRINCIPAL_SET)..."
+  # Firestore: IPS, holdings, liabilities
+  gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+    --member="$PRINCIPAL_SET" \
+    --role="roles/datastore.user" \
+    --condition=None \
+    --quiet || echo "Note: Datastore IAM binding on principalSet skipped or already configured"
+
+  # BigQuery: spending analysis
+  gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+    --member="$PRINCIPAL_SET" \
+    --role="roles/bigquery.dataViewer" \
+    --condition=None \
+    --quiet || echo "Note: BigQuery IAM binding on principalSet skipped or already configured"
+
+  # Secret Manager: Alpaca API key
+  gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+    --member="$PRINCIPAL_SET" \
+    --role="roles/secretmanager.secretAccessor" \
+    --condition=None \
+    --quiet || echo "Note: Secret Manager IAM binding on principalSet skipped or already configured"
+fi
+
+# 3. Deploy Agent Engine instance with Agent Identity
 if command -v uv &> /dev/null; then
-    # Create a temporary virtualenv to run the deployment script
     echo "Running Python deployment script with uv..."
-    # Dependencies: vertexai, google-auth, click
     uv run --with "google-cloud-aiplatform>=1.60.0" --with "google-auth" --with "click" python scripts/deploy_agent_engine.py --project="$PROJECT_ID" --location="$REGION"
 elif command -v python3 &> /dev/null; then
     echo "Running Python deployment script (make sure vertexai, google-auth, click are installed)..."
