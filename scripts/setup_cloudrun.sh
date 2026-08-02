@@ -68,6 +68,7 @@ gcloud run deploy portfolio-copilot-gateway \
   --image="$IMAGE" \
   --region="$REGION" \
   --service-account="$GATEWAY_SA" \
+  --set-labels="app=portfolio-copilot,component=gateway" \
   --allow-unauthenticated \
   --max-instances=1 \
   --quiet || echo "Failed to deploy portfolio-copilot-gateway"
@@ -78,6 +79,7 @@ gcloud run deploy portfolio-copilot-frontend \
   --image="$IMAGE" \
   --region="$REGION" \
   --service-account="$FRONTEND_SA" \
+  --set-labels="app=portfolio-copilot,component=frontend" \
   --allow-unauthenticated \
   --max-instances=1 \
   --quiet || echo "Failed to deploy portfolio-copilot-frontend"

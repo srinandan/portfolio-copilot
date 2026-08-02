@@ -20,12 +20,13 @@ DUMMY_VALUE="dummy-alpaca-api-key-replace-me"
 # Check if secret exists
 if ! gcloud secrets describe "$SECRET_NAME" --project="$PROJECT_ID" &>/dev/null; then
   echo "Creating secret: $SECRET_NAME"
-  gcloud secrets create "$SECRET_NAME" --replication-policy="automatic" --project="$PROJECT_ID"
+  gcloud secrets create "$SECRET_NAME" --replication-policy="automatic" --labels="app=portfolio-copilot" --project="$PROJECT_ID"
 
   echo -n "$DUMMY_VALUE" | gcloud secrets versions add "$SECRET_NAME" --data-file=- --project="$PROJECT_ID"
   echo "Secret $SECRET_NAME created with dummy value."
 else
-  echo "Secret $SECRET_NAME already exists."
+  echo "Secret $SECRET_NAME already exists. Ensuring labels..."
+  gcloud secrets update "$SECRET_NAME" --update-labels="app=portfolio-copilot" --project="$PROJECT_ID" --quiet 2>/dev/null || true
 fi
 
 # Grant Secret Manager access to the Agent Platform Service Agent
