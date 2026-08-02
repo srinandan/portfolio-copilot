@@ -31,8 +31,34 @@ paper trading API).
 
 ## Get started
 
-Setup instructions live in [`install/`](install/). *(Coming soon. The
-install path will be filled in once the agent itself is built.)*
+Setup instructions: [`install/`](install/).
+
+## How to use it
+
+*This section is a placeholder. There's no frontend yet, so nothing
+below is real usage documentation, it's a sketch of the intended flow
+so the eventual UI has a clear target rather than being designed from
+scratch. Replace this whole section once `frontend/` exists.*
+
+### First time: onboarding
+
+You'll answer a short interview: your goals, time horizon, how you'd
+react to a market drop, what you're carrying in debt. From that, the
+agent builds your Investment Policy Statement, the reference plan
+everything else checks against.
+
+### Day to day: checking in
+
+Ask it how your spending looks, whether your portfolio has drifted from
+target, or what's going on with a specific holding. It answers using
+live data, not a cached summary.
+
+### When it wants to act: approving a trade
+
+If it thinks a trade is warranted, it drafts a specific proposal, ticker,
+quantity, and rationale, checks it against your policy, and shows you
+exactly what it wants to do before anything happens. Nothing executes
+without your yes.
 
 ## Learn more
 
@@ -42,19 +68,24 @@ Contributor / coding-agent instructions: see [`AGENTS.md`](AGENTS.md).
 
 ## Status
 
-Architecture and functional spec drafted. Implementation not yet started.
+Foundation, first skill, and several parallel skills implemented.
+Frontend not yet started. See [`docs/adr/`](docs/adr/) for the current
+state of each major decision.
 
 ## Built With
 
-This application was built with the assistance of [Stitch](https://stitch.withgoogle.com/) and [Jules](https://jules.google.com).
+This application was built with the assistance of
+[Stitch](https://stitch.withgoogle.com/) and [Jules](https://jules.google.com).
 
 ## Contributing
 
-Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for details on how to contribute to this project.
+Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for details on how to
+contribute to this project.
 
 ## Support
 
-This demo is *NOT* endorsed by Google or Google Cloud. The repo is intended for educational/hobbyists use only.
+This demo is *NOT* endorsed by Google or Google Cloud. The repo is
+intended for educational/hobbyist use only.
 
 ## License
 
