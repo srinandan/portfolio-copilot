@@ -28,4 +28,16 @@ else
   echo "Secret $SECRET_NAME already exists."
 fi
 
+# Grant Secret Manager access to the Agent Platform Service Agent
+# (Required during deployment when secrets are passed as env vars to Reasoning Engine)
+PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format="value(projectNumber)" 2>/dev/null || echo "")
+if [ -n "$PROJECT_NUMBER" ]; then
+  AI_SERVICE_AGENT="service-${PROJECT_NUMBER}@gcp-sa-aiplatform.iam.gserviceaccount.com"
+  echo "Granting Secret Manager access to Agent Platform Service Agent ($AI_SERVICE_AGENT)..."
+  gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+    --member="serviceAccount:${AI_SERVICE_AGENT}" \
+    --role="roles/secretmanager.secretAccessor" \
+    --quiet || echo "Warning: Failed to grant Secret Manager access to AI Service Agent $AI_SERVICE_AGENT"
+fi
+
 echo "Secret Manager setup complete."
