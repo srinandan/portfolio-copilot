@@ -1,3 +1,7 @@
+from orchestrator.logger import get_logger
+
+logger = get_logger(__name__)
+
 import uuid
 import json
 from datetime import datetime, timezone
@@ -199,7 +203,7 @@ async def goals_onboarding_skill(ctx: Context, node_input: Any):
         fact = UserContent(parts=[Part.from_text(text=summary_text)])
         await ctx.add_events_to_memory(events=[fact])
     except Exception as e:
-        print(f"Warning: add_events_to_memory failed (expected if not implemented fully): {e}")
+        logger.warning(f"add_events_to_memory failed (expected if not implemented fully): {e}")
 
     # Audit log: IPS created/superseded
     completion_log = AuditLogEntry(

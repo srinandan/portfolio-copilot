@@ -1,3 +1,7 @@
+from orchestrator.logger import get_logger
+
+logger = get_logger(__name__)
+
 import os
 import asyncio
 from typing import Optional
@@ -17,7 +21,7 @@ class SessionManager:
             self.session_service: BaseSessionService = InMemorySessionService()
             self.memory_service: Optional[BaseMemoryService] = InMemoryMemoryService()
             if not use_in_memory:
-                 print("Warning: AGENT_ENGINE_ID not set, falling back to InMemorySessionService and InMemoryMemoryService.")
+                 logger.warning("AGENT_ENGINE_ID not set, falling back to InMemorySessionService and InMemoryMemoryService.")
         else:
             self.session_service = VertexAiSessionService(
                 project=self.project,
@@ -36,7 +40,7 @@ class SessionManager:
                 if session:
                     return session
             except Exception as e:
-                print(f"Warning: Failed to retrieve session {session_id}: {e}")
+                logger.warning(f"Failed to retrieve session {session_id}: {e}")
 
         session = await self.session_service.create_session(app_name=app_name, user_id=user_id)
         return session
@@ -44,7 +48,7 @@ class SessionManager:
     async def add_session_to_memory(self, app_name: str, user_id: str, session_id: str):
         """Adds the specified session to the Memory Bank."""
         if not self.memory_service:
-            print("Memory service not configured. Skipping.")
+            logger.warning("Memory service not configured. Skipping.")
             return
 
         try:
@@ -52,4 +56,4 @@ class SessionManager:
              if session:
                  await self.memory_service.add_session_to_memory(session)
         except Exception as e:
-            print(f"Error adding session to memory: {e}")
+            logger.error(f"Error adding session to memory: {e}")

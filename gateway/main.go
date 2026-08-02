@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -12,7 +12,10 @@ import (
 )
 
 func main() {
-	r := gin.Default()
+	InitLogger()
+
+	r := gin.New()
+	r.Use(StructuredLogMiddleware(), gin.Recovery())
 
 	// Health check endpoint for Cloud Run
 	r.GET("/health", func(c *gin.Context) {
@@ -59,7 +62,7 @@ func main() {
 		for i := 0; i < 5; i++ {
 			select {
 			case <-clientGone:
-				log.Println("Client disconnected")
+				slog.InfoContext(c.Request.Context(), "Client disconnected")
 				return
 			case t := <-ticker.C:
 				// Write SSE format
