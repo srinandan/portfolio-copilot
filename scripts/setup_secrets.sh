@@ -37,6 +37,7 @@ if [ -n "$PROJECT_NUMBER" ]; then
   gcloud projects add-iam-policy-binding "$PROJECT_ID" \
     --member="serviceAccount:${AI_SERVICE_AGENT}" \
     --role="roles/secretmanager.secretAccessor" \
+    --condition=None \
     --quiet || echo "Warning: Failed to grant Secret Manager access to AI Service Agent $AI_SERVICE_AGENT"
 fi
 

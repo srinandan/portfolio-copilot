@@ -25,6 +25,7 @@ if [ -n "$PROJECT_NUMBER" ]; then
   gcloud projects add-iam-policy-binding "$PROJECT_ID" \
     --member="serviceAccount:${AI_SERVICE_AGENT}" \
     --role="roles/secretmanager.secretAccessor" \
+    --condition=None \
     --quiet || echo "Warning: Failed to grant Secret Manager access to AI Service Agent $AI_SERVICE_AGENT"
 fi
 
@@ -44,18 +45,21 @@ if [ -n "$PROJECT_NUMBER" ]; then
   gcloud projects add-iam-policy-binding "$PROJECT_ID" \
     --member="$PRINCIPAL_SET" \
     --role="roles/datastore.user" \
+    --condition=None \
     --quiet || echo "Note: Datastore IAM binding on principalSet skipped or already configured"
 
   # BigQuery: spending analysis
   gcloud projects add-iam-policy-binding "$PROJECT_ID" \
     --member="$PRINCIPAL_SET" \
     --role="roles/bigquery.dataViewer" \
+    --condition=None \
     --quiet || echo "Note: BigQuery IAM binding on principalSet skipped or already configured"
 
   # Secret Manager: Alpaca API key
   gcloud projects add-iam-policy-binding "$PROJECT_ID" \
     --member="$PRINCIPAL_SET" \
     --role="roles/secretmanager.secretAccessor" \
+    --condition=None \
     --quiet || echo "Note: Secret Manager IAM binding on principalSet skipped or already configured"
 fi
 

@@ -48,11 +48,13 @@ echo "Configuring IAM policy bindings for gateway-sa..."
 gcloud projects add-iam-policy-binding "$PROJECT_ID" \
   --member="serviceAccount:$GATEWAY_SA" \
   --role="roles/datastore.user" \
+  --condition=None \
   --quiet
 
 gcloud projects add-iam-policy-binding "$PROJECT_ID" \
   --member="serviceAccount:$GATEWAY_SA" \
   --role="roles/bigquery.dataViewer" \
+  --condition=None \
   --quiet
 
 # Note: Frontend needs no GCP API roles at all (it calls gateway, never GCP services directly per ADR-0003).

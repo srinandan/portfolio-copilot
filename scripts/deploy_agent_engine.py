@@ -20,6 +20,7 @@ def grant_iam_role(project: str, member: str, role: str) -> None:
                 project,
                 f"--member={member}",
                 f"--role={role}",
+                "--condition=None",
                 "--quiet",
             ],
             check=True,
