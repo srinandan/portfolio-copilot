@@ -59,51 +59,54 @@ async def goals_onboarding_interview(ctx: Context, node_input: Any):
 
     # 1. Gather Goals
     goals_response = yield RequestInput(message="What are your primary financial goals? (e.g. name, target amount in USD, target date like YYYY-MM-DD)")
-    # For a real implementation, we would use an LLM or structured form to parse this.
-    # For now, we assume the UI/Action passes a structured payload or we mock a parsed response.
-    # We will simulate parsed extraction:
+    if goals_response is None:
+        return
+    if not (isinstance(goals_response, dict) and "goals" in goals_response and goals_response["goals"]):
+        raise ValueError("onboarding interview: missing required field(s) in goals")
+
     goals = []
-    if isinstance(goals_response, dict) and "goals" in goals_response:
-        for g in goals_response["goals"]:
-            goals.append(Goal(name=g["name"], target_amount_usd=g["target_amount_usd"], target_date=g["target_date"]))
-    else:
-        # Fallback dummy for testing
-        goals.append(Goal(name="Retirement", target_amount_usd=1000000, target_date="2045-01-01"))
+    for g in goals_response["goals"]:
+        goals.append(Goal(name=g["name"], target_amount_usd=g["target_amount_usd"], target_date=g["target_date"]))
 
     # 2. Gather Risk Tolerance inputs
     risk_response = yield RequestInput(message="What is your time horizon (in years) for your primary goal? And how would you react to a 20% drop in your portfolio ('sell', 'hold', 'buy_more')?")
-    time_horizon = 10
-    drawdown_reaction = "hold"
-    if isinstance(risk_response, dict):
-        time_horizon = risk_response.get("time_horizon", time_horizon)
-        drawdown_reaction = risk_response.get("drawdown_reaction", drawdown_reaction)
+    if risk_response is None:
+        return
+    if not (isinstance(risk_response, dict) and "time_horizon" in risk_response and "drawdown_reaction" in risk_response):
+        raise ValueError("onboarding interview: missing required field(s) in risk_tolerance")
 
+    time_horizon = risk_response["time_horizon"]
+    drawdown_reaction = risk_response["drawdown_reaction"]
     risk_tolerance = calculate_risk_tolerance(time_horizon, drawdown_reaction)
 
     # 3. Gather Liabilities
-    # Note: If it was a drift_review or life_event we'd pass back the existing liabilities here,
-    # but for simplicity we ask for them or take structured input.
     liabilities_response = yield RequestInput(message="What are your current debts? (mortgage, credit cards, auto loans, etc. Include balance and minimum payments)")
+    if liabilities_response is None:
+        return
+    if not (isinstance(liabilities_response, dict) and "liabilities" in liabilities_response):
+        raise ValueError("onboarding interview: missing required field(s) in liabilities")
+
     liabilities = []
-    if isinstance(liabilities_response, dict) and "liabilities" in liabilities_response:
-        for l in liabilities_response["liabilities"]:
-            liabilities.append(Liability(
-                liability_id=l.get("liability_id", str(uuid.uuid4())),
-                type=LiabilityType(l["type"]),
-                description=l.get("description"),
-                balance_usd=l["balance_usd"],
-                interest_rate_percent=l.get("interest_rate_percent"),
-                minimum_payment_usd=l["minimum_payment_usd"]
-            ))
+    for l_item in liabilities_response["liabilities"]:
+        liabilities.append(Liability(
+            liability_id=l_item.get("liability_id", str(uuid.uuid4())),
+            type=LiabilityType(l_item["type"]),
+            description=l_item.get("description"),
+            balance_usd=l_item["balance_usd"],
+            interest_rate_percent=l_item.get("interest_rate_percent"),
+            minimum_payment_usd=l_item["minimum_payment_usd"],
+        ))
 
     # 4. Gather Liquidity Needs
     # TODO(P1): Derive reserve_months / savings rate from BigQuery Spending Analysis instead of asking directly
     liquidity_response = yield RequestInput(message="How many months of living expenses do you keep in reserve, and do you have any known upcoming major expenses (USD)?")
-    reserve_months = 6.0
-    known_expenses = 0.0
-    if isinstance(liquidity_response, dict):
-        reserve_months = liquidity_response.get("reserve_months", reserve_months)
-        known_expenses = liquidity_response.get("known_upcoming_expenses_usd", known_expenses)
+    if liquidity_response is None:
+        return
+    if not (isinstance(liquidity_response, dict) and "reserve_months" in liquidity_response):
+        raise ValueError("onboarding interview: missing required field(s) in liquidity_needs")
+
+    reserve_months = liquidity_response["reserve_months"]
+    known_expenses = liquidity_response.get("known_upcoming_expenses_usd", 0.0)
 
     # Calculate default allocation bands based on the derived risk tolerance
     bands = get_default_allocation_bands(risk_tolerance)
@@ -113,13 +116,17 @@ async def goals_onboarding_interview(ctx: Context, node_input: Any):
         message=f"Based on your risk tolerance ({risk_tolerance.value}), we propose these allocation bands: {[b.model_dump() for b in bands]}. "
                 "Do you want to override these bands or set constraints? Provide confirmation."
     )
+    if confirm_response is None:
+        return
+    if not isinstance(confirm_response, dict):
+        raise ValueError("onboarding interview: missing required field(s) in confirmation")
 
     # If the user overrides bands in the response:
-    if isinstance(confirm_response, dict) and "overridden_bands" in confirm_response:
+    if "overridden_bands" in confirm_response:
         bands = [TargetAllocation(**b) for b in confirm_response["overridden_bands"]]
 
     constraints = Constraints(concentration_limit_percent=15)
-    if isinstance(confirm_response, dict) and "constraints" in confirm_response:
+    if "constraints" in confirm_response:
         constraints = Constraints(**confirm_response["constraints"])
 
     yield {
@@ -161,7 +168,21 @@ async def goals_onboarding_skill(ctx: Context, node_input: Any):
     db_client.append_audit_log(invoke_log)
 
     # 1. Run the multi-turn interview
-    interview_data = await ctx.run_node(goals_onboarding_interview, node_input=node_input)
+    try:
+        interview_data = await ctx.run_node(goals_onboarding_interview, node_input=node_input)
+    except Exception as e:
+        failed_log = AuditLogEntry(
+            log_id=str(uuid.uuid4()),
+            event_type=EventType.SKILL_INVOCATION_FAILED,
+            timestamp=datetime.now(timezone.utc),
+            actor=Actor(type=ActorType.AGENT, skill_name="private-goals-onboarding", skill_version=SKILL_VERSION),
+            detail=f"Interview failed or abandoned: {e}",
+        )
+        db_client.append_audit_log(failed_log)
+        raise
+
+    if interview_data is None:
+        return
 
     # 2. Persist to Firestore
     # Retrieve existing IPS to get the stable ips_id and next version number

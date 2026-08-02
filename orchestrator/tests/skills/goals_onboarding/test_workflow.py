@@ -146,3 +146,31 @@ async def test_goals_onboarding_skill_version_from_frontmatter(monkeypatch):
         assert first_log.actor.skill_version == "0.9.9-test"
         assert second_log.actor.skill_version == "0.9.9-test"
 
+
+@pytest.mark.asyncio
+async def test_goals_onboarding_partial_interview_failure_emits_audit_and_no_writes():
+    """Verify that if the interview fails/drops halfway through, SKILL_INVOCATION_FAILED is emitted and no IPS/liabilities write occurs."""
+    with patch("src.orchestrator.skills.goals_onboarding.FirestoreClient") as MockFirestoreClient:
+        mock_db_client = MagicMock()
+        MockFirestoreClient.return_value = mock_db_client
+
+        mock_ctx = MagicMock()
+        mock_ctx.run_node = AsyncMock(side_effect=ValueError("onboarding interview: missing required field(s) in liabilities"))
+
+        with pytest.raises(ValueError, match="missing required field.*liabilities"):
+            gen = goals_onboarding_skill.run(ctx=mock_ctx, node_input={"user_id": "u3", "trigger": "initial"})
+            async for _ in gen:
+                pass
+
+        assert mock_db_client.update_ips.call_count == 0
+        assert mock_db_client.set_liabilities.call_count == 0
+        assert mock_db_client.append_audit_log.call_count == 2
+
+        invoked_log = mock_db_client.append_audit_log.call_args_list[0][0][0]
+        failed_log = mock_db_client.append_audit_log.call_args_list[1][0][0]
+
+        assert invoked_log.event_type.value == "skill_invoked"
+        assert failed_log.event_type.value == "skill_invocation_failed"
+        assert "liabilities" in (failed_log.detail or "")
+
+
