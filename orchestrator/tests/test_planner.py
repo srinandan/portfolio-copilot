@@ -227,12 +227,59 @@ async def test_root_planner_invalid_json():
     with patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list, \
          patch("src.orchestrator.skills.goals_onboarding.FirestoreClient") as mock_db:
 
-        mock_db_instance = MagicMock()
-        mock_db.return_value = mock_db_instance
-        mock_list.return_value = [
-            Skill(name="projects/test-project/locations/test-location/skills/private-goals-onboarding", target_state="TARGET_STATE_ACTIVE", default_revision="rev1")
-        ]
-
         response_stream = runner.run_async(user_id="user_123", session_id="s1", new_message=UserContent(parts=[Part.from_text(text="invalid json {")]))
         events = [e async for e in response_stream]
         assert len(events) > 0
+
+
+@pytest.mark.asyncio
+async def test_root_planner_dispatches_research_managed_agent():
+    """Verify planner retrieves dynamic skill content for research and instantiates/runs ManagedAgent."""
+    agent = Workflow(
+        name="test_root",
+        edges=[("START", root_planner)],
+    )
+    session_service = InMemorySessionService()
+    memory_service = InMemoryMemoryService()
+    runner = Runner(
+        app_name="test_app",
+        agent=agent,
+        session_service=session_service,
+        memory_service=memory_service,
+        auto_create_session=True,
+    )
+
+    with patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list, \
+         patch("src.orchestrator.planner.AgentRegistryClient.get_skill_content", new_callable=AsyncMock) as mock_get_content, \
+         patch("src.orchestrator.planner.ManagedAgent._run_async_impl") as mock_managed_run:
+
+        from google.adk.events import Event
+
+        async def fake_research_stream(ctx):
+            yield Event(author="research", output="market research report generated")
+
+        mock_managed_run.side_effect = fake_research_stream
+
+        mock_list.return_value = [
+            Skill(
+                name="projects/test-proj/locations/us-central1/skills/private-research",
+                target_state="TARGET_STATE_ACTIVE",
+                default_revision="rev-research-1",
+            ),
+        ]
+        mock_get_content.return_value = "# Market Research Skill\nPerform market analysis."
+
+        response_stream = runner.run_async(
+            user_id="user_123",
+            session_id="session_456",
+            new_message=UserContent(parts=[Part.from_text(text='{"user_id": "u5"}')]),
+        )
+
+        events = []
+        async for event in response_stream:
+            events.append(event)
+
+        mock_get_content.assert_awaited_once_with("research")
+        last_event = events[-1]
+        assert "research_result: market research report generated" in last_event.output
+
