@@ -1,76 +1,106 @@
-# Skill Evaluations
+# Skill Evaluations via Native ADK
 
-This document outlines the evaluation framework and testing workflows for Portfolio Copilot runtime skills using Google's **[evalin](https://g3doc.corp.google.com/learning/gemini/agents/evaluation/evalin/README.md?cl=head)** infrastructure.
+This document outlines the evaluation framework, schema, and testing workflows for Portfolio Copilot runtime skills using Google's native **Agent Development Kit (ADK)** evaluation framework.
 
 ---
 
 ## Overview
 
-Runtime skills under `/skills` are dynamically discovered by the root planner via the Agent Registry. To prevent regressions, ensure deterministic compliance with schema invariants, and measure model capabilities, all skills maintain evaluation suites defined in `EVAL.txtpb` files.
+Runtime skills under `/skills` are dynamically discovered by the root planner via the Agent Registry. To prevent regressions, ensure deterministic compliance with schema invariants, and measure model capabilities, all skills maintain evaluation suites defined in `.evalset.json` files conforming to ADK's `EvalSet` schema.
 
 ---
 
-## Evaluation Framework: Evalin
+## Evaluation Architecture: Two-Pass Strategy
 
-[Evalin](https://g3doc.corp.google.com/learning/gemini/agents/evaluation/evalin/README.md?cl=head) is the standardized evaluation harness for Gemini/Jetski agent skills.
+The ADK evaluation framework supports evaluating the **same converted EvalSet dataset** across two different agent configurations:
 
-### Key Capabilities
+```
+                      ┌────────────────────────────────────────┐
+                      │  Skill EvalSet (*.evalset.json)        │
+                      │  - Golden Prompts                      │
+                      │  - Invariant Expectations              │
+                      │  - Refusal & Boundary Criteria         │
+                      └──────────────────┬─────────────────────┘
+                                         │
+                 ┌───────────────────────┴───────────────────────┐
+                 ▼                                               ▼
+┌─────────────────────────────────┐             ┌─────────────────────────────────┐
+│ Pass 1: Documentation-Only Eval │             │ Pass 2: Orchestrator / Live     │
+│ (doc_only_agent.py)             │             │ Runtime Skill Eval              │
+├─────────────────────────────────┤             ├─────────────────────────────────┤
+│ • Stripped LlmAgent             │             │ • Full Orchestrator / Skill     │
+│ • Instruction = SKILL.md text   │             │ • Real dynamic planning         │
+│ • Tools = [] (Zero tools)       │             │ • Firestore & BigQuery tools    │
+│ • Tests: Can an agent with ONLY │             │ • Tests: End-to-end operational │
+│   SKILL.md answer correctly?    │             │   behavior & tool interaction   │
+└─────────────────────────────────┘             └─────────────────────────────────┘
+```
 
-- **Skill Uplift Measurement (`--with-vs-without-skills`)**: Evaluates agent performance both with and without the skill enabled to quantify performance delta and verify that the skill adds demonstrable value.
-- **LLM-as-a-Judge Evaluation**: Uses Gemini Flash to grade trajectory outputs, semantic compliance, and adherence to safety constraints.
-- **Multi-Run Consistency**: Executes multiple trials per test case (`--runs=3`) to ensure statistical reliability across stochastic completions.
-- **Trajectory & Error Reporting**: Generates shareable evaluation reports (`EVALIN_REPORT`) and trajectory visualizer links.
+1. **Pass 1: Documentation-Only Eval (`evals/doc_only_agent.py`)**:
+   - Builds a minimal `LlmAgent` using the `SKILL.md` file text as its instruction, with **no tools** and no database plumbing.
+   - Tests whether `SKILL.md` is self-contained and clear enough for external consumers or registry-discovered agents (e.g. `ManagedAgent`-wrapped Antigravity per [ADR-0009](adr/0009-managed-agent-native-class.md)) to understand rules, thresholds, and guardrails.
+
+2. **Pass 2: Real Orchestrator / Runtime Skill Eval**:
+   - Evaluates the deployed orchestrator skill with tool access against the exact same test dataset.
+   - Verifies end-to-end execution, database writes, and tool calling.
 
 ---
 
 ## Skill Evaluation Suites
 
-Each runtime skill contains an `EVAL.txtpb` test suite covering:
-1. **Golden Path Scenarios**: Standard expected user interactions with explicit ground-truth expectations.
-2. **Boundary & Threshold Conditions**: Edge cases around mathematical boundaries (e.g. drift threshold borders, concentration ceilings).
-3. **Guardrails & Safety Invariants**: Enforcement of read-only constraints, exclusion lists, refusal on missing prerequisites, and human-in-the-loop approval gates.
+Each runtime skill folder contains a `.evalset.json` file:
 
-### Summary of Test Suites
-
-| Skill | Test Cases Covered |
-|---|---|
-| [`skills/goals-onboarding/EVAL.txtpb`](../skills/goals-onboarding/EVAL.txtpb) | - Initial onboarding & deterministic risk mapping<br>- Conservative drawdown reaction mapping<br>- Life-event IPS versioning & superseding<br>- Refusal of partial persistence on abandoned interviews<br>- Feasibility reality-checks for unrealistic targets |
-| [`skills/portfolio-analysis/EVAL.txtpb`](../skills/portfolio-analysis/EVAL.txtpb) | - Asset class drift calculation against IPS target bands<br>- Within-band tolerance verification<br>- Unclassified asset reporting without silent omissions<br>- Missing active IPS graceful refusal<br>- Precise boundary evaluation on drift thresholds |
-| [`skills/action-drafting/EVAL.txtpb`](../skills/action-drafting/EVAL.txtpb) | - Deterministic rebalance trim calculation back to target percent<br>- Excluded ticker and sector constraint enforcement<br>- Single-stock concentration limit guardrails<br>- Strict enforcement of `status: drafted` (no execution authority)<br>- Zero-action output when portfolio is in band<br>- Low-confidence research transparency in rationale |
-| [`skills/spending-analysis/EVAL.txtpb`](../skills/spending-analysis/EVAL.txtpb) | - Natural-language-to-SQL translation against Chase transactions<br>- Dual-condition anomaly detection (>1.4x avg AND > avg + $100)<br>- Savings rate and emergency cash reserve calculations<br>- Rejection of destructive/write SQL operations<br>- Clarifying question generation for ambiguous queries |
-| [`skills/research/EVAL.txtpb`](../skills/research/EVAL.txtpb) | - Public market context retrieval via Google Search grounding<br>- Strict isolation (zero private data access)<br>- Transparent reporting of inconclusive data (`confidence: low`)<br>- Rejection of speculative price guarantees |
+| Skill | EvalSet File | Cases Covered |
+|---|---|---|
+| [`skills/goals-onboarding/`](../skills/goals-onboarding/) | [`goals_onboarding.evalset.json`](../skills/goals-onboarding/goals_onboarding.evalset.json) | • Initial onboarding & deterministic risk mapping<br>• Conservative drawdown reaction mapping<br>• Life-event IPS versioning & superseding<br>• Refusal of partial persistence on abandoned interviews<br>• Feasibility reality-checks for unrealistic targets |
+| [`skills/portfolio-analysis/`](../skills/portfolio-analysis/) | [`portfolio_analysis.evalset.json`](../skills/portfolio-analysis/portfolio_analysis.evalset.json) | • Asset class drift calculation against IPS target bands<br>• Within-band tolerance verification<br>• Unclassified asset reporting without silent omissions<br>• Missing active IPS graceful refusal<br>• Precise boundary evaluation on drift thresholds |
+| [`skills/action-drafting/`](../skills/action-drafting/) | [`action_drafting.evalset.json`](../skills/action-drafting/action_drafting.evalset.json) | • Deterministic rebalance trim calculation back to target percent<br>• Excluded ticker and sector constraint enforcement<br>• Single-stock concentration limit guardrails<br>• Strict enforcement of `status: drafted` (no execution authority)<br>• Zero-action output when portfolio is in band<br>• Low-confidence research transparency in rationale |
+| [`skills/spending-analysis/`](../skills/spending-analysis/) | [`spending_analysis.evalset.json`](../skills/spending-analysis/spending_analysis.evalset.json) | • Natural-language-to-SQL translation against Chase transactions<br>• Dual-condition anomaly detection (>1.4x avg AND > avg + $100)<br>• Savings rate and emergency cash reserve calculations<br>• Rejection of destructive/write SQL operations<br>• Clarifying question generation for ambiguous queries |
+| [`skills/research/`](../skills/research/) | [`research.evalset.json`](../skills/research/research.evalset.json) | • Public market context retrieval via Google Search grounding<br>• Strict isolation (zero private data access)<br>• Transparent reporting of inconclusive data (`confidence: low`)<br>• Rejection of speculative price guarantees |
 
 ---
 
 ## Running Evaluations
 
-### Local & Presubmit Execution
+### Running with the ADK CLI
 
-Run `evalin` against a specific skill suite:
+Using the native `adk eval` command:
 
 ```bash
-evalin run skills/portfolio-analysis/EVAL.txtpb \
-  --with-vs-without-skills \
-  --runs=3 \
-  --max-parallel=30 \
-  --model=flash \
-  --judge=flash
+uv run --project orchestrator adk eval \
+  skills/goals-onboarding \
+  skills/goals-onboarding/goals_onboarding.evalset.json
 ```
 
-To run across all skills:
+### Running the Documentation-Only Evaluation Pass
+
+Use the evaluation runner in `evals/`:
 
 ```bash
-for skill in skills/*/EVAL.txtpb; do
-  echo "Evaluating $skill..."
-  evalin run "$skill" --with-vs-without-skills --runs=3 --model=flash --judge=flash
+# Evaluate a single skill
+PYTHONPATH=. uv run --project orchestrator python -m evals.runner skills/goals-onboarding
+
+# Evaluate all skills
+for dir in skills/*/; do
+  PYTHONPATH=. uv run --project orchestrator python -m evals.runner "$dir"
 done
+```
+
+### Automated Unit Testing
+
+EvalSet schema compliance, JSON validation, and doc-only agent construction are covered by pytest:
+
+```bash
+cd orchestrator
+PYTHONSAFEPATH=1 uv run pytest tests/test_skill_evalsets.py
 ```
 
 ---
 
 ## Guidelines for Adding or Modifying Skills
 
-When creating or modifying a skill in `/skills`:
-1. Every new skill **must** include a corresponding `EVAL.txtpb` file in its directory.
+When creating or modifying a runtime skill in `/skills`:
+1. Every new skill **must** include a corresponding `<skill_name>.evalset.json` file in its directory.
 2. The eval suite must test golden paths, edge conditions, and failure/refusal modes.
-3. Include the generated `EVALIN_REPORT` URL in pull request descriptions and code reviews.
+3. Validate that the eval set loads into `google.adk.evaluation.eval_set.EvalSet`.
+4. Ensure `SKILL.md` is complete and passes the doc-only agent evaluation.

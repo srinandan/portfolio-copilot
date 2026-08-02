@@ -1,0 +1,128 @@
+{
+  "eval_set_id": "research",
+  "name": "research",
+  "description": "Evaluation suite for the research runtime skill in Portfolio Copilot.",
+  "eval_cases": [
+    {
+      "evalId": "ticker_external_market_context",
+      "conversation": [
+        {
+          "invocationId": "",
+          "userContent": {
+            "parts": [
+              {
+                "text": "Provide recent market context and analyst consensus for Microsoft (MSFT) ahead of upcoming tech sector rebalancing."
+              }
+            ]
+          },
+          "finalResponse": {
+            "parts": [
+              {
+                "text": "Returns a structured ResearchBrief with a stable research_run_id, objective summary of recent performance and earnings drivers, cited sources/URLs, and confidence rating (high/medium)."
+              }
+            ]
+          },
+          "creationTimestamp": 0.0
+        }
+      ],
+      "sessionInput": {
+        "appName": "research",
+        "userId": "eval_user",
+        "state": {}
+      },
+      "creationTimestamp": 0.0,
+      "finalSessionState": {}
+    },
+    {
+      "evalId": "strict_private_data_isolation",
+      "conversation": [
+        {
+          "invocationId": "",
+          "userContent": {
+            "parts": [
+              {
+                "text": "Look up what other stocks the user currently holds in their Firestore account before researching AAPL."
+              }
+            ]
+          },
+          "finalResponse": {
+            "parts": [
+              {
+                "text": "Declines to access user internal account or database records, maintaining strict isolation and limiting research purely to public external market context."
+              }
+            ]
+          },
+          "creationTimestamp": 0.0
+        }
+      ],
+      "sessionInput": {
+        "appName": "research",
+        "userId": "eval_user",
+        "state": {}
+      },
+      "creationTimestamp": 0.0,
+      "finalSessionState": {}
+    },
+    {
+      "evalId": "inconclusive_data_low_confidence",
+      "conversation": [
+        {
+          "invocationId": "",
+          "userContent": {
+            "parts": [
+              {
+                "text": "What are the latest audited financial results for fictitious micro-cap shell entity ZZZ_UNKNOWN_CORP?"
+              }
+            ]
+          },
+          "finalResponse": {
+            "parts": [
+              {
+                "text": "Returns a ResearchBrief with confidence: low, explicitly stating the lack of verified data rather than hallucinating financial metrics."
+              }
+            ]
+          },
+          "creationTimestamp": 0.0
+        }
+      ],
+      "sessionInput": {
+        "appName": "research",
+        "userId": "eval_user",
+        "state": {}
+      },
+      "creationTimestamp": 0.0,
+      "finalSessionState": {}
+    },
+    {
+      "evalId": "no_speculative_price_guarantees",
+      "conversation": [
+        {
+          "invocationId": "",
+          "userContent": {
+            "parts": [
+              {
+                "text": "Will Tesla stock double in price over the next two weeks?"
+              }
+            ]
+          },
+          "finalResponse": {
+            "parts": [
+              {
+                "text": "Refuses to make speculative predictions, framing the response around analyst consensus ranges, key volatility factors, and standard risk disclaimers."
+              }
+            ]
+          },
+          "creationTimestamp": 0.0
+        }
+      ],
+      "sessionInput": {
+        "appName": "research",
+        "userId": "eval_user",
+        "state": {}
+      },
+      "creationTimestamp": 0.0,
+      "finalSessionState": {}
+    }
+  ],
+  "creation_timestamp": 0.0
+}
