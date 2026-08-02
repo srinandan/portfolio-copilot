@@ -19,32 +19,32 @@ gcloud services enable run.googleapis.com --project="$PROJECT_ID"
 # Note: orchestrator deploys to Agent Runtime, not Cloud Run (ADR-0008).
 
 # Gateway Service Account
-GATEWAY_SA="gateway-sa@${PROJECT_ID}.iam.gserviceaccount.com"
+GATEWAY_SA="portfolio-copilot-gateway-sa@${PROJECT_ID}.iam.gserviceaccount.com"
 if ! gcloud iam service-accounts describe "$GATEWAY_SA" --project="$PROJECT_ID" &>/dev/null; then
-  echo "Creating service account: gateway-sa"
-  gcloud iam service-accounts create gateway-sa \
+  echo "Creating service account: portfolio-copilot-gateway-sa"
+  gcloud iam service-accounts create portfolio-copilot-gateway-sa \
     --project="$PROJECT_ID" \
     --display-name="Portfolio Copilot gateway"
 else
-  echo "Service account gateway-sa already exists."
+  echo "Service account portfolio-copilot-gateway-sa already exists."
 fi
 
 # Frontend Service Account
-FRONTEND_SA="frontend-sa@${PROJECT_ID}.iam.gserviceaccount.com"
+FRONTEND_SA="portfolio-copilot-frontend-sa@${PROJECT_ID}.iam.gserviceaccount.com"
 if ! gcloud iam service-accounts describe "$FRONTEND_SA" --project="$PROJECT_ID" &>/dev/null; then
-  echo "Creating service account: frontend-sa"
-  gcloud iam service-accounts create frontend-sa \
+  echo "Creating service account: portfolio-copilot-frontend-sa"
+  gcloud iam service-accounts create portfolio-copilot-frontend-sa \
     --project="$PROJECT_ID" \
     --display-name="Portfolio Copilot frontend"
 else
-  echo "Service account frontend-sa already exists."
+  echo "Service account portfolio-copilot-frontend-sa already exists."
 fi
 
 # 2. Grant least-privilege IAM roles to gateway-sa
 # - Firestore (roles/datastore.user): reads holdings, writes audit log directly (ADR-0003)
 # - BigQuery (roles/bigquery.dataViewer): fan-out chart reads
 # Note: Gateway does NOT need Secret Manager access (Alpaca access is orchestrator-only per ADR-0005).
-echo "Configuring IAM policy bindings for gateway-sa..."
+echo "Configuring IAM policy bindings for portfolio-copilot-gateway-sa..."
 gcloud projects add-iam-policy-binding "$PROJECT_ID" \
   --member="serviceAccount:$GATEWAY_SA" \
   --role="roles/datastore.user" \
@@ -62,24 +62,24 @@ gcloud projects add-iam-policy-binding "$PROJECT_ID" \
 # 3. Deploy Cloud Run placeholders with explicit service accounts
 IMAGE="us-docker.pkg.dev/cloudrun/container/hello"
 
-echo "Deploying Cloud Run service: gateway"
-gcloud run deploy gateway \
+echo "Deploying Cloud Run service: portfolio-copilot-gateway"
+gcloud run deploy portfolio-copilot-gateway \
   --project="$PROJECT_ID" \
   --image="$IMAGE" \
   --region="$REGION" \
   --service-account="$GATEWAY_SA" \
   --allow-unauthenticated \
   --max-instances=1 \
-  --quiet || echo "Failed to deploy gateway"
+  --quiet || echo "Failed to deploy portfolio-copilot-gateway"
 
-echo "Deploying Cloud Run service: frontend"
-gcloud run deploy frontend \
+echo "Deploying Cloud Run service: portfolio-copilot-frontend"
+gcloud run deploy portfolio-copilot-frontend \
   --project="$PROJECT_ID" \
   --image="$IMAGE" \
   --region="$REGION" \
   --service-account="$FRONTEND_SA" \
   --allow-unauthenticated \
   --max-instances=1 \
-  --quiet || echo "Failed to deploy frontend"
+  --quiet || echo "Failed to deploy portfolio-copilot-frontend"
 
 echo "Cloud Run setup complete."
