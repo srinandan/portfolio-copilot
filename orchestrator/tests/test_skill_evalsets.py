@@ -73,3 +73,42 @@ def test_load_skill_evalset_helper():
 
     with pytest.raises(FileNotFoundError):
         load_skill_evalset(REPO_ROOT / "docs")
+
+
+def test_eval_runner_heuristic_mode_without_api_key(monkeypatch):
+    """Verifies that running without an API key executes in heuristic mode without false failure."""
+    from evals.runner import run_doc_only_eval
+
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    result = run_doc_only_eval(SKILLS_DIR / "goals-onboarding", use_llm_judge=False)
+
+    assert result.status == "PASS"
+    assert result.mode == "heuristic"
+    assert result.score is not None
+    assert result.total_cases > 0
+
+
+def test_eval_runner_llm_judge_skipped_without_api_key(monkeypatch):
+    """Verifies that requesting LLM judge without GEMINI_API_KEY marks run as SKIPPED_NO_KEY with None score."""
+    from evals.runner import run_doc_only_eval
+
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    result = run_doc_only_eval(SKILLS_DIR / "goals-onboarding", use_llm_judge=True)
+
+    assert result.status == "SKIPPED_NO_KEY"
+    assert result.mode == "llm_judge"
+    assert result.score is None
+
+
+def test_report_generation_warning_banner_without_api_key(monkeypatch):
+    """Verifies that markdown report renders a clear warning banner when API key is missing."""
+    from evals.report import evaluate_skills, generate_markdown_report
+
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    reports = evaluate_skills(SKILLS_DIR, use_llm_judge=False)
+    md_report = generate_markdown_report(reports, use_llm_judge=False)
+
+    assert "⚠️" in md_report
+    assert "evaluated heuristically; LLM judge skipped" in md_report
+    assert "🔍 Heuristic" in md_report
+
