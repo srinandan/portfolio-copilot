@@ -134,8 +134,45 @@ async def test_goals_onboarding_skill_direct_call():
         written_liab = mock_db_client.set_liabilities.call_args[0][1]
         assert written_liab.user_id == "u2"
 
-        # Logs
-        assert mock_db_client.append_audit_log.call_count == 2
-
         assert result["status"] == "completed"
         assert result["version"] == 1
+
+
+@pytest.mark.asyncio
+async def test_goals_onboarding_skill_version_from_frontmatter(monkeypatch):
+    """Verify that monkeypatching SKILL_VERSION propagates to both AuditLogEntry writes."""
+    import src.orchestrator.skills.goals_onboarding as go_module
+
+    monkeypatch.setattr(go_module, "SKILL_VERSION", "0.9.9-test")
+
+    with patch("src.orchestrator.skills.goals_onboarding.FirestoreClient") as MockFirestoreClient:
+        mock_db_client = MagicMock()
+        MockFirestoreClient.return_value = mock_db_client
+        mock_db_client.get_active_ips.return_value = None
+
+        mock_ctx = MagicMock()
+        mock_ctx.run_node = AsyncMock(return_value={
+            "goals": [{"name": "Retirement", "target_amount_usd": 1000000, "target_date": "2045-01-01"}],
+            "risk_tolerance": RiskTolerance.MODERATE,
+            "time_horizon_years": 10,
+            "liabilities": [],
+            "reserve_months": 6.0,
+            "known_upcoming_expenses_usd": 0.0,
+            "target_allocation": [{"asset_class": "equity", "target_percent": 60, "min_percent": 50, "max_percent": 70}],
+            "constraints": {"concentration_limit_percent": 15},
+            "user_id": "u2",
+            "trigger": "initial",
+        })
+        mock_ctx.add_events_to_memory = AsyncMock()
+
+        gen = go_module.goals_onboarding_skill.run(ctx=mock_ctx, node_input={"user_id": "u2", "trigger": "initial"})
+        async for _ in gen:
+            pass
+
+        assert mock_db_client.append_audit_log.call_count == 2
+        first_log = mock_db_client.append_audit_log.call_args_list[0][0][0]
+        second_log = mock_db_client.append_audit_log.call_args_list[1][0][0]
+
+        assert first_log.actor.skill_version == "0.9.9-test"
+        assert second_log.actor.skill_version == "0.9.9-test"
+
