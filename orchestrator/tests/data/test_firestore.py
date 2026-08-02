@@ -1,0 +1,175 @@
+import pytest
+from datetime import datetime, timezone
+from google.cloud import firestore
+from unittest.mock import patch, MagicMock
+
+from src.orchestrator.data.firestore import FirestoreClient, COLLECTION_IPS
+from src.orchestrator.contracts import (
+    InvestmentPolicyStatement,
+    IPSStatus,
+    RiskTolerance,
+    TargetAllocation,
+    Constraints,
+    Goal
+)
+
+def test_pydantic_dict_factory():
+    with patch("google.cloud.firestore.Client"):
+        client = FirestoreClient(project="test-project")
+
+        ips = InvestmentPolicyStatement(
+            ips_id="user123_ips",
+            user_id="user123",
+            version=1,
+            status=IPSStatus.ACTIVE,
+            effective_date="2026-01-01",
+            risk_tolerance=RiskTolerance.MODERATE,
+            time_horizon_years=10,
+            target_allocation=[
+                TargetAllocation(asset_class="equity", target_percent=60, min_percent=50, max_percent=70),
+            ],
+            constraints=Constraints(concentration_limit_percent=15),
+            created_at=datetime.now(timezone.utc)
+        )
+
+        raw_dict = client._dict_factory(ips)
+        assert "ips_id" in raw_dict
+        assert raw_dict["status"] == "active"
+
+        parsed_ips = InvestmentPolicyStatement.model_validate(raw_dict)
+        assert parsed_ips.ips_id == ips.ips_id
+
+def test_firestore_client_initialization_no_emulator():
+    with patch("google.cloud.firestore.Client") as mock_client:
+        client = FirestoreClient(project="test-project")
+        mock_client.assert_called_once_with(project="test-project")
+
+def test_set_liabilities():
+    with patch("google.cloud.firestore.Client"):
+        client = FirestoreClient(project="test-project")
+        client.db = MagicMock()
+        mock_doc_ref = MagicMock()
+        client.db.collection.return_value.document.return_value = mock_doc_ref
+
+        from src.orchestrator.contracts import LiabilitiesSnapshot, Liability, LiabilityType
+        snapshot = LiabilitiesSnapshot(
+            user_id="u1",
+            as_of=datetime.now(timezone.utc),
+            liabilities=[Liability(liability_id="l1", type=LiabilityType.MORTGAGE, balance_usd=100000, minimum_payment_usd=1000)]
+        )
+
+        client.set_liabilities("u1", snapshot)
+        mock_doc_ref.set.assert_called_once()
+
+def test_firestore_client_read_ops():
+    with patch("google.cloud.firestore.Client"):
+        client = FirestoreClient(project="test-project")
+        client.db = MagicMock()
+
+        # get_liabilities empty
+        mock_doc_ref = MagicMock()
+        mock_doc_ref.get.return_value.exists = False
+        client.db.collection.return_value.document.return_value = mock_doc_ref
+        assert client.get_liabilities("u1") is None
+
+        # get_active_ips empty
+        mock_query = MagicMock()
+        mock_query.stream.return_value = []
+        client.db.collection.return_value.where.return_value.where.return_value.limit.return_value = mock_query
+        assert client.get_active_ips("ips1") is None
+
+def test_update_ips_transactional_error_multiple_active():
+    with patch("google.cloud.firestore.Client"):
+        client = FirestoreClient(project="test-project")
+
+        ips = InvestmentPolicyStatement(
+            ips_id="user123_ips",
+            user_id="user123",
+            version=1,
+            status=IPSStatus.ACTIVE,
+            effective_date="2026-01-01",
+            risk_tolerance=RiskTolerance.MODERATE,
+            time_horizon_years=10,
+            target_allocation=[],
+            constraints=Constraints(concentration_limit_percent=15),
+            created_at=datetime.now(timezone.utc)
+        )
+
+        transaction = MagicMock()
+
+        original_func = client._update_ips_transactional.to_wrap
+
+        bad_ips = ips.model_copy()
+        bad_ips.status = IPSStatus.DRAFT
+        with pytest.raises(ValueError, match="must have status 'active'"):
+            original_func(client, transaction, bad_ips)
+
+        client.db = MagicMock()
+        mock_query = MagicMock()
+        mock_query.stream.return_value = [MagicMock(), MagicMock()]
+        client.db.collection.return_value.where.return_value.where.return_value.limit.return_value = mock_query
+
+        with pytest.raises(ValueError, match="invariant violated"):
+            original_func(client, transaction, ips)
+
+def test_update_ips_transactional_error_version_not_1():
+    with patch("google.cloud.firestore.Client"):
+        client = FirestoreClient(project="test-project")
+        client.db = MagicMock()
+
+        ips = InvestmentPolicyStatement(
+            ips_id="user123_ips",
+            user_id="user123",
+            version=2,
+            status=IPSStatus.ACTIVE,
+            effective_date="2026-01-01",
+            risk_tolerance=RiskTolerance.MODERATE,
+            time_horizon_years=10,
+            target_allocation=[],
+            constraints=Constraints(concentration_limit_percent=15),
+            created_at=datetime.now(timezone.utc)
+        )
+
+        transaction = MagicMock()
+        mock_query = MagicMock()
+        mock_query.stream.return_value = []
+        client.db.collection.return_value.where.return_value.where.return_value.limit.return_value = mock_query
+
+        original_func = client._update_ips_transactional.to_wrap
+
+        with pytest.raises(ValueError, match="new version is not 1"):
+            original_func(client, transaction, ips)
+
+def test_update_ips_transactional_success_update():
+    with patch("google.cloud.firestore.Client"):
+        client = FirestoreClient(project="test-project")
+        client.db = MagicMock()
+
+        ips = InvestmentPolicyStatement(
+            ips_id="user123_ips",
+            user_id="user123",
+            version=2,
+            status=IPSStatus.ACTIVE,
+            effective_date="2026-01-01",
+            risk_tolerance=RiskTolerance.MODERATE,
+            time_horizon_years=10,
+            target_allocation=[],
+            constraints=Constraints(concentration_limit_percent=15),
+            created_at=datetime.now(timezone.utc)
+        )
+
+        transaction = MagicMock()
+
+        mock_query = MagicMock()
+        mock_old_doc = MagicMock()
+        old_data = ips.model_dump(mode="json")
+        old_data["version"] = 1
+        mock_old_doc.to_dict.return_value = old_data
+
+        mock_query.stream.return_value = [mock_old_doc]
+        client.db.collection.return_value.where.return_value.where.return_value.limit.return_value = mock_query
+
+        original_func = client._update_ips_transactional.to_wrap
+        original_func(client, transaction, ips)
+
+        assert transaction.set.call_count == 2

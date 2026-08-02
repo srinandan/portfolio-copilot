@@ -3,8 +3,8 @@ from google.adk import Context
 from google.adk.events import RequestInput
 from google.adk.workflow import node, Workflow
 from google.adk.runners import Runner
-from unittest.mock import patch, AsyncMock
-from orchestrator.registry_client import Skill
+from unittest.mock import patch, AsyncMock, MagicMock
+from src.orchestrator.registry_client import Skill
 from src.orchestrator.planner import root_planner
 from google.adk.sessions.in_memory_session_service import InMemorySessionService
 from google.adk.memory.in_memory_memory_service import InMemoryMemoryService
@@ -114,3 +114,65 @@ async def test_root_planner_trace():
         last_event = events[-1]
         assert last_event.output == ["research_completed", "action_drafting_completed"]
 
+
+@pytest.mark.asyncio
+async def test_root_planner_json_input():
+    agent = Workflow(
+        name="test_root",
+        edges=[("START", root_planner)],
+    )
+    session_service = InMemorySessionService()
+    memory_service = InMemoryMemoryService()
+    runner = Runner(app_name="test_app", agent=agent, session_service=session_service, memory_service=memory_service, auto_create_session=True)
+
+    with patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list, \
+         patch("src.orchestrator.skills.goals_onboarding.FirestoreClient") as mock_db:
+
+        mock_db_instance = MagicMock()
+        mock_db.return_value = mock_db_instance
+
+        mock_list.return_value = [
+            Skill(name="private-goals-onboarding", target_state="TARGET_STATE_ACTIVE", default_revision="rev1"),
+        ]
+
+        # Use valid json input payload as string text part to cover that branch properly
+        response_stream = runner.run_async(user_id="user_123", session_id="session_456", new_message=UserContent(parts=[Part.from_text(text='{"user_id": "u4", "trigger": "initial"}')]))
+
+        events = []
+        async for event in response_stream:
+            events.append(event)
+
+        def has_request_input(e):
+             if e.content and e.content.parts:
+                  for p in e.content.parts:
+                       if p.function_call and p.function_call.name == "adk_request_input":
+                            return True
+             return False
+
+        assert any(has_request_input(e) for e in events)
+
+
+@pytest.mark.asyncio
+async def test_root_planner_invalid_json():
+    import asyncio
+    from google.adk.workflow import Workflow
+    from google.adk.runners import Runner
+
+    agent = Workflow(
+        name="test_root",
+        edges=[("START", root_planner)],
+    )
+
+    session_service = InMemorySessionService()
+    runner = Runner(app_name="test_app", agent=agent, session_service=session_service, auto_create_session=True)
+
+    with patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list, \
+         patch("src.orchestrator.skills.goals_onboarding.FirestoreClient") as mock_db:
+
+        mock_db_instance = MagicMock()
+        mock_db.return_value = mock_db_instance
+        mock_list.return_value = [Skill(name="private-goals-onboarding", target_state="TARGET_STATE_ACTIVE", default_revision="rev1")]
+
+        response_stream = runner.run_async(user_id="user_123", session_id="s1", new_message=UserContent(parts=[Part.from_text(text="invalid json {")]))
+        events = [e async for e in response_stream]
+        assert len(events) > 0
