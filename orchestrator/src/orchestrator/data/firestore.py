@@ -7,6 +7,7 @@ from google.cloud import firestore
 from google.cloud.firestore_v1.transaction import Transaction
 
 from ..contracts import (
+    HoldingsSnapshot,
     LiabilitiesSnapshot,
     AuditLogEntry,
     InvestmentPolicyStatement,
@@ -35,6 +36,19 @@ class FirestoreClient:
         """Convert a Pydantic model to a dict, handling dates/enums properly for Firestore."""
         # We rely on Pydantic's model_dump with mode="json" to serialize enums/dates to primitives.
         return json.loads(obj.model_dump_json(exclude_none=True))
+
+    def get_holdings(self, user_id: str) -> Optional[HoldingsSnapshot]:
+        """Gets the holdings snapshot for a given user."""
+        doc_ref = self.db.collection(COLLECTION_HOLDINGS).document(user_id)
+        doc = doc_ref.get()
+        if doc.exists:
+            return HoldingsSnapshot.model_validate(doc.to_dict())
+        return None
+
+    def set_holdings(self, user_id: str, snapshot: HoldingsSnapshot) -> None:
+        """Overwrites the holdings snapshot for a given user."""
+        doc_ref = self.db.collection(COLLECTION_HOLDINGS).document(user_id)
+        doc_ref.set(self._dict_factory(snapshot))
 
     def set_liabilities(self, user_id: str, snapshot: LiabilitiesSnapshot) -> None:
         """Overwrites the liabilities snapshot for a given user."""

@@ -87,15 +87,15 @@ surface, so the constraints are load-bearing, not optional:
 
 - Generated SQL is **read-only** — `SELECT`/aggregate only. No
   `INSERT`/`UPDATE`/`DELETE`/DDL, ever, regardless of what the natural
-  language request implies.
+  language request implies. This is enforced at the custom application query layer.
 - Every generated query is scoped to the requesting `user_id` — enforced
   at the query-construction layer (a mandatory `WHERE user_id = @user_id`
-  parameter), not left to the model to remember to include.
+  parameter), not left to the model to remember to include. This is enforced at the custom application query layer.
 - Query must target only the `chase_transactions` table. No dynamic
-  table names from user input.
+  table names from user input. This is enforced at the custom application query layer.
 - A row-count/byte-scan ceiling is enforced (implementation detail: a
   `LIMIT` and a BigQuery maximum-bytes-billed setting) so a malformed or
-  adversarial query can't run an expensive full-table scan.
+  adversarial query can't run an expensive full-table scan. This is enforced via BigQuery job config at the custom application query layer.
 
 ## Failure mode: ambiguous or unanswerable query
 
