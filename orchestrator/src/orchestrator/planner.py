@@ -7,6 +7,7 @@ import os
 from typing import Any
 
 from google.adk import Context
+from google.adk.agents import ManagedAgent
 from google.adk.workflow import Workflow, node
 from google.genai.types import Part, UserContent
 
@@ -69,6 +70,10 @@ async def root_planner(ctx: Context, node_input: Any):
     # Run the memory interaction to satisfy Issue #11
     await ctx.run_node(memory_interaction, node_input="test_memory")
 
+    project_id = os.environ.get("PROJECT_ID") or os.environ.get("GOOGLE_CLOUD_PROJECT") or "dummy-project"
+    location = os.environ.get("GOOGLE_CLOUD_LOCATION", "global")
+    registry_client = AgentRegistryClient(project_id=project_id, location=location)
+
     skills = await ctx.run_node(get_skills_from_registry, node_input=node_input)
     logger.info(f"Available skills: {skills}")
 
@@ -88,11 +93,24 @@ async def root_planner(ctx: Context, node_input: Any):
 
     results = []
     for skill in skills:
-        if _short_skill_id(skill) == "private-goals-onboarding":
+        short_name = _short_skill_id(skill)
+        if short_name == "private-goals-onboarding":
             logger.info(f"Executing native skill: {skill}")
             result = await ctx.run_node(goals_onboarding_skill, node_input={"user_id": user_id, "trigger": trigger})
             results.append(f"goals_onboarding_result: {result}")
+        elif short_name == "private-research":
+            logger.info(f"Executing dynamic managed research skill: {skill}")
+            instructions = await registry_client.get_skill_content("research")
+            research_agent = ManagedAgent(
+                name="research",
+                description=instructions,
+                agent_id="antigravity-preview-05-2026",
+                environment={"type": "remote"},
+            )
+            result = await ctx.run_node(research_agent, node_input={"user_id": user_id, "goal": "market research"})
+            results.append(f"research_result: {result}")
         else:
+            logger.info(f"Authorized skill {skill} is not yet wired into dynamic plan; executing fallback.")
             result = await ctx.run_node(dummy_skill_execution, node_input=skill)
             results.append(result)
 
