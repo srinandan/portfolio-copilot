@@ -5,6 +5,7 @@ Deliberately stripped down — no tools, no orchestrator plumbing, no database a
 """
 
 from pathlib import Path
+
 from google.adk.agents import LlmAgent
 
 DEFAULT_MODEL = "gemini-2.5-pro"

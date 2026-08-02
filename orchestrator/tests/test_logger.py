@@ -1,7 +1,9 @@
-from orchestrator.logger import setup_logger, trace_id_var, request_id_var
+import io
 import json
 import logging
-import io
+
+from orchestrator.logger import request_id_var, setup_logger, trace_id_var
+
 
 def test_json_formatter():
     logger = logging.getLogger("test_logger")

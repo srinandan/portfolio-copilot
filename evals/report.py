@@ -3,13 +3,14 @@
 import os
 import sys
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 from google.adk.evaluation.eval_set import EvalSet
+
 from evals.doc_only_agent import build_doc_only_agent
 
 
-def evaluate_skills(skills_dir: Path) -> List[Dict[str, Any]]:
+def evaluate_skills(skills_dir: Path) -> list[dict[str, Any]]:
     """Evaluates all skills in the skills directory.
 
     Args:
@@ -26,7 +27,7 @@ def evaluate_skills(skills_dir: Path) -> List[Dict[str, Any]]:
         skill_md = skill_path / "SKILL.md"
         evalset_files = list(skill_path.glob("*.evalset.json"))
 
-        report: Dict[str, Any] = {
+        report: dict[str, Any] = {
             "name": skill_name,
             "path": str(skill_path),
             "has_skill_md": skill_md.exists(),
@@ -100,7 +101,7 @@ def evaluate_skills(skills_dir: Path) -> List[Dict[str, Any]]:
     return reports
 
 
-def generate_markdown_report(reports: List[Dict[str, Any]]) -> str:
+def generate_markdown_report(reports: list[dict[str, Any]]) -> str:
     """Generates GitHub-flavored markdown report from evaluation results."""
     total_skills = len(reports)
     passed_skills = sum(1 for r in reports if r["status"] == "PASS")

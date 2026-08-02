@@ -1,17 +1,17 @@
-import pytest
 from datetime import datetime, timezone
-from google.cloud import firestore
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
-from src.orchestrator.data.firestore import FirestoreClient, COLLECTION_IPS
+import pytest
+
 from src.orchestrator.contracts import (
+    Constraints,
     InvestmentPolicyStatement,
     IPSStatus,
     RiskTolerance,
     TargetAllocation,
-    Constraints,
-    Goal
 )
+from src.orchestrator.data.firestore import FirestoreClient
+
 
 def test_pydantic_dict_factory():
     with patch("google.cloud.firestore.Client"):
@@ -51,7 +51,11 @@ def test_set_liabilities():
         mock_doc_ref = MagicMock()
         client.db.collection.return_value.document.return_value = mock_doc_ref
 
-        from src.orchestrator.contracts import LiabilitiesSnapshot, Liability, LiabilityType
+        from src.orchestrator.contracts import (
+            LiabilitiesSnapshot,
+            Liability,
+            LiabilityType,
+        )
         snapshot = LiabilitiesSnapshot(
             user_id="u1",
             as_of=datetime.now(timezone.utc),

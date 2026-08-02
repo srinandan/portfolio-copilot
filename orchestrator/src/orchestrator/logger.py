@@ -1,7 +1,7 @@
-import logging
-import json
-import os
 import contextvars
+import json
+import logging
+import os
 from datetime import datetime, timezone
 
 # Context variables to hold trace and request IDs
