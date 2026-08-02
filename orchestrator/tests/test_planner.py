@@ -101,8 +101,8 @@ async def test_root_planner_trace():
 
     with patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list:
         mock_list.return_value = [
-            Skill(name="research", target_state="TARGET_STATE_ACTIVE", default_revision="rev1"),
-            Skill(name="action_drafting", target_state="TARGET_STATE_ACTIVE", default_revision="rev2"),
+            Skill(name="projects/test-project/locations/test-location/skills/research", target_state="TARGET_STATE_ACTIVE", default_revision="rev1"),
+            Skill(name="projects/test-project/locations/test-location/skills/action_drafting", target_state="TARGET_STATE_ACTIVE", default_revision="rev2"),
         ]
 
         response_stream = runner.run_async(user_id="user_123", session_id="session_456", new_message=UserContent(parts=[Part.from_text(text="test_goal")]))
@@ -112,7 +112,10 @@ async def test_root_planner_trace():
             events.append(event)
 
         last_event = events[-1]
-        assert last_event.output == ["research_completed", "action_drafting_completed"]
+        assert last_event.output == [
+            "projects/test-project/locations/test-location/skills/research_completed",
+            "projects/test-project/locations/test-location/skills/action_drafting_completed",
+        ]
 
 
 @pytest.mark.asyncio
@@ -132,7 +135,7 @@ async def test_root_planner_json_input():
         mock_db.return_value = mock_db_instance
 
         mock_list.return_value = [
-            Skill(name="private-goals-onboarding", target_state="TARGET_STATE_ACTIVE", default_revision="rev1"),
+            Skill(name="projects/test-project/locations/test-location/skills/private-goals-onboarding", target_state="TARGET_STATE_ACTIVE", default_revision="rev1"),
         ]
 
         # Use valid json input payload as string text part to cover that branch properly
@@ -148,6 +151,51 @@ async def test_root_planner_json_input():
                        if p.function_call and p.function_call.name == "adk_request_input":
                             return True
              return False
+
+        assert any(has_request_input(e) for e in events)
+
+
+@pytest.mark.asyncio
+async def test_root_planner_dispatches_goals_onboarding_with_realistic_name():
+    """Verify planner extracts short name from full resource path and invokes goals_onboarding_skill."""
+    agent = Workflow(
+        name="test_root",
+        edges=[("START", root_planner)],
+    )
+    session_service = InMemorySessionService()
+    memory_service = InMemoryMemoryService()
+    runner = Runner(app_name="test_app", agent=agent, session_service=session_service, memory_service=memory_service, auto_create_session=True)
+
+    with patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list, \
+         patch("src.orchestrator.skills.goals_onboarding.FirestoreClient") as mock_db:
+
+        mock_db_instance = MagicMock()
+        mock_db.return_value = mock_db_instance
+
+        mock_list.return_value = [
+            Skill(
+                name="projects/test-proj-123/locations/us-central1/skills/private-goals-onboarding",
+                target_state="TARGET_STATE_ACTIVE",
+                default_revision="rev-v1",
+            ),
+        ]
+
+        response_stream = runner.run_async(
+            user_id="user_123",
+            session_id="session_456",
+            new_message=UserContent(parts=[Part.from_text(text='{"user_id": "u4", "trigger": "initial"}')]),
+        )
+
+        events = []
+        async for event in response_stream:
+            events.append(event)
+
+        def has_request_input(e):
+            if e.content and e.content.parts:
+                for p in e.content.parts:
+                    if p.function_call and p.function_call.name == "adk_request_input":
+                        return True
+            return False
 
         assert any(has_request_input(e) for e in events)
 
@@ -171,7 +219,9 @@ async def test_root_planner_invalid_json():
 
         mock_db_instance = MagicMock()
         mock_db.return_value = mock_db_instance
-        mock_list.return_value = [Skill(name="private-goals-onboarding", target_state="TARGET_STATE_ACTIVE", default_revision="rev1")]
+        mock_list.return_value = [
+            Skill(name="projects/test-project/locations/test-location/skills/private-goals-onboarding", target_state="TARGET_STATE_ACTIVE", default_revision="rev1")
+        ]
 
         response_stream = runner.run_async(user_id="user_123", session_id="s1", new_message=UserContent(parts=[Part.from_text(text="invalid json {")]))
         events = [e async for e in response_stream]

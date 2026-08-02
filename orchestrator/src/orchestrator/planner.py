@@ -54,6 +54,11 @@ async def memory_interaction(ctx: Context, node_input: Any):
 
     return "memory_interaction_completed"
 
+def _short_skill_id(name: str) -> str:
+    """Extracts the short skill ID from a full resource path."""
+    return name.split("/")[-1] if "/" in name else name
+
+
 @node(rerun_on_resume=True)
 async def root_planner(ctx: Context, node_input: Any):
     """The root dynamic workflow orchestrator."""
@@ -80,7 +85,7 @@ async def root_planner(ctx: Context, node_input: Any):
 
     results = []
     for skill in skills:
-        if skill == "private-goals-onboarding":
+        if _short_skill_id(skill) == "private-goals-onboarding":
             logger.info(f"Executing native skill: {skill}")
             result = await ctx.run_node(goals_onboarding_skill, node_input={"user_id": user_id, "trigger": trigger})
             results.append(f"goals_onboarding_result: {result}")
