@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 class EventType(str, Enum):
     SKILL_INVOKED = "skill_invoked"
+    SKILL_INVOCATION_FAILED = "skill_invocation_failed"
     SKILL_REVOKED = "skill_revoked"
     IPS_CREATED = "ips_created"
     IPS_SUPERSEDED = "ips_superseded"

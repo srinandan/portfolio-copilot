@@ -17,6 +17,7 @@
       "type": "string",
       "enum": [
         "skill_invoked",
+        "skill_invocation_failed",
         "skill_revoked",
         "ips_created",
         "ips_superseded",
