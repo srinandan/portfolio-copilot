@@ -62,13 +62,15 @@ Skills (discovered/composed per session)
 
 The frontend is a standalone custom UI, not built on Gemini
 Enterprise/Agentspace — see [ADR-0003](../adr/0003-standalone-ui-not-agentspace.md)
-for why.
+for why. All Cloud Run services are deployed with `--no-allow-unauthenticated`,
+with IAM-authenticated invocation granted from the frontend service account to the gateway
+([ADR-0013](../adr/0013-authenticated-cloud-run.md)).
 
 ## Deployment identities
 
-Every deployed component operates under a least-privilege, scoped identity (see [ADR-0011](../adr/0011-least-privilege-identities.md)):
+Every deployed component operates under a least-privilege, scoped identity (see [ADR-0011](../adr/0011-least-privilege-identities.md) and [ADR-0013](../adr/0013-authenticated-cloud-run.md)):
 - **`portfolio-copilot-gateway-sa`** (Cloud Run): Granted `roles/datastore.user` (Firestore audit log + holdings) and `roles/bigquery.dataViewer` (fan-out chart queries). Does not have Secret Manager access.
-- **`portfolio-copilot-frontend-sa`** (Cloud Run): Dedicated service account with zero additional GCP IAM roles (communicates strictly with the Gateway API).
+- **`portfolio-copilot-frontend-sa`** (Cloud Run): Dedicated service account with `roles/run.invoker` on the gateway service (communicates strictly with the Gateway API via authenticated IAM tokens).
 - **`orchestrator` Agent Identity** (Agent Runtime): Uses SPIFFE-based per-agent cryptographic identity with `roles/datastore.user`, `roles/bigquery.dataViewer`, and `roles/secretmanager.secretAccessor` (Alpaca API credentials). The Agent Platform Service Agent holds deployment-time secret accessor permissions.
 
 

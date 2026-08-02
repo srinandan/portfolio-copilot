@@ -19,7 +19,7 @@ steps:
       - '--region'
       - 'us-central1'
       - '--set-labels=app=portfolio-copilot,component=gateway'
-      - '--allow-unauthenticated'
+      - '--no-allow-unauthenticated'
 
 images:
   - 'gcr.io/$PROJECT_ID/portfolio-copilot-gateway'
