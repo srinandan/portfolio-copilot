@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/schemas/chase-transaction",
+  "title": "ChaseTransaction",
+  "description": "Represents a single Chase bank transaction exported to BigQuery for spending analysis.",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "description": "The unique identifier of the user who owns this transaction.",
+      "type": "string"
+    },
+    "transaction_date": {
+      "description": "The date the transaction occurred.",
+      "type": "string",
+      "format": "date"
+    },
+    "amount": {
+      "description": "The transaction amount. Negative values indicate expenses/outflows.",
+      "type": "number"
+    },
+    "description": {
+      "description": "The raw description of the transaction from the bank statement.",
+      "type": "string"
+    },
+    "raw_category": {
+      "description": "The category provided by Chase before normalization.",
+      "type": "string"
+    },
+    "normalized_category": {
+      "description": "The category after normalization into our standard taxonomy.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "user_id",
+    "transaction_date",
+    "amount",
+    "normalized_category"
+  ],
+  "additionalProperties": false
+}

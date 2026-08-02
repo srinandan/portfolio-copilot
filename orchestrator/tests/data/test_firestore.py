@@ -5,8 +5,10 @@ import pytest
 
 from src.orchestrator.contracts import (
     Constraints,
+    HoldingsSnapshot,
     InvestmentPolicyStatement,
     IPSStatus,
+    Position,
     RiskTolerance,
     TargetAllocation,
 )
@@ -177,3 +179,56 @@ def test_update_ips_transactional_success_update():
         original_func(client, transaction, ips)
 
         assert transaction.set.call_count == 2
+
+
+@patch('google.cloud.firestore.Client')
+def test_get_holdings(mock_client):
+    client = FirestoreClient("test-project")
+
+    mock_db = MagicMock()
+    mock_doc_ref = MagicMock()
+    mock_doc = MagicMock()
+
+    mock_doc.exists = True
+    now = datetime.now(timezone.utc)
+    mock_doc.to_dict.return_value = {
+        "user_id": "user1",
+        "as_of": now.isoformat(),
+        "positions": [],
+        "cash_usd": 1000.0,
+        "total_value_usd": 1000.0
+    }
+
+    mock_doc_ref.get.return_value = mock_doc
+    mock_db.collection.return_value.document.return_value = mock_doc_ref
+    client.db = mock_db
+
+    holdings = client.get_holdings("user1")
+    assert holdings is not None
+    assert holdings.user_id == "user1"
+    assert holdings.cash_usd == 1000.0
+
+@patch('google.cloud.firestore.Client')
+def test_set_holdings(mock_client):
+    client = FirestoreClient("test-project")
+
+    mock_db = MagicMock()
+    mock_doc_ref = MagicMock()
+
+    mock_db.collection.return_value.document.return_value = mock_doc_ref
+    client.db = mock_db
+
+    now = datetime.now(timezone.utc)
+    holdings = HoldingsSnapshot(
+        user_id="user1",
+        as_of=now,
+        positions=[Position(ticker="AAPL", quantity=10, asset_class="equity", market_value_usd=1500)],
+        cash_usd=500.0
+    )
+
+    client.set_holdings("user1", holdings)
+
+    mock_doc_ref.set.assert_called_once()
+    called_args = mock_doc_ref.set.call_args[0][0]
+    assert called_args["user_id"] == "user1"
+    assert called_args["cash_usd"] == 500.0
