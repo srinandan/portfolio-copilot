@@ -40,7 +40,7 @@ Don't count against the target, and don't chase coverage on:
 
 ## Where enforced
 
-CI gate, once `infra/` CI config exists (not yet built — see repo status
+CI gate, once CI config exists (not yet built — see repo status
 in the root `README.md`). Until then, run coverage locally before opening
 a PR:
 

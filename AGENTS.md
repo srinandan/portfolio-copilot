@@ -30,7 +30,7 @@ pkg/               Go — contracts, BigQuery, Agent Registry client, Firestore 
                     (library code for gateway/; not consumed by orchestrator's Python)
 gateway/           Go — API gateway (Cloud Run) — not an agent, unaffected by orchestrator's language
 frontend/          TypeScript + Vue.js (Cloud Run)
-infra/             Terraform
+scripts/           bash/gcloud/python and Makefiles for infra provisioning
 .agent/skills/     Engineering-practice skills (this repo's coding agent, see above)
 ```
 
@@ -76,6 +76,6 @@ npm run test -- --coverage
 
 - Conventional commits (`feat:`, `fix:`, `docs:`, `refactor:`, `test:`)
 - No secrets, tokens, or credentials committed anywhere, including
-  `infra/` — use Secret Manager / environment injection
+  `scripts/` — use Secret Manager / environment injection
 - Every skill in `/skills` must have a complete `SKILL.md` (no TODOs)
   before it's registered with the Agent Registry
