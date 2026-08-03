@@ -62,6 +62,22 @@ async def memory_interaction(ctx: Context, node_input: Any):
     return "memory_interaction_completed"
 
 
+PIPELINE_SKILL_ORDER = [
+    "private-goals-onboarding",
+    "private-portfolio-analysis",
+    "private-research",
+    "private-action-drafting",
+]
+
+
+def _skill_sort_key(skill_name: str) -> int:
+    """Sorts authorized skills into canonical pipeline execution order."""
+    short_name = _short_skill_id(skill_name)
+    if short_name in PIPELINE_SKILL_ORDER:
+        return PIPELINE_SKILL_ORDER.index(short_name)
+    return len(PIPELINE_SKILL_ORDER) + 1
+
+
 def _short_skill_id(name: str) -> str:
     """Extracts the short skill ID from a full resource path."""
     return name.split("/")[-1] if "/" in name else name
@@ -96,16 +112,25 @@ async def root_planner(ctx: Context, node_input: Any):
             pass
 
     results = []
-    for skill in skills:
+    context: dict[str, Any] = {}
+
+    # Sort skills into deterministic pipeline order (I2)
+    ordered_skills = sorted(skills, key=_skill_sort_key)
+
+    for skill in ordered_skills:
         short_name = _short_skill_id(skill)
         if short_name == "private-goals-onboarding":
             logger.info(f"Executing native skill: {skill}")
             result = await ctx.run_node(goals_onboarding_skill, node_input={"user_id": user_id, "trigger": trigger})
             results.append(f"goals_onboarding_result: {result}")
+            context["goals_onboarding_result"] = result
         elif short_name == "private-portfolio-analysis":
             logger.info(f"Executing native portfolio analysis skill: {skill}")
             result = await ctx.run_node(portfolio_analysis_skill, node_input={"user_id": user_id})
             results.append(f"portfolio_analysis_result: {result}")
+            context["portfolio_analysis_result"] = result
+            if isinstance(result, dict) and result.get("status") == "completed" and result.get("drift_report"):
+                context["drift_report"] = result["drift_report"]
         elif short_name == "private-research":
             logger.info(f"Executing dynamic managed research skill: {skill}")
             research_question = "What are the current market conditions and sentiment for the tech sector?"
@@ -113,11 +138,13 @@ async def root_planner(ctx: Context, node_input: Any):
                 research_question = node_input["research_question"]
 
             result = await ctx.run_node(managed_research_agent_node, node_input={"research_question": research_question})
-            results.append(f"research_result: {result.model_dump() if hasattr(result, 'model_dump') else result}")
+            brief_data = result.model_dump() if hasattr(result, "model_dump") else result
+            results.append(f"research_result: {brief_data}")
+            context["research_briefs"] = [result]
         elif short_name == "private-action-drafting":
             logger.info(f"Executing native action drafting skill: {skill}")
-            drift_report = node_input.get("drift_report") if isinstance(node_input, dict) else None
-            research_briefs = node_input.get("research_briefs") if isinstance(node_input, dict) else None
+            drift_report = (node_input.get("drift_report") if isinstance(node_input, dict) else None) or context.get("drift_report")
+            research_briefs = (node_input.get("research_briefs") if isinstance(node_input, dict) else None) or context.get("research_briefs")
             requested_trade = node_input.get("requested_trade") if isinstance(node_input, dict) else None
             result = await ctx.run_node(
                 action_drafting_skill,
@@ -129,6 +156,7 @@ async def root_planner(ctx: Context, node_input: Any):
                 },
             )
             results.append(f"action_drafting_result: {result}")
+            context["action_drafting_result"] = result
         else:
             logger.info(f"Authorized skill {skill} is not yet wired into dynamic plan; executing fallback.")
             result = await ctx.run_node(dummy_skill_execution, node_input=skill)

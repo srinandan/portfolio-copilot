@@ -47,7 +47,14 @@ def calculate_drift(holdings: HoldingsSnapshot, ips: InvestmentPolicyStatement) 
     Returns:
         DriftReport detailing asset class allocations, drift percentages, and rebalance recommendation.
     """
-    computed_total = sum(p.market_value_usd for p in holdings.positions) + (holdings.cash_usd or 0.0)
+    cash_amount = holdings.cash_usd or 0.0
+    cash_in_positions = sum(
+        p.market_value_usd for p in holdings.positions if p.asset_class.strip().lower() in CASH_ASSET_CLASS_SYNONYMS
+    )
+    # Reconcile cash to prevent double-counting when cash is represented both in positions and cash_usd (I5)
+    net_cash_usd = max(0.0, cash_amount - cash_in_positions) if cash_in_positions > 0 else cash_amount
+
+    computed_total = sum(p.market_value_usd for p in holdings.positions) + net_cash_usd
 
     # Use holdings.total_value_usd if present, but reconcile if it significantly deviates from computed sum (PA1)
     if holdings.total_value_usd is not None:
@@ -90,20 +97,18 @@ def calculate_drift(holdings: HoldingsSnapshot, ips: InvestmentPolicyStatement) 
     for p in holdings.positions:
         value_by_class[p.asset_class] = value_by_class.get(p.asset_class, 0.0) + p.market_value_usd
 
-    # Map cash balance to target allocation bands recognizing standard cash synonyms
+    # Map net cash balance to target allocation bands recognizing standard cash synonyms
     cash_mapped = False
-    cash_amount = holdings.cash_usd or 0.0
-
-    if cash_amount > 0:
+    if net_cash_usd > 0:
         for alloc in ips.target_allocation:
             if alloc.asset_class.strip().lower() in CASH_ASSET_CLASS_SYNONYMS:
-                value_by_class[alloc.asset_class] = value_by_class.get(alloc.asset_class, 0.0) + cash_amount
+                value_by_class[alloc.asset_class] = value_by_class.get(alloc.asset_class, 0.0) + net_cash_usd
                 cash_mapped = True
                 break
 
     unclassified_value = 0.0
-    if not cash_mapped and cash_amount > 0:
-        unclassified_value += cash_amount
+    if not cash_mapped and net_cash_usd > 0:
+        unclassified_value += net_cash_usd
 
     bands = {alloc.asset_class: alloc for alloc in ips.target_allocation}
 

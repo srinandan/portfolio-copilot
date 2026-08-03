@@ -22,9 +22,18 @@ def mock_firestore():
         yield mock
 
 
+async def _run_skill(ctx, node_input):
+    """Helper to run action_drafting_skill via public .run generator interface (A2)."""
+    gen = action_drafting_skill.run(ctx=ctx, node_input=node_input)
+    result = None
+    async for item in gen:
+        result = item.output
+    return result
+
+
 @pytest.mark.asyncio
 async def test_action_drafting_skill_success_with_research_brief(mock_firestore):
-    """Verifies action drafting drafts action and links ResearchBrief metadata (D4, M2)."""
+    """Verifies action drafting drafts action and links ResearchBrief metadata (D4, M2, A2)."""
     client_instance = mock_firestore.return_value
 
     ips = InvestmentPolicyStatement(
@@ -71,7 +80,7 @@ async def test_action_drafting_skill_success_with_research_brief(mock_firestore)
     }
 
     ctx = MagicMock()
-    result = await action_drafting_skill._func(ctx, node_input)
+    result = await _run_skill(ctx, node_input)
 
     assert len(result) == 1
     action = result[0]
@@ -130,7 +139,7 @@ async def test_action_drafting_skill_no_action(mock_firestore):
     node_input = {"user_id": "user_1", "ips_id": "ips_123", "drift_report": {"rebalance_recommended": False}}
 
     ctx = MagicMock()
-    result = await action_drafting_skill._func(ctx, node_input)
+    result = await _run_skill(ctx, node_input)
 
     # Zero proposed actions drafted
     assert len(result) == 0
@@ -138,7 +147,7 @@ async def test_action_drafting_skill_no_action(mock_firestore):
 
 @pytest.mark.asyncio
 async def test_action_drafting_skill_constraint_failure_audit_log(mock_firestore):
-    """Verifies constraint violation raises ValueError and logs SKILL_INVOCATION_FAILED."""
+    """Verifies constraint violation raises ValueError and logs SKILL_INVOCATION_FAILED (A2)."""
     client_instance = mock_firestore.return_value
 
     ips = InvestmentPolicyStatement(
@@ -176,8 +185,22 @@ async def test_action_drafting_skill_constraint_failure_audit_log(mock_firestore
 
     ctx = MagicMock()
     with pytest.raises(ValueError, match="excluded_tickers"):
-        await action_drafting_skill._func(ctx, node_input)
+        await _run_skill(ctx, node_input)
 
     assert client_instance.append_audit_log.call_count == 2
     failed_log = client_instance.append_audit_log.call_args_list[1][0][0]
     assert failed_log.event_type == EventType.SKILL_INVOCATION_FAILED
+
+
+@pytest.mark.asyncio
+async def test_action_drafting_skill_audit_log_failure_raises(mock_firestore):
+    """Verifies I3: If audit log append fails, action drafting fails closed."""
+    client_instance = mock_firestore.return_value
+    client_instance.append_audit_log.side_effect = RuntimeError("Firestore unavailable")
+
+    node_input = {"user_id": "user_audit_fail"}
+    ctx = MagicMock()
+
+    with pytest.raises(RuntimeError, match="Audit log write failed for skill invocation"):
+        await action_drafting_skill._func(ctx, node_input)
+
