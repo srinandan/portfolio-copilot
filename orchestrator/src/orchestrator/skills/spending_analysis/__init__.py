@@ -12,8 +12,8 @@ from .logic import calculate_reserve_months, calculate_savings_rate, is_anomalou
 
 @node(name="spending_analysis_skill", rerun_on_resume=True)
 async def spending_analysis_skill(ctx: Context, node_input: Any):
-    """
-    Skill for analyzing Chase transaction data via BigQuery.
+    """Skill for analyzing Chase transaction data via BigQuery.
+
     Supports query_intent: "savings_rate", "anomaly_check", or ad-hoc NL queries.
     """
     user_id = node_input.get("user_id")
@@ -35,7 +35,10 @@ async def spending_analysis_skill(ctx: Context, node_input: Any):
         total_outflow = totals["total_outflow"]
 
         savings_rate = calculate_savings_rate(total_income, total_outflow)
-        average_monthly_expenses = total_outflow / 3.0
+        window_months = node_input.get("window_months", 3)
+        if not isinstance(window_months, (int, float)) or window_months <= 0:
+            window_months = 3
+        average_monthly_expenses = total_outflow / float(window_months)
 
         holdings = firestore_client.get_holdings(user_id)
         cash_usd = holdings.cash_usd if holdings and holdings.cash_usd else 0.0
