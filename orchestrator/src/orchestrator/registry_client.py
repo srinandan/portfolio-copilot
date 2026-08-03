@@ -9,7 +9,7 @@ import httpx
 from google.auth import default as google_auth_default
 from google.auth.transport.requests import Request as GoogleAuthRequest
 
-DEFAULT_BASE_URL = "https://agentregistry.googleapis.com/v1"
+DEFAULT_BASE_URL = "https://agentregistry.googleapis.com/v1alpha"
 
 
 @dataclass
