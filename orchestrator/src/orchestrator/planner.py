@@ -17,6 +17,7 @@ from .skills.action_drafting import action_drafting_skill
 from .skills.portfolio_analysis import portfolio_analysis_skill
 from .skills.research import managed_research_agent_node
 from .state import write_ips_from_interview_result
+from .state.spending import preload_spending_facts
 
 
 @node(name="get_skills", rerun_on_resume=False)
@@ -65,6 +66,7 @@ async def memory_interaction(ctx: Context, node_input: Any):
 
 
 PIPELINE_SKILL_ORDER = [
+    "private-spending-analysis",
     "private-goals-onboarding",
     "private-portfolio-analysis",
     "private-research",
@@ -127,7 +129,23 @@ async def root_planner(ctx: Context, node_input: Any):
 
     for skill in ordered_skills:
         short_name = _short_skill_id(skill)
-        if short_name == "private-goals-onboarding":
+        if short_name == "private-spending-analysis":
+            logger.info(f"Executing dynamic managed spending analysis skill: {skill}")
+            preloaded_spending = preload_spending_facts(user_id=user_id)
+            spending_input = {
+                "user_id": user_id,
+                "query_intent": input_dict.get("query_intent", "anomaly_check"),
+                "preloaded": preloaded_spending,
+            }
+            result = await dispatch_managed_skill(
+                "private-spending-analysis",
+                node_input=spending_input,
+                ctx=ctx,
+            )
+            report_data = result.model_dump() if hasattr(result, "model_dump") else result
+            results.append(f"spending_analysis_result: {report_data}")
+            context["spending_analysis_result"] = result
+        elif short_name == "private-goals-onboarding":
             logger.info(f"Executing dynamic managed goals onboarding skill: {skill}")
             result = await dispatch_managed_skill(
                 "private-goals-onboarding",
