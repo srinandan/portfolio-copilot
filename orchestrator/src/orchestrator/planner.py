@@ -10,11 +10,13 @@ from google.adk import Context
 from google.adk.workflow import Workflow, node
 from google.genai.types import Part, UserContent
 
+from .contracts.goals_onboarding import GoalsOnboardingResult
+from .managed_agents import dispatch_managed_skill
 from .registry_client import AgentRegistryClient
 from .skills.action_drafting import action_drafting_skill
-from .skills.goals_onboarding import goals_onboarding_skill
 from .skills.portfolio_analysis import portfolio_analysis_skill
 from .skills.research import managed_research_agent_node
+from .state import write_ips_from_interview_result
 
 
 @node(name="get_skills", rerun_on_resume=False)
@@ -90,10 +92,6 @@ async def root_planner(ctx: Context, node_input: Any):
     # Run the memory interaction to satisfy Issue #11
     await ctx.run_node(memory_interaction, node_input="test_memory")
 
-    project_id = os.environ.get("PROJECT_ID") or os.environ.get("GOOGLE_CLOUD_PROJECT") or "dummy-project"
-    location = os.environ.get("GOOGLE_CLOUD_LOCATION", "global")
-    registry_client = AgentRegistryClient(project_id=project_id, location=location)
-
     skills = await ctx.run_node(get_skills_from_registry, node_input=node_input)
     logger.info(f"Available skills: {skills}")
 
@@ -130,10 +128,24 @@ async def root_planner(ctx: Context, node_input: Any):
     for skill in ordered_skills:
         short_name = _short_skill_id(skill)
         if short_name == "private-goals-onboarding":
-            logger.info(f"Executing native skill: {skill}")
-            result = await ctx.run_node(goals_onboarding_skill, node_input={"user_id": user_id, "trigger": trigger})
-            results.append(f"goals_onboarding_result: {result}")
-            context["goals_onboarding_result"] = result
+            logger.info(f"Executing dynamic managed goals onboarding skill: {skill}")
+            result = await dispatch_managed_skill(
+                "private-goals-onboarding",
+                node_input={"user_id": user_id, "trigger": trigger},
+                ctx=ctx,
+            )
+            if isinstance(result, GoalsOnboardingResult):
+                new_ips, _ = write_ips_from_interview_result(user_id=user_id, result=result, trigger=trigger)
+                summary_text = f"User {user_id} completed goals onboarding. Risk tolerance: {new_ips.risk_tolerance.value}. Primary horizon: {new_ips.time_horizon_years} years."
+                try:
+                    await ctx.add_events_to_memory(events=[UserContent(parts=[Part.from_text(text=summary_text)])])
+                except Exception as mem_err:
+                    logger.warning(f"add_events_to_memory failed: {mem_err}")
+                result_payload = {"status": "completed", "ips_id": new_ips.ips_id, "version": new_ips.version}
+            else:
+                result_payload = result
+            results.append(f"goals_onboarding_result: {result_payload}")
+            context["goals_onboarding_result"] = result_payload
         elif short_name == "private-portfolio-analysis":
             logger.info(f"Executing native portfolio analysis skill: {skill}")
             result = await ctx.run_node(portfolio_analysis_skill, node_input={"user_id": user_id})
