@@ -38,6 +38,29 @@ async def test_spending_analysis_skill_savings_rate(mock_bq_class, mock_fs_class
 @pytest.mark.asyncio
 @patch("orchestrator.skills.spending_analysis.__init__.FirestoreClient")
 @patch("orchestrator.skills.spending_analysis.__init__.BigQueryClient")
+async def test_spending_analysis_skill_savings_rate_custom_window(mock_bq_class, mock_fs_class, mock_context):
+    mock_fs = mock_fs_class.return_value
+    mock_bq = mock_bq_class.return_value
+
+    mock_bq.get_trailing_income_and_outflow.return_value = {"total_income": 10000.0, "total_outflow": 6000.0}
+    mock_holdings = MagicMock()
+    mock_holdings.cash_usd = 12000.0
+    mock_fs.get_holdings.return_value = mock_holdings
+
+    # 6-month window: monthly expense = 6000 / 6 = 1000, reserve_months = 12000 / 1000 = 12.0
+    node_input = {"user_id": "user1", "query_intent": "savings_rate", "window_months": 6}
+
+    generator = spending_analysis_skill._func(mock_context, node_input)
+    result = await generator.__anext__()
+
+    assert result["savings_rate"] == 0.4
+    assert result["reserve_months"] == 12.0
+
+
+
+@pytest.mark.asyncio
+@patch("orchestrator.skills.spending_analysis.__init__.FirestoreClient")
+@patch("orchestrator.skills.spending_analysis.__init__.BigQueryClient")
 async def test_spending_analysis_skill_anomaly_check(mock_bq_class, mock_fs_class, mock_context):
     mock_bq = mock_bq_class.return_value
 
