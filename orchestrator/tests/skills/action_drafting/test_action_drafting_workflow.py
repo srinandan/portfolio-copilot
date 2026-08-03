@@ -181,3 +181,17 @@ async def test_action_drafting_skill_constraint_failure_audit_log(mock_firestore
     assert client_instance.append_audit_log.call_count == 2
     failed_log = client_instance.append_audit_log.call_args_list[1][0][0]
     assert failed_log.event_type == EventType.SKILL_INVOCATION_FAILED
+
+
+@pytest.mark.asyncio
+async def test_action_drafting_skill_audit_log_failure_raises(mock_firestore):
+    """Verifies I3: If audit log append fails, action drafting fails closed."""
+    client_instance = mock_firestore.return_value
+    client_instance.append_audit_log.side_effect = RuntimeError("Firestore unavailable")
+
+    node_input = {"user_id": "user_audit_fail"}
+    ctx = MagicMock()
+
+    with pytest.raises(RuntimeError, match="Audit log write failed for skill invocation"):
+        await action_drafting_skill._func(ctx, node_input)
+
