@@ -49,7 +49,7 @@ async def action_drafting_skill(ctx: Context, node_input: Any):
     db_client = FirestoreClient()
     now = datetime.now(timezone.utc)
 
-    # 1. Audit log: Skill invoked
+    # 1. Audit log: Skill invoked (Fail closed per I3)
     try:
         db_client.append_audit_log(
             AuditLogEntry(
@@ -65,7 +65,8 @@ async def action_drafting_skill(ctx: Context, node_input: Any):
             )
         )
     except Exception as audit_err:
-        logger.warning(f"Failed to append audit log for skill invocation: {audit_err}")
+        logger.error(f"Failed to append audit log for skill invocation: {audit_err}")
+        raise RuntimeError(f"Audit log write failed for skill invocation: {audit_err}") from audit_err
 
     # 2. Fetch active IPS
     ips_id = node_input.get("ips_id") if isinstance(node_input, dict) else None
@@ -101,7 +102,7 @@ async def action_drafting_skill(ctx: Context, node_input: Any):
                 )
             )
         except Exception as audit_err:
-            logger.warning(f"Failed to append audit log: {audit_err}")
+            logger.error(f"Failed to append audit log: {audit_err}")
         raise
 
     if not trade_details:
@@ -159,7 +160,7 @@ async def action_drafting_skill(ctx: Context, node_input: Any):
         created_at=now,
     )
 
-    # 5. Audit log: Action proposed
+    # 5. Audit log: Action proposed (Fail closed per I3)
     try:
         db_client.append_audit_log(
             AuditLogEntry(
@@ -177,6 +178,7 @@ async def action_drafting_skill(ctx: Context, node_input: Any):
             )
         )
     except Exception as audit_err:
-        logger.warning(f"Failed to append audit log: {audit_err}")
+        logger.error(f"Failed to append audit log for proposed action: {audit_err}")
+        raise RuntimeError(f"Audit log write failed for proposed action: {audit_err}") from audit_err
 
     return [action.model_dump()]
