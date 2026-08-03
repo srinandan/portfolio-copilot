@@ -249,14 +249,23 @@ async def test_root_planner_dispatches_research_managed_agent():
         auto_create_session=True,
     )
 
+    from orchestrator.contracts import ResearchBrief, ConfidenceLevel
+    from datetime import datetime, timezone
+
     with patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list, \
-         patch("src.orchestrator.planner.AgentRegistryClient.get_skill_content", new_callable=AsyncMock) as mock_get_content, \
-         patch("src.orchestrator.planner.ManagedAgent._run_async_impl") as mock_managed_run:
+         patch("src.orchestrator.skills.research.AgentRegistryClient.get_skill_content", new_callable=AsyncMock) as mock_get_content, \
+         patch("src.orchestrator.skills.research.ManagedAgent._run_async_impl") as mock_managed_run:
 
         from google.adk.events import Event
 
         async def fake_research_stream(ctx):
-            yield Event(author="research", output="market research report generated")
+            yield Event(author="research", output=ResearchBrief(
+                research_run_id="test_run_id",
+                summary="market research report generated",
+                sources=["http://test.com"],
+                confidence=ConfidenceLevel.HIGH,
+                as_of=datetime.now(timezone.utc)
+            ))
 
         mock_managed_run.side_effect = fake_research_stream
 
@@ -281,5 +290,5 @@ async def test_root_planner_dispatches_research_managed_agent():
 
         mock_get_content.assert_awaited_once_with("research")
         last_event = events[-1]
-        assert "research_result: market research report generated" in last_event.output
+        assert any("research_result:" in out and "market research report generated" in out for out in last_event.output)
 

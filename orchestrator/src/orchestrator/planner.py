@@ -7,12 +7,12 @@ import os
 from typing import Any
 
 from google.adk import Context
-from google.adk.agents import ManagedAgent
 from google.adk.workflow import Workflow, node
 from google.genai.types import Part, UserContent
 
 from .registry_client import AgentRegistryClient
 from .skills.goals_onboarding import goals_onboarding_skill
+from .skills.research import managed_research_agent_node
 
 
 @node(name="get_skills", rerun_on_resume=False)
@@ -100,15 +100,12 @@ async def root_planner(ctx: Context, node_input: Any):
             results.append(f"goals_onboarding_result: {result}")
         elif short_name == "private-research":
             logger.info(f"Executing dynamic managed research skill: {skill}")
-            instructions = await registry_client.get_skill_content("research")
-            research_agent = ManagedAgent(
-                name="research",
-                description=instructions,
-                agent_id="antigravity-preview-05-2026",
-                environment={"type": "remote"},
-            )
-            result = await ctx.run_node(research_agent, node_input={"user_id": user_id, "goal": "market research"})
-            results.append(f"research_result: {result}")
+            research_question = "What are the current market conditions and sentiment for the tech sector?"
+            if isinstance(node_input, dict) and "research_question" in node_input:
+                research_question = node_input["research_question"]
+
+            result = await ctx.run_node(managed_research_agent_node, node_input={"research_question": research_question})
+            results.append(f"research_result: {result.model_dump() if hasattr(result, 'model_dump') else result}")
         else:
             logger.info(f"Authorized skill {skill} is not yet wired into dynamic plan; executing fallback.")
             result = await ctx.run_node(dummy_skill_execution, node_input=skill)
