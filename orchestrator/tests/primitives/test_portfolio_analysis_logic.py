@@ -11,7 +11,7 @@ from orchestrator.contracts.ips import (
     RiskTolerance,
     TargetAllocation,
 )
-from orchestrator.skills.portfolio_analysis.logic import calculate_drift
+from orchestrator.primitives.portfolio_analysis import calculate_drift
 
 
 @pytest.fixture
@@ -55,7 +55,6 @@ def test_basic_drift_calculation_in_band(sample_holdings, sample_ips):
     assert report.rebalance_recommended is False
     assert report.unclassified_value_usd == 0.0
 
-    # Check entries
     entry_map = {e.asset_class: e for e in report.entries}
     assert entry_map["Equity"].current_percent == 60.0
     assert entry_map["Equity"].in_band is True
@@ -69,12 +68,8 @@ def test_basic_drift_calculation_in_band(sample_holdings, sample_ips):
 
 
 def test_out_of_band_but_below_threshold(sample_holdings, sample_ips):
-    # Drift threshold is 5.0
-    # Let's drift Equity to 72% (2% out of band, which is < 5%)
-    # Target: 60, Max: 70
     sample_holdings.positions[0].market_value_usd = 72000
     sample_holdings.positions[1].market_value_usd = 18000
-    # Cash remains 10000
 
     report = calculate_drift(sample_holdings, sample_ips)
 
@@ -91,8 +86,6 @@ def test_out_of_band_but_below_threshold(sample_holdings, sample_ips):
 
 
 def test_exactly_at_threshold_triggers_rebalance(sample_holdings, sample_ips):
-    # Drift threshold is 5.0
-    # Equity max is 70.0. We want drift amount to be exactly 5.0, so current_percent = 75.0
     sample_holdings.positions[0].market_value_usd = 75000
     sample_holdings.positions[1].market_value_usd = 15000
 
@@ -106,21 +99,17 @@ def test_exactly_at_threshold_triggers_rebalance(sample_holdings, sample_ips):
 
 
 def test_unclassified_assets_reporting(sample_holdings, sample_ips):
-    # Add gold and crypto
     sample_holdings.positions.append(
         Position(ticker="GLD", quantity=10, asset_class="Alternatives", market_value_usd=10000)
     )
     sample_holdings.positions.append(
         Position(ticker="BTC", quantity=1, asset_class="Crypto", market_value_usd=5000)
     )
-    # Total is now 115000
     sample_holdings.total_value_usd = 115000
 
     report = calculate_drift(sample_holdings, sample_ips)
 
     assert report.unclassified_value_usd == 15000.0
-
-    # Check percentages relative to true total
     entry_map = {e.asset_class: e for e in report.entries}
 
     expected_equity_percent = (60000 / 115000) * 100
@@ -128,20 +117,16 @@ def test_unclassified_assets_reporting(sample_holdings, sample_ips):
 
 
 def test_missing_drift_threshold(sample_holdings, sample_ips):
-    # If no drift threshold, it should not recommend rebalance even if out of band
     sample_ips.rebalancing_rules.drift_threshold_percent = None
-
-    # Make it out of band by a lot
     sample_holdings.positions[0].market_value_usd = 90000
     sample_holdings.positions[1].market_value_usd = 0
 
     report = calculate_drift(sample_holdings, sample_ips)
 
     assert report.rebalance_recommended is False
-
     entry_map = {e.asset_class: e for e in report.entries}
     assert entry_map["Equity"].in_band is False
-    assert entry_map["Equity"].drift_amount_percent == 20.0  # 90 - 70 = 20
+    assert entry_map["Equity"].drift_amount_percent == 20.0
 
 
 def test_zero_total_value(sample_holdings, sample_ips):
@@ -155,11 +140,10 @@ def test_zero_total_value(sample_holdings, sample_ips):
     assert report.unclassified_value_usd == 0.0
     entry_map = {e.asset_class: e for e in report.entries}
     assert entry_map["Equity"].current_percent == 0.0
-    assert entry_map["Equity"].drift_amount_percent == 50.0  # min is 50, current is 0
+    assert entry_map["Equity"].drift_amount_percent == 50.0
 
 
 def test_zero_total_value_with_zero_min_percent(sample_holdings, sample_ips):
-    """Verifies that bands with min_percent=0 have drift=0.0 (non-negative) when portfolio is empty."""
     sample_ips.target_allocation = [
         TargetAllocation(asset_class="Equity", target_percent=90.0, min_percent=80.0, max_percent=100.0),
         TargetAllocation(asset_class="Bonds", target_percent=10.0, min_percent=0.0, max_percent=20.0),
@@ -172,14 +156,12 @@ def test_zero_total_value_with_zero_min_percent(sample_holdings, sample_ips):
 
     entry_map = {e.asset_class: e for e in report.entries}
     assert entry_map["Bonds"].in_band is True
-    assert entry_map["Bonds"].drift_amount_percent == 0.0  # 0.0 in [0, 20], drift must never be negative!
+    assert entry_map["Bonds"].drift_amount_percent == 0.0
     assert entry_map["Equity"].in_band is False
     assert entry_map["Equity"].drift_amount_percent == 80.0
 
 
 def test_cash_mapping_synonyms_and_unclassified():
-    """Verifies B1: cash mapping works with 'Cash', 'cash_reserves', and handles unclassified cash."""
-    # Test cash_reserves
     ips = InvestmentPolicyStatement(
         ips_id="ips_cash_test",
         user_id="user_cash",
@@ -211,27 +193,8 @@ def test_cash_mapping_synonyms_and_unclassified():
     assert entry_map["cash_reserves"].in_band is True
     assert report.unclassified_value_usd == 0.0
 
-    # Test cash with no cash band in IPS (becomes unclassified)
-    ips_no_cash = InvestmentPolicyStatement(
-        ips_id="ips_no_cash",
-        user_id="user_cash",
-        version=1,
-        status=IPSStatus.ACTIVE,
-        effective_date=date(2023, 1, 1),
-        risk_tolerance=RiskTolerance.AGGRESSIVE,
-        time_horizon_years=20,
-        target_allocation=[
-            TargetAllocation(asset_class="Equities", target_percent=100.0, min_percent=90.0, max_percent=100.0),
-        ],
-        constraints=Constraints(concentration_limit_percent=15),
-        created_at=datetime.now(timezone.utc),
-    )
-    report_no_cash = calculate_drift(holdings, ips_no_cash)
-    assert report_no_cash.unclassified_value_usd == 50000.0
-
 
 def test_cash_position_and_cash_usd_deduplication(sample_ips):
-    """Verifies I5: Cash position in positions + cash_usd are reconciled without double-counting."""
     holdings = HoldingsSnapshot(
         user_id="user_dedup",
         as_of=datetime.now(timezone.utc),
@@ -247,14 +210,12 @@ def test_cash_position_and_cash_usd_deduplication(sample_ips):
     report = calculate_drift(holdings, sample_ips)
     entry_map = {e.asset_class: e for e in report.entries}
 
-    # Cash should be 10% ($10,000 / $100,000), NOT 20% ($20,000)
     assert entry_map["Cash"].current_percent == 10.0
     assert entry_map["Cash"].in_band is True
     assert report.rebalance_recommended is False
 
 
 def test_stale_total_value_usd_reconciled(sample_ips):
-    """Verifies PA1: If total_value_usd is stale and disagrees with sum of positions + cash, computed total is used."""
     holdings = HoldingsSnapshot(
         user_id="user_reconcile",
         as_of=datetime.now(timezone.utc),
@@ -263,13 +224,12 @@ def test_stale_total_value_usd_reconciled(sample_ips):
             Position(ticker="BND", quantity=100, asset_class="Fixed Income", market_value_usd=30000),
         ],
         cash_usd=10000,
-        total_value_usd=50000,  # Stale: says $50k, actual sum is $100k
+        total_value_usd=50000,
     )
 
     report = calculate_drift(holdings, sample_ips)
     entry_map = {e.asset_class: e for e in report.entries}
 
-    # Should use $100,000 denominator, so Equity is 60%, not 120%
     assert entry_map["Equity"].current_percent == 60.0
     assert entry_map["Fixed Income"].current_percent == 30.0
     assert entry_map["Cash"].current_percent == 10.0

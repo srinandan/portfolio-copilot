@@ -1,6 +1,6 @@
 import pytest
 
-from orchestrator.skills.spending_analysis.logic import calculate_reserve_months, calculate_savings_rate, is_anomalous
+from orchestrator.primitives.spending_analysis import calculate_reserve_months, calculate_savings_rate, is_anomalous
 
 
 @pytest.mark.parametrize(
