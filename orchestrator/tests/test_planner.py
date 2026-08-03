@@ -401,7 +401,7 @@ async def test_root_planner_dispatches_portfolio_analysis_skill():
             events.append(event)
 
         last_event = events[-1]
-        assert any("portfolio_analysis_result:" in str(item) for item in last_event.output)
+        assert any("portfolio_analysis_result:" in str(item) and "declined" in str(item) for item in last_event.output)
 
 
 @pytest.mark.asyncio
@@ -447,7 +447,7 @@ async def test_root_planner_dispatches_action_drafting_skill():
             events.append(event)
 
         last_event = events[-1]
-        assert any("action_drafting_result:" in str(item) for item in last_event.output)
+        assert any("action_drafting_result: []" in str(item) for item in last_event.output)
 
 
 @pytest.mark.asyncio
