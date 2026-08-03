@@ -127,12 +127,17 @@ adjust.
 
 ## Output
 
-One [`InvestmentPolicyStatement`](../../schemas/ips.schema.json) instance,
-written to Firestore, **plus** one
-[`LiabilitiesSnapshot`](../../schemas/liabilities.schema.json), written
-or overwritten in Firestore (current-state, not versioned — unlike the
-IPS below, there's no history to preserve here, the latest snapshot
-simply replaces the prior one).
+Produces a typed [`GoalsOnboardingResult`](../../schemas/ips.schema.json)
+carrying the synthesized interview responses. The trusted orchestrator
+validates this structured output and executes the corresponding Firestore
+writes:
+
+1. One [`InvestmentPolicyStatement`](../../schemas/ips.schema.json) instance,
+   written to Firestore, **plus**
+2. One [`LiabilitiesSnapshot`](../../schemas/liabilities.schema.json), written
+   or overwritten in Firestore (current-state, not versioned — unlike the
+   IPS below, there's no history to preserve here, the latest snapshot
+   simply replaces the prior one).
 
 **Versioning invariant (IPS only):** exactly one document with
 `status: "active"` per `ips_id` at any time.
@@ -145,27 +150,27 @@ simply replaces the prior one).
   zero.
 
 A summarized version (risk tolerance, goals, key constraints — not the
-full document) is also pushed to Vertex AI Memory Bank for semantic
-recall in future sessions.
+full document) is also pushed by the orchestrator to Vertex AI Memory Bank
+for semantic recall in future sessions.
 
 ## Failure mode: incomplete interview
 
 If the user abandons the interview before all required IPS fields are
-answered, **no documents are written** — neither the IPS nor the
-`LiabilitiesSnapshot`. Partial state is never persisted: a half-complete
-IPS would fail schema validation, and a document that doesn't validate
-should never exist in Firestore. Resume from where the user left off on
-the next invocation rather than starting over, if practical.
+answered, the Managed Agent does not emit a complete result and **no
+documents are written** — neither the IPS nor the `LiabilitiesSnapshot`.
+Partial state is never persisted: a half-complete IPS would fail schema
+validation, and a document that doesn't validate should never exist in
+Firestore. Resume from where the user left off on the next invocation rather
+than starting over, if practical.
 
 ## Tools / permissions required
 
-- Firestore: read `holdings`, read `liabilities`, read `ips` (existing
-  active version), write `ips`, write `liabilities`
-- BigQuery: read `chase_transactions` (aggregate queries only)
-- Vertex AI Memory Bank: write (summarized preferences)
-- **No** trade-execution tools, no Alpaca access, no write access outside
-  the above. This skill's tool surface should never grow to overlap with
-  Action Drafting's.
+- Managed Agent sandbox: conversational interaction with the user (`RequestInput`)
+- Orchestrator (outside sandbox):
+  - Firestore: read `holdings`, read `liabilities`, read/write `ips`, write `liabilities`, write `audit_log`
+  - BigQuery: read `chase_transactions` (aggregate queries only)
+  - Vertex AI Memory Bank: write (summarized preferences)
+- **No** trade-execution tools, no Alpaca access, no write access inside the sandbox.
 
 ## Registry metadata
 
