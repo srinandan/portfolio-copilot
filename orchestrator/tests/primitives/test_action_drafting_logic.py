@@ -11,7 +11,7 @@ from orchestrator.contracts.ips import (
     TargetAllocation,
 )
 from orchestrator.contracts.proposed_action import Side
-from orchestrator.skills.action_drafting.logic import calculate_draft_action
+from orchestrator.primitives.action_drafting import calculate_draft_action
 
 
 def get_base_ips():
