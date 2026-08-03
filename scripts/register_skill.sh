@@ -130,6 +130,6 @@ echo "Calling Agent Registry API (Step 3: Setting default revision to '$FULL_REV
 gcloud alpha agent-registry skills update "$REGISTERED_NAME" \
   --project="$PROJECT_ID" \
   --location="$REGION" \
-  --default-revision="$FULL_REV_NAME" || echo "Note: Default revision already set or updated."
+  --default-revision="$FULL_REV_NAME"
 
 echo "Skill '$SKILL_NAME' successfully registered/updated as '$REGISTERED_NAME' with default revision '$REV_ID'."
