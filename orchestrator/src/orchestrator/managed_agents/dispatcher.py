@@ -1,0 +1,108 @@
+"""Generic Managed Agent dispatcher for registry-driven dynamic execution."""
+
+import os
+from typing import Any, Dict, Optional, Type
+
+from google.adk import Context
+from google.adk.tools import google_search
+from pydantic import BaseModel, ValidationError
+
+from ..contracts.drift_report import DriftReport
+from ..contracts.goals_onboarding import GoalsOnboardingResult
+from ..contracts.proposed_action import ProposedAction
+from ..contracts.research_brief import ResearchBrief
+from ..contracts.reviewer_verdict import ReviewerVerdict
+from ..contracts.spending_analysis import SpendingReport
+from ..logger import get_logger
+from ..registry_client import AgentRegistryClient
+from .worker import build_worker_managed_agent
+
+logger = get_logger(__name__)
+
+# Canonical mapping of skill identifiers to typed output schemas
+OUTPUT_SCHEMA_BY_SKILL: Dict[str, Type[BaseModel]] = {
+    "goals-onboarding": GoalsOnboardingResult,
+    "private-goals-onboarding": GoalsOnboardingResult,
+    "portfolio-analysis": DriftReport,
+    "private-portfolio-analysis": DriftReport,
+    "research": ResearchBrief,
+    "private-research": ResearchBrief,
+    "action-drafting": ProposedAction,
+    "private-action-drafting": ProposedAction,
+    "spending-analysis": SpendingReport,
+    "private-spending-analysis": SpendingReport,
+    "reviewer": ReviewerVerdict,
+    "private-reviewer": ReviewerVerdict,
+}
+
+
+def get_skill_tools(skill_name: str) -> list:
+    """Returns the authorized toolset for a given skill turn."""
+    normalized = skill_name.replace("private-", "")
+    if normalized == "research":
+        return [google_search]
+    return []
+
+
+def normalize_skill_name(skill_name: str) -> str:
+    """Extracts short skill ID from full resource name."""
+    base = skill_name.split("/")[-1] if "/" in skill_name else skill_name
+    return base.replace("private-", "")
+
+
+async def resolve_skill_instructions(skill_name: str, client: Optional[AgentRegistryClient] = None) -> str:
+    """Resolves SKILL.md content from Agent Registry."""
+    project_id = os.environ.get("PROJECT_ID") or os.environ.get("GOOGLE_CLOUD_PROJECT") or "dummy-project"
+    location = os.environ.get("GOOGLE_CLOUD_LOCATION", "global")
+    norm_name = normalize_skill_name(skill_name)
+
+    if client:
+        return await client.get_skill_content(norm_name)
+
+    async with AgentRegistryClient(project_id=project_id, location=location) as reg_client:
+        return await reg_client.get_skill_content(norm_name)
+
+
+async def dispatch_managed_skill(
+    skill_name: str,
+    node_input: Any,
+    ctx: Context,
+    registry_client: Optional[AgentRegistryClient] = None,
+) -> BaseModel | Any:
+    """Dispatches a skill turn to the worker Managed Agent.
+
+    1. Resolves SKILL.md from the Agent Registry for runtime instructions.
+    2. Constructs a ManagedAgent with the skill's description, tools, and output schema.
+    3. Invokes the agent node via ADK Context.
+    4. Validates and returns the typed Pydantic output.
+    """
+    short_name = skill_name.split("/")[-1] if "/" in skill_name else skill_name
+    output_schema = OUTPUT_SCHEMA_BY_SKILL.get(short_name) or OUTPUT_SCHEMA_BY_SKILL.get(normalize_skill_name(short_name))
+    tools = get_skill_tools(short_name)
+
+    try:
+        instructions = await resolve_skill_instructions(short_name, client=registry_client)
+    except Exception as e:
+        logger.error(f"Failed to resolve skill instructions for {short_name}: {e}")
+        raise RuntimeError(f"Skill instruction resolution failed for {short_name}: {e}") from e
+
+    agent = build_worker_managed_agent(
+        name=short_name,
+        description=instructions,
+        output_schema=output_schema,
+        tools=tools,
+    )
+
+    logger.info(f"Dispatching skill '{short_name}' to worker Managed Agent (schema={output_schema.__name__ if output_schema else None})")
+    raw_result = await ctx.run_node(agent, node_input=node_input)
+
+    if output_schema:
+        if isinstance(raw_result, output_schema):
+            return raw_result
+        if isinstance(raw_result, dict):
+            try:
+                return output_schema.model_validate(raw_result)
+            except ValidationError as ve:
+                logger.warning(f"Could not validate result as {output_schema.__name__}: {ve}")
+
+    return raw_result
