@@ -14,6 +14,7 @@ def test_json_formatter():
     ch = logging.StreamHandler(log_capture_string)
 
     from orchestrator.logger import JSONFormatter
+
     ch.setFormatter(JSONFormatter())
     logger.addHandler(ch)
 
@@ -33,8 +34,10 @@ def test_json_formatter():
     assert "timestamp" in log_dict
     assert log_dict["logger"] == "test_logger"
 
+
 def test_setup_logger():
     from orchestrator.logger import get_logger
+
     logger = setup_logger()
     assert isinstance(logger, logging.Logger)
     assert logger.name == "orchestrator"

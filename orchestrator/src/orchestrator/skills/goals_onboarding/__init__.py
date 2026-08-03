@@ -4,10 +4,8 @@ logger = get_logger(__name__)
 
 import uuid
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 
-import yaml
 from google.adk import Context
 from google.adk.events import RequestInput
 from google.adk.workflow import node
@@ -24,27 +22,10 @@ from ...contracts.ips import (
 )
 from ...contracts.liabilities import LiabilitiesSnapshot, Liability, LiabilityType
 from ...data.firestore import FirestoreClient
+from .._skill_metadata import read_skill_version
 from .logic import calculate_risk_tolerance, get_default_allocation_bands
 
-
-def _load_skill_version() -> str:
-    """Reads metadata.version from skills/goals-onboarding/SKILL.md frontmatter."""
-    current = Path(__file__).resolve().parent
-    for parent in [current] + list(current.parents):
-        candidate = parent / "skills" / "goals-onboarding" / "SKILL.md"
-        if candidate.exists():
-            content = candidate.read_text(encoding="utf-8")
-            if content.startswith("---"):
-                parts = content.split("---", 2)
-                if len(parts) >= 3:
-                    parsed = yaml.safe_load(parts[1])
-                    if isinstance(parsed, dict) and "metadata" in parsed and "version" in parsed["metadata"]:
-                        return str(parsed["metadata"]["version"])
-            raise RuntimeError(f"No metadata.version found in frontmatter of {candidate}")
-    raise RuntimeError("Could not find skills/goals-onboarding/SKILL.md")
-
-
-SKILL_VERSION = _load_skill_version()
+SKILL_VERSION = read_skill_version("goals-onboarding")
 
 
 @node(name="goals_onboarding_interview", rerun_on_resume=False)
@@ -58,7 +39,9 @@ async def goals_onboarding_interview(ctx: Context, node_input: Any):
     user_id = node_input.get("user_id")
 
     # 1. Gather Goals
-    goals_response = yield RequestInput(message="What are your primary financial goals? (e.g. name, target amount in USD, target date like YYYY-MM-DD)")
+    goals_response = yield RequestInput(
+        message="What are your primary financial goals? (e.g. name, target amount in USD, target date like YYYY-MM-DD)"
+    )
     if goals_response is None:
         return
     if not (isinstance(goals_response, dict) and "goals" in goals_response and goals_response["goals"]):
@@ -69,10 +52,14 @@ async def goals_onboarding_interview(ctx: Context, node_input: Any):
         goals.append(Goal(name=g["name"], target_amount_usd=g["target_amount_usd"], target_date=g["target_date"]))
 
     # 2. Gather Risk Tolerance inputs
-    risk_response = yield RequestInput(message="What is your time horizon (in years) for your primary goal? And how would you react to a 20% drop in your portfolio ('sell', 'hold', 'buy_more')?")
+    risk_response = yield RequestInput(
+        message="What is your time horizon (in years) for your primary goal? And how would you react to a 20% drop in your portfolio ('sell', 'hold', 'buy_more')?"
+    )
     if risk_response is None:
         return
-    if not (isinstance(risk_response, dict) and "time_horizon" in risk_response and "drawdown_reaction" in risk_response):
+    if not (
+        isinstance(risk_response, dict) and "time_horizon" in risk_response and "drawdown_reaction" in risk_response
+    ):
         raise ValueError("onboarding interview: missing required field(s) in risk_tolerance")
 
     time_horizon = risk_response["time_horizon"]
@@ -80,7 +67,9 @@ async def goals_onboarding_interview(ctx: Context, node_input: Any):
     risk_tolerance = calculate_risk_tolerance(time_horizon, drawdown_reaction)
 
     # 3. Gather Liabilities
-    liabilities_response = yield RequestInput(message="What are your current debts? (mortgage, credit cards, auto loans, etc. Include balance and minimum payments)")
+    liabilities_response = yield RequestInput(
+        message="What are your current debts? (mortgage, credit cards, auto loans, etc. Include balance and minimum payments)"
+    )
     if liabilities_response is None:
         return
     if not (isinstance(liabilities_response, dict) and "liabilities" in liabilities_response):
@@ -88,18 +77,22 @@ async def goals_onboarding_interview(ctx: Context, node_input: Any):
 
     liabilities = []
     for l_item in liabilities_response["liabilities"]:
-        liabilities.append(Liability(
-            liability_id=l_item.get("liability_id", str(uuid.uuid4())),
-            type=LiabilityType(l_item["type"]),
-            description=l_item.get("description"),
-            balance_usd=l_item["balance_usd"],
-            interest_rate_percent=l_item.get("interest_rate_percent"),
-            minimum_payment_usd=l_item["minimum_payment_usd"],
-        ))
+        liabilities.append(
+            Liability(
+                liability_id=l_item.get("liability_id", str(uuid.uuid4())),
+                type=LiabilityType(l_item["type"]),
+                description=l_item.get("description"),
+                balance_usd=l_item["balance_usd"],
+                interest_rate_percent=l_item.get("interest_rate_percent"),
+                minimum_payment_usd=l_item["minimum_payment_usd"],
+            )
+        )
 
     # 4. Gather Liquidity Needs
     # TODO(P1): Derive reserve_months / savings rate from BigQuery Spending Analysis instead of asking directly
-    liquidity_response = yield RequestInput(message="How many months of living expenses do you keep in reserve, and do you have any known upcoming major expenses (USD)?")
+    liquidity_response = yield RequestInput(
+        message="How many months of living expenses do you keep in reserve, and do you have any known upcoming major expenses (USD)?"
+    )
     if liquidity_response is None:
         return
     if not (isinstance(liquidity_response, dict) and "reserve_months" in liquidity_response):
@@ -114,7 +107,7 @@ async def goals_onboarding_interview(ctx: Context, node_input: Any):
     # 5. Confirm Allocation Bands and finalize
     confirm_response = yield RequestInput(
         message=f"Based on your risk tolerance ({risk_tolerance.value}), we propose these allocation bands: {[b.model_dump() for b in bands]}. "
-                "Do you want to override these bands or set constraints? Provide confirmation."
+        "Do you want to override these bands or set constraints? Provide confirmation."
     )
     if confirm_response is None:
         return
@@ -142,6 +135,7 @@ async def goals_onboarding_interview(ctx: Context, node_input: Any):
         "constraints": constraints,
     }
 
+
 @node(name="goals_onboarding_skill", rerun_on_resume=True)
 async def goals_onboarding_skill(ctx: Context, node_input: Any):
     """
@@ -163,7 +157,7 @@ async def goals_onboarding_skill(ctx: Context, node_input: Any):
         log_id=str(uuid.uuid4()),
         event_type=EventType.SKILL_INVOKED,
         timestamp=datetime.now(timezone.utc),
-        actor=Actor(type=ActorType.AGENT, skill_name="private-goals-onboarding", skill_version=SKILL_VERSION)
+        actor=Actor(type=ActorType.AGENT, skill_name="private-goals-onboarding", skill_version=SKILL_VERSION),
     )
     db_client.append_audit_log(invoke_log)
 
@@ -220,22 +214,18 @@ async def goals_onboarding_skill(ctx: Context, node_input: Any):
         goals=interview_data["goals"],
         liquidity_needs=LiquidityNeeds(
             reserve_months=interview_data["reserve_months"],
-            known_upcoming_expenses_usd=interview_data["known_upcoming_expenses_usd"]
+            known_upcoming_expenses_usd=interview_data["known_upcoming_expenses_usd"],
         ),
         target_allocation=interview_data["target_allocation"],
         constraints=interview_data["constraints"],
-        created_at=now
+        created_at=now,
     )
 
     # Transactional dual-write via FirestoreClient
     db_client.update_ips(new_ips)
 
     # Write Liabilities Snapshot
-    liab_snapshot = LiabilitiesSnapshot(
-        user_id=user_id,
-        as_of=now,
-        liabilities=interview_data["liabilities"]
-    )
+    liab_snapshot = LiabilitiesSnapshot(user_id=user_id, as_of=now, liabilities=interview_data["liabilities"])
     db_client.set_liabilities(user_id, liab_snapshot)
 
     # Summary to memory bank
@@ -252,7 +242,7 @@ async def goals_onboarding_skill(ctx: Context, node_input: Any):
         event_type=event_type,
         timestamp=now,
         actor=Actor(type=ActorType.AGENT, skill_name="private-goals-onboarding", skill_version=SKILL_VERSION),
-        detail=f"IPS {ips_id} version {next_version} written."
+        detail=f"IPS {ips_id} version {next_version} written.",
     )
     db_client.append_audit_log(completion_log)
 

@@ -89,6 +89,7 @@ class InvestmentPolicyStatement(BaseModel):
     created_at: datetime
     updated_at: datetime | None = None
 
+
 class RelatedIPSVersion(BaseModel):
     ips_id: str
     version: int

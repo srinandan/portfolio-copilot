@@ -1,38 +1,19 @@
 import uuid
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 
-import yaml
 from google.adk import Context
 from google.adk.workflow import node
 
 from ...contracts.audit_log import Actor, ActorType, AuditLogEntry, EventType
 from ...data.firestore import FirestoreClient
 from ...logger import get_logger
+from .._skill_metadata import read_skill_version
 from .logic import calculate_drift
 
 logger = get_logger(__name__)
 
-
-def _load_skill_version() -> str:
-    """Reads metadata.version from skills/portfolio-analysis/SKILL.md frontmatter."""
-    current = Path(__file__).resolve().parent
-    for parent in [current] + list(current.parents):
-        candidate = parent / "skills" / "portfolio-analysis" / "SKILL.md"
-        if candidate.exists():
-            content = candidate.read_text(encoding="utf-8")
-            if content.startswith("---"):
-                parts = content.split("---", 2)
-                if len(parts) >= 3:
-                    parsed = yaml.safe_load(parts[1])
-                    if isinstance(parsed, dict) and "metadata" in parsed and "version" in parsed["metadata"]:
-                        return str(parsed["metadata"]["version"])
-            raise RuntimeError(f"No metadata.version found in frontmatter of {candidate}")
-    raise RuntimeError("Could not find skills/portfolio-analysis/SKILL.md")
-
-
-SKILL_VERSION = _load_skill_version()
+SKILL_VERSION = read_skill_version("portfolio-analysis")
 
 
 @node(name="portfolio_analysis_skill", rerun_on_resume=True)

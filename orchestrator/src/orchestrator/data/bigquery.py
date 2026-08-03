@@ -7,7 +7,9 @@ from google.cloud import bigquery
 
 class BigQueryClient:
     def __init__(self, project: Optional[str] = None):
-        self.project = project or os.environ.get("PROJECT_ID") or os.environ.get("GOOGLE_CLOUD_PROJECT") or "test-project"
+        self.project = (
+            project or os.environ.get("PROJECT_ID") or os.environ.get("GOOGLE_CLOUD_PROJECT") or "test-project"
+        )
         self.client = bigquery.Client(project=self.project)
 
     def get_monthly_spending_totals(self, user_id: str, current_month_start: str) -> List[Dict[str, Any]]:
@@ -66,17 +68,14 @@ class BigQueryClient:
         total_income = results[0].total_income if results and results[0].total_income else 0.0
         total_outflow = results[0].total_outflow if results and results[0].total_outflow else 0.0
 
-        return {
-            "total_income": float(total_income),
-            "total_outflow": float(total_outflow)
-        }
+        return {"total_income": float(total_income), "total_outflow": float(total_outflow)}
 
     def validate_and_execute_nl_sql(self, user_id: str, sql_query: str) -> List[Dict[str, Any]]:
         sql_upper = sql_query.upper()
 
         forbidden_keywords = ["INSERT", "UPDATE", "DELETE", "DROP", "CREATE", "ALTER", "TRUNCATE", "MERGE"]
         for kw in forbidden_keywords:
-            if re.search(r'\b' + kw + r'\b', sql_upper):
+            if re.search(r"\b" + kw + r"\b", sql_upper):
                 raise ValueError(f"Write-intent SQL refused: {kw} is not allowed.")
 
         if "FROM" in sql_upper:

@@ -7,6 +7,7 @@ def is_anomalous(current_month_spend: float, trailing_3mo_avg: float) -> bool:
     """
     return (current_month_spend > trailing_3mo_avg * 1.4) and (current_month_spend > trailing_3mo_avg + 100)
 
+
 def calculate_savings_rate(total_income: float, total_outflow: float) -> float:
     """
     savings_rate = (total_income - total_outflow) / total_income
@@ -15,10 +16,11 @@ def calculate_savings_rate(total_income: float, total_outflow: float) -> float:
         return 0.0
     return (total_income - total_outflow) / total_income
 
+
 def calculate_reserve_months(cash_usd: float, average_monthly_expenses: float) -> float:
     """
     reserve_months = HoldingsSnapshot.cash_usd / average_monthly_expenses
     """
     if average_monthly_expenses <= 0:
-        return float('inf') if cash_usd > 0 else 0.0
+        return float("inf") if cash_usd > 0 else 0.0
     return cash_usd / average_monthly_expenses

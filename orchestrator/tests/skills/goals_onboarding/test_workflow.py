@@ -15,8 +15,10 @@ from src.orchestrator.skills.goals_onboarding import goals_onboarding_skill
 async def start_wrapper(ctx, node_input):
     return await ctx.run_node(goals_onboarding_skill, node_input={"user_id": "u1", "trigger": "initial"})
 
+
 def get_interrupt_id(events):
-    if not events: return None
+    if not events:
+        return None
     last_event = events[-1]
     if last_event.content and last_event.content.parts:
         for part in last_event.content.parts:
@@ -29,6 +31,7 @@ def get_interrupt_id(events):
                     return part.function_call.id
     return None
 
+
 @pytest.mark.asyncio
 async def test_goals_onboarding_workflow_abandonment():
     """Verify that if the interview is abandoned (not all RequestInputs fulfilled), no writes occur to Firestore."""
@@ -39,16 +42,20 @@ async def test_goals_onboarding_workflow_abandonment():
 
     session_service = InMemorySessionService()
     memory_service = InMemoryMemoryService()
-    runner = Runner(app_name="test_app", agent=agent, session_service=session_service, memory_service=memory_service, auto_create_session=True)
+    runner = Runner(
+        app_name="test_app",
+        agent=agent,
+        session_service=session_service,
+        memory_service=memory_service,
+        auto_create_session=True,
+    )
 
     with patch("src.orchestrator.skills.goals_onboarding.FirestoreClient") as MockFirestoreClient:
         mock_db_client = MagicMock()
         MockFirestoreClient.return_value = mock_db_client
 
         response_stream = runner.run_async(
-            user_id="u1",
-            session_id="s1",
-            new_message=UserContent(parts=[Part.from_text(text="start")])
+            user_id="u1", session_id="s1", new_message=UserContent(parts=[Part.from_text(text="start")])
         )
 
         events = [e async for e in response_stream]
@@ -70,22 +77,26 @@ async def test_goals_onboarding_skill_direct_call():
     with patch("src.orchestrator.skills.goals_onboarding.FirestoreClient") as MockFirestoreClient:
         mock_db_client = MagicMock()
         MockFirestoreClient.return_value = mock_db_client
-        mock_db_client.get_active_ips.return_value = None # initial state
+        mock_db_client.get_active_ips.return_value = None  # initial state
 
         # Mock the context
         mock_ctx = MagicMock()
-        mock_ctx.run_node = AsyncMock(return_value={
-            "goals": [{"name": "Retirement", "target_amount_usd": 1000000, "target_date": "2045-01-01"}],
-            "risk_tolerance": RiskTolerance.MODERATE,
-            "time_horizon_years": 10,
-            "liabilities": [],
-            "reserve_months": 6.0,
-            "known_upcoming_expenses_usd": 0.0,
-            "target_allocation": [{"asset_class": "equity", "target_percent": 60, "min_percent": 50, "max_percent": 70}],
-            "constraints": {"concentration_limit_percent": 15},
-            "user_id": "u2",
-            "trigger": "initial"
-        })
+        mock_ctx.run_node = AsyncMock(
+            return_value={
+                "goals": [{"name": "Retirement", "target_amount_usd": 1000000, "target_date": "2045-01-01"}],
+                "risk_tolerance": RiskTolerance.MODERATE,
+                "time_horizon_years": 10,
+                "liabilities": [],
+                "reserve_months": 6.0,
+                "known_upcoming_expenses_usd": 0.0,
+                "target_allocation": [
+                    {"asset_class": "equity", "target_percent": 60, "min_percent": 50, "max_percent": 70}
+                ],
+                "constraints": {"concentration_limit_percent": 15},
+                "user_id": "u2",
+                "trigger": "initial",
+            }
+        )
         mock_ctx.add_events_to_memory = AsyncMock()
 
         gen = goals_onboarding_skill.run(ctx=mock_ctx, node_input={"user_id": "u2", "trigger": "initial"})
@@ -121,18 +132,22 @@ async def test_goals_onboarding_skill_version_from_frontmatter(monkeypatch):
         mock_db_client.get_active_ips.return_value = None
 
         mock_ctx = MagicMock()
-        mock_ctx.run_node = AsyncMock(return_value={
-            "goals": [{"name": "Retirement", "target_amount_usd": 1000000, "target_date": "2045-01-01"}],
-            "risk_tolerance": RiskTolerance.MODERATE,
-            "time_horizon_years": 10,
-            "liabilities": [],
-            "reserve_months": 6.0,
-            "known_upcoming_expenses_usd": 0.0,
-            "target_allocation": [{"asset_class": "equity", "target_percent": 60, "min_percent": 50, "max_percent": 70}],
-            "constraints": {"concentration_limit_percent": 15},
-            "user_id": "u2",
-            "trigger": "initial",
-        })
+        mock_ctx.run_node = AsyncMock(
+            return_value={
+                "goals": [{"name": "Retirement", "target_amount_usd": 1000000, "target_date": "2045-01-01"}],
+                "risk_tolerance": RiskTolerance.MODERATE,
+                "time_horizon_years": 10,
+                "liabilities": [],
+                "reserve_months": 6.0,
+                "known_upcoming_expenses_usd": 0.0,
+                "target_allocation": [
+                    {"asset_class": "equity", "target_percent": 60, "min_percent": 50, "max_percent": 70}
+                ],
+                "constraints": {"concentration_limit_percent": 15},
+                "user_id": "u2",
+                "trigger": "initial",
+            }
+        )
         mock_ctx.add_events_to_memory = AsyncMock()
 
         gen = go_module.goals_onboarding_skill.run(ctx=mock_ctx, node_input={"user_id": "u2", "trigger": "initial"})
@@ -155,7 +170,9 @@ async def test_goals_onboarding_partial_interview_failure_emits_audit_and_no_wri
         MockFirestoreClient.return_value = mock_db_client
 
         mock_ctx = MagicMock()
-        mock_ctx.run_node = AsyncMock(side_effect=ValueError("onboarding interview: missing required field(s) in liabilities"))
+        mock_ctx.run_node = AsyncMock(
+            side_effect=ValueError("onboarding interview: missing required field(s) in liabilities")
+        )
 
         with pytest.raises(ValueError, match="missing required field.*liabilities"):
             gen = goals_onboarding_skill.run(ctx=mock_ctx, node_input={"user_id": "u3", "trigger": "initial"})
@@ -172,5 +189,3 @@ async def test_goals_onboarding_partial_interview_failure_emits_audit_and_no_wri
         assert invoked_log.event_type.value == "skill_invoked"
         assert failed_log.event_type.value == "skill_invocation_failed"
         assert "liabilities" in (failed_log.detail or "")
-
-

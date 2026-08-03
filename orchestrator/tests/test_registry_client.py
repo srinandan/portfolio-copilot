@@ -212,10 +212,12 @@ async def test_get_skill_content_success():
 async def test_get_skill_content_in_subdirectory():
     def handler(request: httpx.Request) -> httpx.Response:
         if "alt=media" in str(request.url):
-            zip_bytes = create_zip({
-                "some-dir/SKILL.md": "# Subdir Skill Doc",
-                "README.md": "# Readme",
-            })
+            zip_bytes = create_zip(
+                {
+                    "some-dir/SKILL.md": "# Subdir Skill Doc",
+                    "README.md": "# Readme",
+                }
+            )
             return httpx.Response(200, content=zip_bytes)
 
         return httpx.Response(
