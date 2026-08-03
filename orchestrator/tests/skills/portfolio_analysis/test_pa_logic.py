@@ -252,3 +252,25 @@ def test_cash_position_and_cash_usd_deduplication(sample_ips):
     assert entry_map["Cash"].in_band is True
     assert report.rebalance_recommended is False
 
+
+def test_stale_total_value_usd_reconciled(sample_ips):
+    """Verifies PA1: If total_value_usd is stale and disagrees with sum of positions + cash, computed total is used."""
+    holdings = HoldingsSnapshot(
+        user_id="user_reconcile",
+        as_of=datetime.now(timezone.utc),
+        positions=[
+            Position(ticker="VTI", quantity=100, asset_class="Equity", market_value_usd=60000),
+            Position(ticker="BND", quantity=100, asset_class="Fixed Income", market_value_usd=30000),
+        ],
+        cash_usd=10000,
+        total_value_usd=50000,  # Stale: says $50k, actual sum is $100k
+    )
+
+    report = calculate_drift(holdings, sample_ips)
+    entry_map = {e.asset_class: e for e in report.entries}
+
+    # Should use $100,000 denominator, so Equity is 60%, not 120%
+    assert entry_map["Equity"].current_percent == 60.0
+    assert entry_map["Fixed Income"].current_percent == 30.0
+    assert entry_map["Cash"].current_percent == 10.0
+    assert report.rebalance_recommended is False

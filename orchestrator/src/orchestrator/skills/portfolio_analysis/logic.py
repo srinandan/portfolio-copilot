@@ -6,6 +6,9 @@ from pydantic import BaseModel, Field
 
 from ...contracts.holdings import HoldingsSnapshot
 from ...contracts.ips import InvestmentPolicyStatement
+from ...logger import get_logger
+
+logger = get_logger(__name__)
 
 CASH_ASSET_CLASS_SYNONYMS = {
     "cash",
@@ -51,11 +54,20 @@ def calculate_drift(holdings: HoldingsSnapshot, ips: InvestmentPolicyStatement) 
     # Reconcile cash to prevent double-counting when cash is represented both in positions and cash_usd (I5)
     net_cash_usd = max(0.0, cash_amount - cash_in_positions) if cash_in_positions > 0 else cash_amount
 
-    # Use holdings.total_value_usd if present, otherwise calculate it
+    computed_total = sum(p.market_value_usd for p in holdings.positions) + net_cash_usd
+
+    # Use holdings.total_value_usd if present, but reconcile if it significantly deviates from computed sum (PA1)
     if holdings.total_value_usd is not None:
-        total_value = holdings.total_value_usd
+        if abs(holdings.total_value_usd - computed_total) > 0.001 * max(holdings.total_value_usd, computed_total, 1.0):
+            logger.warning(
+                f"Holdings total_value_usd ({holdings.total_value_usd}) disagrees with computed positions + cash sum "
+                f"({computed_total}). Using computed total value."
+            )
+            total_value = computed_total
+        else:
+            total_value = holdings.total_value_usd
     else:
-        total_value = sum(p.market_value_usd for p in holdings.positions) + net_cash_usd
+        total_value = computed_total
 
     # If total value is 0, we can't calculate percentages
     if total_value == 0:
