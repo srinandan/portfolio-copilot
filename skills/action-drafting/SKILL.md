@@ -104,17 +104,28 @@ output — never invent a trade to have something to show.
 
 ## Tools / permissions required
 
-- Alpaca: **read-only** quote/market-data endpoint only
-- Firestore: read `holdings`, read `ips`
-- **No** Alpaca order-placement credential, ever. Per the resolved
-  ADR-0005 decision, only the orchestrator's own trusted code ever calls
-  Alpaca's execution endpoint, after Reviewer pass and human approval.
+- Managed Agent sandbox: reasons over the orchestrator's pre-computed
+  trade candidate + IPS + holdings + research briefs. Produces a
+  `ProposedAction` typed output with `rationale`.
+- Orchestrator (outside sandbox):
+  - pre-fetches IPS + holdings from Firestore
+  - pre-computes the trade math and constraint checks via
+    `primitives/action_drafting.py::calculate_draft_action` (excluded
+    ticker/sector, concentration limit, IPS-target-band trim math)
+  - persists the returned `ProposedAction` to Firestore and emits the
+    `ACTION_PROPOSED` audit entry
+- Alpaca: **not called at drafting time.** Quote lookups are mocked in
+  `primitives/action_drafting.py::get_mock_alpaca_quote`. Only the
+  orchestrator's own code calls the real Alpaca endpoint, and only after
+  Reviewer pass + human approval (see ADR-0005).
+- **No** Alpaca order-placement credential, ever. The Managed Agent
+  sandbox holds no broker credentials, per ADR-0005.
 
 ## Registry metadata
 
 - Registered as: `projects/{project}/locations/{location}/skills/private-action-drafting`
 - Skill revision: 0.1.0 (draft — not yet registered)
-- Approval scope: `read:holdings,read:ips,read:market_data_quote,write:proposed_action`
+- Approval scope: `read:holdings,read:ips,read:market_data_quote`
 
 ## Acceptance criteria
 
