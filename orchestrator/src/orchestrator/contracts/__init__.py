@@ -20,6 +20,7 @@ from .proposed_action import (
     Side,
     SkillVersionRef,
 )
+from .research_brief import ConfidenceLevel, ResearchBrief
 from .reviewer_verdict import ReviewerVerdict, RuleResult
 
 __all__ = [
@@ -44,6 +45,8 @@ __all__ = [
     "ProposedAction",
     "RebalancingRules",
     "RelatedIPSVersion",
+    "ResearchBrief",
+    "ConfidenceLevel",
     "ReviewerVerdict",
     "RiskTolerance",
     "RuleResult",
