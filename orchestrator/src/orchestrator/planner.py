@@ -12,6 +12,7 @@ from google.genai.types import Part, UserContent
 
 from .registry_client import AgentRegistryClient
 from .skills.goals_onboarding import goals_onboarding_skill
+from .skills.portfolio_analysis import portfolio_analysis_skill
 from .skills.research import managed_research_agent_node
 
 
@@ -98,6 +99,10 @@ async def root_planner(ctx: Context, node_input: Any):
             logger.info(f"Executing native skill: {skill}")
             result = await ctx.run_node(goals_onboarding_skill, node_input={"user_id": user_id, "trigger": trigger})
             results.append(f"goals_onboarding_result: {result}")
+        elif short_name == "private-portfolio-analysis":
+            logger.info(f"Executing native portfolio analysis skill: {skill}")
+            result = await ctx.run_node(portfolio_analysis_skill, node_input={"user_id": user_id})
+            results.append(f"portfolio_analysis_result: {result}")
         elif short_name == "private-research":
             logger.info(f"Executing dynamic managed research skill: {skill}")
             research_question = "What are the current market conditions and sentiment for the tech sector?"

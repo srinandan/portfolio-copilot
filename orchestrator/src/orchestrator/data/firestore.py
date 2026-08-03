@@ -133,3 +133,17 @@ class FirestoreClient:
         """
         transaction = self.db.transaction()
         self._update_ips_transactional(transaction, new_ips)
+
+    def get_active_ips_by_user(self, user_id: str) -> InvestmentPolicyStatement | None:
+        """Gets the currently active IPS for a given user_id."""
+        query = (
+            self.db.collection(COLLECTION_IPS)
+            .where(filter=firestore.FieldFilter("user_id", "==", user_id))
+            .where(filter=firestore.FieldFilter("status", "==", IPSStatus.ACTIVE.value))
+        )
+        docs = list(query.stream())
+        if len(docs) > 1:
+            raise ValueError(f"invariant violated: found multiple active IPS documents for user_id {user_id}")
+        if len(docs) == 1:
+            return InvestmentPolicyStatement.model_validate(docs[0].to_dict())
+        return None
