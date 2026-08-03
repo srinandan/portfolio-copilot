@@ -22,7 +22,7 @@ def create_zip(files: dict[str, str | bytes]) -> bytes:
 @pytest.mark.asyncio
 async def test_list_authorized_skills_single_page():
     def handler(request: httpx.Request) -> httpx.Response:
-        assert request.url.path == "/v1/projects/test-project/locations/test-location/skills"
+        assert request.url.path == "/v1alpha/projects/test-project/locations/test-location/skills"
         return httpx.Response(
             200,
             json={
@@ -49,7 +49,7 @@ async def test_list_authorized_skills_single_page():
     client = AgentRegistryClient(
         project_id="test-project",
         location="test-location",
-        base_url="https://agentregistry.googleapis.com/v1",
+        base_url="https://agentregistry.googleapis.com/v1alpha",
         http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
     )
 
@@ -185,11 +185,11 @@ async def test_list_authorized_skills_revocation_scenario():
 async def test_get_skill_content_success():
     def handler(request: httpx.Request) -> httpx.Response:
         if "alt=media" in str(request.url):
-            assert request.url.path == "/v1/projects/p/locations/l/skills/private-my-skill/revisions/rev1"
+            assert request.url.path == "/v1alpha/projects/p/locations/l/skills/private-my-skill/revisions/rev1"
             zip_bytes = create_zip({"SKILL.md": "# My Skill Doc"})
             return httpx.Response(200, content=zip_bytes)
 
-        assert request.url.path == "/v1/projects/test-project/locations/test-location/skills/private-my-skill"
+        assert request.url.path == "/v1alpha/projects/test-project/locations/test-location/skills/private-my-skill"
         return httpx.Response(
             200,
             json={

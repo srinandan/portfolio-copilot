@@ -135,12 +135,12 @@ async def test_root_planner_trace():
     ) as mock_list:
         mock_list.return_value = [
             Skill(
-                name="projects/test-project/locations/test-location/skills/research",
+                name="projects/test-project/locations/test-location/skills/dummy_skill_1",
                 target_state="TARGET_STATE_ACTIVE",
                 default_revision="rev1",
             ),
             Skill(
-                name="projects/test-project/locations/test-location/skills/action_drafting",
+                name="projects/test-project/locations/test-location/skills/dummy_skill_2",
                 target_state="TARGET_STATE_ACTIVE",
                 default_revision="rev2",
             ),
@@ -158,8 +158,8 @@ async def test_root_planner_trace():
 
         last_event = events[-1]
         assert last_event.output == [
-            "projects/test-project/locations/test-location/skills/research_completed",
-            "projects/test-project/locations/test-location/skills/action_drafting_completed",
+            "projects/test-project/locations/test-location/skills/dummy_skill_1_completed",
+            "projects/test-project/locations/test-location/skills/dummy_skill_2_completed",
         ]
 
 

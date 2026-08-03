@@ -30,10 +30,15 @@ logger = get_logger(__name__)
 
 
 PIPELINE_SKILL_ORDER = [
+    "spending-analysis",
     "private-spending-analysis",
+    "goals-onboarding",
     "private-goals-onboarding",
+    "portfolio-analysis",
     "private-portfolio-analysis",
+    "research",
     "private-research",
+    "action-drafting",
     "private-action-drafting",
 ]
 
@@ -152,8 +157,18 @@ SKILL_PLANS: Dict[str, SkillPlan] = {
         build_input=_build_spending_input,
         postprocess=_postprocess_spending,
     ),
+    "spending-analysis": SkillPlan(
+        short_name="spending-analysis",
+        build_input=_build_spending_input,
+        postprocess=_postprocess_spending,
+    ),
     "private-goals-onboarding": SkillPlan(
         short_name="private-goals-onboarding",
+        build_input=_build_goals_onboarding_input,
+        postprocess=_postprocess_goals_onboarding,
+    ),
+    "goals-onboarding": SkillPlan(
+        short_name="goals-onboarding",
         build_input=_build_goals_onboarding_input,
         postprocess=_postprocess_goals_onboarding,
     ),
@@ -162,13 +177,28 @@ SKILL_PLANS: Dict[str, SkillPlan] = {
         build_input=_build_portfolio_analysis_input,
         postprocess=_postprocess_portfolio_analysis,
     ),
+    "portfolio-analysis": SkillPlan(
+        short_name="portfolio-analysis",
+        build_input=_build_portfolio_analysis_input,
+        postprocess=_postprocess_portfolio_analysis,
+    ),
     "private-research": SkillPlan(
         short_name="private-research",
         build_input=_build_research_input,
         postprocess=_postprocess_research,
     ),
+    "research": SkillPlan(
+        short_name="research",
+        build_input=_build_research_input,
+        postprocess=_postprocess_research,
+    ),
     "private-action-drafting": SkillPlan(
         short_name="private-action-drafting",
+        build_input=_build_action_drafting_input,
+        postprocess=_postprocess_action_drafting,
+    ),
+    "action-drafting": SkillPlan(
+        short_name="action-drafting",
         build_input=_build_action_drafting_input,
         postprocess=_postprocess_action_drafting,
     ),
