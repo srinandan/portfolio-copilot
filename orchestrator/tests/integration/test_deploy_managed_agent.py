@@ -1,8 +1,11 @@
 import json
+import subprocess
 from unittest.mock import MagicMock, patch
 
+import pytest
 from scripts.deploy_managed_agent import (
     find_existing_managed_agent,
+    grant_iam_role,
     provision_managed_agent,
     store_secret,
 )
@@ -54,6 +57,36 @@ def test_provision_managed_agent_creates_and_returns_server_id():
     with patch("subprocess.run", side_effect=subprocess_side_effect):
         result = provision_managed_agent("test-proj", "us-central1", "portfolio-copilot-worker")
         assert result == "projects/test-proj/locations/us-central1/agents/generated-id-789"
+
+
+def test_provision_managed_agent_fails_loud_by_default():
+    # Both list and create fail
+    with patch(
+        "subprocess.run",
+        side_effect=subprocess.CalledProcessError(1, ["gcloud"], stderr="Permission denied"),
+    ):
+        with pytest.raises(RuntimeError, match="Failed to provision Managed Agent"):
+            provision_managed_agent("test-proj", "us-central1", "portfolio-copilot-worker", allow_placeholder=False)
+
+
+def test_provision_managed_agent_allow_placeholder_returns_fallback():
+    # Both list and create fail, but allow_placeholder is True
+    with patch(
+        "subprocess.run",
+        side_effect=subprocess.CalledProcessError(1, ["gcloud"], stderr="Permission denied"),
+    ):
+        result = provision_managed_agent("test-proj", "us-central1", "portfolio-copilot-worker", allow_placeholder=True)
+        assert result == "projects/test-proj/locations/us-central1/agents/portfolio-copilot-worker"
+
+
+def test_grant_iam_role_executes_gcloud_binding():
+    with patch("subprocess.run") as mock_run:
+        grant_iam_role("test-proj", "principalSet://...", "roles/secretmanager.secretAccessor")
+        mock_run.assert_called_once()
+        args = mock_run.call_args[0][0]
+        assert "add-iam-policy-binding" in args
+        assert "--member=principalSet://..." in args
+        assert "--role=roles/secretmanager.secretAccessor" in args
 
 
 def test_store_secret_via_gcloud_cli():
