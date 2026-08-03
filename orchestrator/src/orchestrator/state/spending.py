@@ -18,6 +18,7 @@ logger = get_logger(__name__)
 
 def preload_spending_facts(
     user_id: str,
+    window_months: int = 3,
     bq_client: Optional[BigQueryClient] = None,
     firestore_client: Optional[FirestoreClient] = None,
 ) -> Dict[str, Any]:
@@ -33,7 +34,9 @@ def preload_spending_facts(
 
     holdings = fs.get_holdings(user_id)
     cash_usd = float(holdings.cash_usd) if holdings and holdings.cash_usd else 0.0
-    avg_monthly_expenses = (total_outflow / 3.0) if total_outflow > 0 else 0.0
+
+    valid_window = float(window_months) if isinstance(window_months, (int, float)) and window_months > 0 else 3.0
+    avg_monthly_expenses = (total_outflow / valid_window) if total_outflow > 0 else 0.0
     reserve_months = calculate_reserve_months(cash_usd, avg_monthly_expenses)
 
     spending_totals = bq.get_monthly_spending_totals(user_id, current_month_start)
@@ -60,11 +63,12 @@ def preload_spending_facts(
 
     logger.info(
         f"Preloaded spending facts for {user_id}: income=${total_income}, outflow=${total_outflow}, "
-        f"savings_rate={savings_rate:.2%}, anomalies={len(anomalies)}"
+        f"savings_rate={savings_rate:.2%}, reserve_months={reserve_months:.1f}, anomalies={len(anomalies)}"
     )
 
     return {
         "user_id": user_id,
+        "window_months": int(valid_window),
         "total_income_usd": total_income,
         "total_outflow_usd": total_outflow,
         "savings_rate": savings_rate,

@@ -14,7 +14,7 @@ from orchestrator.registry_client import Skill
 from orchestrator.state.spending import preload_spending_facts
 
 
-def test_preload_spending_facts():
+def test_preload_spending_facts_default_3_months():
     mock_bq = MagicMock()
     mock_bq.get_trailing_income_and_outflow.return_value = {
         "total_income": 10000.0,
@@ -33,9 +33,10 @@ def test_preload_spending_facts():
         positions=[],
     )
 
-    facts = preload_spending_facts("user_123", bq_client=mock_bq, firestore_client=mock_fs)
+    facts = preload_spending_facts("user_123", window_months=3, bq_client=mock_bq, firestore_client=mock_fs)
 
     assert facts["user_id"] == "user_123"
+    assert facts["window_months"] == 3
     assert facts["total_income_usd"] == 10000.0
     assert facts["total_outflow_usd"] == 6000.0
     assert facts["savings_rate"] == 0.4  # (10000 - 6000) / 10000
@@ -43,6 +44,29 @@ def test_preload_spending_facts():
     assert len(facts["anomalies"]) == 1
     assert facts["anomalies"][0]["category"] == "dining"
     assert len(facts["category_breakdown"]) == 2
+
+
+def test_preload_spending_facts_dynamic_6_months():
+    mock_bq = MagicMock()
+    mock_bq.get_trailing_income_and_outflow.return_value = {
+        "total_income": 20000.0,
+        "total_outflow": 12000.0,
+    }
+    mock_bq.get_monthly_spending_totals.return_value = []
+
+    mock_fs = MagicMock()
+    mock_fs.get_holdings.return_value = HoldingsSnapshot(
+        user_id="user_123",
+        as_of="2026-08-01T00:00:00Z",
+        cash_usd=10000.0,
+        positions=[],
+    )
+
+    facts = preload_spending_facts("user_123", window_months=6, bq_client=mock_bq, firestore_client=mock_fs)
+
+    assert facts["window_months"] == 6
+    # monthly expenses = 12000 / 6 = 2000; reserve_months = 10000 / 2000 = 5.0
+    assert facts["reserve_months"] == 5.0
 
 
 @pytest.mark.asyncio
@@ -107,14 +131,15 @@ async def test_planner_dispatches_spending_analysis_managed_agent():
         response_stream = runner.run_async(
             user_id="user_123",
             session_id="session_spending_1",
-            new_message=UserContent(parts=[Part.from_text(text='{"user_id": "user_123", "query_intent": "anomaly_check"}')]),
+            new_message=UserContent(parts=[Part.from_text(text='{"user_id": "user_123", "query_intent": "anomaly_check", "window_months": 6}')]),
         )
 
         events = [e async for e in response_stream]
         assert len(events) > 0
 
-        mock_preload.assert_called_once_with(user_id="user_123")
+        mock_preload.assert_called_once_with(user_id="user_123", window_months=6)
         assert mock_dispatch.call_args[0][0] == "private-spending-analysis"
         assert mock_dispatch.call_args[1]["node_input"]["user_id"] == "user_123"
         assert mock_dispatch.call_args[1]["node_input"]["query_intent"] == "anomaly_check"
+        assert mock_dispatch.call_args[1]["node_input"]["window_months"] == 6
         assert "preloaded" in mock_dispatch.call_args[1]["node_input"]
