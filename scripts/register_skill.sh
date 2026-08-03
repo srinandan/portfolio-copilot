@@ -29,31 +29,107 @@ fi
 
 echo "Registering skill '$SKILL_NAME' in project $PROJECT_ID ($REGION)..."
 
+# Extract display name and description from SKILL.md YAML frontmatter
+DISPLAY_NAME=$(python3 -c "
+import sys
+with open(sys.argv[1], 'r') as f:
+    lines = f.readlines()
+in_yaml = False
+for line in lines:
+    if line.strip() == '---':
+        if not in_yaml:
+            in_yaml = True
+            continue
+        else:
+            break
+    if in_yaml and line.startswith('name:'):
+        print(line.split('name:', 1)[1].strip())
+        break
+" "$SKILL_DIR/SKILL.md")
+
+DESCRIPTION=$(python3 -c "
+import sys
+with open(sys.argv[1], 'r') as f:
+    lines = f.readlines()
+in_yaml = False
+yaml_lines = []
+for line in lines:
+    if line.strip() == '---':
+        if not in_yaml:
+            in_yaml = True
+            continue
+        else:
+            break
+    if in_yaml:
+        yaml_lines.append(line)
+desc_lines = []
+in_desc = False
+for line in yaml_lines:
+    if line.startswith('description:'):
+        desc = line.split('description:', 1)[1].strip().lstrip('>-\"\'').rstrip('\"\'')
+        if desc:
+            desc_lines.append(desc)
+        in_desc = True
+    elif in_desc and line.startswith(' '):
+        desc_lines.append(line.strip())
+    else:
+        in_desc = False
+print(' '.join(desc_lines))
+" "$SKILL_DIR/SKILL.md")
+
+if [ -z "$DISPLAY_NAME" ]; then
+  DISPLAY_NAME="$SKILL_NAME"
+fi
+
 # Package the skill directory into a ZIP file in /tmp/
 ZIP_PATH="/tmp/${SKILL_NAME}.zip"
 echo "Creating ZIP payload at $ZIP_PATH..."
 rm -f "$ZIP_PATH"
 (cd "$SKILL_DIR" && zip -r "$ZIP_PATH" .)
 
-REGISTERED_NAME="${SKILL_NAME}"
+# Determine if the skill is registered as private-{skill} or {skill}
+if gcloud alpha agent-registry skills describe "private-${SKILL_NAME}" --project="$PROJECT_ID" --location="$REGION" &>/dev/null; then
+  REGISTERED_NAME="private-${SKILL_NAME}"
+elif gcloud alpha agent-registry skills describe "${SKILL_NAME}" --project="$PROJECT_ID" --location="$REGION" &>/dev/null; then
+  REGISTERED_NAME="${SKILL_NAME}"
+else
+  REGISTERED_NAME="${SKILL_NAME}"
+fi
 
-# Register the skill using gcloud alpha agent-registry skills create (or revisions create if existing)
-echo "Calling Agent Registry API..."
+# Step 1: Create skill resource without payload, or update metadata if it already exists
+echo "Calling Agent Registry API (Step 1: Resource Metadata)..."
 if gcloud alpha agent-registry skills describe "$REGISTERED_NAME" --project="$PROJECT_ID" --location="$REGION" &>/dev/null; then
-  REV_ID="rev-$(date +%Y%m%d-%H%M%S)"
-  echo "Skill '$REGISTERED_NAME' already exists in project $PROJECT_ID ($REGION). Creating revision '$REV_ID'..."
-  gcloud alpha agent-registry skills revisions create "$REV_ID" \
-    --skill="$REGISTERED_NAME" \
+  echo "Skill '$REGISTERED_NAME' already exists in project $PROJECT_ID ($REGION). Updating display name and description..."
+  gcloud alpha agent-registry skills update "$REGISTERED_NAME" \
     --project="$PROJECT_ID" \
     --location="$REGION" \
-    --payload="$ZIP_PATH"
+    --display-name="$DISPLAY_NAME" \
+    --description="$DESCRIPTION" || echo "Note: Metadata update skipped or unchanged."
 else
-  echo "Creating new skill '$REGISTERED_NAME' in project $PROJECT_ID ($REGION)..."
+  echo "Creating new skill '$REGISTERED_NAME' (display-name: '$DISPLAY_NAME')..."
   gcloud alpha agent-registry skills create "$REGISTERED_NAME" \
     --project="$PROJECT_ID" \
     --location="$REGION" \
     --type=simple \
-    --payload="$ZIP_PATH"
+    --display-name="$DISPLAY_NAME" \
+    --description="$DESCRIPTION"
 fi
 
-echo "Skill '$SKILL_NAME' successfully registered/updated as '$REGISTERED_NAME'."
+# Step 2: Create a skill revision with the payload
+REV_ID="rev-$(date +%Y%m%d-%H%M%S)"
+echo "Calling Agent Registry API (Step 2: Creating Revision '$REV_ID' with payload)..."
+gcloud alpha agent-registry skills revisions create "$REV_ID" \
+  --skill="$REGISTERED_NAME" \
+  --project="$PROJECT_ID" \
+  --location="$REGION" \
+  --payload="$ZIP_PATH"
+
+# Step 3: Ensure default revision is set to the newly created revision
+FULL_REV_NAME="projects/${PROJECT_ID}/locations/${REGION}/skills/${REGISTERED_NAME}/revisions/${REV_ID}"
+echo "Calling Agent Registry API (Step 3: Setting default revision to '$FULL_REV_NAME')..."
+gcloud alpha agent-registry skills update "$REGISTERED_NAME" \
+  --project="$PROJECT_ID" \
+  --location="$REGION" \
+  --default-revision="$FULL_REV_NAME"
+
+echo "Skill '$SKILL_NAME' successfully registered/updated as '$REGISTERED_NAME' with default revision '$REV_ID'."
