@@ -283,3 +283,49 @@ async def test_root_planner_dispatches_research_managed_agent():
         last_event = events[-1]
         assert "research_result: market research report generated" in last_event.output
 
+
+@pytest.mark.asyncio
+async def test_root_planner_dispatches_portfolio_analysis_skill():
+    """Verify D1: planner recognizes private-portfolio-analysis and dispatches portfolio_analysis_skill."""
+    agent = Workflow(
+        name="test_root",
+        edges=[("START", root_planner)],
+    )
+    session_service = InMemorySessionService()
+    memory_service = InMemoryMemoryService()
+    runner = Runner(
+        app_name="test_app",
+        agent=agent,
+        session_service=session_service,
+        memory_service=memory_service,
+        auto_create_session=True,
+    )
+
+    with patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list, \
+         patch("src.orchestrator.skills.portfolio_analysis.FirestoreClient") as mock_firestore:
+
+        mock_db = mock_firestore.return_value
+        mock_db.get_active_ips_by_user.return_value = None  # Will return declined
+
+        mock_list.return_value = [
+            Skill(
+                name="projects/test-proj/locations/us-central1/skills/private-portfolio-analysis",
+                target_state="TARGET_STATE_ACTIVE",
+                default_revision="rev-pa-1",
+            ),
+        ]
+
+        response_stream = runner.run_async(
+            user_id="user_pa",
+            session_id="session_pa_1",
+            new_message=UserContent(parts=[Part.from_text(text='{"user_id": "user_pa"}')]),
+        )
+
+        events = []
+        async for event in response_stream:
+            events.append(event)
+
+        last_event = events[-1]
+        assert any("portfolio_analysis_result:" in str(item) for item in last_event.output)
+
+

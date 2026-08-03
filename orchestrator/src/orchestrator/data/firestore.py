@@ -140,9 +140,10 @@ class FirestoreClient:
             self.db.collection(COLLECTION_IPS)
             .where(filter=firestore.FieldFilter("user_id", "==", user_id))
             .where(filter=firestore.FieldFilter("status", "==", IPSStatus.ACTIVE.value))
-            .limit(1)
         )
         docs = list(query.stream())
-        if docs:
+        if len(docs) > 1:
+            raise ValueError(f"invariant violated: found multiple active IPS documents for user_id {user_id}")
+        if len(docs) == 1:
             return InvestmentPolicyStatement.model_validate(docs[0].to_dict())
         return None

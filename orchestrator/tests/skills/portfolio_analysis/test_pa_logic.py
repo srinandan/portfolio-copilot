@@ -31,8 +31,9 @@ def sample_ips():
         ],
         constraints=Constraints(concentration_limit_percent=15),
         rebalancing_rules=RebalancingRules(drift_threshold_percent=5.0),
-        created_at=datetime.now(timezone.utc)
+        created_at=datetime.now(timezone.utc),
     )
+
 
 @pytest.fixture
 def sample_holdings():
@@ -44,7 +45,7 @@ def sample_holdings():
             Position(ticker="BND", quantity=100, asset_class="Fixed Income", market_value_usd=30000),
         ],
         cash_usd=10000,
-        total_value_usd=100000
+        total_value_usd=100000,
     )
 
 
@@ -142,6 +143,7 @@ def test_missing_drift_threshold(sample_holdings, sample_ips):
     assert entry_map["Equity"].in_band is False
     assert entry_map["Equity"].drift_amount_percent == 20.0  # 90 - 70 = 20
 
+
 def test_zero_total_value(sample_holdings, sample_ips):
     sample_holdings.total_value_usd = 0
     sample_holdings.positions = []
@@ -154,3 +156,75 @@ def test_zero_total_value(sample_holdings, sample_ips):
     entry_map = {e.asset_class: e for e in report.entries}
     assert entry_map["Equity"].current_percent == 0.0
     assert entry_map["Equity"].drift_amount_percent == 50.0  # min is 50, current is 0
+
+
+def test_zero_total_value_with_zero_min_percent(sample_holdings, sample_ips):
+    """Verifies that bands with min_percent=0 have drift=0.0 (non-negative) when portfolio is empty."""
+    sample_ips.target_allocation = [
+        TargetAllocation(asset_class="Equity", target_percent=90.0, min_percent=80.0, max_percent=100.0),
+        TargetAllocation(asset_class="Bonds", target_percent=10.0, min_percent=0.0, max_percent=20.0),
+    ]
+    sample_holdings.total_value_usd = 0
+    sample_holdings.positions = []
+    sample_holdings.cash_usd = 0
+
+    report = calculate_drift(sample_holdings, sample_ips)
+
+    entry_map = {e.asset_class: e for e in report.entries}
+    assert entry_map["Bonds"].in_band is True
+    assert entry_map["Bonds"].drift_amount_percent == 0.0  # 0.0 in [0, 20], drift must never be negative!
+    assert entry_map["Equity"].in_band is False
+    assert entry_map["Equity"].drift_amount_percent == 80.0
+
+
+def test_cash_mapping_synonyms_and_unclassified():
+    """Verifies B1: cash mapping works with 'Cash', 'cash_reserves', and handles unclassified cash."""
+    # Test cash_reserves
+    ips = InvestmentPolicyStatement(
+        ips_id="ips_cash_test",
+        user_id="user_cash",
+        version=1,
+        status=IPSStatus.ACTIVE,
+        effective_date=date(2023, 1, 1),
+        risk_tolerance=RiskTolerance.CONSERVATIVE,
+        time_horizon_years=5,
+        target_allocation=[
+            TargetAllocation(asset_class="Equities", target_percent=50.0, min_percent=40.0, max_percent=60.0),
+            TargetAllocation(asset_class="cash_reserves", target_percent=50.0, min_percent=40.0, max_percent=60.0),
+        ],
+        constraints=Constraints(concentration_limit_percent=15),
+        created_at=datetime.now(timezone.utc),
+    )
+    holdings = HoldingsSnapshot(
+        user_id="user_cash",
+        as_of=datetime.now(timezone.utc),
+        positions=[
+            Position(ticker="VTI", quantity=100, asset_class="Equities", market_value_usd=50000),
+        ],
+        cash_usd=50000,
+        total_value_usd=100000,
+    )
+
+    report = calculate_drift(holdings, ips)
+    entry_map = {e.asset_class: e for e in report.entries}
+    assert entry_map["cash_reserves"].current_percent == 50.0
+    assert entry_map["cash_reserves"].in_band is True
+    assert report.unclassified_value_usd == 0.0
+
+    # Test cash with no cash band in IPS (becomes unclassified)
+    ips_no_cash = InvestmentPolicyStatement(
+        ips_id="ips_no_cash",
+        user_id="user_cash",
+        version=1,
+        status=IPSStatus.ACTIVE,
+        effective_date=date(2023, 1, 1),
+        risk_tolerance=RiskTolerance.AGGRESSIVE,
+        time_horizon_years=20,
+        target_allocation=[
+            TargetAllocation(asset_class="Equities", target_percent=100.0, min_percent=90.0, max_percent=100.0),
+        ],
+        constraints=Constraints(concentration_limit_percent=15),
+        created_at=datetime.now(timezone.utc),
+    )
+    report_no_cash = calculate_drift(holdings, ips_no_cash)
+    assert report_no_cash.unclassified_value_usd == 50000.0

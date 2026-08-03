@@ -232,3 +232,64 @@ def test_set_holdings(mock_client):
     called_args = mock_doc_ref.set.call_args[0][0]
     assert called_args["user_id"] == "user1"
     assert called_args["cash_usd"] == 500.0
+
+
+@patch('google.cloud.firestore.Client')
+def test_get_active_ips_by_user_single(mock_client):
+    """Verifies get_active_ips_by_user returns active IPS when exactly one active document exists."""
+    client = FirestoreClient("test-project")
+    mock_db = MagicMock()
+    mock_query = MagicMock()
+    mock_doc = MagicMock()
+
+    mock_doc.to_dict.return_value = {
+        "ips_id": "ips_user1",
+        "user_id": "user1",
+        "version": 1,
+        "status": "active",
+        "effective_date": "2026-01-01",
+        "risk_tolerance": "moderate",
+        "time_horizon_years": 10,
+        "target_allocation": [{"asset_class": "equity", "target_percent": 60.0, "min_percent": 50.0, "max_percent": 70.0}],
+        "constraints": {"concentration_limit_percent": 15},
+        "created_at": "2026-01-01T00:00:00Z",
+    }
+    mock_query.stream.return_value = [mock_doc]
+    mock_db.collection.return_value.where.return_value.where.return_value = mock_query
+    client.db = mock_db
+
+    ips = client.get_active_ips_by_user("user1")
+    assert ips is not None
+    assert ips.ips_id == "ips_user1"
+    assert ips.user_id == "user1"
+
+
+@patch('google.cloud.firestore.Client')
+def test_get_active_ips_by_user_none(mock_client):
+    """Verifies get_active_ips_by_user returns None when no active IPS exists."""
+    client = FirestoreClient("test-project")
+    mock_db = MagicMock()
+    mock_query = MagicMock()
+    mock_query.stream.return_value = []
+    mock_db.collection.return_value.where.return_value.where.return_value = mock_query
+    client.db = mock_db
+
+    ips = client.get_active_ips_by_user("user1")
+    assert ips is None
+
+
+@patch('google.cloud.firestore.Client')
+def test_get_active_ips_by_user_multiple_invariant_violation(mock_client):
+    """Verifies D2: get_active_ips_by_user raises ValueError if multiple active documents exist."""
+    client = FirestoreClient("test-project")
+    mock_db = MagicMock()
+    mock_query = MagicMock()
+    mock_doc1 = MagicMock()
+    mock_doc2 = MagicMock()
+    mock_query.stream.return_value = [mock_doc1, mock_doc2]
+    mock_db.collection.return_value.where.return_value.where.return_value = mock_query
+    client.db = mock_db
+
+    with pytest.raises(ValueError, match="invariant violated: found multiple active IPS documents"):
+        client.get_active_ips_by_user("user1")
+
