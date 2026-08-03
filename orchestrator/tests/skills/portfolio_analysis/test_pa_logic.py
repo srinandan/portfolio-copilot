@@ -1,14 +1,15 @@
-import pytest
-from datetime import datetime, timezone, date
+from datetime import date, datetime, timezone
 
-from orchestrator.contracts.holdings import HoldingsSnapshot, Position, AccountType as HoldingsAccountType
+import pytest
+
+from orchestrator.contracts.holdings import HoldingsSnapshot, Position
 from orchestrator.contracts.ips import (
+    Constraints,
     InvestmentPolicyStatement,
     IPSStatus,
+    RebalancingRules,
     RiskTolerance,
     TargetAllocation,
-    Constraints,
-    RebalancingRules
 )
 from orchestrator.skills.portfolio_analysis.logic import calculate_drift
 

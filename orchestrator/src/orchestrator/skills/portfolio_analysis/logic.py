@@ -1,8 +1,10 @@
-from pydantic import BaseModel
 from typing import List
+
+from pydantic import BaseModel
 
 from ...contracts.holdings import HoldingsSnapshot
 from ...contracts.ips import InvestmentPolicyStatement
+
 
 class DriftReportEntry(BaseModel):
     asset_class: str

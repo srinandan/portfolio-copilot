@@ -1,7 +1,9 @@
-import pytest
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from orchestrator.skills.portfolio_analysis import portfolio_analysis_skill
+
 
 @pytest.mark.asyncio
 async def test_portfolio_analysis_skill_missing_user_id():
