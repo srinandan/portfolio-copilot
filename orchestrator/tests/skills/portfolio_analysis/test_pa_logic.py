@@ -228,3 +228,27 @@ def test_cash_mapping_synonyms_and_unclassified():
     )
     report_no_cash = calculate_drift(holdings, ips_no_cash)
     assert report_no_cash.unclassified_value_usd == 50000.0
+
+
+def test_cash_position_and_cash_usd_deduplication(sample_ips):
+    """Verifies I5: Cash position in positions + cash_usd are reconciled without double-counting."""
+    holdings = HoldingsSnapshot(
+        user_id="user_dedup",
+        as_of=datetime.now(timezone.utc),
+        positions=[
+            Position(ticker="VTI", quantity=100, asset_class="Equity", market_value_usd=60000),
+            Position(ticker="BND", quantity=100, asset_class="Fixed Income", market_value_usd=30000),
+            Position(ticker="USD", quantity=10000, asset_class="Cash", market_value_usd=10000),
+        ],
+        cash_usd=10000,
+        total_value_usd=100000,
+    )
+
+    report = calculate_drift(holdings, sample_ips)
+    entry_map = {e.asset_class: e for e in report.entries}
+
+    # Cash should be 10% ($10,000 / $100,000), NOT 20% ($20,000)
+    assert entry_map["Cash"].current_percent == 10.0
+    assert entry_map["Cash"].in_band is True
+    assert report.rebalance_recommended is False
+
