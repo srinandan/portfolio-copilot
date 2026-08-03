@@ -12,12 +12,14 @@ from ..contracts import (
     InvestmentPolicyStatement,
     IPSStatus,
     LiabilitiesSnapshot,
+    ProposedAction,
 )
 
 COLLECTION_HOLDINGS = "holdings"
 COLLECTION_LIABILITIES = "liabilities"
 COLLECTION_AUDIT_LOG = "audit_log"
 COLLECTION_IPS = "ips"
+COLLECTION_PROPOSED_ACTIONS = "proposed_actions"
 
 
 class FirestoreClient:
@@ -63,6 +65,19 @@ class FirestoreClient:
         doc = doc_ref.get()
         if doc.exists:
             return LiabilitiesSnapshot.model_validate(doc.to_dict())
+        return None
+
+    def set_proposed_action(self, action: ProposedAction) -> None:
+        """Writes a ProposedAction to Firestore, keyed by action_id."""
+        doc_ref = self.db.collection(COLLECTION_PROPOSED_ACTIONS).document(action.action_id)
+        doc_ref.set(self._dict_factory(action))
+
+    def get_proposed_action(self, action_id: str) -> ProposedAction | None:
+        """Reads a ProposedAction by action_id."""
+        doc_ref = self.db.collection(COLLECTION_PROPOSED_ACTIONS).document(action_id)
+        doc = doc_ref.get()
+        if doc.exists:
+            return ProposedAction.model_validate(doc.to_dict())
         return None
 
     def append_audit_log(self, entry: AuditLogEntry) -> None:
