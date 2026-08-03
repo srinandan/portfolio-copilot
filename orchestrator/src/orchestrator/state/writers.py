@@ -10,6 +10,7 @@ from ..contracts.ips import Constraints, InvestmentPolicyStatement, IPSStatus, L
 from ..contracts.liabilities import LiabilitiesSnapshot
 from ..data.firestore import FirestoreClient
 from ..logger import get_logger
+from ..skills._skill_metadata import read_skill_version
 
 logger = get_logger(__name__)
 
@@ -79,6 +80,7 @@ def write_ips_from_interview_result(
     client.set_liabilities(user_id, liab_snapshot)
     logger.info(f"Persisted {len(result.identified_liabilities)} liabilities for user {user_id}")
 
+    skill_version = read_skill_version("goals-onboarding")
     audit_entry = AuditLogEntry(
         log_id=str(uuid.uuid4()),
         event_type=event_type,
@@ -86,7 +88,7 @@ def write_ips_from_interview_result(
         actor=Actor(
             type=ActorType.AGENT,
             skill_name="private-goals-onboarding",
-            skill_version="0.2.0",
+            skill_version=skill_version,
         ),
         detail=f"IPS {ips_id} version {version} written from goals onboarding interview.",
     )

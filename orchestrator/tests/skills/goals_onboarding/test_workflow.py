@@ -14,6 +14,7 @@ from orchestrator.contracts.ips import (
     TargetAllocation,
 )
 from orchestrator.contracts.liabilities import Liability, LiabilityType
+from orchestrator.skills._skill_metadata import read_skill_version
 from orchestrator.state.writers import write_ips_from_interview_result
 
 
@@ -66,6 +67,27 @@ def test_write_ips_initial_trigger_creates_v1(sample_interview_result):
 
     audit_entry = mock_client.append_audit_log.call_args[0][0]
     assert audit_entry.event_type == EventType.IPS_CREATED
+    assert audit_entry.actor.skill_version == read_skill_version("goals-onboarding")
+
+
+def test_write_ips_dynamic_skill_version_from_frontmatter(sample_interview_result, monkeypatch):
+    mock_client = MagicMock()
+    mock_client.get_active_ips_by_user.return_value = None
+
+    monkeypatch.setattr(
+        "orchestrator.state.writers.read_skill_version",
+        lambda skill_name: "9.9.9",
+    )
+
+    _, _ = write_ips_from_interview_result(
+        user_id="user_123",
+        result=sample_interview_result,
+        trigger="initial",
+        db_client=mock_client,
+    )
+
+    audit_entry = mock_client.append_audit_log.call_args[0][0]
+    assert audit_entry.actor.skill_version == "9.9.9"
 
 
 def test_write_ips_revision_trigger_supersedes_existing(sample_interview_result):
@@ -99,6 +121,7 @@ def test_write_ips_revision_trigger_supersedes_existing(sample_interview_result)
     mock_client.update_ips.assert_called_once_with(ips)
     audit_entry = mock_client.append_audit_log.call_args[0][0]
     assert audit_entry.event_type == EventType.IPS_SUPERSEDED
+    assert audit_entry.actor.skill_version == read_skill_version("goals-onboarding")
 
 
 def test_write_ips_audit_log_failure_fails_closed(sample_interview_result):
