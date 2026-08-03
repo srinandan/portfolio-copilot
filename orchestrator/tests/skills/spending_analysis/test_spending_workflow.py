@@ -108,6 +108,7 @@ async def test_planner_dispatches_spending_analysis_managed_agent():
             "orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock
         ) as mock_list,
         patch("orchestrator.planner.preload_spending_facts") as mock_preload,
+        patch("orchestrator.planner.emit_skill_invoked_audit"),
         patch("orchestrator.planner.dispatch_managed_skill", new_callable=AsyncMock) as mock_dispatch,
     ):
         mock_list.return_value = [

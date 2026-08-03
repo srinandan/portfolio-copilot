@@ -183,6 +183,7 @@ async def test_root_planner_json_input():
         patch(
             "src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock
         ) as mock_list,
+        patch("src.orchestrator.planner.emit_skill_invoked_audit"),
         patch("src.orchestrator.planner.dispatch_managed_skill", new_callable=AsyncMock) as mock_dispatch,
         patch("src.orchestrator.planner.write_ips_from_interview_result") as mock_write,
     ):
@@ -243,6 +244,7 @@ async def test_root_planner_dispatches_goals_onboarding_with_realistic_name():
         patch(
             "src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock
         ) as mock_list,
+        patch("src.orchestrator.planner.emit_skill_invoked_audit"),
         patch("src.orchestrator.planner.dispatch_managed_skill", new_callable=AsyncMock) as mock_dispatch,
         patch("src.orchestrator.planner.write_ips_from_interview_result") as mock_write,
     ):
@@ -298,6 +300,7 @@ async def test_root_planner_invalid_json():
         patch(
             "src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock
         ) as mock_list,
+        patch("src.orchestrator.planner.emit_skill_invoked_audit"),
         patch("src.orchestrator.planner.dispatch_managed_skill", new_callable=AsyncMock) as mock_dispatch,
     ):
         mock_dispatch.return_value = {"status": "completed"}
@@ -317,8 +320,8 @@ async def test_root_planner_invalid_json():
 
 
 @pytest.mark.asyncio
-async def test_root_planner_dispatches_research_managed_agent():
-    """Verify planner retrieves dynamic skill content for research and instantiates/runs ManagedAgent."""
+async def test_root_planner_end_to_end_pa_then_ad():
+    """Verify registry returns both PA and AD; assert AD receives PA's drift_report via context chaining."""
     agent = Workflow(
         name="test_root",
         edges=[("START", root_planner)],
@@ -333,55 +336,56 @@ async def test_root_planner_dispatches_research_managed_agent():
         auto_create_session=True,
     )
 
-    from datetime import datetime, timezone
-
-    from google.adk.events import Event
-
-    from orchestrator.contracts import ConfidenceLevel, ResearchBrief
-
-    async def fake_research_stream(ctx, **kwargs):
-        yield Event(
-            author="research",
-            output=ResearchBrief(
-                research_run_id="test_run_id",
-                summary="market research report generated",
-                sources=["http://test.com"],
-                confidence=ConfidenceLevel.HIGH,
-                as_of=datetime.now(timezone.utc),
-            ),
-        )
-
-    with patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list, \
-         patch("src.orchestrator.skills.research.AgentRegistryClient.get_skill_content", new_callable=AsyncMock) as mock_get_content, \
-         patch("src.orchestrator.skills.research.ManagedAgent.run", side_effect=fake_research_stream):
-
+    with (
+        patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list,
+        patch("src.orchestrator.planner.emit_skill_invoked_audit"),
+        patch("src.orchestrator.planner.dispatch_managed_skill", new_callable=AsyncMock) as mock_dispatch,
+        patch("src.orchestrator.state.preloader.FirestoreClient") as mock_fs_cls,
+    ):
         mock_list.return_value = [
-            Skill(
-                name="projects/test-proj/locations/us-central1/skills/private-research",
-                target_state="TARGET_STATE_ACTIVE",
-                default_revision="rev-research-1",
-            ),
+            Skill(name="projects/p/locations/l/skills/private-portfolio-analysis", target_state="TARGET_STATE_ACTIVE", default_revision="v1"),
+            Skill(name="projects/p/locations/l/skills/private-action-drafting", target_state="TARGET_STATE_ACTIVE", default_revision="v1"),
         ]
-        mock_get_content.return_value = "# Market Research Skill\nPerform market analysis."
+
+        mock_fs = mock_fs_cls.return_value
+        fake_ips = MagicMock(ips_id="ips_1", version=1)
+        fake_ips.model_dump.return_value = {"ips_id": "ips_1", "version": 1}
+        fake_holdings = MagicMock(total_value_usd=100000.0, positions=[], cash_usd=100000.0)
+        fake_holdings.model_dump.return_value = {"total_value_usd": 100000.0, "positions":[], "cash_usd": 100000.0}
+
+        mock_fs.get_active_ips_by_user.return_value = fake_ips
+        mock_fs.get_holdings.return_value = fake_holdings
+
+        async def fake_dispatch(skill_name, **kwargs):
+            if skill_name == "private-portfolio-analysis":
+                return {"entries": [], "unclassified_value_usd": 0.0, "rebalance_recommended": False}
+            if skill_name == "private-action-drafting":
+                return {}
+            return {}
+
+        mock_dispatch.side_effect = fake_dispatch
 
         response_stream = runner.run_async(
-            user_id="user_123",
-            session_id="session_456",
-            new_message=UserContent(parts=[Part.from_text(text='{"user_id": "u5", "research_question": "Analyze tech sector"}')]),
+            user_id="user_chain",
+            session_id="session_chain_1",
+            new_message=UserContent(parts=[Part.from_text(text='{"user_id": "user_chain"}')]),
         )
 
-        events = []
-        async for event in response_stream:
-            events.append(event)
-
-        mock_get_content.assert_awaited_once_with("research")
+        events = [e async for e in response_stream]
+        assert len(events) > 0
         last_event = events[-1]
-        assert any("research_result:" in out and "market research report generated" in out for out in last_event.output)
+        assert any("portfolio-analysis_result" in str(out) for out in last_event.output)
+        assert any("action-drafting_result" in str(out) for out in last_event.output)
+
+        # Ensure AD call received PA's drift_report in node_input
+        ad_call = [c for c in mock_dispatch.call_args_list if c[0][0] == "private-action-drafting"][0]
+        assert "drift_report" in ad_call[1]["node_input"]
+        assert ad_call[1]["node_input"]["drift_report"] == {"entries": [], "unclassified_value_usd": 0.0, "rebalance_recommended": False}
 
 
 @pytest.mark.asyncio
-async def test_root_planner_skips_research_when_no_question():
-    """Verify I4: Planner skips invoking research ManagedAgent when no research_question was requested."""
+async def test_root_planner_skips_research_without_question():
+    """Verify research is skipped cleanly when no research_question was requested."""
     agent = Workflow(
         name="test_root",
         edges=[("START", root_planner)],
@@ -396,9 +400,10 @@ async def test_root_planner_skips_research_when_no_question():
         auto_create_session=True,
     )
 
-    with patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list, \
-         patch("src.orchestrator.skills.research.AgentRegistryClient.get_skill_content", new_callable=AsyncMock) as mock_get_content:
-
+    with (
+        patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list,
+        patch("src.orchestrator.planner.dispatch_managed_skill", new_callable=AsyncMock) as mock_dispatch,
+    ):
         mock_list.return_value = [
             Skill(
                 name="projects/test-proj/locations/us-central1/skills/private-research",
@@ -416,15 +421,13 @@ async def test_root_planner_skips_research_when_no_question():
         events = [e async for e in response_stream]
         last_event = events[-1]
 
-        # Ensure get_skill_content was not called and no research_result was generated
-        mock_get_content.assert_not_called()
+        mock_dispatch.assert_not_called()
         assert not any("research_result:" in str(item) for item in last_event.output)
 
 
-
 @pytest.mark.asyncio
-async def test_root_planner_dispatches_portfolio_analysis_skill():
-    """Verify D1: planner recognizes private-portfolio-analysis and dispatches portfolio_analysis_skill."""
+async def test_root_planner_pipeline_order_stable():
+    """Verify registry returning skills in reverse order still runs them in PIPELINE_SKILL_ORDER."""
     agent = Workflow(
         name="test_root",
         edges=[("START", root_planner)],
@@ -439,137 +442,44 @@ async def test_root_planner_dispatches_portfolio_analysis_skill():
         auto_create_session=True,
     )
 
-    with patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list, \
-         patch("src.orchestrator.skills.portfolio_analysis.FirestoreClient") as mock_firestore:
-
-        mock_db = mock_firestore.return_value
-        mock_db.get_active_ips_by_user.return_value = None  # Will return declined
-
-        mock_list.return_value = [
-            Skill(
-                name="projects/test-proj/locations/us-central1/skills/private-portfolio-analysis",
-                target_state="TARGET_STATE_ACTIVE",
-                default_revision="rev-pa-1",
-            ),
-        ]
-
-        response_stream = runner.run_async(
-            user_id="user_pa",
-            session_id="session_pa_1",
-            new_message=UserContent(parts=[Part.from_text(text='{"user_id": "user_pa"}')]),
-        )
-
-        events = []
-        async for event in response_stream:
-            events.append(event)
-
-        last_event = events[-1]
-        assert any("portfolio_analysis_result:" in str(item) and "declined" in str(item) for item in last_event.output)
-
-
-@pytest.mark.asyncio
-async def test_root_planner_dispatches_action_drafting_skill():
-    """Verify D1: planner recognizes private-action-drafting and dispatches action_drafting_skill."""
-    agent = Workflow(
-        name="test_root",
-        edges=[("START", root_planner)],
-    )
-    session_service = InMemorySessionService()
-    memory_service = InMemoryMemoryService()
-    runner = Runner(
-        app_name="test_app",
-        agent=agent,
-        session_service=session_service,
-        memory_service=memory_service,
-        auto_create_session=True,
-    )
-
-    with patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list, \
-         patch("src.orchestrator.skills.action_drafting.FirestoreClient") as mock_firestore:
-
-        mock_db = mock_firestore.return_value
-        mock_db.get_active_ips_by_user.return_value = MagicMock()
-        mock_db.get_holdings.return_value = MagicMock(total_value_usd=100000, positions=[], cash_usd=100000)
-
-        mock_list.return_value = [
-            Skill(
-                name="projects/test-proj/locations/us-central1/skills/private-action-drafting",
-                target_state="TARGET_STATE_ACTIVE",
-                default_revision="rev-ad-1",
-            ),
-        ]
-
-        response_stream = runner.run_async(
-            user_id="user_ad",
-            session_id="session_ad_1",
-            new_message=UserContent(parts=[Part.from_text(text='{"user_id": "user_ad"}')]),
-        )
-
-        events = []
-        async for event in response_stream:
-            events.append(event)
-
-        last_event = events[-1]
-        assert any("action_drafting_result: []" in str(item) for item in last_event.output)
-
-
-@pytest.mark.asyncio
-async def test_root_planner_chains_portfolio_analysis_to_action_drafting():
-    """Verify I1 & I2: Planner deterministically orders PA before AD and chains drift_report to AD."""
-    agent = Workflow(
-        name="test_root",
-        edges=[("START", root_planner)],
-    )
-    session_service = InMemorySessionService()
-    memory_service = InMemoryMemoryService()
-    runner = Runner(
-        app_name="test_app",
-        agent=agent,
-        session_service=session_service,
-        memory_service=memory_service,
-        auto_create_session=True,
-    )
-
-    with patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list, \
-         patch("src.orchestrator.skills.portfolio_analysis.FirestoreClient") as mock_pa_firestore, \
-         patch("src.orchestrator.skills.action_drafting.FirestoreClient") as mock_ad_firestore:
-
-        # Mock out of order skills from registry (AD listed before PA)
+    with (
+        patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list,
+        patch("src.orchestrator.planner.emit_skill_invoked_audit"),
+        patch("src.orchestrator.planner.dispatch_managed_skill", new_callable=AsyncMock) as mock_dispatch,
+        patch("src.orchestrator.state.preloader.FirestoreClient") as mock_fs_cls,
+    ):
+        # Return in reverse order
         mock_list.return_value = [
             Skill(name="skills/private-action-drafting", target_state="TARGET_STATE_ACTIVE", default_revision="v1"),
+            Skill(name="skills/private-research", target_state="TARGET_STATE_ACTIVE", default_revision="v1"),
             Skill(name="skills/private-portfolio-analysis", target_state="TARGET_STATE_ACTIVE", default_revision="v1"),
         ]
 
-        # PA returns completed with drift_report recommending rebalance
-        mock_pa_db = mock_pa_firestore.return_value
+        mock_fs = mock_fs_cls.return_value
         fake_ips = MagicMock(ips_id="ips_1", version=1)
-        fake_holdings = MagicMock(
-            total_value_usd=100000.0,
-            positions=[MagicMock(ticker="AAPL", quantity=100, market_value_usd=80000.0, asset_class="Equity")],
-            cash_usd=20000.0,
-        )
-        mock_pa_db.get_active_ips_by_user.return_value = fake_ips
-        mock_pa_db.get_holdings.return_value = fake_holdings
+        fake_ips.model_dump.return_value = {"ips_id": "ips_1", "version": 1}
+        fake_holdings = MagicMock(total_value_usd=100000.0, positions=[], cash_usd=100000.0)
+        fake_holdings.model_dump.return_value = {"total_value_usd": 100000.0, "positions":[], "cash_usd": 100000.0}
 
-        # AD DB mocks
-        mock_ad_db = mock_ad_firestore.return_value
-        mock_ad_db.get_active_ips_by_user.return_value = fake_ips
-        mock_ad_db.get_holdings.return_value = fake_holdings
+        mock_fs.get_active_ips_by_user.return_value = fake_ips
+        mock_fs.get_holdings.return_value = fake_holdings
+        mock_dispatch.return_value = {}
 
         response_stream = runner.run_async(
             user_id="user_chain",
             session_id="session_chain_1",
-            new_message=UserContent(parts=[Part.from_text(text='{"user_id": "user_chain"}')]),
+            new_message=UserContent(parts=[Part.from_text(text='{"user_id": "user_chain", "research_question": "tech stocks"}')]),
         )
 
         events = [e async for e in response_stream]
         last_event = events[-1]
 
-        # Verify PA executed before AD despite registry returning AD first
-        outputs = last_event.output
-        pa_idx = next(i for i, out in enumerate(outputs) if "portfolio_analysis_result" in str(out))
-        ad_idx = next(i for i, out in enumerate(outputs) if "action_drafting_result" in str(out))
-        assert pa_idx < ad_idx, "Portfolio analysis should execute before action drafting"
+        outputs = [str(o) for o in last_event.output]
+        pa_idx = next(i for i, out in enumerate(outputs) if "portfolio-analysis_result" in out)
+        res_idx = next(i for i, out in enumerate(outputs) if "research_result" in out)
+        ad_idx = next(i for i, out in enumerate(outputs) if "action-drafting_result" in out)
+
+        assert pa_idx < res_idx < ad_idx, f"Pipeline order violated: PA={pa_idx}, Res={res_idx}, AD={ad_idx}"
 
 
 

@@ -63,9 +63,14 @@ doesn't fabricate a comparison.
 
 ## Tools / permissions required
 
-- Firestore: read `holdings`, read `ips`
-- **No** write access. This skill only reads and reports; it never
-  drafts or executes anything itself.
+- Managed Agent sandbox: reasons over the orchestrator's pre-computed
+  drift report + IPS + holdings context. Formats a `DriftReport` typed
+  output with a narrative rationale.
+- Orchestrator (outside sandbox): pre-fetches active IPS + holdings from
+  Firestore and pre-computes drift via `primitives/portfolio_analysis.py::calculate_drift`
+  before invoking the Managed Agent. See [ADR-0016](../../docs/adr/0016-deterministic-primitives-in-orchestrator.md).
+- **No** Firestore write access from the Managed Agent. This skill only
+  reads and reports; it never drafts or executes anything itself.
 
 ## Registry metadata
 
