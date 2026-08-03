@@ -10,6 +10,7 @@ from google.adk.sessions.in_memory_session_service import InMemorySessionService
 from google.adk.workflow import Workflow, node
 from google.genai.types import Part, UserContent
 
+from src.orchestrator.contracts import Goal, GoalsOnboardingResult, RiskTolerance
 from src.orchestrator.planner import root_planner
 from src.orchestrator.registry_client import Skill
 
@@ -182,10 +183,21 @@ async def test_root_planner_json_input():
         patch(
             "src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock
         ) as mock_list,
-        patch("src.orchestrator.skills.goals_onboarding.FirestoreClient") as mock_db,
+        patch("src.orchestrator.planner.dispatch_managed_skill", new_callable=AsyncMock) as mock_dispatch,
+        patch("src.orchestrator.planner.write_ips_from_interview_result") as mock_write,
     ):
-        mock_db_instance = MagicMock()
-        mock_db.return_value = mock_db_instance
+        mock_write.return_value = (
+            MagicMock(ips_id="ips-123", version=1, risk_tolerance=RiskTolerance.MODERATE, time_horizon_years=10),
+            MagicMock(),
+        )
+        mock_dispatch.return_value = GoalsOnboardingResult(
+            user_id="u4",
+            primary_goal=Goal(name="Retirement", target_amount_usd=1000000.0, target_date="2045-01-01"),
+            risk_tolerance=RiskTolerance.MODERATE,
+            time_horizon_years=10,
+            target_allocation=[],
+            interview_summary="Goals onboarding complete",
+        )
 
         mock_list.return_value = [
             Skill(
@@ -195,7 +207,6 @@ async def test_root_planner_json_input():
             ),
         ]
 
-        # Use valid json input payload as string text part to cover that branch properly
         response_stream = runner.run_async(
             user_id="user_123",
             session_id="session_456",
@@ -206,19 +217,14 @@ async def test_root_planner_json_input():
         async for event in response_stream:
             events.append(event)
 
-        def has_request_input(e):
-            if e.content and e.content.parts:
-                for p in e.content.parts:
-                    if p.function_call and p.function_call.name == "adk_request_input":
-                        return True
-            return False
-
-        assert any(has_request_input(e) for e in events)
+        assert len(events) > 0
+        assert mock_dispatch.call_args[0][0] == "private-goals-onboarding"
+        assert mock_dispatch.call_args[1]["node_input"] == {"user_id": "u4", "trigger": "initial"}
 
 
 @pytest.mark.asyncio
 async def test_root_planner_dispatches_goals_onboarding_with_realistic_name():
-    """Verify planner extracts short name from full resource path and invokes goals_onboarding_skill."""
+    """Verify planner extracts short name from full resource path and invokes managed dispatcher."""
     agent = Workflow(
         name="test_root",
         edges=[("START", root_planner)],
@@ -237,10 +243,21 @@ async def test_root_planner_dispatches_goals_onboarding_with_realistic_name():
         patch(
             "src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock
         ) as mock_list,
-        patch("src.orchestrator.skills.goals_onboarding.FirestoreClient") as mock_db,
+        patch("src.orchestrator.planner.dispatch_managed_skill", new_callable=AsyncMock) as mock_dispatch,
+        patch("src.orchestrator.planner.write_ips_from_interview_result") as mock_write,
     ):
-        mock_db_instance = MagicMock()
-        mock_db.return_value = mock_db_instance
+        mock_write.return_value = (
+            MagicMock(ips_id="ips-123", version=1, risk_tolerance=RiskTolerance.MODERATE, time_horizon_years=10),
+            MagicMock(),
+        )
+        mock_dispatch.return_value = GoalsOnboardingResult(
+            user_id="u4",
+            primary_goal=Goal(name="Retirement", target_amount_usd=1000000.0, target_date="2045-01-01"),
+            risk_tolerance=RiskTolerance.MODERATE,
+            time_horizon_years=10,
+            target_allocation=[],
+            interview_summary="Goals onboarding complete",
+        )
 
         mock_list.return_value = [
             Skill(
@@ -260,14 +277,8 @@ async def test_root_planner_dispatches_goals_onboarding_with_realistic_name():
         async for event in response_stream:
             events.append(event)
 
-        def has_request_input(e):
-            if e.content and e.content.parts:
-                for p in e.content.parts:
-                    if p.function_call and p.function_call.name == "adk_request_input":
-                        return True
-            return False
-
-        assert any(has_request_input(e) for e in events)
+        assert len(events) > 0
+        mock_dispatch.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -287,12 +298,21 @@ async def test_root_planner_invalid_json():
         patch(
             "src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock
         ) as mock_list,
-        patch("src.orchestrator.skills.goals_onboarding.FirestoreClient") as mock_db,
+        patch("src.orchestrator.planner.dispatch_managed_skill", new_callable=AsyncMock) as mock_dispatch,
     ):
+        mock_dispatch.return_value = {"status": "completed"}
+        mock_list.return_value = [
+            Skill(
+                name="projects/test-project/locations/test-location/skills/private-goals-onboarding",
+                target_state="TARGET_STATE_ACTIVE",
+                default_revision="rev1",
+            ),
+        ]
         response_stream = runner.run_async(
             user_id="user_123", session_id="s1", new_message=UserContent(parts=[Part.from_text(text="invalid json {")])
         )
         events = [e async for e in response_stream]
+        assert len(events) > 0
         assert len(events) > 0
 
 

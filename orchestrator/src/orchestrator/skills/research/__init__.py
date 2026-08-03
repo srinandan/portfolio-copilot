@@ -44,11 +44,13 @@ async def managed_research_agent_node(ctx: Context, node_input: Any) -> Research
             logger.error(f"Failed to fetch research skill content from Agent Registry: {e}")
             raise RuntimeError(f"Failed to resolve research skill content from registry: {e}") from e
 
+    agent_id = os.environ.get("MANAGED_AGENT_ID") or "antigravity-preview-05-2026"
+
     # 3. Instantiate ManagedAgent dynamically per planning cycle
     research_agent = ManagedAgent(
         name="research",
         description=instructions,
-        agent_id="antigravity-preview-05-2026",
+        agent_id=agent_id,
         environment={"type": "remote"},
         tools=[google_search],
         output_schema=ResearchBrief,

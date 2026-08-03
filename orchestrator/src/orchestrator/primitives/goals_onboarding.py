@@ -1,9 +1,11 @@
-from ...contracts.ips import RiskTolerance, TargetAllocation
+"""Deterministic formulas for risk tolerance and default allocation bands."""
+
+from ..contracts.ips import RiskTolerance, TargetAllocation
 
 
 def calculate_risk_tolerance(time_horizon_years: int, drawdown_reaction: str) -> RiskTolerance:
-    """
-    Deterministically calculates risk tolerance based on time horizon and drawdown reaction.
+    """Deterministically calculates risk tolerance based on time horizon and drawdown reaction.
+
     Reaction must be one of: 'sell', 'hold', 'buy_more'
     """
     if drawdown_reaction == "sell":
@@ -18,9 +20,7 @@ def calculate_risk_tolerance(time_horizon_years: int, drawdown_reaction: str) ->
 
 
 def get_default_allocation_bands(risk_tolerance: RiskTolerance) -> list[TargetAllocation]:
-    """
-    Proposes default bands per risk tier as a starting point.
-    """
+    """Proposes default bands per risk tier as a starting point."""
     if risk_tolerance == RiskTolerance.CONSERVATIVE:
         return [
             TargetAllocation(asset_class="equity", target_percent=30, min_percent=20, max_percent=40),

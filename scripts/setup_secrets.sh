@@ -29,6 +29,16 @@ else
   gcloud secrets update "$SECRET_NAME" --update-labels="app=portfolio-copilot" --project="$PROJECT_ID" --quiet 2>/dev/null || true
 fi
 
+# Ensure MANAGED_AGENT_ID secret exists
+MA_SECRET_NAME="MANAGED_AGENT_ID"
+MA_DEFAULT_VALUE="projects/${PROJECT_ID}/locations/us-central1/agents/portfolio-copilot-worker"
+if ! gcloud secrets describe "$MA_SECRET_NAME" --project="$PROJECT_ID" &>/dev/null; then
+  echo "Creating secret: $MA_SECRET_NAME"
+  gcloud secrets create "$MA_SECRET_NAME" --replication-policy="automatic" --labels="app=portfolio-copilot" --project="$PROJECT_ID"
+  echo -n "$MA_DEFAULT_VALUE" | gcloud secrets versions add "$MA_SECRET_NAME" --data-file=- --project="$PROJECT_ID"
+  echo "Secret $MA_SECRET_NAME created with default value."
+fi
+
 # Grant Secret Manager access to the Agent Platform Service Agent
 # (Required during deployment when secrets are passed as env vars to Reasoning Engine)
 PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format="value(projectNumber)" 2>/dev/null || echo "")
