@@ -249,8 +249,9 @@ async def test_root_planner_dispatches_research_managed_agent():
         auto_create_session=True,
     )
 
-    from orchestrator.contracts import ResearchBrief, ConfidenceLevel
     from datetime import datetime, timezone
+
+    from orchestrator.contracts import ConfidenceLevel, ResearchBrief
 
     with patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list, \
          patch("src.orchestrator.skills.research.AgentRegistryClient.get_skill_content", new_callable=AsyncMock) as mock_get_content, \
