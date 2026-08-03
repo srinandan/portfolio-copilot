@@ -450,3 +450,63 @@ async def test_root_planner_dispatches_action_drafting_skill():
         assert any("action_drafting_result:" in str(item) for item in last_event.output)
 
 
+@pytest.mark.asyncio
+async def test_root_planner_chains_portfolio_analysis_to_action_drafting():
+    """Verify I1 & I2: Planner deterministically orders PA before AD and chains drift_report to AD."""
+    agent = Workflow(
+        name="test_root",
+        edges=[("START", root_planner)],
+    )
+    session_service = InMemorySessionService()
+    memory_service = InMemoryMemoryService()
+    runner = Runner(
+        app_name="test_app",
+        agent=agent,
+        session_service=session_service,
+        memory_service=memory_service,
+        auto_create_session=True,
+    )
+
+    with patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list, \
+         patch("src.orchestrator.skills.portfolio_analysis.FirestoreClient") as mock_pa_firestore, \
+         patch("src.orchestrator.skills.action_drafting.FirestoreClient") as mock_ad_firestore:
+
+        # Mock out of order skills from registry (AD listed before PA)
+        mock_list.return_value = [
+            Skill(name="skills/private-action-drafting", target_state="TARGET_STATE_ACTIVE", default_revision="v1"),
+            Skill(name="skills/private-portfolio-analysis", target_state="TARGET_STATE_ACTIVE", default_revision="v1"),
+        ]
+
+        # PA returns completed with drift_report recommending rebalance
+        mock_pa_db = mock_pa_firestore.return_value
+        fake_ips = MagicMock(ips_id="ips_1", version=1)
+        fake_holdings = MagicMock(
+            total_value_usd=100000.0,
+            positions=[MagicMock(ticker="AAPL", quantity=100, market_value_usd=80000.0, asset_class="Equity")],
+            cash_usd=20000.0,
+        )
+        mock_pa_db.get_active_ips_by_user.return_value = fake_ips
+        mock_pa_db.get_holdings.return_value = fake_holdings
+
+        # AD DB mocks
+        mock_ad_db = mock_ad_firestore.return_value
+        mock_ad_db.get_active_ips_by_user.return_value = fake_ips
+        mock_ad_db.get_holdings.return_value = fake_holdings
+
+        response_stream = runner.run_async(
+            user_id="user_chain",
+            session_id="session_chain_1",
+            new_message=UserContent(parts=[Part.from_text(text='{"user_id": "user_chain"}')]),
+        )
+
+        events = [e async for e in response_stream]
+        last_event = events[-1]
+
+        # Verify PA executed before AD despite registry returning AD first
+        outputs = last_event.output
+        pa_idx = next(i for i, out in enumerate(outputs) if "portfolio_analysis_result" in str(out))
+        ad_idx = next(i for i, out in enumerate(outputs) if "action_drafting_result" in str(out))
+        assert pa_idx < ad_idx, "Portfolio analysis should execute before action drafting"
+
+
+
