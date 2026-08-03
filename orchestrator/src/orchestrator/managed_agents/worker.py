@@ -1,18 +1,27 @@
 """Worker Managed Agent factory and execution helpers."""
 
-import os
 import re
 from typing import Any, List, Optional, Type
 
 from google.adk.agents import ManagedAgent
 from pydantic import BaseModel
 
-DEFAULT_MANAGED_AGENT_ID = "antigravity-preview-05-2026"
+from orchestrator.managed_agents.secret_loader import (
+    DEFAULT_MANAGED_AGENT_ID,
+    resolve_managed_agent_id,
+)
+
+__all__ = [
+    "DEFAULT_MANAGED_AGENT_ID",
+    "build_worker_managed_agent",
+    "get_worker_agent_id",
+    "sanitize_node_name",
+]
 
 
 def get_worker_agent_id() -> str:
     """Resolves the provisioned worker Managed Agent resource ID."""
-    return os.environ.get("MANAGED_AGENT_ID") or DEFAULT_MANAGED_AGENT_ID
+    return resolve_managed_agent_id()
 
 
 def sanitize_node_name(name: str) -> str:

@@ -100,7 +100,7 @@ def deploy_agent_engine(project: str | None, location: str, display_name: str):
             roles = [
                 "roles/datastore.user",  # Firestore: IPS, holdings, liabilities
                 "roles/bigquery.dataViewer",  # BigQuery: spending analysis
-                "roles/secretmanager.secretAccessor",  # Secret Manager: Alpaca API key
+                "roles/secretmanager.secretAccessor",  # Secret Manager: Alpaca API key & MANAGED_AGENT_ID
             ]
             for role in roles:
                 grant_iam_role(project, principal, role)
