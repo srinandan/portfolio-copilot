@@ -178,7 +178,7 @@ than starting over, if practical.
   (self-registered skills are namespaced under the `private-` publisher
   prefix — see [ADR-0006](../../docs/adr/0006-agent-registry-api-alignment.md))
 - Skill revision: 0.2.0 (draft — not yet registered)
-- Approval scope: `read:holdings,read:liabilities,read:spending,read:ips,write:ips,write:liabilities,write:memory`
+- Approval scope: `read:holdings,read:liabilities,read:spending,read:ips`
 
 ## Acceptance criteria
 
