@@ -347,7 +347,7 @@ async def test_root_planner_dispatches_research_managed_agent():
         response_stream = runner.run_async(
             user_id="user_123",
             session_id="session_456",
-            new_message=UserContent(parts=[Part.from_text(text='{"user_id": "u5"}')]),
+            new_message=UserContent(parts=[Part.from_text(text='{"user_id": "u5", "research_question": "Analyze tech sector"}')]),
         )
 
         events = []
@@ -357,6 +357,49 @@ async def test_root_planner_dispatches_research_managed_agent():
         mock_get_content.assert_awaited_once_with("research")
         last_event = events[-1]
         assert any("research_result:" in out and "market research report generated" in out for out in last_event.output)
+
+
+@pytest.mark.asyncio
+async def test_root_planner_skips_research_when_no_question():
+    """Verify I4: Planner skips invoking research ManagedAgent when no research_question was requested."""
+    agent = Workflow(
+        name="test_root",
+        edges=[("START", root_planner)],
+    )
+    session_service = InMemorySessionService()
+    memory_service = InMemoryMemoryService()
+    runner = Runner(
+        app_name="test_app",
+        agent=agent,
+        session_service=session_service,
+        memory_service=memory_service,
+        auto_create_session=True,
+    )
+
+    with patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list, \
+         patch("src.orchestrator.skills.research.AgentRegistryClient.get_skill_content", new_callable=AsyncMock) as mock_get_content:
+
+        mock_list.return_value = [
+            Skill(
+                name="projects/test-proj/locations/us-central1/skills/private-research",
+                target_state="TARGET_STATE_ACTIVE",
+                default_revision="rev-research-1",
+            ),
+        ]
+
+        response_stream = runner.run_async(
+            user_id="user_123",
+            session_id="session_456",
+            new_message=UserContent(parts=[Part.from_text(text='{"user_id": "u5"}')]),
+        )
+
+        events = [e async for e in response_stream]
+        last_event = events[-1]
+
+        # Ensure get_skill_content was not called and no research_result was generated
+        mock_get_content.assert_not_called()
+        assert not any("research_result:" in str(item) for item in last_event.output)
+
 
 
 @pytest.mark.asyncio

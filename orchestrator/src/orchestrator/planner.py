@@ -81,19 +81,29 @@ async def root_planner(ctx: Context, node_input: Any):
     skills = await ctx.run_node(get_skills_from_registry, node_input=node_input)
     logger.info(f"Available skills: {skills}")
 
-    # Simple extraction of user_id from node_input or default
-    user_id = "default_user"
-    trigger = "initial"
+    input_dict = {}
     if isinstance(node_input, dict):
-        user_id = node_input.get("user_id", user_id)
-        trigger = node_input.get("trigger", trigger)
+        input_dict = node_input
     elif isinstance(node_input, str):
         try:
             parsed = json.loads(node_input)
-            user_id = parsed.get("user_id", user_id)
-            trigger = parsed.get("trigger", trigger)
+            if isinstance(parsed, dict):
+                input_dict = parsed
         except json.JSONDecodeError:
             pass
+    elif hasattr(node_input, "parts") and node_input.parts:
+        for part in node_input.parts:
+            text = getattr(part, "text", None)
+            if text:
+                try:
+                    parsed = json.loads(text)
+                    if isinstance(parsed, dict):
+                        input_dict.update(parsed)
+                except json.JSONDecodeError:
+                    pass
+
+    user_id = input_dict.get("user_id", "default_user")
+    trigger = input_dict.get("trigger", "initial")
 
     results = []
     for skill in skills:
@@ -107,18 +117,18 @@ async def root_planner(ctx: Context, node_input: Any):
             result = await ctx.run_node(portfolio_analysis_skill, node_input={"user_id": user_id})
             results.append(f"portfolio_analysis_result: {result}")
         elif short_name == "private-research":
-            logger.info(f"Executing dynamic managed research skill: {skill}")
-            research_question = "What are the current market conditions and sentiment for the tech sector?"
-            if isinstance(node_input, dict) and "research_question" in node_input:
-                research_question = node_input["research_question"]
-
-            result = await ctx.run_node(managed_research_agent_node, node_input={"research_question": research_question})
-            results.append(f"research_result: {result.model_dump() if hasattr(result, 'model_dump') else result}")
+            research_question = input_dict.get("research_question")
+            if research_question and str(research_question).strip():
+                logger.info(f"Executing dynamic managed research skill for question: {research_question}")
+                result = await ctx.run_node(managed_research_agent_node, node_input={"research_question": str(research_question).strip()})
+                results.append(f"research_result: {result.model_dump() if hasattr(result, 'model_dump') else result}")
+            else:
+                logger.info("Skipping research skill execution as no research_question was requested.")
         elif short_name == "private-action-drafting":
             logger.info(f"Executing native action drafting skill: {skill}")
-            drift_report = node_input.get("drift_report") if isinstance(node_input, dict) else None
-            research_briefs = node_input.get("research_briefs") if isinstance(node_input, dict) else None
-            requested_trade = node_input.get("requested_trade") if isinstance(node_input, dict) else None
+            drift_report = input_dict.get("drift_report")
+            research_briefs = input_dict.get("research_briefs")
+            requested_trade = input_dict.get("requested_trade")
             result = await ctx.run_node(
                 action_drafting_skill,
                 node_input={
