@@ -251,24 +251,25 @@ async def test_root_planner_dispatches_research_managed_agent():
 
     from datetime import datetime, timezone
 
+    from google.adk.events import Event
+
     from orchestrator.contracts import ConfidenceLevel, ResearchBrief
 
-    with patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list, \
-         patch("src.orchestrator.skills.research.AgentRegistryClient.get_skill_content", new_callable=AsyncMock) as mock_get_content, \
-         patch("src.orchestrator.skills.research.ManagedAgent._run_async_impl") as mock_managed_run:
-
-        from google.adk.events import Event
-
-        async def fake_research_stream(ctx):
-            yield Event(author="research", output=ResearchBrief(
+    async def fake_research_stream(ctx, **kwargs):
+        yield Event(
+            author="research",
+            output=ResearchBrief(
                 research_run_id="test_run_id",
                 summary="market research report generated",
                 sources=["http://test.com"],
                 confidence=ConfidenceLevel.HIGH,
-                as_of=datetime.now(timezone.utc)
-            ))
+                as_of=datetime.now(timezone.utc),
+            ),
+        )
 
-        mock_managed_run.side_effect = fake_research_stream
+    with patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list, \
+         patch("src.orchestrator.skills.research.AgentRegistryClient.get_skill_content", new_callable=AsyncMock) as mock_get_content, \
+         patch("src.orchestrator.skills.research.ManagedAgent.run", side_effect=fake_research_stream):
 
         mock_list.return_value = [
             Skill(
