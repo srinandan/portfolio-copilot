@@ -1,7 +1,7 @@
 import pytest
 
-from src.orchestrator.contracts.ips import RiskTolerance
-from src.orchestrator.skills.goals_onboarding.logic import (
+from orchestrator.contracts.ips import RiskTolerance
+from orchestrator.primitives.goals_onboarding import (
     calculate_risk_tolerance,
     get_default_allocation_bands,
 )
