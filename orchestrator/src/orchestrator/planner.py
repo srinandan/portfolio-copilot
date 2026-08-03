@@ -7,12 +7,14 @@ import os
 from typing import Any
 
 from google.adk import Context
-from google.adk.agents import ManagedAgent
 from google.adk.workflow import Workflow, node
 from google.genai.types import Part, UserContent
 
 from .registry_client import AgentRegistryClient
+from .skills.action_drafting import action_drafting_skill
 from .skills.goals_onboarding import goals_onboarding_skill
+from .skills.portfolio_analysis import portfolio_analysis_skill
+from .skills.research import managed_research_agent_node
 
 
 @node(name="get_skills", rerun_on_resume=False)
@@ -100,17 +102,33 @@ async def root_planner(ctx: Context, node_input: Any):
             logger.info(f"Executing native skill: {skill}")
             result = await ctx.run_node(goals_onboarding_skill, node_input={"user_id": user_id, "trigger": trigger})
             results.append(f"goals_onboarding_result: {result}")
+        elif short_name == "private-portfolio-analysis":
+            logger.info(f"Executing native portfolio analysis skill: {skill}")
+            result = await ctx.run_node(portfolio_analysis_skill, node_input={"user_id": user_id})
+            results.append(f"portfolio_analysis_result: {result}")
         elif short_name == "private-research":
             logger.info(f"Executing dynamic managed research skill: {skill}")
-            instructions = await registry_client.get_skill_content("research")
-            research_agent = ManagedAgent(
-                name="research",
-                description=instructions,
-                agent_id="antigravity-preview-05-2026",
-                environment={"type": "remote"},
+            research_question = "What are the current market conditions and sentiment for the tech sector?"
+            if isinstance(node_input, dict) and "research_question" in node_input:
+                research_question = node_input["research_question"]
+
+            result = await ctx.run_node(managed_research_agent_node, node_input={"research_question": research_question})
+            results.append(f"research_result: {result.model_dump() if hasattr(result, 'model_dump') else result}")
+        elif short_name == "private-action-drafting":
+            logger.info(f"Executing native action drafting skill: {skill}")
+            drift_report = node_input.get("drift_report") if isinstance(node_input, dict) else None
+            research_briefs = node_input.get("research_briefs") if isinstance(node_input, dict) else None
+            requested_trade = node_input.get("requested_trade") if isinstance(node_input, dict) else None
+            result = await ctx.run_node(
+                action_drafting_skill,
+                node_input={
+                    "user_id": user_id,
+                    "drift_report": drift_report,
+                    "research_briefs": research_briefs,
+                    "requested_trade": requested_trade,
+                },
             )
-            result = await ctx.run_node(research_agent, node_input={"user_id": user_id, "goal": "market research"})
-            results.append(f"research_result: {result}")
+            results.append(f"action_drafting_result: {result}")
         else:
             logger.info(f"Authorized skill {skill} is not yet wired into dynamic plan; executing fallback.")
             result = await ctx.run_node(dummy_skill_execution, node_input=skill)

@@ -313,21 +313,27 @@ async def test_root_planner_dispatches_research_managed_agent():
         auto_create_session=True,
     )
 
-    with (
-        patch(
-            "src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock
-        ) as mock_list,
-        patch(
-            "src.orchestrator.planner.AgentRegistryClient.get_skill_content", new_callable=AsyncMock
-        ) as mock_get_content,
-        patch("src.orchestrator.planner.ManagedAgent._run_async_impl") as mock_managed_run,
-    ):
-        from google.adk.events import Event
+    from datetime import datetime, timezone
 
-        async def fake_research_stream(ctx):
-            yield Event(author="research", output="market research report generated")
+    from google.adk.events import Event
 
-        mock_managed_run.side_effect = fake_research_stream
+    from orchestrator.contracts import ConfidenceLevel, ResearchBrief
+
+    async def fake_research_stream(ctx, **kwargs):
+        yield Event(
+            author="research",
+            output=ResearchBrief(
+                research_run_id="test_run_id",
+                summary="market research report generated",
+                sources=["http://test.com"],
+                confidence=ConfidenceLevel.HIGH,
+                as_of=datetime.now(timezone.utc),
+            ),
+        )
+
+    with patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list, \
+         patch("src.orchestrator.skills.research.AgentRegistryClient.get_skill_content", new_callable=AsyncMock) as mock_get_content, \
+         patch("src.orchestrator.skills.research.ManagedAgent.run", side_effect=fake_research_stream):
 
         mock_list.return_value = [
             Skill(
@@ -350,4 +356,97 @@ async def test_root_planner_dispatches_research_managed_agent():
 
         mock_get_content.assert_awaited_once_with("research")
         last_event = events[-1]
-        assert "research_result: market research report generated" in last_event.output
+        assert any("research_result:" in out and "market research report generated" in out for out in last_event.output)
+
+
+@pytest.mark.asyncio
+async def test_root_planner_dispatches_portfolio_analysis_skill():
+    """Verify D1: planner recognizes private-portfolio-analysis and dispatches portfolio_analysis_skill."""
+    agent = Workflow(
+        name="test_root",
+        edges=[("START", root_planner)],
+    )
+    session_service = InMemorySessionService()
+    memory_service = InMemoryMemoryService()
+    runner = Runner(
+        app_name="test_app",
+        agent=agent,
+        session_service=session_service,
+        memory_service=memory_service,
+        auto_create_session=True,
+    )
+
+    with patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list, \
+         patch("src.orchestrator.skills.portfolio_analysis.FirestoreClient") as mock_firestore:
+
+        mock_db = mock_firestore.return_value
+        mock_db.get_active_ips_by_user.return_value = None  # Will return declined
+
+        mock_list.return_value = [
+            Skill(
+                name="projects/test-proj/locations/us-central1/skills/private-portfolio-analysis",
+                target_state="TARGET_STATE_ACTIVE",
+                default_revision="rev-pa-1",
+            ),
+        ]
+
+        response_stream = runner.run_async(
+            user_id="user_pa",
+            session_id="session_pa_1",
+            new_message=UserContent(parts=[Part.from_text(text='{"user_id": "user_pa"}')]),
+        )
+
+        events = []
+        async for event in response_stream:
+            events.append(event)
+
+        last_event = events[-1]
+        assert any("portfolio_analysis_result:" in str(item) for item in last_event.output)
+
+
+@pytest.mark.asyncio
+async def test_root_planner_dispatches_action_drafting_skill():
+    """Verify D1: planner recognizes private-action-drafting and dispatches action_drafting_skill."""
+    agent = Workflow(
+        name="test_root",
+        edges=[("START", root_planner)],
+    )
+    session_service = InMemorySessionService()
+    memory_service = InMemoryMemoryService()
+    runner = Runner(
+        app_name="test_app",
+        agent=agent,
+        session_service=session_service,
+        memory_service=memory_service,
+        auto_create_session=True,
+    )
+
+    with patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list, \
+         patch("src.orchestrator.skills.action_drafting.FirestoreClient") as mock_firestore:
+
+        mock_db = mock_firestore.return_value
+        mock_db.get_active_ips_by_user.return_value = MagicMock()
+        mock_db.get_holdings.return_value = MagicMock(total_value_usd=100000, positions=[], cash_usd=100000)
+
+        mock_list.return_value = [
+            Skill(
+                name="projects/test-proj/locations/us-central1/skills/private-action-drafting",
+                target_state="TARGET_STATE_ACTIVE",
+                default_revision="rev-ad-1",
+            ),
+        ]
+
+        response_stream = runner.run_async(
+            user_id="user_ad",
+            session_id="session_ad_1",
+            new_message=UserContent(parts=[Part.from_text(text='{"user_id": "user_ad"}')]),
+        )
+
+        events = []
+        async for event in response_stream:
+            events.append(event)
+
+        last_event = events[-1]
+        assert any("action_drafting_result:" in str(item) for item in last_event.output)
+
+

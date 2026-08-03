@@ -4,10 +4,8 @@ logger = get_logger(__name__)
 
 import uuid
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 
-import yaml
 from google.adk import Context
 from google.adk.events import RequestInput
 from google.adk.workflow import node
@@ -24,27 +22,10 @@ from ...contracts.ips import (
 )
 from ...contracts.liabilities import LiabilitiesSnapshot, Liability, LiabilityType
 from ...data.firestore import FirestoreClient
+from .._skill_metadata import read_skill_version
 from .logic import calculate_risk_tolerance, get_default_allocation_bands
 
-
-def _load_skill_version() -> str:
-    """Reads metadata.version from skills/goals-onboarding/SKILL.md frontmatter."""
-    current = Path(__file__).resolve().parent
-    for parent in [current] + list(current.parents):
-        candidate = parent / "skills" / "goals-onboarding" / "SKILL.md"
-        if candidate.exists():
-            content = candidate.read_text(encoding="utf-8")
-            if content.startswith("---"):
-                parts = content.split("---", 2)
-                if len(parts) >= 3:
-                    parsed = yaml.safe_load(parts[1])
-                    if isinstance(parsed, dict) and "metadata" in parsed and "version" in parsed["metadata"]:
-                        return str(parsed["metadata"]["version"])
-            raise RuntimeError(f"No metadata.version found in frontmatter of {candidate}")
-    raise RuntimeError("Could not find skills/goals-onboarding/SKILL.md")
-
-
-SKILL_VERSION = _load_skill_version()
+SKILL_VERSION = read_skill_version("goals-onboarding")
 
 
 @node(name="goals_onboarding_interview", rerun_on_resume=False)

@@ -1,68 +1,90 @@
+"""Core logic and constraint evaluation for drafting proposed actions."""
+
+from typing import Callable, Union
+
 from ...contracts.holdings import HoldingsSnapshot
 from ...contracts.ips import InvestmentPolicyStatement
 from ...contracts.proposed_action import OrderType, Side
 
+KNOWN_SECTOR_MAP = {
+    "XOM": "Energy",
+    "CVX": "Energy",
+    "JPM": "Financials",
+    "GS": "Financials",
+    "AAPL": "Technology",
+    "MSFT": "Technology",
+    "TSLA": "Consumer Cyclical",
+    "NVDA": "Technology",
+    "VOO": "Broad Market",
+    "SPY": "Broad Market",
+    "BND": "Fixed Income",
+}
+
 
 def get_mock_alpaca_quote(ticker: str) -> float:
-    """Mock Alpaca market data endpoint."""
-    # Deterministic price for testing
+    """Mock Alpaca market data endpoint returning deterministic prices for testing."""
     if ticker == "AAPL":
         return 150.0
     if ticker == "TSLA":
         return 200.0
+    if ticker == "NVDA":
+        return 100.0
     return 100.0
 
 
 def get_mock_sector(ticker: str) -> str:
-    """Mock sector lookup since it's not in the holdings schema."""
-    if ticker in ["XOM", "CVX"]:
-        return "Energy"
-    if ticker in ["JPM", "GS"]:
-        return "Financials"
-    return "Technology"
+    """Mock sector lookup mapping known tickers to their sector, or Unknown."""
+    return KNOWN_SECTOR_MAP.get(ticker.upper(), "Unknown")
 
 
 def calculate_draft_action(
-    drift_report: dict,
+    drift_report: Union[dict, None],
     holdings: HoldingsSnapshot,
     ips: InvestmentPolicyStatement,
+    quote_fn: Callable[[str], float] = get_mock_alpaca_quote,
+    sector_fn: Callable[[str], str] = get_mock_sector,
 ) -> dict | None:
-    """
-    Calculates the drafted action based on the drift report or a directly requested trade.
+    """Calculates the drafted action based on the drift report or a directly requested trade.
+
     Returns a dict with proposed trade details, or None if no action is warranted.
-    Raises ValueError if a trade would violate constraints.
+    Raises ValueError if a trade would violate constraints or if insufficient shares exist.
     """
-    if not drift_report.get("rebalance_recommended", False) and not drift_report.get("requested_trade"):
+    report_dict = drift_report.model_dump() if hasattr(drift_report, "model_dump") else (drift_report or {})
+
+    rebalance_recommended = report_dict.get("rebalance_recommended", False)
+    requested_trade = report_dict.get("requested_trade")
+
+    if not rebalance_recommended and not requested_trade:
         return None
 
     total_value_usd = holdings.total_value_usd
     if total_value_usd is None:
         total_value_usd = sum(p.market_value_usd for p in holdings.positions) + (holdings.cash_usd or 0.0)
 
-    if total_value_usd == 0:
+    if total_value_usd <= 0:
         return None
 
     trade_details = None
+    is_direct_request = bool(requested_trade)
 
     # Handle directly requested trade first
-    if drift_report.get("requested_trade"):
-        req = drift_report["requested_trade"]
-        ticker = req["ticker"]
-        side = req["side"]
-        quantity = req.get("quantity")
+    if is_direct_request:
+        ticker = requested_trade["ticker"]
+        raw_side = requested_trade["side"]
+        side = Side(raw_side.lower() if isinstance(raw_side, str) else raw_side)
+        quantity = requested_trade.get("quantity")
         if not quantity:
-            # If no quantity given, default to 1 for drafting
             quantity = 1.0
 
-        current_price = get_mock_alpaca_quote(ticker)
+        current_price = quote_fn(ticker)
         trade_details = {
             "ticker": ticker,
             "side": side,
-            "quantity": quantity,
+            "quantity": float(quantity),
             "order_type": OrderType.MARKET,
             "estimated_price_usd": current_price,
-            "estimated_value_usd": quantity * current_price,
-            "rationale": f"User requested to {side} {quantity} shares of {ticker}",
+            "estimated_value_usd": float(quantity) * current_price,
+            "rationale": f"User requested to {side.value} {quantity} shares of {ticker}",
         }
     else:
         # Handle drift rebalancing
@@ -95,19 +117,22 @@ def calculate_draft_action(
 
         largest_position = max(ac_positions, key=lambda p: p.market_value_usd)
         ticker = largest_position.ticker
-        current_price = get_mock_alpaca_quote(ticker)
+        current_price = quote_fn(ticker)
         quantity_to_sell = trim_amount_usd / current_price
 
-        # Don't sell more than we have
+        # B1: If single position does not have enough shares, decline to draft rather than under-trimming silently
         if quantity_to_sell > largest_position.quantity:
-            quantity_to_sell = largest_position.quantity
-            trim_amount_usd = quantity_to_sell * current_price
+            raise ValueError(
+                f"no single position in {over_allocated_ac} has enough market value to complete the trim to "
+                f"target_percent — trim needed: ${trim_amount_usd:.2f}, largest available ({largest_position.ticker}): "
+                f"${largest_position.market_value_usd:.2f}"
+            )
 
         trade_details = {
             "ticker": ticker,
-            "side": Side.SELL.value,
+            "side": Side.SELL,
             "quantity": quantity_to_sell,
-            "order_type": OrderType.MARKET.value,
+            "order_type": OrderType.MARKET,
             "estimated_price_usd": current_price,
             "estimated_value_usd": trim_amount_usd,
             "rationale": f"Trimming {ticker} by {round(quantity_to_sell, 2)} shares to bring {over_allocated_ac} back to exactly {target_percent}%",
@@ -122,20 +147,30 @@ def calculate_draft_action(
     if ticker in ips.constraints.excluded_tickers:
         raise ValueError(f"Drafting failed: {ticker} is in excluded_tickers")
 
-    sector = get_mock_sector(ticker)
-    if sector in ips.constraints.excluded_sectors:
+    sector = sector_fn(ticker)
+    if sector != "Unknown" and sector in ips.constraints.excluded_sectors:
         raise ValueError(f"Drafting failed: {ticker} is in excluded_sectors ({sector})")
 
-    # Check concentration limit
+    # B2: Check concentration limit
     current_position = next((p for p in holdings.positions if p.ticker == ticker), None)
     current_value = current_position.market_value_usd if current_position else 0.0
 
-    if trade_details["side"] == Side.BUY.value or trade_details["side"] == Side.BUY:
+    side = trade_details["side"]
+    if side == Side.BUY:
         new_value = current_value + trade_details["estimated_value_usd"]
-        new_percent = (new_value / total_value_usd) * 100
+        new_percent = (new_value / total_value_usd) * 100.0
         if new_percent > ips.constraints.concentration_limit_percent:
             raise ValueError(
                 f"Drafting failed: Buying {ticker} would push position to {round(new_percent, 2)}%, "
+                f"exceeding concentration limit of {ips.constraints.concentration_limit_percent}%"
+            )
+    elif is_direct_request and side == Side.SELL:
+        # A user-requested sell that still leaves position above the concentration limit
+        new_value = max(0.0, current_value - trade_details["estimated_value_usd"])
+        new_percent = (new_value / total_value_usd) * 100.0
+        if new_percent > ips.constraints.concentration_limit_percent:
+            raise ValueError(
+                f"Drafting failed: Trade in {ticker} results in position concentration of {round(new_percent, 2)}%, "
                 f"exceeding concentration limit of {ips.constraints.concentration_limit_percent}%"
             )
 
