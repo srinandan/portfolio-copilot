@@ -8,6 +8,7 @@ from ..contracts.audit_log import Actor, ActorType, AuditLogEntry, EventType
 from ..contracts.goals_onboarding import GoalsOnboardingResult
 from ..contracts.ips import Constraints, InvestmentPolicyStatement, IPSStatus, LiquidityNeeds
 from ..contracts.liabilities import LiabilitiesSnapshot
+from ..contracts.proposed_action import ProposedAction
 from ..data.firestore import FirestoreClient
 from ..logger import get_logger
 from ..skills._skill_metadata import read_skill_version
@@ -99,3 +100,101 @@ def write_ips_from_interview_result(
         raise RuntimeError(f"Audit log write failed for IPS creation: {e}") from e
 
     return new_ips, liab_snapshot
+
+
+def write_proposed_action(
+    user_id: str,
+    action: ProposedAction,
+    db_client: Optional[FirestoreClient] = None,
+) -> ProposedAction:
+    """Persists a drafted ProposedAction and emits an ACTION_PROPOSED audit entry.
+
+    Called by the orchestrator after the action-drafting Managed Agent returns
+    a validated ProposedAction. The MA does not have Firestore write access.
+    """
+    client = db_client or FirestoreClient()
+    client.set_proposed_action(action)
+    logger.info(f"Persisted ProposedAction {action.action_id} for user {user_id}")
+
+    skill_version = read_skill_version("action-drafting")
+    audit_entry = AuditLogEntry(
+        log_id=str(uuid.uuid4()),
+        event_type=EventType.ACTION_PROPOSED,
+        timestamp=datetime.now(timezone.utc),
+        actor=Actor(
+            type=ActorType.AGENT,
+            skill_name="private-action-drafting",
+            skill_version=skill_version,
+        ),
+        related_action_id=action.action_id,
+        related_ips_version=action.ips_version_referenced.model_dump(),
+        detail=f"Proposed {action.side.value} {action.quantity} {action.ticker}",
+    )
+    try:
+        client.append_audit_log(audit_entry)
+    except Exception as e:
+        logger.error(f"Failed to append audit log for ProposedAction {action.action_id}: {e}")
+        raise RuntimeError(f"Audit log write failed for ProposedAction: {e}") from e
+
+    return action
+
+
+def emit_skill_invoked_audit(
+    skill_short_name: str,
+    detail: Optional[str] = None,
+    db_client: Optional[FirestoreClient] = None,
+) -> None:
+    """Emits a SKILL_INVOKED audit entry for a skill turn. Fail-closed.
+
+    Called by the dispatcher at the start of each Managed Agent invocation.
+    """
+    client = db_client or FirestoreClient()
+    skill_dir_name = skill_short_name.replace("private-", "")
+    skill_version = read_skill_version(skill_dir_name)
+    audit_entry = AuditLogEntry(
+        log_id=str(uuid.uuid4()),
+        event_type=EventType.SKILL_INVOKED,
+        timestamp=datetime.now(timezone.utc),
+        actor=Actor(
+            type=ActorType.AGENT,
+            skill_name=skill_short_name if skill_short_name.startswith("private-") else f"private-{skill_short_name}",
+            skill_version=skill_version,
+        ),
+        detail=detail,
+    )
+    try:
+        client.append_audit_log(audit_entry)
+    except Exception as e:
+        logger.error(f"Failed to append SKILL_INVOKED audit for {skill_short_name}: {e}")
+        raise RuntimeError(f"Audit log write failed for skill invocation: {e}") from e
+
+
+def emit_skill_failed_audit(
+    skill_short_name: str,
+    error: str,
+    db_client: Optional[FirestoreClient] = None,
+) -> None:
+    """Emits a SKILL_INVOCATION_FAILED audit entry. Fail-closed.
+
+    Called by the dispatcher when a Managed Agent invocation or its
+    validation fails.
+    """
+    client = db_client or FirestoreClient()
+    skill_dir_name = skill_short_name.replace("private-", "")
+    skill_version = read_skill_version(skill_dir_name)
+    audit_entry = AuditLogEntry(
+        log_id=str(uuid.uuid4()),
+        event_type=EventType.SKILL_INVOCATION_FAILED,
+        timestamp=datetime.now(timezone.utc),
+        actor=Actor(
+            type=ActorType.AGENT,
+            skill_name=skill_short_name if skill_short_name.startswith("private-") else f"private-{skill_short_name}",
+            skill_version=skill_version,
+        ),
+        detail=f"Skill invocation failed: {error}",
+    )
+    try:
+        client.append_audit_log(audit_entry)
+    except Exception as e:
+        logger.error(f"Failed to append SKILL_INVOCATION_FAILED audit for {skill_short_name}: {e}")
+        raise RuntimeError(f"Audit log write failed for skill failure: {e}") from e
