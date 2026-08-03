@@ -133,3 +133,16 @@ class FirestoreClient:
         """
         transaction = self.db.transaction()
         self._update_ips_transactional(transaction, new_ips)
+
+    def get_active_ips_by_user(self, user_id: str) -> InvestmentPolicyStatement | None:
+        """Gets the currently active IPS for a given user_id."""
+        query = (
+            self.db.collection(COLLECTION_IPS)
+            .where(filter=firestore.FieldFilter("user_id", "==", user_id))
+            .where(filter=firestore.FieldFilter("status", "==", IPSStatus.ACTIVE.value))
+            .limit(1)
+        )
+        docs = list(query.stream())
+        if docs:
+            return InvestmentPolicyStatement.model_validate(docs[0].to_dict())
+        return None
