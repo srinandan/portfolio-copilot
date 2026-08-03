@@ -1,4 +1,6 @@
 from .audit_log import Actor, ActorType, AuditLogEntry, EventType
+from .drift_report import DriftReport, DriftReportEntry
+from .goals_onboarding import GoalsOnboardingResult
 from .holdings import AccountType, HoldingsSnapshot, Position
 from .ips import (
     Constraints,
@@ -22,6 +24,7 @@ from .proposed_action import (
 )
 from .research_brief import ConfidenceLevel, ResearchBrief
 from .reviewer_verdict import ReviewerVerdict, RuleResult
+from .spending_analysis import CategorySpending, SpendingAnomaly, SpendingReport
 
 __all__ = [
     "AccountType",
@@ -30,9 +33,14 @@ __all__ = [
     "Actor",
     "ActorType",
     "AuditLogEntry",
+    "CategorySpending",
+    "ConfidenceLevel",
     "Constraints",
+    "DriftReport",
+    "DriftReportEntry",
     "EventType",
     "Goal",
+    "GoalsOnboardingResult",
     "HoldingsSnapshot",
     "IPSStatus",
     "InvestmentPolicyStatement",
@@ -46,11 +54,12 @@ __all__ = [
     "RebalancingRules",
     "RelatedIPSVersion",
     "ResearchBrief",
-    "ConfidenceLevel",
     "ReviewerVerdict",
     "RiskTolerance",
     "RuleResult",
     "Side",
     "SkillVersionRef",
+    "SpendingAnomaly",
+    "SpendingReport",
     "TargetAllocation",
 ]

@@ -10,11 +10,13 @@ from google.adk import Context
 from google.adk.workflow import Workflow, node
 from google.genai.types import Part, UserContent
 
+from .managed_agents import dispatch_managed_skill
 from .registry_client import AgentRegistryClient
 from .skills.action_drafting import action_drafting_skill
 from .skills.goals_onboarding import goals_onboarding_skill
 from .skills.portfolio_analysis import portfolio_analysis_skill
 from .skills.research import managed_research_agent_node
+from .state.spending import preload_spending_facts
 
 
 @node(name="get_skills", rerun_on_resume=False)
@@ -63,6 +65,7 @@ async def memory_interaction(ctx: Context, node_input: Any):
 
 
 PIPELINE_SKILL_ORDER = [
+    "private-spending-analysis",
     "private-goals-onboarding",
     "private-portfolio-analysis",
     "private-research",
@@ -89,10 +92,6 @@ async def root_planner(ctx: Context, node_input: Any):
 
     # Run the memory interaction to satisfy Issue #11
     await ctx.run_node(memory_interaction, node_input="test_memory")
-
-    project_id = os.environ.get("PROJECT_ID") or os.environ.get("GOOGLE_CLOUD_PROJECT") or "dummy-project"
-    location = os.environ.get("GOOGLE_CLOUD_LOCATION", "global")
-    registry_client = AgentRegistryClient(project_id=project_id, location=location)
 
     skills = await ctx.run_node(get_skills_from_registry, node_input=node_input)
     logger.info(f"Available skills: {skills}")
@@ -129,7 +128,23 @@ async def root_planner(ctx: Context, node_input: Any):
 
     for skill in ordered_skills:
         short_name = _short_skill_id(skill)
-        if short_name == "private-goals-onboarding":
+        if short_name == "private-spending-analysis":
+            logger.info(f"Executing dynamic managed spending analysis skill: {skill}")
+            preloaded_spending = preload_spending_facts(user_id=user_id)
+            spending_input = {
+                "user_id": user_id,
+                "query_intent": input_dict.get("query_intent", "anomaly_check"),
+                "preloaded": preloaded_spending,
+            }
+            result = await dispatch_managed_skill(
+                "private-spending-analysis",
+                node_input=spending_input,
+                ctx=ctx,
+            )
+            report_data = result.model_dump() if hasattr(result, "model_dump") else result
+            results.append(f"spending_analysis_result: {report_data}")
+            context["spending_analysis_result"] = result
+        elif short_name == "private-goals-onboarding":
             logger.info(f"Executing native skill: {skill}")
             result = await ctx.run_node(goals_onboarding_skill, node_input={"user_id": user_id, "trigger": trigger})
             results.append(f"goals_onboarding_result: {result}")
