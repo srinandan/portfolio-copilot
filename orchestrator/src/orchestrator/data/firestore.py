@@ -22,7 +22,9 @@ COLLECTION_IPS = "ips"
 
 class FirestoreClient:
     def __init__(self, project: str | None = None):
-        self.project = project or os.environ.get("PROJECT_ID") or os.environ.get("GOOGLE_CLOUD_PROJECT") or "test-project"
+        self.project = (
+            project or os.environ.get("PROJECT_ID") or os.environ.get("GOOGLE_CLOUD_PROJECT") or "test-project"
+        )
 
         # In test environments (emulator), we need to handle credentials differently
         emulator_host = os.environ.get("FIRESTORE_EMULATOR_HOST")
@@ -94,15 +96,14 @@ class FirestoreClient:
 
         # 1. Find the currently active IPS for this ips_id
         query = (
-            ips_collection
-            .where(filter=firestore.FieldFilter("ips_id", "==", new_ips.ips_id))
+            ips_collection.where(filter=firestore.FieldFilter("ips_id", "==", new_ips.ips_id))
             .where(filter=firestore.FieldFilter("status", "==", IPSStatus.ACTIVE.value))
             .limit(1)
         )
 
         docs = list(query.stream(transaction=transaction))
         if len(docs) > 1:
-             raise ValueError(f"invariant violated: found multiple active IPS documents for ips_id {new_ips.ips_id}")
+            raise ValueError(f"invariant violated: found multiple active IPS documents for ips_id {new_ips.ips_id}")
 
         if len(docs) == 1:
             # There's an active IPS, supersede it
@@ -118,9 +119,9 @@ class FirestoreClient:
 
             transaction.set(old_doc.reference, self._dict_factory(old_ips))
         else:
-             # Initial case: no active IPS exists.
-             if new_ips.version != 1:
-                 raise ValueError(f"no active IPS found, but new version is not 1 (got {new_ips.version})")
+            # Initial case: no active IPS exists.
+            if new_ips.version != 1:
+                raise ValueError(f"no active IPS found, but new version is not 1 (got {new_ips.version})")
 
         # 2. Write the new active document
         transaction.set(new_doc_ref, self._dict_factory(new_ips))

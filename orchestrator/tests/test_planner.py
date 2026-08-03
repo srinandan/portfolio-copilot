@@ -15,11 +15,13 @@ from src.orchestrator.registry_client import Skill
 
 execution_count = 0
 
+
 @node(name="counter_node", rerun_on_resume=False)
 async def counter_node(ctx: Context, node_input: str):
     global execution_count
     execution_count += 1
     return f"Count: {execution_count}"
+
 
 @node(name="pausing_node", rerun_on_resume=False)
 async def pausing_node(ctx: Context, node_input: str):
@@ -27,11 +29,13 @@ async def pausing_node(ctx: Context, node_input: str):
     result = yield RequestInput(message="Pause here")
     yield result
 
+
 @node(rerun_on_resume=True)
 async def checkpoint_workflow(ctx: Context, node_input: Any):
     count_result = await ctx.run_node(counter_node, node_input="test")
     approval = await ctx.run_node(pausing_node, node_input="test")
     return {"count": count_result, "approval": approval}
+
 
 @pytest.mark.asyncio
 async def test_checkpointing():
@@ -46,12 +50,20 @@ async def test_checkpointing():
 
     session_service = InMemorySessionService()
     memory_service = InMemoryMemoryService()
-    runner = Runner(app_name="test_app", agent=agent, session_service=session_service, memory_service=memory_service, auto_create_session=True)
+    runner = Runner(
+        app_name="test_app",
+        agent=agent,
+        session_service=session_service,
+        memory_service=memory_service,
+        auto_create_session=True,
+    )
 
     session_id = "test_session_123"
 
     # --- FIRST RUN ---
-    response_stream = runner.run_async(user_id="user_123", session_id=session_id, new_message=UserContent(parts=[Part.from_text(text="start_goal")]))
+    response_stream = runner.run_async(
+        user_id="user_123", session_id=session_id, new_message=UserContent(parts=[Part.from_text(text="start_goal")])
+    )
 
     events = []
     async for event in response_stream:
@@ -99,6 +111,7 @@ async def test_checkpointing():
     # Crucially, execution_count MUST still be 1 (checkpointing bypassed running counter_node)
     assert execution_count == 1
 
+
 @pytest.mark.asyncio
 async def test_root_planner_trace():
     """Verify the root planner dynamic workflow executes correctly and queries the mocked registry."""
@@ -108,15 +121,35 @@ async def test_root_planner_trace():
     )
     session_service = InMemorySessionService()
     memory_service = InMemoryMemoryService()
-    runner = Runner(app_name="test_app", agent=agent, session_service=session_service, memory_service=memory_service, auto_create_session=True)
+    runner = Runner(
+        app_name="test_app",
+        agent=agent,
+        session_service=session_service,
+        memory_service=memory_service,
+        auto_create_session=True,
+    )
 
-    with patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list:
+    with patch(
+        "src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock
+    ) as mock_list:
         mock_list.return_value = [
-            Skill(name="projects/test-project/locations/test-location/skills/research", target_state="TARGET_STATE_ACTIVE", default_revision="rev1"),
-            Skill(name="projects/test-project/locations/test-location/skills/action_drafting", target_state="TARGET_STATE_ACTIVE", default_revision="rev2"),
+            Skill(
+                name="projects/test-project/locations/test-location/skills/research",
+                target_state="TARGET_STATE_ACTIVE",
+                default_revision="rev1",
+            ),
+            Skill(
+                name="projects/test-project/locations/test-location/skills/action_drafting",
+                target_state="TARGET_STATE_ACTIVE",
+                default_revision="rev2",
+            ),
         ]
 
-        response_stream = runner.run_async(user_id="user_123", session_id="session_456", new_message=UserContent(parts=[Part.from_text(text="test_goal")]))
+        response_stream = runner.run_async(
+            user_id="user_123",
+            session_id="session_456",
+            new_message=UserContent(parts=[Part.from_text(text="test_goal")]),
+        )
 
         events = []
         async for event in response_stream:
@@ -137,31 +170,48 @@ async def test_root_planner_json_input():
     )
     session_service = InMemorySessionService()
     memory_service = InMemoryMemoryService()
-    runner = Runner(app_name="test_app", agent=agent, session_service=session_service, memory_service=memory_service, auto_create_session=True)
+    runner = Runner(
+        app_name="test_app",
+        agent=agent,
+        session_service=session_service,
+        memory_service=memory_service,
+        auto_create_session=True,
+    )
 
-    with patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list, \
-         patch("src.orchestrator.skills.goals_onboarding.FirestoreClient") as mock_db:
-
+    with (
+        patch(
+            "src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock
+        ) as mock_list,
+        patch("src.orchestrator.skills.goals_onboarding.FirestoreClient") as mock_db,
+    ):
         mock_db_instance = MagicMock()
         mock_db.return_value = mock_db_instance
 
         mock_list.return_value = [
-            Skill(name="projects/test-project/locations/test-location/skills/private-goals-onboarding", target_state="TARGET_STATE_ACTIVE", default_revision="rev1"),
+            Skill(
+                name="projects/test-project/locations/test-location/skills/private-goals-onboarding",
+                target_state="TARGET_STATE_ACTIVE",
+                default_revision="rev1",
+            ),
         ]
 
         # Use valid json input payload as string text part to cover that branch properly
-        response_stream = runner.run_async(user_id="user_123", session_id="session_456", new_message=UserContent(parts=[Part.from_text(text='{"user_id": "u4", "trigger": "initial"}')]))
+        response_stream = runner.run_async(
+            user_id="user_123",
+            session_id="session_456",
+            new_message=UserContent(parts=[Part.from_text(text='{"user_id": "u4", "trigger": "initial"}')]),
+        )
 
         events = []
         async for event in response_stream:
             events.append(event)
 
         def has_request_input(e):
-             if e.content and e.content.parts:
-                  for p in e.content.parts:
-                       if p.function_call and p.function_call.name == "adk_request_input":
-                            return True
-             return False
+            if e.content and e.content.parts:
+                for p in e.content.parts:
+                    if p.function_call and p.function_call.name == "adk_request_input":
+                        return True
+            return False
 
         assert any(has_request_input(e) for e in events)
 
@@ -175,11 +225,20 @@ async def test_root_planner_dispatches_goals_onboarding_with_realistic_name():
     )
     session_service = InMemorySessionService()
     memory_service = InMemoryMemoryService()
-    runner = Runner(app_name="test_app", agent=agent, session_service=session_service, memory_service=memory_service, auto_create_session=True)
+    runner = Runner(
+        app_name="test_app",
+        agent=agent,
+        session_service=session_service,
+        memory_service=memory_service,
+        auto_create_session=True,
+    )
 
-    with patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list, \
-         patch("src.orchestrator.skills.goals_onboarding.FirestoreClient") as mock_db:
-
+    with (
+        patch(
+            "src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock
+        ) as mock_list,
+        patch("src.orchestrator.skills.goals_onboarding.FirestoreClient") as mock_db,
+    ):
         mock_db_instance = MagicMock()
         mock_db.return_value = mock_db_instance
 
@@ -224,10 +283,15 @@ async def test_root_planner_invalid_json():
     session_service = InMemorySessionService()
     runner = Runner(app_name="test_app", agent=agent, session_service=session_service, auto_create_session=True)
 
-    with patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list, \
-         patch("src.orchestrator.skills.goals_onboarding.FirestoreClient") as mock_db:
-
-        response_stream = runner.run_async(user_id="user_123", session_id="s1", new_message=UserContent(parts=[Part.from_text(text="invalid json {")]))
+    with (
+        patch(
+            "src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock
+        ) as mock_list,
+        patch("src.orchestrator.skills.goals_onboarding.FirestoreClient") as mock_db,
+    ):
+        response_stream = runner.run_async(
+            user_id="user_123", session_id="s1", new_message=UserContent(parts=[Part.from_text(text="invalid json {")])
+        )
         events = [e async for e in response_stream]
         assert len(events) > 0
 
@@ -249,10 +313,15 @@ async def test_root_planner_dispatches_research_managed_agent():
         auto_create_session=True,
     )
 
-    with patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list, \
-         patch("src.orchestrator.planner.AgentRegistryClient.get_skill_content", new_callable=AsyncMock) as mock_get_content, \
-         patch("src.orchestrator.planner.ManagedAgent._run_async_impl") as mock_managed_run:
-
+    with (
+        patch(
+            "src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock
+        ) as mock_list,
+        patch(
+            "src.orchestrator.planner.AgentRegistryClient.get_skill_content", new_callable=AsyncMock
+        ) as mock_get_content,
+        patch("src.orchestrator.planner.ManagedAgent._run_async_impl") as mock_managed_run,
+    ):
         from google.adk.events import Event
 
         async def fake_research_stream(ctx):
@@ -282,4 +351,3 @@ async def test_root_planner_dispatches_research_managed_agent():
         mock_get_content.assert_awaited_once_with("research")
         last_event = events[-1]
         assert "research_result: market research report generated" in last_event.output
-

@@ -111,4 +111,3 @@ def test_report_generation_warning_banner_without_api_key(monkeypatch):
     assert "⚠️" in md_report
     assert "evaluated heuristically; LLM judge skipped" in md_report
     assert "🔍 Heuristic" in md_report
-

@@ -42,10 +42,7 @@ async def spending_analysis_skill(ctx: Context, node_input: Any):
 
         reserve_months = calculate_reserve_months(cash_usd, average_monthly_expenses)
 
-        yield {
-            "savings_rate": savings_rate,
-            "reserve_months": reserve_months
-        }
+        yield {"savings_rate": savings_rate, "reserve_months": reserve_months}
 
     elif query_intent == "anomaly_check":
         totals = bq_client.get_monthly_spending_totals(user_id, current_month_start)
@@ -56,23 +53,23 @@ async def spending_analysis_skill(ctx: Context, node_input: Any):
             avg = row.get("trailing_3mo_avg", 0.0) or 0.0
 
             if is_anomalous(curr, avg):
-                anomalies.append({
-                    "category": cat,
-                    "current_month_spend": curr,
-                    "trailing_3mo_avg": avg
-                })
+                anomalies.append({"category": cat, "current_month_spend": curr, "trailing_3mo_avg": avg})
         yield {"anomalies": anomalies}
 
     else:
         is_ambiguous = node_input.get("is_ambiguous", False)
         if is_ambiguous:
-            clarification = yield RequestInput(message="I'm not sure I understand your query. Could you clarify what category or date range you mean?")
+            clarification = yield RequestInput(
+                message="I'm not sure I understand your query. Could you clarify what category or date range you mean?"
+            )
             yield {"status": "clarified", "user_response": clarification}
             return
 
         sql_query = node_input.get("sql_query")
         if not sql_query:
-            clarification = yield RequestInput(message="I couldn't map your request to a valid query. Could you rephrase it?")
+            clarification = yield RequestInput(
+                message="I couldn't map your request to a valid query. Could you rephrase it?"
+            )
             yield {"status": "clarified", "user_response": clarification}
             return
 

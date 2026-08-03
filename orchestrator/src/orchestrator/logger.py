@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 trace_id_var = contextvars.ContextVar("trace_id", default="")
 request_id_var = contextvars.ContextVar("request_id", default="")
 
+
 class JSONFormatter(logging.Formatter):
     def format(self, record):
         log_record = {
@@ -32,6 +33,7 @@ class JSONFormatter(logging.Formatter):
 
         return json.dumps(log_record)
 
+
 def setup_logger():
     """
     Configures the root logger or base logger with the JSON formatter.
@@ -52,11 +54,13 @@ def setup_logger():
 
     return logger
 
+
 def get_logger(name=__name__):
     """
     Returns a logger for the given module name.
     """
     return logging.getLogger(name)
+
 
 # Configure the base 'orchestrator' logger
 logger = setup_logger()

@@ -1,4 +1,3 @@
-
 from ...contracts.ips import RiskTolerance, TargetAllocation
 
 
@@ -7,7 +6,7 @@ def calculate_risk_tolerance(time_horizon_years: int, drawdown_reaction: str) ->
     Deterministically calculates risk tolerance based on time horizon and drawdown reaction.
     Reaction must be one of: 'sell', 'hold', 'buy_more'
     """
-    if drawdown_reaction == 'sell':
+    if drawdown_reaction == "sell":
         return RiskTolerance.CONSERVATIVE
 
     if time_horizon_years >= 15:
@@ -16,6 +15,7 @@ def calculate_risk_tolerance(time_horizon_years: int, drawdown_reaction: str) ->
         return RiskTolerance.MODERATE
     else:
         return RiskTolerance.MODERATE
+
 
 def get_default_allocation_bands(risk_tolerance: RiskTolerance) -> list[TargetAllocation]:
     """

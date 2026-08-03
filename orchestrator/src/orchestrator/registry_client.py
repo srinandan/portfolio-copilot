@@ -51,9 +51,7 @@ class AgentRegistryClient:
 
     async def _get_client(self) -> httpx.AsyncClient:
         if self._http_client is None:
-            credentials, _ = google_auth_default(
-                scopes=["https://www.googleapis.com/auth/cloud-platform"]
-            )
+            credentials, _ = google_auth_default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
             self._http_client = httpx.AsyncClient(auth=GoogleAuth(credentials))
         return self._http_client
 
@@ -85,9 +83,7 @@ class AgentRegistryClient:
 
             response = await client.get(base_url, params=params)
             if response.status_code != 200:
-                raise RuntimeError(
-                    f"API returned status {response.status_code}: {response.text}"
-                )
+                raise RuntimeError(f"API returned status {response.status_code}: {response.text}")
 
             data = response.json()
             skills_data = data.get("skills", [])
@@ -114,18 +110,14 @@ class AgentRegistryClient:
         client = await self._get_client()
 
         # ADR-0006 specifies: private-{skill}
-        formatted_id = (
-            skill_id if skill_id.startswith("private-") else f"private-{skill_id}"
-        )
+        formatted_id = skill_id if skill_id.startswith("private-") else f"private-{skill_id}"
         skill_name = f"projects/{self.project_id}/locations/{self.location}/skills/{formatted_id}"
 
         # 1. Fetch skill metadata to get defaultRevision
         skill_url = f"{self.base_url}/{skill_name}"
         response = await client.get(skill_url)
         if response.status_code != 200:
-            raise RuntimeError(
-                f"API returned status {response.status_code}: {response.text}"
-            )
+            raise RuntimeError(f"API returned status {response.status_code}: {response.text}")
 
         skill_data = response.json()
         default_revision = skill_data.get("defaultRevision", "")
@@ -136,9 +128,7 @@ class AgentRegistryClient:
         rev_url = f"{self.base_url}/{default_revision}"
         rev_response = await client.get(rev_url, params={"alt": "media"})
         if rev_response.status_code != 200:
-            raise RuntimeError(
-                f"API returned status {rev_response.status_code} fetching revision: {rev_response.text}"
-            )
+            raise RuntimeError(f"API returned status {rev_response.status_code} fetching revision: {rev_response.text}")
 
         # 3. Extract SKILL.md from zip
         try:

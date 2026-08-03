@@ -31,7 +31,7 @@ def test_pydantic_dict_factory():
                 TargetAllocation(asset_class="equity", target_percent=60, min_percent=50, max_percent=70),
             ],
             constraints=Constraints(concentration_limit_percent=15),
-            created_at=datetime.now(timezone.utc)
+            created_at=datetime.now(timezone.utc),
         )
 
         raw_dict = client._dict_factory(ips)
@@ -41,10 +41,12 @@ def test_pydantic_dict_factory():
         parsed_ips = InvestmentPolicyStatement.model_validate(raw_dict)
         assert parsed_ips.ips_id == ips.ips_id
 
+
 def test_firestore_client_initialization_no_emulator():
     with patch("google.cloud.firestore.Client") as mock_client:
         client = FirestoreClient(project="test-project")
         mock_client.assert_called_once_with(project="test-project")
+
 
 def test_set_liabilities():
     with patch("google.cloud.firestore.Client"):
@@ -58,14 +60,18 @@ def test_set_liabilities():
             Liability,
             LiabilityType,
         )
+
         snapshot = LiabilitiesSnapshot(
             user_id="u1",
             as_of=datetime.now(timezone.utc),
-            liabilities=[Liability(liability_id="l1", type=LiabilityType.MORTGAGE, balance_usd=100000, minimum_payment_usd=1000)]
+            liabilities=[
+                Liability(liability_id="l1", type=LiabilityType.MORTGAGE, balance_usd=100000, minimum_payment_usd=1000)
+            ],
         )
 
         client.set_liabilities("u1", snapshot)
         mock_doc_ref.set.assert_called_once()
+
 
 def test_firestore_client_read_ops():
     with patch("google.cloud.firestore.Client"):
@@ -84,6 +90,7 @@ def test_firestore_client_read_ops():
         client.db.collection.return_value.where.return_value.where.return_value.limit.return_value = mock_query
         assert client.get_active_ips("ips1") is None
 
+
 def test_update_ips_transactional_error_multiple_active():
     with patch("google.cloud.firestore.Client"):
         client = FirestoreClient(project="test-project")
@@ -98,7 +105,7 @@ def test_update_ips_transactional_error_multiple_active():
             time_horizon_years=10,
             target_allocation=[],
             constraints=Constraints(concentration_limit_percent=15),
-            created_at=datetime.now(timezone.utc)
+            created_at=datetime.now(timezone.utc),
         )
 
         transaction = MagicMock()
@@ -118,6 +125,7 @@ def test_update_ips_transactional_error_multiple_active():
         with pytest.raises(ValueError, match="invariant violated"):
             original_func(client, transaction, ips)
 
+
 def test_update_ips_transactional_error_version_not_1():
     with patch("google.cloud.firestore.Client"):
         client = FirestoreClient(project="test-project")
@@ -133,7 +141,7 @@ def test_update_ips_transactional_error_version_not_1():
             time_horizon_years=10,
             target_allocation=[],
             constraints=Constraints(concentration_limit_percent=15),
-            created_at=datetime.now(timezone.utc)
+            created_at=datetime.now(timezone.utc),
         )
 
         transaction = MagicMock()
@@ -145,6 +153,7 @@ def test_update_ips_transactional_error_version_not_1():
 
         with pytest.raises(ValueError, match="new version is not 1"):
             original_func(client, transaction, ips)
+
 
 def test_update_ips_transactional_success_update():
     with patch("google.cloud.firestore.Client"):
@@ -161,7 +170,7 @@ def test_update_ips_transactional_success_update():
             time_horizon_years=10,
             target_allocation=[],
             constraints=Constraints(concentration_limit_percent=15),
-            created_at=datetime.now(timezone.utc)
+            created_at=datetime.now(timezone.utc),
         )
 
         transaction = MagicMock()
@@ -181,7 +190,7 @@ def test_update_ips_transactional_success_update():
         assert transaction.set.call_count == 2
 
 
-@patch('google.cloud.firestore.Client')
+@patch("google.cloud.firestore.Client")
 def test_get_holdings(mock_client):
     client = FirestoreClient("test-project")
 
@@ -196,7 +205,7 @@ def test_get_holdings(mock_client):
         "as_of": now.isoformat(),
         "positions": [],
         "cash_usd": 1000.0,
-        "total_value_usd": 1000.0
+        "total_value_usd": 1000.0,
     }
 
     mock_doc_ref.get.return_value = mock_doc
@@ -208,7 +217,8 @@ def test_get_holdings(mock_client):
     assert holdings.user_id == "user1"
     assert holdings.cash_usd == 1000.0
 
-@patch('google.cloud.firestore.Client')
+
+@patch("google.cloud.firestore.Client")
 def test_set_holdings(mock_client):
     client = FirestoreClient("test-project")
 
@@ -223,7 +233,7 @@ def test_set_holdings(mock_client):
         user_id="user1",
         as_of=now,
         positions=[Position(ticker="AAPL", quantity=10, asset_class="equity", market_value_usd=1500)],
-        cash_usd=500.0
+        cash_usd=500.0,
     )
 
     client.set_holdings("user1", holdings)

@@ -29,22 +29,24 @@ class SessionManager:
             self.session_service: BaseSessionService = InMemorySessionService()
             self.memory_service: BaseMemoryService | None = InMemoryMemoryService()
             if not use_in_memory:
-                 logger.warning("AGENT_ENGINE_ID not set, falling back to InMemorySessionService and InMemoryMemoryService.")
+                logger.warning(
+                    "AGENT_ENGINE_ID not set, falling back to InMemorySessionService and InMemoryMemoryService."
+                )
         else:
             self.session_service = VertexAiSessionService(
                 project=self.project,
                 location=self.location,
             )
             self.memory_service = VertexAiMemoryBankService(
-                project=self.project,
-                location=self.location,
-                agent_engine_id=self.agent_engine_id
+                project=self.project, location=self.location, agent_engine_id=self.agent_engine_id
             )
 
     async def get_or_create_session(self, app_name: str, user_id: str, session_id: str | None = None):
         if session_id:
             try:
-                session = await self.session_service.get_session(app_name=app_name, user_id=user_id, session_id=session_id)
+                session = await self.session_service.get_session(
+                    app_name=app_name, user_id=user_id, session_id=session_id
+                )
                 if session:
                     return session
             except Exception as e:
@@ -60,8 +62,8 @@ class SessionManager:
             return
 
         try:
-             session = await self.session_service.get_session(app_name=app_name, user_id=user_id, session_id=session_id)
-             if session:
-                 await self.memory_service.add_session_to_memory(session)
+            session = await self.session_service.get_session(app_name=app_name, user_id=user_id, session_id=session_id)
+            if session:
+                await self.memory_service.add_session_to_memory(session)
         except Exception as e:
             logger.error(f"Error adding session to memory: {e}")
