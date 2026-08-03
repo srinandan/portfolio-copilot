@@ -26,7 +26,7 @@ async def portfolio_analysis_skill(ctx: Context, node_input: Any):
     firestore_client = FirestoreClient()
     now = datetime.now(timezone.utc)
 
-    # 1. Audit log: Skill invoked
+    # 1. Audit log: Skill invoked (Fail closed on audit write failures per I3)
     try:
         firestore_client.append_audit_log(
             AuditLogEntry(
@@ -42,7 +42,8 @@ async def portfolio_analysis_skill(ctx: Context, node_input: Any):
             )
         )
     except Exception as e:
-        logger.warning(f"Failed to append audit log for skill invocation: {e}")
+        logger.error(f"Audit log write failed for skill invocation: {e}")
+        raise RuntimeError(f"Audit log write failed for skill invocation: {e}") from e
 
     try:
         ips = firestore_client.get_active_ips_by_user(user_id)
@@ -63,7 +64,8 @@ async def portfolio_analysis_skill(ctx: Context, node_input: Any):
                     )
                 )
             except Exception as audit_err:
-                logger.warning(f"Failed to append audit log: {audit_err}")
+                logger.error(f"Failed to append audit log for decline: {audit_err}")
+                raise RuntimeError(f"Failed to append audit log for decline: {audit_err}") from audit_err
 
             yield {
                 "status": "declined",
@@ -89,7 +91,8 @@ async def portfolio_analysis_skill(ctx: Context, node_input: Any):
                     )
                 )
             except Exception as audit_err:
-                logger.warning(f"Failed to append audit log: {audit_err}")
+                logger.error(f"Failed to append audit log for decline: {audit_err}")
+                raise RuntimeError(f"Failed to append audit log for decline: {audit_err}") from audit_err
 
             yield {
                 "status": "declined",
@@ -120,5 +123,5 @@ async def portfolio_analysis_skill(ctx: Context, node_input: Any):
                 )
             )
         except Exception as audit_err:
-            logger.warning(f"Failed to append audit log on failure: {audit_err}")
+            logger.error(f"Failed to append audit log on failure: {audit_err}")
         raise

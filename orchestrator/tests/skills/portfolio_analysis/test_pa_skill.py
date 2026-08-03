@@ -152,3 +152,20 @@ async def test_portfolio_analysis_skill_end_to_end_integration(mock_firestore_cl
     assert log_entry.event_type == EventType.SKILL_INVOKED
     assert log_entry.actor.skill_name == "private-portfolio-analysis"
     assert log_entry.actor.skill_version == "0.1.0"
+
+
+@pytest.mark.asyncio
+@patch("orchestrator.skills.portfolio_analysis.FirestoreClient")
+async def test_portfolio_analysis_skill_audit_log_failure_raises(mock_firestore_class):
+    """Verifies I3: If audit log append fails, skill fails closed by raising RuntimeError."""
+    mock_db = mock_firestore_class.return_value
+    mock_db.append_audit_log.side_effect = RuntimeError("Firestore unavailable")
+
+    ctx = MagicMock()
+    node_input = {"user_id": "user_audit_fail"}
+
+    with pytest.raises(RuntimeError, match="Audit log write failed for skill invocation"):
+        gen = portfolio_analysis_skill.run(ctx=ctx, node_input=node_input)
+        async for _ in gen:
+            pass
+
