@@ -131,10 +131,12 @@ async def root_planner(ctx: Context, node_input: Any):
         short_name = _short_skill_id(skill)
         if short_name == "private-spending-analysis":
             logger.info(f"Executing dynamic managed spending analysis skill: {skill}")
-            preloaded_spending = preload_spending_facts(user_id=user_id)
+            window_months = input_dict.get("window_months", 3)
+            preloaded_spending = preload_spending_facts(user_id=user_id, window_months=window_months)
             spending_input = {
                 "user_id": user_id,
                 "query_intent": input_dict.get("query_intent", "anomaly_check"),
+                "window_months": window_months,
                 "preloaded": preloaded_spending,
             }
             result = await dispatch_managed_skill(
