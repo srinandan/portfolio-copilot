@@ -6,6 +6,9 @@ from pydantic import BaseModel, Field
 
 from ...contracts.holdings import HoldingsSnapshot
 from ...contracts.ips import InvestmentPolicyStatement
+from ...logger import get_logger
+
+logger = get_logger(__name__)
 
 CASH_ASSET_CLASS_SYNONYMS = {
     "cash",
@@ -44,11 +47,20 @@ def calculate_drift(holdings: HoldingsSnapshot, ips: InvestmentPolicyStatement) 
     Returns:
         DriftReport detailing asset class allocations, drift percentages, and rebalance recommendation.
     """
-    # Use holdings.total_value_usd if present, otherwise calculate it
+    computed_total = sum(p.market_value_usd for p in holdings.positions) + (holdings.cash_usd or 0.0)
+
+    # Use holdings.total_value_usd if present, but reconcile if it significantly deviates from computed sum (PA1)
     if holdings.total_value_usd is not None:
-        total_value = holdings.total_value_usd
+        if abs(holdings.total_value_usd - computed_total) > 0.001 * max(holdings.total_value_usd, computed_total, 1.0):
+            logger.warning(
+                f"Holdings total_value_usd ({holdings.total_value_usd}) disagrees with computed positions + cash sum "
+                f"({computed_total}). Using computed total value."
+            )
+            total_value = computed_total
+        else:
+            total_value = holdings.total_value_usd
     else:
-        total_value = sum(p.market_value_usd for p in holdings.positions) + (holdings.cash_usd or 0.0)
+        total_value = computed_total
 
     # If total value is 0, we can't calculate percentages
     if total_value == 0:
