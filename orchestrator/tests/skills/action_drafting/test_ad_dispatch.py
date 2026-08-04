@@ -94,7 +94,9 @@ async def test_ad_dispatch_writes_proposed_action(mock_dispatch, mock_write, moc
 
     payload = await _execute_skill(plan, "private-action-drafting", "user_123", {}, context, ctx)
 
-    mock_write.assert_called_once_with(user_id="user_123", action=sample_proposed_action)
+    mock_write.assert_called_once_with(
+        user_id="user_123", action=sample_proposed_action, registry_entry_id=None
+    )
     assert payload == sample_proposed_action.model_dump()
     assert context["action_drafting_result"] == sample_proposed_action.model_dump()
     mock_emit_invoked.assert_called_once()

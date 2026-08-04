@@ -26,7 +26,11 @@ def test_get_worker_agent_id():
     with patch.dict(os.environ, {"MANAGED_AGENT_ID": "projects/test/agents/worker-1"}):
         assert get_worker_agent_id() == "projects/test/agents/worker-1"
 
-    with patch.dict(os.environ, {}, clear=True):
+    with (
+        patch.dict(os.environ, {}, clear=True),
+        patch("orchestrator.managed_agents.secret_loader._fetch_from_secret_manager", return_value=None),
+        patch("orchestrator.managed_agents.secret_loader._CACHED_AGENT_ID", None),
+    ):
         assert get_worker_agent_id() == "antigravity-preview-05-2026"
 
 

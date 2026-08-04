@@ -56,6 +56,8 @@ def test_emit_action_executed_audit_writes_entry(sample_proposed_action):
     assert audit_entry.related_action_id == "act_exec_123"
     assert audit_entry.actor.type == ActorType.AGENT
     assert audit_entry.actor.skill_name == "orchestrator-execution-gate"
+    assert audit_entry.actor.registry_entry_id is None
+    assert audit_entry.actor.approval_scope is None
     assert "broker-ord-555" in audit_entry.detail
     assert "user-exec-1" in audit_entry.detail
 
@@ -75,6 +77,8 @@ def test_emit_action_failed_audit_writes_entry(sample_proposed_action):
     assert audit_entry.related_action_id == "act_exec_123"
     assert audit_entry.actor.type == ActorType.AGENT
     assert audit_entry.actor.skill_name == "orchestrator-execution-gate"
+    assert audit_entry.actor.registry_entry_id is None
+    assert audit_entry.actor.approval_scope is None
     assert "insufficient funds" in audit_entry.detail
 
 

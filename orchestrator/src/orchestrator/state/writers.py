@@ -11,7 +11,7 @@ from ..contracts.liabilities import LiabilitiesSnapshot
 from ..contracts.proposed_action import ProposedAction
 from ..data.firestore import FirestoreClient
 from ..logger import get_logger
-from ..skills._skill_metadata import read_skill_version
+from ..skills._skill_metadata import read_skill_approval_scope, read_skill_version
 
 logger = get_logger(__name__)
 
@@ -21,6 +21,7 @@ def write_ips_from_interview_result(
     result: GoalsOnboardingResult,
     trigger: str = "initial",
     existing_ips_ref: Optional[str] = None,
+    registry_entry_id: Optional[str] = None,
     db_client: Optional[FirestoreClient] = None,
 ) -> Tuple[InvestmentPolicyStatement, LiabilitiesSnapshot]:
     """Persists synthesized goals onboarding interview results to Firestore.
@@ -82,6 +83,7 @@ def write_ips_from_interview_result(
     logger.info(f"Persisted {len(result.identified_liabilities)} liabilities for user {user_id}")
 
     skill_version = read_skill_version("goals-onboarding")
+    approval_scope = read_skill_approval_scope("goals-onboarding")
     audit_entry = AuditLogEntry(
         log_id=str(uuid.uuid4()),
         event_type=event_type,
@@ -90,6 +92,8 @@ def write_ips_from_interview_result(
             type=ActorType.AGENT,
             skill_name="private-goals-onboarding",
             skill_version=skill_version,
+            registry_entry_id=registry_entry_id,
+            approval_scope=approval_scope,
         ),
         detail=f"IPS {ips_id} version {version} written from goals onboarding interview.",
     )
@@ -105,6 +109,7 @@ def write_ips_from_interview_result(
 def write_proposed_action(
     user_id: str,
     action: ProposedAction,
+    registry_entry_id: Optional[str] = None,
     db_client: Optional[FirestoreClient] = None,
 ) -> ProposedAction:
     """Persists a drafted ProposedAction and emits an ACTION_PROPOSED audit entry.
@@ -117,6 +122,7 @@ def write_proposed_action(
     logger.info(f"Persisted ProposedAction {action.action_id} for user {user_id}")
 
     skill_version = read_skill_version("action-drafting")
+    approval_scope = read_skill_approval_scope("action-drafting")
     audit_entry = AuditLogEntry(
         log_id=str(uuid.uuid4()),
         event_type=EventType.ACTION_PROPOSED,
@@ -125,6 +131,8 @@ def write_proposed_action(
             type=ActorType.AGENT,
             skill_name="private-action-drafting",
             skill_version=skill_version,
+            registry_entry_id=registry_entry_id,
+            approval_scope=approval_scope,
         ),
         related_action_id=action.action_id,
         related_ips_version=action.ips_version_referenced.model_dump(),
@@ -142,6 +150,7 @@ def write_proposed_action(
 def emit_skill_invoked_audit(
     skill_short_name: str,
     detail: Optional[str] = None,
+    registry_entry_id: Optional[str] = None,
     db_client: Optional[FirestoreClient] = None,
 ) -> None:
     """Emits a SKILL_INVOKED audit entry for a skill turn. Fail-closed.
@@ -151,6 +160,7 @@ def emit_skill_invoked_audit(
     client = db_client or FirestoreClient()
     skill_dir_name = skill_short_name.replace("private-", "")
     skill_version = read_skill_version(skill_dir_name)
+    approval_scope = read_skill_approval_scope(skill_dir_name)
     audit_entry = AuditLogEntry(
         log_id=str(uuid.uuid4()),
         event_type=EventType.SKILL_INVOKED,
@@ -159,6 +169,8 @@ def emit_skill_invoked_audit(
             type=ActorType.AGENT,
             skill_name=skill_short_name if skill_short_name.startswith("private-") else f"private-{skill_short_name}",
             skill_version=skill_version,
+            registry_entry_id=registry_entry_id,
+            approval_scope=approval_scope,
         ),
         detail=detail,
     )
@@ -172,6 +184,7 @@ def emit_skill_invoked_audit(
 def emit_skill_failed_audit(
     skill_short_name: str,
     error: str,
+    registry_entry_id: Optional[str] = None,
     db_client: Optional[FirestoreClient] = None,
 ) -> None:
     """Emits a SKILL_INVOCATION_FAILED audit entry. Fail-closed.
@@ -182,6 +195,7 @@ def emit_skill_failed_audit(
     client = db_client or FirestoreClient()
     skill_dir_name = skill_short_name.replace("private-", "")
     skill_version = read_skill_version(skill_dir_name)
+    approval_scope = read_skill_approval_scope(skill_dir_name)
     audit_entry = AuditLogEntry(
         log_id=str(uuid.uuid4()),
         event_type=EventType.SKILL_INVOCATION_FAILED,
@@ -190,6 +204,8 @@ def emit_skill_failed_audit(
             type=ActorType.AGENT,
             skill_name=skill_short_name if skill_short_name.startswith("private-") else f"private-{skill_short_name}",
             skill_version=skill_version,
+            registry_entry_id=registry_entry_id,
+            approval_scope=approval_scope,
         ),
         detail=f"Skill invocation failed: {error}",
     )
@@ -215,6 +231,8 @@ def emit_approval_requested_audit(
             type=ActorType.AGENT,
             skill_name="orchestrator-hitl-gate",
             skill_version="0.1.0",
+            registry_entry_id=None,
+            approval_scope=None,
         ),
         related_action_id=action.action_id,
         related_ips_version=action.ips_version_referenced.model_dump(),
@@ -273,6 +291,8 @@ def emit_approval_rejected_audit(
             user_id=rejecting_user_id,
             skill_name=None if rejecting_user_id else "orchestrator-hitl-gate",
             skill_version=None if rejecting_user_id else "0.1.0",
+            registry_entry_id=None,
+            approval_scope=None,
         ),
         related_action_id=action.action_id,
         related_ips_version=action.ips_version_referenced.model_dump(),
@@ -301,6 +321,8 @@ def emit_action_executed_audit(
             type=ActorType.AGENT,
             skill_name="orchestrator-execution-gate",
             skill_version="0.1.0",
+            registry_entry_id=None,
+            approval_scope=None,
         ),
         related_action_id=action.action_id,
         related_ips_version=action.ips_version_referenced.model_dump(),
@@ -331,6 +353,8 @@ def emit_action_failed_audit(
             type=ActorType.AGENT,
             skill_name="orchestrator-execution-gate",
             skill_version="0.1.0",
+            registry_entry_id=None,
+            approval_scope=None,
         ),
         related_action_id=action.action_id,
         related_ips_version=action.ips_version_referenced.model_dump(),
