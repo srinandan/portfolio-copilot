@@ -620,4 +620,175 @@ async def test_root_planner_skips_hitl_when_no_proposed_action():
         assert len(hitl_calls) == 0, f"Expected 0 hitl_approval_gate calls, found: {hitl_calls}"
 
 
+@pytest.mark.asyncio
+async def test_root_planner_dispatches_execution_gate_when_hitl_approved():
+    """Verify root_planner dispatches execution_gate when HITL decision is approved."""
+    agent = Workflow(
+        name="test_root",
+        edges=[("START", root_planner)],
+    )
+    session_service = InMemorySessionService()
+    runner = Runner(
+        app_name="test_app",
+        agent=agent,
+        session_service=session_service,
+        auto_create_session=True,
+    )
+
+    with (
+        patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list,
+        patch("src.orchestrator.planner.emit_skill_invoked_audit"),
+        patch("src.orchestrator.planner.dispatch_managed_skill", new_callable=AsyncMock) as mock_dispatch,
+        patch("src.orchestrator.planner.write_proposed_action"),
+        patch("src.orchestrator.state.preloader.FirestoreClient") as mock_fs_cls,
+        patch.object(Context, "run_node", new_callable=AsyncMock) as mock_run_node,
+    ):
+        mock_list.return_value = [
+            Skill(name="skills/private-action-drafting", target_state="TARGET_STATE_ACTIVE", default_revision="v1"),
+        ]
+
+        mock_fs = mock_fs_cls.return_value
+        fake_ips = MagicMock(ips_id="ips_1", version=1)
+        fake_ips.model_dump.return_value = {"ips_id": "ips_1", "version": 1}
+        fake_holdings = MagicMock(total_value_usd=100000.0, positions=[], cash_usd=100000.0)
+        fake_holdings.model_dump.return_value = {"total_value_usd": 100000.0, "positions": [], "cash_usd": 100000.0}
+        mock_fs.get_active_ips_by_user.return_value = fake_ips
+        mock_fs.get_holdings.return_value = fake_holdings
+
+        from datetime import datetime, timezone
+        from src.orchestrator.contracts import ProposedAction, ActionType, Side, OrderType, ActionStatus, RelatedIPSVersion, SkillVersionRef
+        action = ProposedAction(
+            action_id="act_exec_1",
+            session_id="sess_exec_1",
+            type=ActionType.TRADE,
+            ticker="AAPL",
+            side=Side.BUY,
+            quantity=10.0,
+            order_type=OrderType.MARKET,
+            estimated_price_usd=250.0,
+            estimated_value_usd=2500.0,
+            rationale="Rebalancing into equity per IPS target.",
+            supporting_research_refs=[],
+            ips_version_referenced=RelatedIPSVersion(ips_id="ips_1", version=1),
+            proposed_by_skill_version=SkillVersionRef(skill_name="private-action-drafting", skill_version="0.2.0"),
+            status=ActionStatus.DRAFTED,
+            created_at=datetime.now(timezone.utc),
+        )
+        mock_dispatch.return_value = action
+
+        hitl_decision = {"outcome": "approved", "action": action.model_dump(), "approving_user_id": "u1"}
+        exec_result = {"status": "executed", "broker_order_id": "ord-alp-123", "action_id": "act_exec_1"}
+
+        async def fake_run_node(node_func, *args, **kwargs):
+            name = getattr(node_func, "name", "")
+            if name == "get_skills":
+                return ["skills/private-action-drafting"]
+            if name == "hitl_approval_gate":
+                return hitl_decision
+            if name == "execution_gate":
+                return exec_result
+            return None
+
+        mock_run_node.side_effect = fake_run_node
+
+        response_stream = runner.run_async(
+            user_id="user_exec",
+            session_id="sess_exec_1",
+            new_message=UserContent(parts=[Part.from_text(text='{"user_id": "user_exec"}')]),
+        )
+
+        events = [e async for e in response_stream]
+        last_event = events[-1]
+
+        exec_calls = [c for c in mock_run_node.call_args_list if c[0] and getattr(c[0][0], "name", "") == "execution_gate"]
+        assert len(exec_calls) == 1, f"Expected 1 execution_gate call, found {len(exec_calls)}"
+        assert exec_calls[0].kwargs["node_input"] == {"hitl_decision": hitl_decision, "reviewer_verdict": None}
+        assert any("execution_result:" in str(item) for item in last_event.output)
+
+
+@pytest.mark.asyncio
+async def test_root_planner_skips_execution_when_hitl_rejected():
+    """Verify root_planner dispatches execution_gate which skips when HITL decision is rejected."""
+    agent = Workflow(
+        name="test_root",
+        edges=[("START", root_planner)],
+    )
+    session_service = InMemorySessionService()
+    runner = Runner(
+        app_name="test_app",
+        agent=agent,
+        session_service=session_service,
+        auto_create_session=True,
+    )
+
+    with (
+        patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list,
+        patch("src.orchestrator.planner.emit_skill_invoked_audit"),
+        patch("src.orchestrator.planner.dispatch_managed_skill", new_callable=AsyncMock) as mock_dispatch,
+        patch("src.orchestrator.planner.write_proposed_action"),
+        patch("src.orchestrator.state.preloader.FirestoreClient") as mock_fs_cls,
+        patch.object(Context, "run_node", new_callable=AsyncMock) as mock_run_node,
+    ):
+        mock_list.return_value = [
+            Skill(name="skills/private-action-drafting", target_state="TARGET_STATE_ACTIVE", default_revision="v1"),
+        ]
+
+        mock_fs = mock_fs_cls.return_value
+        fake_ips = MagicMock(ips_id="ips_1", version=1)
+        fake_ips.model_dump.return_value = {"ips_id": "ips_1", "version": 1}
+        fake_holdings = MagicMock(total_value_usd=100000.0, positions=[], cash_usd=100000.0)
+        fake_holdings.model_dump.return_value = {"total_value_usd": 100000.0, "positions": [], "cash_usd": 100000.0}
+        mock_fs.get_active_ips_by_user.return_value = fake_ips
+        mock_fs.get_holdings.return_value = fake_holdings
+
+        from datetime import datetime, timezone
+        from src.orchestrator.contracts import ProposedAction, ActionType, Side, OrderType, ActionStatus, RelatedIPSVersion, SkillVersionRef
+        action = ProposedAction(
+            action_id="act_exec_2",
+            session_id="sess_exec_2",
+            type=ActionType.TRADE,
+            ticker="AAPL",
+            side=Side.BUY,
+            quantity=10.0,
+            order_type=OrderType.MARKET,
+            estimated_price_usd=250.0,
+            estimated_value_usd=2500.0,
+            rationale="Rebalancing into equity per IPS target.",
+            supporting_research_refs=[],
+            ips_version_referenced=RelatedIPSVersion(ips_id="ips_1", version=1),
+            proposed_by_skill_version=SkillVersionRef(skill_name="private-action-drafting", skill_version="0.2.0"),
+            status=ActionStatus.DRAFTED,
+            created_at=datetime.now(timezone.utc),
+        )
+        mock_dispatch.return_value = action
+
+        hitl_decision = {"outcome": "rejected", "action": action.model_dump()}
+        exec_result = {"status": "skipped", "reason": "hitl_rejected"}
+
+        async def fake_run_node(node_func, *args, **kwargs):
+            name = getattr(node_func, "name", "")
+            if name == "get_skills":
+                return ["skills/private-action-drafting"]
+            if name == "hitl_approval_gate":
+                return hitl_decision
+            if name == "execution_gate":
+                return exec_result
+            return None
+
+        mock_run_node.side_effect = fake_run_node
+
+        response_stream = runner.run_async(
+            user_id="user_exec_2",
+            session_id="sess_exec_2",
+            new_message=UserContent(parts=[Part.from_text(text='{"user_id": "user_exec_2"}')]),
+        )
+
+        events = [e async for e in response_stream]
+        last_event = events[-1]
+
+        exec_calls = [c for c in mock_run_node.call_args_list if c[0] and getattr(c[0][0], "name", "") == "execution_gate"]
+        assert len(exec_calls) == 1
+        assert any("execution_result: {'status': 'skipped'" in str(item) for item in last_event.output)
+
+
 
