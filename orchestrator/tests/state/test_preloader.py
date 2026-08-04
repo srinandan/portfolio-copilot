@@ -17,6 +17,7 @@ from orchestrator.state.preloader import (
     preload_for_action_drafting,
     preload_for_portfolio_analysis,
     preload_for_research,
+    preload_for_reviewer,
 )
 
 
@@ -187,3 +188,29 @@ def test_preload_research_valid_question_returns_dict():
         "user_id": "user_123",
         "research_question": "What is the outlook for tech stocks in 2026?",
     }
+
+
+def test_preload_reviewer_success(sample_ips, sample_holdings):
+    mock_fs = MagicMock()
+    mock_fs.get_active_ips_by_user.return_value = sample_ips
+    mock_fs.get_holdings.return_value = sample_holdings
+
+    action_dict = {"action_id": "act_1", "ticker": "AAPL", "side": "buy", "quantity": 10.0}
+    res = preload_for_reviewer("user_123", action=action_dict, firestore_client=mock_fs)
+    assert res["user_id"] == "user_123"
+    assert res["action"] == action_dict
+    assert "ips" in res
+    assert "holdings" in res
+
+
+def test_preload_reviewer_no_ips_declines():
+    mock_fs = MagicMock()
+    mock_fs.get_active_ips_by_user.return_value = None
+
+    with pytest.raises(PreloadDeclinedError, match="No active IPS found"):
+        preload_for_reviewer("user_123", action={"action_id": "act_1"}, firestore_client=mock_fs)
+
+
+def test_preload_reviewer_missing_action_raises():
+    with pytest.raises(ValueError, match="requires 'action'"):
+        preload_for_reviewer("user_123", action=None)

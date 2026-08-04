@@ -2,7 +2,9 @@
 
 import json
 import os
+import uuid
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any, Awaitable, Callable, Dict, Optional
 
 from google.adk import Context
@@ -11,17 +13,20 @@ from google.genai.types import Part, UserContent
 
 from .contracts.goals_onboarding import GoalsOnboardingResult
 from .contracts.proposed_action import ProposedAction
+from .data.firestore import FirestoreClient
 from .gates import execution_gate, hitl_approval_gate
 from .logger import get_logger
 from .managed_agents import dispatch_managed_skill
 from .registry_client import AgentRegistryClient
 from .state import (
     PreloadDeclinedError,
+    emit_review_completed_audit,
     emit_skill_failed_audit,
     emit_skill_invoked_audit,
     preload_for_action_drafting,
     preload_for_portfolio_analysis,
     preload_for_research,
+    preload_for_reviewer,
     preload_spending_facts,
     write_ips_from_interview_result,
     write_proposed_action,
@@ -41,6 +46,8 @@ PIPELINE_SKILL_ORDER = [
     "private-research",
     "action-drafting",
     "private-action-drafting",
+    "reviewer",
+    "private-reviewer",
 ]
 
 
@@ -179,6 +186,95 @@ async def _postprocess_action_drafting(
     return payload, {"action_drafting_result": payload}
 
 
+def _build_reviewer_input(user_id, input_dict, context):
+    ad_result = context.get("action_drafting_result")
+    if not ad_result or not isinstance(ad_result, dict) or ad_result.get("status") != "drafted":
+        return None  # SkillPlan returning None = skip cleanly
+    input_dict["_reviewer_action"] = ad_result
+    return preload_for_reviewer(user_id=user_id, action=ad_result)
+
+
+async def _postprocess_reviewer(user_id, result, ctx, input_dict, registry_entry_id=None):
+    """After the Reviewer MA returns its advisory verdict, run the deterministic
+    re-check and produce the authoritative verdict. Emit REVIEW_COMPLETED with
+    both."""
+    from .contracts.ips import RelatedIPSVersion
+    from .contracts.proposed_action import ProposedAction, SkillVersionRef
+    from .contracts.reviewer_verdict import ReviewerVerdict
+    from .reviewer import ReviewInput, check_all_rules, compute_requires_human_approval
+    from .skills._skill_metadata import read_skill_version
+
+    llm_verdict: Optional[ReviewerVerdict] = None
+    if isinstance(result, ReviewerVerdict):
+        llm_verdict = result
+    elif isinstance(result, dict):
+        try:
+            llm_verdict = ReviewerVerdict.model_validate(result)
+        except Exception as e:
+            logger.warning(f"Reviewer MA returned malformed verdict, treating as no-verdict: {e}")
+
+    ad_result_dict = input_dict.get("_reviewer_action")
+    action = ProposedAction.model_validate(ad_result_dict)
+
+    fs = FirestoreClient()
+    ips_obj = fs.get_active_ips_by_user(user_id)
+    holdings_obj = fs.get_holdings(user_id)
+    if ips_obj is None or holdings_obj is None:
+        logger.error(f"Reviewer postprocess: missing IPS or holdings for user {user_id}")
+        if llm_verdict is not None:
+            auth_verdict = llm_verdict
+        else:
+            auth_verdict = ReviewerVerdict(
+                verdict_id=str(uuid.uuid4()),
+                action_id=action.action_id,
+                ips_version_checked_against=RelatedIPSVersion(ips_id="unknown", version=0),
+                rule_results=[],
+                overall_pass=False,
+                requires_human_approval=True,
+                reviewer_skill_version=SkillVersionRef(
+                    skill_name="private-reviewer",
+                    skill_version=read_skill_version("reviewer"),
+                    registry_entry_id=registry_entry_id,
+                ),
+                reviewed_at=datetime.now(timezone.utc),
+            )
+    else:
+        review_input = ReviewInput(action=action, ips=ips_obj, holdings=holdings_obj)
+        rule_results = check_all_rules(review_input)
+        overall_pass = all(r.passed for r in rule_results)
+        requires_approval = compute_requires_human_approval(review_input, overall_pass)
+        auth_verdict = ReviewerVerdict(
+            verdict_id=str(uuid.uuid4()),
+            action_id=action.action_id,
+            ips_version_checked_against=RelatedIPSVersion(
+                ips_id=ips_obj.ips_id, version=ips_obj.version
+            ),
+            rule_results=rule_results,
+            overall_pass=overall_pass,
+            requires_human_approval=requires_approval,
+            reviewer_skill_version=SkillVersionRef(
+                skill_name="private-reviewer",
+                skill_version=read_skill_version("reviewer"),
+                registry_entry_id=registry_entry_id,
+            ),
+            reviewed_at=datetime.now(timezone.utc),
+        )
+
+    emit_review_completed_audit(
+        action=action,
+        authoritative_verdict=auth_verdict,
+        llm_verdict=llm_verdict,
+        registry_entry_id=registry_entry_id,
+    )
+
+    payload = auth_verdict.model_dump() if auth_verdict else {"status": "unavailable"}
+    ctx_update = {
+        "reviewer_verdict": auth_verdict,
+        "reviewer_verdict_llm": llm_verdict,
+    }
+    return payload, ctx_update
+
+
 SKILL_PLANS: Dict[str, SkillPlan] = {
     "private-spending-analysis": SkillPlan(
         short_name="private-spending-analysis",
@@ -229,6 +325,16 @@ SKILL_PLANS: Dict[str, SkillPlan] = {
         short_name="action-drafting",
         build_input=_build_action_drafting_input,
         postprocess=_postprocess_action_drafting,
+    ),
+    "private-reviewer": SkillPlan(
+        short_name="private-reviewer",
+        build_input=_build_reviewer_input,
+        postprocess=_postprocess_reviewer,
+    ),
+    "reviewer": SkillPlan(
+        short_name="reviewer",
+        build_input=_build_reviewer_input,
+        postprocess=_postprocess_reviewer,
     ),
 }
 

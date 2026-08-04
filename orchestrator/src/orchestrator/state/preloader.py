@@ -8,6 +8,7 @@ orchestrator's job after the Managed Agent returns.
 
 from typing import Any, Dict, List, Optional
 
+from ..contracts.proposed_action import ProposedAction
 from ..data.firestore import FirestoreClient
 from ..logger import get_logger
 from ..primitives.action_drafting import calculate_draft_action
@@ -111,4 +112,40 @@ def preload_for_research(user_id: str, research_question: str) -> Dict[str, Any]
     return {
         "user_id": user_id,
         "research_question": research_question.strip(),
+    }
+
+
+def preload_for_reviewer(
+    user_id: str,
+    action: Dict[str, Any] | ProposedAction,
+    firestore_client: Optional[FirestoreClient] = None,
+) -> Dict[str, Any]:
+    """Pre-fetches active IPS + holdings for the reviewer skill.
+
+    The `action` is the drafted ProposedAction (from context, populated by
+    action-drafting's postprocess). Passed through as-is to the Managed
+    Agent input.
+
+    Raises:
+        PreloadDeclinedError: if no active IPS or holdings.
+        ValueError: if action is missing or invalid.
+    """
+    if action is None:
+        raise ValueError("preload_for_reviewer requires 'action' from prior action-drafting step")
+
+    fs = firestore_client or FirestoreClient()
+    ips = fs.get_active_ips_by_user(user_id)
+    if not ips:
+        raise PreloadDeclinedError(f"No active IPS found for user {user_id}.")
+    holdings = fs.get_holdings(user_id)
+    if not holdings:
+        raise PreloadDeclinedError(f"No holdings found for user {user_id}.")
+
+    action_dict = action.model_dump() if hasattr(action, "model_dump") else dict(action)
+
+    return {
+        "user_id": user_id,
+        "action": action_dict,
+        "ips": ips.model_dump(),
+        "holdings": holdings.model_dump(),
     }

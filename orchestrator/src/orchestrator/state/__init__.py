@@ -5,6 +5,7 @@ from .preloader import (
     preload_for_action_drafting,
     preload_for_portfolio_analysis,
     preload_for_research,
+    preload_for_reviewer,
 )
 from .spending import preload_spending_facts
 from .writers import (
@@ -13,6 +14,7 @@ from .writers import (
     emit_approval_granted_audit,
     emit_approval_rejected_audit,
     emit_approval_requested_audit,
+    emit_review_completed_audit,
     emit_skill_failed_audit,
     emit_skill_invoked_audit,
     write_ips_from_interview_result,
@@ -24,12 +26,14 @@ __all__ = [
     "preload_for_action_drafting",
     "preload_for_portfolio_analysis",
     "preload_for_research",
+    "preload_for_reviewer",
     "preload_spending_facts",
     "emit_action_executed_audit",
     "emit_action_failed_audit",
     "emit_approval_granted_audit",
     "emit_approval_rejected_audit",
     "emit_approval_requested_audit",
+    "emit_review_completed_audit",
     "emit_skill_failed_audit",
     "emit_skill_invoked_audit",
     "write_ips_from_interview_result",
