@@ -809,4 +809,128 @@ async def test_root_planner_skips_execution_when_hitl_rejected():
         assert any("execution_result: {'status': 'skipped'" in str(item) for item in last_event.output)
 
 
+@pytest.mark.asyncio
+async def test_get_skills_from_registry_returns_full_skill_objects():
+    from src.orchestrator.planner import get_skills_from_registry
+
+    mock_ctx = MagicMock()
+    with patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list:
+        mock_list.return_value = [
+            Skill(name="skills/private-goals-onboarding", target_state="TARGET_STATE_ACTIVE", default_revision="rev-goals"),
+        ]
+        res = await get_skills_from_registry._func(mock_ctx, {})
+        assert len(res) == 1
+        assert isinstance(res[0], Skill)
+        assert res[0].name == "skills/private-goals-onboarding"
+        assert res[0].default_revision == "rev-goals"
+
+
+@pytest.mark.asyncio
+async def test_root_planner_threads_registry_entry_id_to_skill_invoked_audit():
+    agent = Workflow(
+        name="test_root",
+        edges=[("START", root_planner)],
+    )
+    session_service = InMemorySessionService()
+    runner = Runner(
+        app_name="test_app",
+        agent=agent,
+        session_service=session_service,
+        auto_create_session=True,
+    )
+
+    with (
+        patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list,
+        patch("src.orchestrator.planner.emit_skill_invoked_audit") as mock_invoked,
+        patch("src.orchestrator.planner.dispatch_managed_skill", new_callable=AsyncMock) as mock_dispatch,
+        patch("src.orchestrator.planner.preload_spending_facts") as mock_preload,
+    ):
+        mock_list.return_value = [
+            Skill(name="skills/private-spending-analysis", target_state="TARGET_STATE_ACTIVE", default_revision="rev-xyz"),
+        ]
+        mock_preload.return_value = {}
+        mock_dispatch.return_value = {"summary": "spending ok"}
+
+        response_stream = runner.run_async(
+            user_id="user_trace_1",
+            session_id="sess_trace_1",
+            new_message=UserContent(parts=[Part.from_text(text='{"user_id": "user_trace_1"}')]),
+        )
+        _ = [e async for e in response_stream]
+        mock_invoked.assert_called_once()
+        assert mock_invoked.call_args[1]["registry_entry_id"] == "rev-xyz"
+
+
+@pytest.mark.asyncio
+async def test_root_planner_threads_registry_entry_id_to_action_proposed_audit():
+    agent = Workflow(
+        name="test_root",
+        edges=[("START", root_planner)],
+    )
+    session_service = InMemorySessionService()
+    runner = Runner(
+        app_name="test_app",
+        agent=agent,
+        session_service=session_service,
+        auto_create_session=True,
+    )
+
+    with (
+        patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list,
+        patch("src.orchestrator.planner.emit_skill_invoked_audit"),
+        patch("src.orchestrator.planner.dispatch_managed_skill", new_callable=AsyncMock) as mock_dispatch,
+        patch("src.orchestrator.planner.write_proposed_action") as mock_write,
+        patch("src.orchestrator.state.preloader.FirestoreClient") as mock_fs_cls,
+    ):
+        mock_list.return_value = [
+            Skill(name="skills/private-action-drafting", target_state="TARGET_STATE_ACTIVE", default_revision="rev-action-99"),
+        ]
+        mock_fs = mock_fs_cls.return_value
+        fake_ips = MagicMock(ips_id="ips_1", version=1)
+        fake_ips.model_dump.return_value = {"ips_id": "ips_1", "version": 1}
+        fake_holdings = MagicMock(total_value_usd=100000.0, positions=[], cash_usd=100000.0)
+        fake_holdings.model_dump.return_value = {"total_value_usd": 100000.0, "positions": [], "cash_usd": 100000.0}
+        mock_fs.get_active_ips_by_user.return_value = fake_ips
+        mock_fs.get_holdings.return_value = fake_holdings
+
+        from datetime import datetime, timezone
+
+        from src.orchestrator.contracts import (
+            ActionStatus,
+            ActionType,
+            OrderType,
+            ProposedAction,
+            RelatedIPSVersion,
+            Side,
+            SkillVersionRef,
+        )
+        action = ProposedAction(
+            action_id="act_trace_1",
+            session_id="sess_trace_1",
+            type=ActionType.TRADE,
+            ticker="AAPL",
+            side=Side.BUY,
+            quantity=10.0,
+            order_type=OrderType.MARKET,
+            estimated_price_usd=250.0,
+            estimated_value_usd=2500.0,
+            rationale="Rebalancing into equity per IPS target.",
+            supporting_research_refs=[],
+            ips_version_referenced=RelatedIPSVersion(ips_id="ips_1", version=1),
+            proposed_by_skill_version=SkillVersionRef(skill_name="private-action-drafting", skill_version="0.2.0"),
+            status=ActionStatus.DRAFTED,
+            created_at=datetime.now(timezone.utc),
+        )
+        mock_dispatch.return_value = action
+
+        response_stream = runner.run_async(
+            user_id="user_trace_2",
+            session_id="sess_trace_2",
+            new_message=UserContent(parts=[Part.from_text(text='{"user_id": "user_trace_2"}')]),
+        )
+        _ = [e async for e in response_stream]
+        mock_write.assert_called_once()
+        assert mock_write.call_args[1]["registry_entry_id"] == "rev-action-99"
+
+
 

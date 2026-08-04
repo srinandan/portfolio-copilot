@@ -60,6 +60,30 @@ def test_write_proposed_action_persists_and_audits(sample_proposed_action):
     assert audit_entry.related_action_id == "act_123"
     assert audit_entry.actor.skill_version == read_skill_version("action-drafting")
     assert audit_entry.actor.skill_name == "private-action-drafting"
+    assert audit_entry.actor.approval_scope == "read:holdings,read:ips,read:market_data_quote"
+
+
+def test_write_proposed_action_carries_registry_entry_id(sample_proposed_action):
+    mock_client = MagicMock()
+    write_proposed_action(
+        user_id="user_123",
+        action=sample_proposed_action,
+        registry_entry_id="projects/test/revisions/rev-abc",
+        db_client=mock_client,
+    )
+    audit_entry = mock_client.append_audit_log.call_args[0][0]
+    assert audit_entry.actor.registry_entry_id == "projects/test/revisions/rev-abc"
+
+
+def test_write_proposed_action_carries_approval_scope(sample_proposed_action):
+    mock_client = MagicMock()
+    write_proposed_action(
+        user_id="user_123",
+        action=sample_proposed_action,
+        db_client=mock_client,
+    )
+    audit_entry = mock_client.append_audit_log.call_args[0][0]
+    assert audit_entry.actor.approval_scope == "read:holdings,read:ips,read:market_data_quote"
 
 
 def test_write_proposed_action_uses_dynamic_skill_version(sample_proposed_action, monkeypatch):

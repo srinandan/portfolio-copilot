@@ -55,6 +55,8 @@ def test_emit_approval_requested_audit_writes_entry(sample_proposed_action):
     assert audit_entry.event_type == EventType.APPROVAL_REQUESTED
     assert audit_entry.related_action_id == "act_123"
     assert audit_entry.actor.type == ActorType.AGENT
+    assert audit_entry.actor.registry_entry_id is None
+    assert audit_entry.actor.approval_scope is None
     assert "verdict_99" in audit_entry.detail
 
 
@@ -92,6 +94,8 @@ def test_emit_approval_rejected_audit_agent_actor_when_no_user_id(
     assert audit1.event_type == EventType.APPROVAL_REJECTED
     assert audit1.actor.type == ActorType.AGENT
     assert audit1.actor.skill_name == "orchestrator-hitl-gate"
+    assert audit1.actor.registry_entry_id is None
+    assert audit1.actor.approval_scope is None
 
     # Test 2: With rejecting_user_id -> HUMAN actor
     mock_client2 = MagicMock()
