@@ -83,3 +83,9 @@ Depends on what changed:
 - **Infra changes** (new secrets, new BigQuery columns, IAM changes):
   re-run the specific `setup_*.sh` script that owns that resource, not
   `setup_all.sh` wholesale, unless you're provisioning a fresh project
+
+## Demos
+
+- [Live Skill Revocation](../docs/demos/live-revocation.md) — Demonstrates
+  revoking a skill mid-session and observing the next planning cycle adapt
+  without errors or restarts.

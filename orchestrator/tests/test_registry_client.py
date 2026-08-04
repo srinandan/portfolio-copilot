@@ -1,4 +1,5 @@
 import io
+import json
 import zipfile
 from unittest.mock import MagicMock, patch
 
@@ -379,3 +380,84 @@ async def test_client_context_manager_and_default_auth():
             assert client._owns_client is True
 
         assert client._http_client is None
+
+
+@pytest.mark.asyncio
+async def test_revoke_skill_patches_target_state():
+    captured_request = None
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal captured_request
+        captured_request = request
+        return httpx.Response(200, json={"name": "test"})
+
+    client = AgentRegistryClient(
+        project_id="test-project",
+        location="test-location",
+        http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+    )
+    await client.revoke_skill("research")
+    assert captured_request is not None
+    assert captured_request.method == "PATCH"
+    assert "private-research" in str(captured_request.url)
+    assert "updateMask=targetState" in str(captured_request.url)
+    assert json.loads(captured_request.content) == {"targetState": "TARGET_STATE_DISABLED"}
+
+
+@pytest.mark.asyncio
+async def test_restore_skill_patches_target_state_active():
+    captured_request = None
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal captured_request
+        captured_request = request
+        return httpx.Response(200, json={"name": "test"})
+
+    client = AgentRegistryClient(
+        project_id="test-project",
+        location="test-location",
+        http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+    )
+    await client.restore_skill("research")
+    assert captured_request is not None
+    assert json.loads(captured_request.content) == {"targetState": "TARGET_STATE_ACTIVE"}
+
+
+@pytest.mark.asyncio
+async def test_revoke_skill_adds_private_prefix_when_missing():
+    urls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        urls.append(str(request.url))
+        return httpx.Response(200, json={})
+
+    client = AgentRegistryClient(
+        project_id="test-project",
+        location="test-location",
+        http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+    )
+    await client.revoke_skill("research")
+    await client.revoke_skill("private-research")
+    assert len(urls) == 2
+    assert urls[0] == urls[1]
+
+
+@pytest.mark.asyncio
+async def test_revoke_skill_raises_on_non_2xx():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(500, text="error")
+
+    client = AgentRegistryClient(
+        project_id="test-project",
+        location="test-location",
+        http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+    )
+    with pytest.raises(RuntimeError, match="Failed to PATCH skill"):
+        await client.revoke_skill("research")
+
+
+@pytest.mark.asyncio
+async def test_patch_target_state_rejects_invalid_state():
+    client = AgentRegistryClient(project_id="test-project", location="test-location")
+    with pytest.raises(ValueError, match="Invalid target_state"):
+        await client._patch_target_state("research", "TARGET_STATE_BOGUS")

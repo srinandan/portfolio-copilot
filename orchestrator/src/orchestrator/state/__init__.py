@@ -17,6 +17,7 @@ from .writers import (
     emit_review_completed_audit,
     emit_skill_failed_audit,
     emit_skill_invoked_audit,
+    emit_skill_revoked_audit,
     write_ips_from_interview_result,
     write_proposed_action,
 )
@@ -36,6 +37,7 @@ __all__ = [
     "emit_review_completed_audit",
     "emit_skill_failed_audit",
     "emit_skill_invoked_audit",
+    "emit_skill_revoked_audit",
     "write_ips_from_interview_result",
     "write_proposed_action",
 ]

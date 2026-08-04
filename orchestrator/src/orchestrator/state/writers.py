@@ -286,6 +286,50 @@ def emit_skill_failed_audit(
         raise RuntimeError(f"Audit log write failed for skill failure: {e}") from e
 
 
+def emit_skill_revoked_audit(
+    revoked_skill_short_name: str,
+    prior_registry_entry_id: Optional[str] = None,
+    detail: Optional[str] = None,
+    db_client: Optional[FirestoreClient] = None,
+) -> None:
+    """Emits SKILL_REVOKED when the planner detects a skill that was authorized
+    last planning cycle but isn't authorized this cycle. Fail-closed.
+
+    The registry_entry_id passed here is the *prior* revision — the one that
+    was active before revocation. This lets an auditor trace "what was revoked
+    and when" precisely.
+
+    detail should describe what triggered the revocation observation (e.g.
+    "detected on planning cycle for session {sess_id}").
+    """
+    client = db_client or FirestoreClient()
+    skill_dir_name = revoked_skill_short_name.replace("private-", "")
+    skill_version = read_skill_version(skill_dir_name)
+    approval_scope = read_skill_approval_scope(skill_dir_name)
+    audit_entry = AuditLogEntry(
+        log_id=str(uuid.uuid4()),
+        event_type=EventType.SKILL_REVOKED,
+        timestamp=datetime.now(timezone.utc),
+        actor=Actor(
+            type=ActorType.AGENT,
+            skill_name=(
+                revoked_skill_short_name
+                if revoked_skill_short_name.startswith("private-")
+                else f"private-{revoked_skill_short_name}"
+            ),
+            skill_version=skill_version,
+            registry_entry_id=prior_registry_entry_id,
+            approval_scope=approval_scope,
+        ),
+        detail=detail or f"Skill {revoked_skill_short_name} observed as revoked at planning cycle",
+    )
+    try:
+        client.append_audit_log(audit_entry)
+    except Exception as e:
+        logger.error(f"Failed to append SKILL_REVOKED audit for {revoked_skill_short_name}: {e}")
+        raise RuntimeError(f"Audit log write failed for skill revocation: {e}") from e
+
+
 def emit_approval_requested_audit(
     action: ProposedAction,
     reviewer_verdict_id: Optional[str] = None,
