@@ -656,7 +656,16 @@ async def test_root_planner_dispatches_execution_gate_when_hitl_approved():
         mock_fs.get_holdings.return_value = fake_holdings
 
         from datetime import datetime, timezone
-        from src.orchestrator.contracts import ProposedAction, ActionType, Side, OrderType, ActionStatus, RelatedIPSVersion, SkillVersionRef
+
+        from src.orchestrator.contracts import (
+            ActionStatus,
+            ActionType,
+            OrderType,
+            ProposedAction,
+            RelatedIPSVersion,
+            Side,
+            SkillVersionRef,
+        )
         action = ProposedAction(
             action_id="act_exec_1",
             session_id="sess_exec_1",
@@ -742,7 +751,16 @@ async def test_root_planner_skips_execution_when_hitl_rejected():
         mock_fs.get_holdings.return_value = fake_holdings
 
         from datetime import datetime, timezone
-        from src.orchestrator.contracts import ProposedAction, ActionType, Side, OrderType, ActionStatus, RelatedIPSVersion, SkillVersionRef
+
+        from src.orchestrator.contracts import (
+            ActionStatus,
+            ActionType,
+            OrderType,
+            ProposedAction,
+            RelatedIPSVersion,
+            Side,
+            SkillVersionRef,
+        )
         action = ProposedAction(
             action_id="act_exec_2",
             session_id="sess_exec_2",
