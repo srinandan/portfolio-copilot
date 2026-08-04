@@ -1,0 +1,217 @@
+{
+  "eval_set_id": "reviewer",
+  "name": "reviewer",
+  "description": "Evaluation suite for the reviewer runtime skill in Portfolio Copilot.",
+  "eval_cases": [
+    {
+      "evalId": "happy_path_all_rules_pass",
+      "conversation": [
+        {
+          "invocationId": "",
+          "userContent": {
+            "parts": [
+              {
+                "text": "Review proposed buy of 100 shares of VTI at $250 within IPS bounds. Current allocation is under target."
+              }
+            ]
+          },
+          "finalResponse": {
+            "parts": [
+              {
+                "text": "Returns ReviewerVerdict with overall_pass=true, all five rule_results.passed=true, requires_human_approval based on IPS thresholds only."
+              }
+            ]
+          },
+          "creationTimestamp": 0.0
+        }
+      ],
+      "sessionInput": {
+        "appName": "reviewer",
+        "userId": "eval_user",
+        "state": {}
+      },
+      "creationTimestamp": 0.0,
+      "finalSessionState": {}
+    },
+    {
+      "evalId": "excluded_ticker_violation",
+      "conversation": [
+        {
+          "invocationId": "",
+          "userContent": {
+            "parts": [
+              {
+                "text": "Review proposed buy of TSLA where TSLA is in constraints.excluded_tickers."
+              }
+            ]
+          },
+          "finalResponse": {
+            "parts": [
+              {
+                "text": "Returns ReviewerVerdict with overall_pass=false, rule 'excluded_ticker' passed=false with detail explaining TSLA is excluded. requires_human_approval=true."
+              }
+            ]
+          },
+          "creationTimestamp": 0.0
+        }
+      ],
+      "sessionInput": {
+        "appName": "reviewer",
+        "userId": "eval_user",
+        "state": {}
+      },
+      "creationTimestamp": 0.0,
+      "finalSessionState": {}
+    },
+    {
+      "evalId": "excluded_sector_violation",
+      "conversation": [
+        {
+          "invocationId": "",
+          "userContent": {
+            "parts": [
+              {
+                "text": "Review proposed buy of XOM where Energy is in constraints.excluded_sectors."
+              }
+            ]
+          },
+          "finalResponse": {
+            "parts": [
+              {
+                "text": "Returns ReviewerVerdict with overall_pass=false, rule 'excluded_sector' passed=false with detail explaining XOM is in excluded sector Energy. requires_human_approval=true."
+              }
+            ]
+          },
+          "creationTimestamp": 0.0
+        }
+      ],
+      "sessionInput": {
+        "appName": "reviewer",
+        "userId": "eval_user",
+        "state": {}
+      },
+      "creationTimestamp": 0.0,
+      "finalSessionState": {}
+    },
+    {
+      "evalId": "concentration_limit_violation",
+      "conversation": [
+        {
+          "invocationId": "",
+          "userContent": {
+            "parts": [
+              {
+                "text": "Review proposed buy of AAPL that would increase AAPL position to 35% of total portfolio value when concentration_limit_percent is 20%."
+              }
+            ]
+          },
+          "finalResponse": {
+            "parts": [
+              {
+                "text": "Returns ReviewerVerdict with overall_pass=false, rule 'concentration_limit' passed=false with detail explaining resulting position exceeds 20% limit. requires_human_approval=true."
+              }
+            ]
+          },
+          "creationTimestamp": 0.0
+        }
+      ],
+      "sessionInput": {
+        "appName": "reviewer",
+        "userId": "eval_user",
+        "state": {}
+      },
+      "creationTimestamp": 0.0,
+      "finalSessionState": {}
+    },
+    {
+      "evalId": "allocation_band_direction_violation",
+      "conversation": [
+        {
+          "invocationId": "",
+          "userContent": {
+            "parts": [
+              {
+                "text": "Review proposed buy of an Equity ticker when Equity asset class is already over-allocated at 75% against a max_percent of 70%."
+              }
+            ]
+          },
+          "finalResponse": {
+            "parts": [
+              {
+                "text": "Returns ReviewerVerdict with overall_pass=false, rule 'allocation_band_direction' passed=false with detail explaining trade moves asset class further over maximum band. requires_human_approval=true."
+              }
+            ]
+          },
+          "creationTimestamp": 0.0
+        }
+      ],
+      "sessionInput": {
+        "appName": "reviewer",
+        "userId": "eval_user",
+        "state": {}
+      },
+      "creationTimestamp": 0.0,
+      "finalSessionState": {}
+    },
+    {
+      "evalId": "ips_version_current_violation",
+      "conversation": [
+        {
+          "invocationId": "",
+          "userContent": {
+            "parts": [
+              {
+                "text": "Review proposed trade referencing IPS version 1 when currently active IPS version is 2."
+              }
+            ]
+          },
+          "finalResponse": {
+            "parts": [
+              {
+                "text": "Returns ReviewerVerdict with overall_pass=false, rule 'ips_version_current' passed=false with detail explaining stale IPS reference. requires_human_approval=true."
+              }
+            ]
+          },
+          "creationTimestamp": 0.0
+        }
+      ],
+      "sessionInput": {
+        "appName": "reviewer",
+        "userId": "eval_user",
+        "state": {}
+      },
+      "creationTimestamp": 0.0,
+      "finalSessionState": {}
+    },
+    {
+      "evalId": "high_stakes_requires_human_approval",
+      "conversation": [
+        {
+          "invocationId": "",
+          "userContent": {
+            "parts": [
+              {
+                "text": "Review proposed buy of VTI of $50,000 where all rules pass, but estimated_value_usd exceeds approval_required_above_usd threshold of $25,000."
+              }
+            ]
+          },
+          "finalResponse": {
+            "parts": [
+              {
+                "text": "Returns ReviewerVerdict with overall_pass=true, all rule_results.passed=true, but requires_human_approval=true because trade value exceeds high-stakes threshold."
+              }
+            ]
+          },
+          "creationTimestamp": 0.0
+        }
+      ],
+      "sessionInput": {
+        "appName": "reviewer",
+        "userId": "eval_user",
+        "state": {}
+      },
+      "creationTimestamp": 0.0,
+      "finalSessionState": {}
+    }
+  ]
+}

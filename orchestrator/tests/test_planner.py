@@ -933,4 +933,114 @@ async def test_root_planner_threads_registry_entry_id_to_action_proposed_audit()
         assert mock_write.call_args[1]["registry_entry_id"] == "rev-action-99"
 
 
+def test_reviewer_skips_when_no_drafted_action():
+    from src.orchestrator.planner import SKILL_PLANS
+
+    plan = SKILL_PLANS["private-reviewer"]
+    assert plan.build_input("user_1", {}, {}) is None
+    assert plan.build_input("user_1", {}, {"action_drafting_result": {"status": "executed"}}) is None
+
+
+@patch("src.orchestrator.planner.preload_for_reviewer")
+def test_reviewer_builds_input_when_drafted_action_present(mock_preload):
+    from src.orchestrator.planner import SKILL_PLANS
+
+    mock_preload.return_value = {"action": "test"}
+    plan = SKILL_PLANS["private-reviewer"]
+    ctx = {"action_drafting_result": {"status": "drafted", "action_id": "a_1"}}
+    inp = {}
+    res = plan.build_input("user_1", inp, ctx)
+    assert res == {"action": "test"}
+    assert inp["_reviewer_action"] == ctx["action_drafting_result"]
+    mock_preload.assert_called_once_with(user_id="user_1", action=ctx["action_drafting_result"])
+
+
+@pytest.mark.asyncio
+@patch("src.orchestrator.planner.FirestoreClient")
+@patch("src.orchestrator.planner.emit_review_completed_audit")
+async def test_reviewer_postprocess_populates_context(mock_emit, mock_fs_cls):
+    from datetime import datetime, timezone
+
+    from src.orchestrator.contracts import (
+        ActionStatus,
+        ActionType,
+        Constraints,
+        InvestmentPolicyStatement,
+        IPSStatus,
+        OrderType,
+        ProposedAction,
+        RelatedIPSVersion,
+        RiskTolerance,
+        Side,
+        SkillVersionRef,
+        TargetAllocation,
+    )
+    from src.orchestrator.contracts.holdings import HoldingsSnapshot, Position
+    from src.orchestrator.contracts.reviewer_verdict import ReviewerVerdict, RuleResult
+    from src.orchestrator.planner import SKILL_PLANS
+
+    mock_fs = mock_fs_cls.return_value
+    fake_ips = InvestmentPolicyStatement(
+        ips_id="ips_1",
+        user_id="user_1",
+        version=1,
+        status=IPSStatus.ACTIVE,
+        effective_date="2026-01-01",
+        risk_tolerance=RiskTolerance.MODERATE,
+        time_horizon_years=10,
+        target_allocation=[
+            TargetAllocation(asset_class="Equity", target_percent=60, min_percent=50, max_percent=70)
+        ],
+        constraints=Constraints(concentration_limit_percent=15, excluded_tickers=[], excluded_sectors=[]),
+        approval_required_above_usd=25000.0,
+        approval_required_above_percent=20.0,
+        created_at=datetime.now(timezone.utc),
+    )
+    fake_holdings = HoldingsSnapshot(
+        user_id="user_1",
+        as_of=datetime.now(timezone.utc),
+        positions=[Position(ticker="AAPL", quantity=10, asset_class="Equity", market_value_usd=10000.0)],
+        cash_usd=90000.0,
+        total_value_usd=100000.0,
+    )
+    mock_fs.get_active_ips_by_user.return_value = fake_ips
+    mock_fs.get_holdings.return_value = fake_holdings
+
+    action = ProposedAction(
+        action_id="act_1",
+        session_id="s_1",
+        type=ActionType.TRADE,
+        ticker="AAPL",
+        side=Side.BUY,
+        quantity=5.0,
+        order_type=OrderType.MARKET,
+        estimated_price_usd=200.0,
+        estimated_value_usd=1000.0,
+        rationale="test",
+        supporting_research_refs=[],
+        ips_version_referenced=RelatedIPSVersion(ips_id="ips_1", version=1),
+        proposed_by_skill_version=SkillVersionRef(skill_name="private-action-drafting", skill_version="0.1.0"),
+        status=ActionStatus.DRAFTED,
+        created_at=datetime.now(timezone.utc),
+    )
+    llm_verdict = ReviewerVerdict(
+        verdict_id="v_llm",
+        action_id="act_1",
+        ips_version_checked_against=RelatedIPSVersion(ips_id="ips_1", version=1),
+        rule_results=[RuleResult(rule_id="excluded_ticker", description="test", passed=True)],
+        overall_pass=True,
+        requires_human_approval=False,
+        reviewer_skill_version=SkillVersionRef(skill_name="private-reviewer", skill_version="0.1.0"),
+        reviewed_at=datetime.now(timezone.utc),
+    )
+
+    plan = SKILL_PLANS["private-reviewer"]
+    inp = {"_reviewer_action": action.model_dump()}
+    payload, ctx_update = await plan.postprocess("user_1", llm_verdict, {}, inp, registry_entry_id="rev-rev-1")
+    assert ctx_update["reviewer_verdict"].overall_pass is True
+    assert ctx_update["reviewer_verdict_llm"].verdict_id == "v_llm"
+    mock_emit.assert_called_once()
+    assert mock_emit.call_args[1]["registry_entry_id"] == "rev-rev-1"
+
+
 

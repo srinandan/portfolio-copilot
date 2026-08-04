@@ -9,6 +9,7 @@ from ..contracts.goals_onboarding import GoalsOnboardingResult
 from ..contracts.ips import Constraints, InvestmentPolicyStatement, IPSStatus, LiquidityNeeds
 from ..contracts.liabilities import LiabilitiesSnapshot
 from ..contracts.proposed_action import ProposedAction
+from ..contracts.reviewer_verdict import ReviewerVerdict
 from ..data.firestore import FirestoreClient
 from ..logger import get_logger
 from ..skills._skill_metadata import read_skill_approval_scope, read_skill_version
@@ -145,6 +146,75 @@ def write_proposed_action(
         raise RuntimeError(f"Audit log write failed for ProposedAction: {e}") from e
 
     return action
+
+
+def emit_review_completed_audit(
+    action: ProposedAction,
+    authoritative_verdict: ReviewerVerdict,
+    llm_verdict: Optional[ReviewerVerdict] = None,
+    registry_entry_id: Optional[str] = None,
+    db_client: Optional[FirestoreClient] = None,
+) -> None:
+    """Emits REVIEW_COMPLETED. Fail-closed.
+
+    `authoritative_verdict` is the orchestrator's deterministic re-check output
+    (what the HITL and execution gates enforce). `llm_verdict` is the Managed
+    Agent's advisory output — captured for audit, never enforced.
+
+    Divergence (LLM says pass, deterministic says fail — or vice versa) is
+    captured in the audit entry's `detail` field so post-hoc auditing can find
+    prompt-injection or model-drift incidents.
+    """
+    from ..skills._skill_metadata import read_skill_approval_scope
+
+    client = db_client or FirestoreClient()
+    skill_version = read_skill_version("reviewer")
+    approval_scope = read_skill_approval_scope("reviewer")
+
+    divergence: Optional[str] = None
+    if llm_verdict is not None:
+        if llm_verdict.overall_pass != authoritative_verdict.overall_pass:
+            divergence = (
+                f"LLM verdict overall_pass={llm_verdict.overall_pass} "
+                f"disagreed with deterministic re-check overall_pass={authoritative_verdict.overall_pass}"
+            )
+        else:
+            llm_fails = {r.rule_id for r in llm_verdict.rule_results if not r.passed}
+            det_fails = {r.rule_id for r in authoritative_verdict.rule_results if not r.passed}
+            if llm_fails != det_fails:
+                divergence = (
+                    f"LLM failing rules {sorted(llm_fails)} != deterministic failing rules {sorted(det_fails)}"
+                )
+
+    pass_summary = (
+        "all rules passed"
+        if authoritative_verdict.overall_pass
+        else f"failed rules: {sorted(r.rule_id for r in authoritative_verdict.rule_results if not r.passed)}"
+    )
+    detail = f"Reviewer completed for {action.action_id}: {pass_summary}"
+    if divergence:
+        detail += f" | LLM/deterministic divergence: {divergence}"
+
+    audit_entry = AuditLogEntry(
+        log_id=str(uuid.uuid4()),
+        event_type=EventType.REVIEW_COMPLETED,
+        timestamp=datetime.now(timezone.utc),
+        actor=Actor(
+            type=ActorType.AGENT,
+            skill_name="private-reviewer",
+            skill_version=skill_version,
+            registry_entry_id=registry_entry_id,
+            approval_scope=approval_scope,
+        ),
+        related_action_id=action.action_id,
+        related_ips_version=action.ips_version_referenced.model_dump() if hasattr(action.ips_version_referenced, "model_dump") else action.ips_version_referenced,
+        detail=detail,
+    )
+    try:
+        client.append_audit_log(audit_entry)
+    except Exception as e:
+        logger.error(f"Failed to append REVIEW_COMPLETED audit for {action.action_id}: {e}")
+        raise RuntimeError(f"Audit log write failed for review completion: {e}") from e
 
 
 def emit_skill_invoked_audit(
