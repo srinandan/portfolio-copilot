@@ -198,3 +198,88 @@ def emit_skill_failed_audit(
     except Exception as e:
         logger.error(f"Failed to append SKILL_INVOCATION_FAILED audit for {skill_short_name}: {e}")
         raise RuntimeError(f"Audit log write failed for skill failure: {e}") from e
+
+
+def emit_approval_requested_audit(
+    action: ProposedAction,
+    reviewer_verdict_id: Optional[str] = None,
+    db_client: Optional[FirestoreClient] = None,
+) -> None:
+    """Emits APPROVAL_REQUESTED right before the gate yields RequestInput. Fail-closed."""
+    client = db_client or FirestoreClient()
+    audit_entry = AuditLogEntry(
+        log_id=str(uuid.uuid4()),
+        event_type=EventType.APPROVAL_REQUESTED,
+        timestamp=datetime.now(timezone.utc),
+        actor=Actor(
+            type=ActorType.AGENT,
+            skill_name="orchestrator-hitl-gate",
+            skill_version="0.1.0",
+        ),
+        related_action_id=action.action_id,
+        related_ips_version=action.ips_version_referenced.model_dump(),
+        detail=f"Approval requested for {action.side.value} {action.quantity} {action.ticker}"
+               + (f" (reviewer_verdict={reviewer_verdict_id})" if reviewer_verdict_id else " (no reviewer verdict available)"),
+    )
+    try:
+        client.append_audit_log(audit_entry)
+    except Exception as e:
+        logger.error(f"Failed to append APPROVAL_REQUESTED audit for {action.action_id}: {e}")
+        raise RuntimeError(f"Audit log write failed for approval request: {e}") from e
+
+
+def emit_approval_granted_audit(
+    action: ProposedAction,
+    approving_user_id: str,
+    edit_rounds: int = 0,
+    db_client: Optional[FirestoreClient] = None,
+) -> None:
+    """Emits APPROVAL_GRANTED after human approve. Fail-closed."""
+    client = db_client or FirestoreClient()
+    audit_entry = AuditLogEntry(
+        log_id=str(uuid.uuid4()),
+        event_type=EventType.APPROVAL_GRANTED,
+        timestamp=datetime.now(timezone.utc),
+        actor=Actor(
+            type=ActorType.HUMAN,
+            user_id=approving_user_id,
+        ),
+        related_action_id=action.action_id,
+        related_ips_version=action.ips_version_referenced.model_dump(),
+        detail=f"Human approved {action.side.value} {action.quantity} {action.ticker}"
+               + (f" after {edit_rounds} edit round(s)" if edit_rounds else ""),
+    )
+    try:
+        client.append_audit_log(audit_entry)
+    except Exception as e:
+        logger.error(f"Failed to append APPROVAL_GRANTED audit for {action.action_id}: {e}")
+        raise RuntimeError(f"Audit log write failed for approval grant: {e}") from e
+
+
+def emit_approval_rejected_audit(
+    action: ProposedAction,
+    reason: str,
+    rejecting_user_id: Optional[str] = None,
+    db_client: Optional[FirestoreClient] = None,
+) -> None:
+    """Emits APPROVAL_REJECTED after human reject (or edit-limit exceeded). Fail-closed."""
+    client = db_client or FirestoreClient()
+    audit_entry = AuditLogEntry(
+        log_id=str(uuid.uuid4()),
+        event_type=EventType.APPROVAL_REJECTED,
+        timestamp=datetime.now(timezone.utc),
+        actor=Actor(
+            type=ActorType.HUMAN if rejecting_user_id else ActorType.AGENT,
+            user_id=rejecting_user_id,
+            skill_name=None if rejecting_user_id else "orchestrator-hitl-gate",
+            skill_version=None if rejecting_user_id else "0.1.0",
+        ),
+        related_action_id=action.action_id,
+        related_ips_version=action.ips_version_referenced.model_dump(),
+        detail=f"Rejected: {reason}",
+    )
+    try:
+        client.append_audit_log(audit_entry)
+    except Exception as e:
+        logger.error(f"Failed to append APPROVAL_REJECTED audit for {action.action_id}: {e}")
+        raise RuntimeError(f"Audit log write failed for approval rejection: {e}") from e

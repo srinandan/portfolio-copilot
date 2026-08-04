@@ -482,4 +482,142 @@ async def test_root_planner_pipeline_order_stable():
         assert pa_idx < res_idx < ad_idx, f"Pipeline order violated: PA={pa_idx}, Res={res_idx}, AD={ad_idx}"
 
 
+@pytest.mark.asyncio
+async def test_root_planner_dispatches_hitl_gate_after_action_drafting():
+    """Verify root_planner dispatches hitl_approval_gate when a ProposedAction is drafted."""
+
+    agent = Workflow(
+        name="test_root",
+        edges=[("START", root_planner)],
+    )
+    session_service = InMemorySessionService()
+    runner = Runner(
+        app_name="test_app",
+        agent=agent,
+        session_service=session_service,
+        auto_create_session=True,
+    )
+
+    with (
+        patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list,
+        patch("src.orchestrator.planner.emit_skill_invoked_audit"),
+        patch("src.orchestrator.planner.dispatch_managed_skill", new_callable=AsyncMock) as mock_dispatch,
+        patch("src.orchestrator.planner.write_proposed_action"),
+        patch("src.orchestrator.state.preloader.FirestoreClient") as mock_fs_cls,
+        patch.object(Context, "run_node", new_callable=AsyncMock) as mock_run_node,
+    ):
+        mock_list.return_value = [
+            Skill(name="skills/private-action-drafting", target_state="TARGET_STATE_ACTIVE", default_revision="v1"),
+        ]
+
+        mock_fs = mock_fs_cls.return_value
+        fake_ips = MagicMock(ips_id="ips_1", version=1)
+        fake_ips.model_dump.return_value = {"ips_id": "ips_1", "version": 1}
+        fake_holdings = MagicMock(total_value_usd=100000.0, positions=[], cash_usd=100000.0)
+        fake_holdings.model_dump.return_value = {"total_value_usd": 100000.0, "positions": [], "cash_usd": 100000.0}
+        mock_fs.get_active_ips_by_user.return_value = fake_ips
+        mock_fs.get_holdings.return_value = fake_holdings
+
+        from datetime import datetime, timezone
+
+        from src.orchestrator.contracts import (
+            ActionStatus,
+            ActionType,
+            OrderType,
+            ProposedAction,
+            RelatedIPSVersion,
+            Side,
+            SkillVersionRef,
+        )
+        action = ProposedAction(
+            action_id="act_1",
+            session_id="sess_1",
+            type=ActionType.TRADE,
+            ticker="VTI",
+            side=Side.BUY,
+            quantity=10.0,
+            order_type=OrderType.MARKET,
+            estimated_price_usd=250.0,
+            estimated_value_usd=2500.0,
+            rationale="Rebalancing into equity per IPS target.",
+            supporting_research_refs=[],
+            ips_version_referenced=RelatedIPSVersion(ips_id="ips_1", version=1),
+            proposed_by_skill_version=SkillVersionRef(skill_name="private-action-drafting", skill_version="0.2.0"),
+            status=ActionStatus.DRAFTED,
+            created_at=datetime.now(timezone.utc),
+        )
+        mock_dispatch.return_value = action
+
+        async def fake_run_node(node_func, *args, **kwargs):
+            name = getattr(node_func, "name", "")
+            if name == "get_skills":
+                return ["skills/private-action-drafting"]
+            if name == "hitl_approval_gate":
+                return {"outcome": "approved", "action_id": "act_1"}
+            return None
+
+        mock_run_node.side_effect = fake_run_node
+
+        response_stream = runner.run_async(
+            user_id="user_hitl",
+            session_id="sess_hitl_1",
+            new_message=UserContent(parts=[Part.from_text(text='{"user_id": "user_hitl"}')]),
+        )
+
+        events = [e async for e in response_stream]
+        last_event = events[-1]
+
+        hitl_calls = [c for c in mock_run_node.call_args_list if c[0] and getattr(c[0][0], "name", "") == "hitl_approval_gate"]
+        assert len(hitl_calls) == 1, f"Expected 1 hitl_approval_gate call, found {len(hitl_calls)}"
+        assert hitl_calls[0].kwargs["node_input"] == {"action": action.model_dump(), "reviewer_verdict": None}
+        assert any("hitl_decision:" in str(item) for item in last_event.output)
+
+
+@pytest.mark.asyncio
+async def test_root_planner_skips_hitl_when_no_proposed_action():
+    """Verify root_planner does not invoke hitl_approval_gate when no ProposedAction is drafted."""
+    agent = Workflow(
+        name="test_root",
+        edges=[("START", root_planner)],
+    )
+    session_service = InMemorySessionService()
+    runner = Runner(
+        app_name="test_app",
+        agent=agent,
+        session_service=session_service,
+        auto_create_session=True,
+    )
+
+    with (
+        patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list,
+        patch("src.orchestrator.planner.emit_skill_invoked_audit"),
+        patch("src.orchestrator.planner.dispatch_managed_skill", new_callable=AsyncMock) as mock_dispatch,
+        patch("src.orchestrator.planner.preload_spending_facts") as mock_preload,
+        patch.object(Context, "run_node", new_callable=AsyncMock) as mock_run_node,
+    ):
+        mock_list.return_value = [
+            Skill(name="skills/private-spending-analysis", target_state="TARGET_STATE_ACTIVE", default_revision="v1"),
+        ]
+        mock_preload.return_value = {}
+        mock_dispatch.return_value = {"summary": "spending ok"}
+
+        async def fake_run_node_2(node_func, *args, **kwargs):
+            name = getattr(node_func, "name", "")
+            if name == "get_skills":
+                return ["skills/private-spending-analysis"]
+            return None
+
+        mock_run_node.side_effect = fake_run_node_2
+
+        response_stream = runner.run_async(
+            user_id="user_hitl_2",
+            session_id="sess_hitl_2",
+            new_message=UserContent(parts=[Part.from_text(text='{"user_id": "user_hitl_2"}')]),
+        )
+
+        events = [e async for e in response_stream]
+        hitl_calls = [c for c in mock_run_node.call_args_list if c[0] and getattr(c[0][0], "name", "") == "hitl_approval_gate"]
+        assert len(hitl_calls) == 0, f"Expected 0 hitl_approval_gate calls, found: {hitl_calls}"
+
+
 

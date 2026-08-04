@@ -11,6 +11,7 @@ from google.genai.types import Part, UserContent
 
 from .contracts.goals_onboarding import GoalsOnboardingResult
 from .contracts.proposed_action import ProposedAction
+from .gates import hitl_approval_gate
 from .logger import get_logger
 from .managed_agents import dispatch_managed_skill
 from .registry_client import AgentRegistryClient
@@ -345,6 +346,26 @@ async def root_planner(ctx: Context, node_input: Any):
         if payload is None:
             continue
         results.append(f"{plan.short_name.replace('private-', '')}_result: {payload}")
+
+    # HITL approval gate: if action-drafting produced a ProposedAction, gate it before returning
+    ad_result = context.get("action_drafting_result")
+    if ad_result and isinstance(ad_result, dict) and ad_result.get("status") == "drafted":
+        # ProposedAction was drafted this cycle -- run it past the human
+        # Reviewer verdict may be present in context (once #106 lands); may be None until then
+        gate_input = {
+            "action": ad_result,
+            "reviewer_verdict": context.get("reviewer_verdict"),
+        }
+        try:
+            hitl_result = await ctx.run_node(hitl_approval_gate, node_input=gate_input)
+        except Exception as e:
+            logger.error(f"HITL gate failed: {e}")
+            results.append(f"hitl_error: {e}")
+        else:
+            results.append(f"hitl_decision: {hitl_result}")
+            context["hitl_decision"] = hitl_result
+            # Downstream: #23 G3 execution path picks up context["hitl_decision"] and
+            # checks outcome == "approved" before calling Alpaca.
 
     return results
 
