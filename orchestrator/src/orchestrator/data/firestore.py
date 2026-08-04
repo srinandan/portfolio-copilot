@@ -7,6 +7,7 @@ from google.cloud import firestore
 from google.cloud.firestore_v1.transaction import Transaction
 
 from ..contracts import (
+    ActionStatus,
     AuditLogEntry,
     HoldingsSnapshot,
     InvestmentPolicyStatement,
@@ -79,6 +80,19 @@ class FirestoreClient:
         if doc.exists:
             return ProposedAction.model_validate(doc.to_dict())
         return None
+
+    def update_proposed_action_status(
+        self, action_id: str, new_status: ActionStatus, updated_fields: dict[str, Any] | None = None
+    ) -> None:
+        """Updates the status (and optionally other fields) of a stored ProposedAction.
+
+        Uses `update()` rather than `set()` so partial writes are safe under concurrent access.
+        """
+        doc_ref = self.db.collection(COLLECTION_PROPOSED_ACTIONS).document(action_id)
+        updates: dict[str, Any] = {"status": new_status.value}
+        if updated_fields:
+            updates.update(updated_fields)
+        doc_ref.update(updates)
 
     def append_audit_log(self, entry: AuditLogEntry) -> None:
         """Adds a new audit log entry."""
