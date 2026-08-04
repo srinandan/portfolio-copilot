@@ -23,6 +23,7 @@ from .state import (
     emit_review_completed_audit,
     emit_skill_failed_audit,
     emit_skill_invoked_audit,
+    emit_skill_revoked_audit,
     preload_for_action_drafting,
     preload_for_portfolio_analysis,
     preload_for_research,
@@ -449,6 +450,49 @@ async def _execute_skill(
     return payload
 
 
+def _detect_and_audit_revocations(
+    ctx: Context,
+    current_skills: list[Any],
+) -> None:
+    """Compares current authorized skills against last cycle's; emits SKILL_REVOKED
+    for each skill that was authorized last cycle but isn't now.
+
+    State is stored in ctx.state["last_authorized_skills"] as a list of
+    {"name": str, "default_revision": str} dicts (JSON-serializable across resumes).
+    """
+    current_by_name = {
+        (s.name if hasattr(s, "name") else str(s)): getattr(s, "default_revision", None)
+        for s in current_skills
+    }
+    prior_raw = ctx.state.get("last_authorized_skills") or []
+    prior_by_name = {p["name"]: p for p in prior_raw if isinstance(p, dict) and "name" in p}
+
+    # Any name in prior but not in current is a revocation
+    revoked_names = set(prior_by_name.keys()) - set(current_by_name.keys())
+
+    for full_name in sorted(revoked_names):
+        short_name = _short_skill_id(full_name)
+        prior_revision = prior_by_name[full_name].get("default_revision")
+        try:
+            emit_skill_revoked_audit(
+                revoked_skill_short_name=short_name,
+                prior_registry_entry_id=prior_revision,
+                detail=f"Skill {short_name} was authorized last cycle but is now DISABLED or absent",
+            )
+            logger.info(f"Detected revocation of skill {short_name} (prior revision {prior_revision})")
+        except Exception as e:
+            # Audit fail-closed raises; log and continue so a single failure doesn't
+            # block detection of other revocations in the same cycle.
+            logger.error(f"Failed to audit revocation of {short_name}: {e}")
+
+    # Store current cycle for next comparison. Serialized as plain dicts so
+    # ADK's ctx.state (which needs JSON-safe values) is happy.
+    ctx.state["last_authorized_skills"] = [
+        {"name": name, "default_revision": rev}
+        for name, rev in current_by_name.items()
+    ]
+
+
 @node(rerun_on_resume=True)
 async def root_planner(ctx: Context, node_input: Any):
     """Registry-driven dynamic planner. Iterates authorized skills in canonical order,
@@ -458,6 +502,10 @@ async def root_planner(ctx: Context, node_input: Any):
 
     skills = await ctx.run_node(get_skills_from_registry, node_input=node_input)
     logger.info(f"Available skills: {skills}")
+
+    # Delta-detect revocations vs the previous planning cycle in this session.
+    # Emits SKILL_REVOKED audit for anything that disappeared.
+    _detect_and_audit_revocations(ctx, skills)
 
     # Parse node_input into a plain dict
     input_dict: Dict[str, Any] = {}

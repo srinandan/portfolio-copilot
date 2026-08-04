@@ -1043,4 +1043,127 @@ async def test_reviewer_postprocess_populates_context(mock_emit, mock_fs_cls):
     assert mock_emit.call_args[1]["registry_entry_id"] == "rev-rev-1"
 
 
+@patch("src.orchestrator.planner.emit_skill_revoked_audit")
+def test_detect_revocations_emits_for_missing_skills(mock_emit):
+    from src.orchestrator.planner import _detect_and_audit_revocations
+
+    ctx = MagicMock()
+    ctx.state = {
+        "last_authorized_skills": [
+            {"name": "skills/private-A", "default_revision": "rev-A1"},
+            {"name": "skills/private-B", "default_revision": "rev-B1"},
+        ]
+    }
+    current_skills = [MagicMock(name="skills/private-A", default_revision="rev-A1")]
+    # override .name attribute on mock
+    current_skills[0].name = "skills/private-A"
+
+    _detect_and_audit_revocations(ctx, current_skills)
+    mock_emit.assert_called_once()
+    assert mock_emit.call_args[1]["revoked_skill_short_name"] in ("B", "private-B")
+    assert mock_emit.call_args[1]["prior_registry_entry_id"] == "rev-B1"
+    assert ctx.state["last_authorized_skills"] == [
+        {"name": "skills/private-A", "default_revision": "rev-A1"}
+    ]
+
+
+@patch("src.orchestrator.planner.emit_skill_revoked_audit")
+def test_detect_revocations_first_cycle_no_prior_state(mock_emit):
+    from src.orchestrator.planner import _detect_and_audit_revocations
+
+    ctx = MagicMock()
+    ctx.state = {}
+    current_skills = [MagicMock()]
+    current_skills[0].name = "skills/private-A"
+    current_skills[0].default_revision = "rev-A1"
+
+    _detect_and_audit_revocations(ctx, current_skills)
+    mock_emit.assert_not_called()
+    assert ctx.state["last_authorized_skills"] == [
+        {"name": "skills/private-A", "default_revision": "rev-A1"}
+    ]
+
+
+@patch("src.orchestrator.planner.emit_skill_revoked_audit")
+def test_detect_revocations_audit_failure_does_not_abort_detection(mock_emit):
+    from src.orchestrator.planner import _detect_and_audit_revocations
+
+    ctx = MagicMock()
+    ctx.state = {
+        "last_authorized_skills": [
+            {"name": "skills/private-A", "default_revision": "rev-A"},
+            {"name": "skills/private-B", "default_revision": "rev-B"},
+        ]
+    }
+
+    mock_emit.side_effect = [Exception("error"), None]
+    _detect_and_audit_revocations(ctx, [])
+    assert mock_emit.call_count == 2
+    assert ctx.state["last_authorized_skills"] == []
+
+
+@pytest.mark.asyncio
+@patch("src.orchestrator.planner.emit_skill_revoked_audit")
+@patch("src.orchestrator.planner.emit_skill_invoked_audit")
+@patch("src.orchestrator.planner.dispatch_managed_skill", new_callable=AsyncMock)
+@patch("src.orchestrator.planner.preload_spending_facts")
+@patch("src.orchestrator.planner.AgentRegistryClient")
+async def test_root_planner_end_to_end_second_cycle_omits_revoked_skill(
+    mock_reg_cls, mock_preload, mock_dispatch, mock_invoked, mock_emit
+):
+    from google.adk.memory.in_memory_memory_service import InMemoryMemoryService
+    from google.adk.runners import Runner
+    from google.adk.sessions.in_memory_session_service import InMemorySessionService
+
+    from src.orchestrator.planner import root_agent
+    from src.orchestrator.registry_client import Skill
+
+    skill_a = Skill(
+        name="projects/test/locations/global/skills/private-spending-analysis",
+        target_state="TARGET_STATE_ACTIVE",
+        default_revision="rev-spend-1",
+    )
+    skill_b = Skill(
+        name="projects/test/locations/global/skills/private-goals-onboarding",
+        target_state="TARGET_STATE_ACTIVE",
+        default_revision="rev-goal-1",
+    )
+
+    # Cycle 1 returns [A, B], cycle 2 returns [A] (B was revoked)
+    mock_reg_cls.return_value.list_authorized_skills = AsyncMock(
+        side_effect=[[skill_a, skill_b], [skill_a]]
+    )
+    mock_preload.return_value = {}
+    mock_dispatch.return_value = {"summary": "ok"}
+
+    runner = Runner(
+        app_name="test_revocation",
+        agent=root_agent,
+        session_service=InMemorySessionService(),
+        memory_service=InMemoryMemoryService(),
+        auto_create_session=True,
+    )
+
+    # Cycle 1
+    stream1 = runner.run_async(
+        user_id="user_1",
+        session_id="sess_1",
+        new_message=UserContent(parts=[Part.from_text(text="{}")]),
+    )
+    res1 = [e async for e in stream1]
+
+    # Cycle 2
+    stream2 = runner.run_async(
+        user_id="user_1",
+        session_id="sess_1",
+        new_message=UserContent(parts=[Part.from_text(text="{}")]),
+    )
+    res2 = [e async for e in stream2]
+
+    # Check that emit_skill_revoked_audit was called for B
+    mock_emit.assert_called_once()
+    assert mock_emit.call_args[1]["revoked_skill_short_name"] in ("goals-onboarding", "private-goals-onboarding")
+    assert mock_emit.call_args[1]["prior_registry_entry_id"] == "rev-goal-1"
+
+
 

@@ -140,3 +140,48 @@ class AgentRegistryClient:
                 raise ValueError("SKILL.md not found in revision zip")
         except zipfile.BadZipFile as e:
             raise ValueError(f"failed to read zip archive: {e}") from e
+
+    async def revoke_skill(self, skill_id: str) -> None:
+        """Patches a skill's targetState to TARGET_STATE_DISABLED.
+
+        The next call to list_authorized_skills() will filter this skill out.
+        See ADR-0006 (targetState mechanism), acceptance criterion 1 in #25.
+
+        Args:
+            skill_id: Short form (e.g. "research") or full path. The `private-`
+                      prefix is added if missing, mirroring get_skill_content's
+                      behavior.
+        """
+        await self._patch_target_state(skill_id, "TARGET_STATE_DISABLED")
+
+    async def restore_skill(self, skill_id: str) -> None:
+        """Patches a skill's targetState back to TARGET_STATE_ACTIVE.
+
+        Symmetric to revoke_skill — used by the demo runner to reset state
+        between runs.
+        """
+        await self._patch_target_state(skill_id, "TARGET_STATE_ACTIVE")
+
+    async def _patch_target_state(self, skill_id: str, target_state: str) -> None:
+        """Shared PATCH implementation for revoke/restore.
+
+        Uses the standard Google API pattern: PATCH with updateMask=targetState.
+        """
+        if target_state not in ("TARGET_STATE_ACTIVE", "TARGET_STATE_DISABLED"):
+            raise ValueError(f"Invalid target_state '{target_state}'; must be ACTIVE or DISABLED")
+
+        client = await self._get_client()
+        formatted_id = skill_id if skill_id.startswith("private-") else f"private-{skill_id}"
+        skill_name = f"projects/{self.project_id}/locations/{self.location}/skills/{formatted_id}"
+        url = f"{self.base_url}/{skill_name}"
+
+        body = {"targetState": target_state}
+        # updateMask ensures only targetState is modified — never touch defaultRevision etc.
+        params = {"updateMask": "targetState"}
+
+        response = await client.patch(url, json=body, params=params)
+        if response.status_code not in (200, 204):
+            raise RuntimeError(
+                f"Failed to PATCH skill {skill_name} to {target_state}: "
+                f"status={response.status_code} body={response.text}"
+            )
