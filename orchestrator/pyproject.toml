@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "alpaca-py>=0.30.0",
     "google-adk[a2a,agent-identity,eval]>=2.5.0",
     "google-auth>=2.0.0",
     "google-cloud-firestore>=2.28.0",

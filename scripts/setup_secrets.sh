@@ -14,20 +14,22 @@ echo "Setting up Secret Manager secrets in project $PROJECT_ID..."
 # Enable Secret Manager API
 gcloud services enable secretmanager.googleapis.com --project="$PROJECT_ID"
 
-SECRET_NAME="ALPACA_API_KEY"
-DUMMY_VALUE="dummy-alpaca-api-key-replace-me"
+# Alpaca credentials: two secrets, key + secret
+for SECRET in ALPACA_API_KEY_ID ALPACA_API_SECRET; do
+  if ! gcloud secrets describe "$SECRET" --project="$PROJECT_ID" &>/dev/null; then
+    echo "Creating secret: $SECRET"
+    gcloud secrets create "$SECRET" --replication-policy="automatic" \
+      --labels="app=portfolio-copilot" --project="$PROJECT_ID"
 
-# Check if secret exists
-if ! gcloud secrets describe "$SECRET_NAME" --project="$PROJECT_ID" &>/dev/null; then
-  echo "Creating secret: $SECRET_NAME"
-  gcloud secrets create "$SECRET_NAME" --replication-policy="automatic" --labels="app=portfolio-copilot" --project="$PROJECT_ID"
-
-  echo -n "$DUMMY_VALUE" | gcloud secrets versions add "$SECRET_NAME" --data-file=- --project="$PROJECT_ID"
-  echo "Secret $SECRET_NAME created with dummy value."
-else
-  echo "Secret $SECRET_NAME already exists. Ensuring labels..."
-  gcloud secrets update "$SECRET_NAME" --update-labels="app=portfolio-copilot" --project="$PROJECT_ID" --quiet 2>/dev/null || true
-fi
+    echo -n "dummy-replace-me-with-real-value" | \
+      gcloud secrets versions add "$SECRET" --data-file=- --project="$PROJECT_ID"
+    echo "Secret $SECRET created with dummy value."
+  else
+    echo "Secret $SECRET already exists. Ensuring labels..."
+    gcloud secrets update "$SECRET" --update-labels="app=portfolio-copilot" \
+      --project="$PROJECT_ID" --quiet 2>/dev/null || true
+  fi
+done
 
 # Ensure MANAGED_AGENT_ID secret exists
 MA_SECRET_NAME="MANAGED_AGENT_ID"

@@ -11,7 +11,7 @@ from google.genai.types import Part, UserContent
 
 from .contracts.goals_onboarding import GoalsOnboardingResult
 from .contracts.proposed_action import ProposedAction
-from .gates import hitl_approval_gate
+from .gates import execution_gate, hitl_approval_gate
 from .logger import get_logger
 from .managed_agents import dispatch_managed_skill
 from .registry_client import AgentRegistryClient
@@ -366,6 +366,21 @@ async def root_planner(ctx: Context, node_input: Any):
             context["hitl_decision"] = hitl_result
             # Downstream: #23 G3 execution path picks up context["hitl_decision"] and
             # checks outcome == "approved" before calling Alpaca.
+
+    # Execution gate: if HITL approved, place the trade with Alpaca
+    if context.get("hitl_decision"):
+        exec_input = {
+            "hitl_decision": context.get("hitl_decision"),
+            "reviewer_verdict": context.get("reviewer_verdict"),
+        }
+        try:
+            exec_result = await ctx.run_node(execution_gate, node_input=exec_input)
+        except Exception as e:
+            logger.error(f"Execution gate raised: {e}")
+            results.append(f"execution_error: {e}")
+        else:
+            results.append(f"execution_result: {exec_result}")
+            context["execution_result"] = exec_result
 
     return results
 

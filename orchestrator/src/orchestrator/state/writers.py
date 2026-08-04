@@ -283,3 +283,62 @@ def emit_approval_rejected_audit(
     except Exception as e:
         logger.error(f"Failed to append APPROVAL_REJECTED audit for {action.action_id}: {e}")
         raise RuntimeError(f"Audit log write failed for approval rejection: {e}") from e
+
+
+def emit_action_executed_audit(
+    action: ProposedAction,
+    broker_order_id: str,
+    executing_user_id: Optional[str] = None,
+    db_client: Optional[FirestoreClient] = None,
+) -> None:
+    """Emits ACTION_EXECUTED after successful Alpaca submission. Fail-closed."""
+    client = db_client or FirestoreClient()
+    audit_entry = AuditLogEntry(
+        log_id=str(uuid.uuid4()),
+        event_type=EventType.ACTION_EXECUTED,
+        timestamp=datetime.now(timezone.utc),
+        actor=Actor(
+            type=ActorType.AGENT,
+            skill_name="orchestrator-execution-gate",
+            skill_version="0.1.0",
+        ),
+        related_action_id=action.action_id,
+        related_ips_version=action.ips_version_referenced.model_dump(),
+        detail=(
+            f"Alpaca accepted {action.side.value} {action.quantity} {action.ticker} "
+            f"(broker_order_id={broker_order_id}, approved_by={executing_user_id or 'unknown'})"
+        ),
+    )
+    try:
+        client.append_audit_log(audit_entry)
+    except Exception as e:
+        logger.error(f"Failed to append ACTION_EXECUTED audit for {action.action_id}: {e}")
+        raise RuntimeError(f"Audit log write failed for action execution: {e}") from e
+
+
+def emit_action_failed_audit(
+    action: ProposedAction,
+    error: str,
+    db_client: Optional[FirestoreClient] = None,
+) -> None:
+    """Emits ACTION_FAILED when Alpaca rejects the order or the executor errors. Fail-closed."""
+    client = db_client or FirestoreClient()
+    audit_entry = AuditLogEntry(
+        log_id=str(uuid.uuid4()),
+        event_type=EventType.ACTION_FAILED,
+        timestamp=datetime.now(timezone.utc),
+        actor=Actor(
+            type=ActorType.AGENT,
+            skill_name="orchestrator-execution-gate",
+            skill_version="0.1.0",
+        ),
+        related_action_id=action.action_id,
+        related_ips_version=action.ips_version_referenced.model_dump(),
+        detail=f"Execution failed: {error}",
+    )
+    try:
+        client.append_audit_log(audit_entry)
+    except Exception as e:
+        logger.error(f"Failed to append ACTION_FAILED audit for {action.action_id}: {e}")
+        raise RuntimeError(f"Audit log write failed for action failure: {e}") from e
+

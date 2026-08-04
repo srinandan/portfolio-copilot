@@ -8,6 +8,8 @@ from .preloader import (
 )
 from .spending import preload_spending_facts
 from .writers import (
+    emit_action_executed_audit,
+    emit_action_failed_audit,
     emit_approval_granted_audit,
     emit_approval_rejected_audit,
     emit_approval_requested_audit,
@@ -23,6 +25,8 @@ __all__ = [
     "preload_for_portfolio_analysis",
     "preload_for_research",
     "preload_spending_facts",
+    "emit_action_executed_audit",
+    "emit_action_failed_audit",
     "emit_approval_granted_audit",
     "emit_approval_rejected_audit",
     "emit_approval_requested_audit",
