@@ -57,9 +57,13 @@ def test_get_skill_tools():
 
 
 def test_output_schema_by_skill():
-    assert OUTPUT_SCHEMA_BY_SKILL["goals-onboarding"] == GoalsOnboardingResult
-    assert OUTPUT_SCHEMA_BY_SKILL["spending-analysis"] == SpendingReport
-    assert OUTPUT_SCHEMA_BY_SKILL["research"] == ResearchBrief
+    from orchestrator.managed_agents.dispatcher import normalize_private_skill_name
+
+    assert OUTPUT_SCHEMA_BY_SKILL["private-goals-onboarding"] == GoalsOnboardingResult
+    assert OUTPUT_SCHEMA_BY_SKILL["private-spending-analysis"] == SpendingReport
+    assert OUTPUT_SCHEMA_BY_SKILL["private-research"] == ResearchBrief
+    assert OUTPUT_SCHEMA_BY_SKILL.get(normalize_private_skill_name("goals-onboarding")) == GoalsOnboardingResult
+    assert OUTPUT_SCHEMA_BY_SKILL.get(normalize_private_skill_name("private-goals-onboarding")) == GoalsOnboardingResult
 
 
 @pytest.mark.asyncio

@@ -21,33 +21,33 @@ logger = get_logger(__name__)
 
 # Canonical mapping of skill identifiers to typed output schemas
 OUTPUT_SCHEMA_BY_SKILL: Dict[str, Type[BaseModel]] = {
-    "goals-onboarding": GoalsOnboardingResult,
     "private-goals-onboarding": GoalsOnboardingResult,
-    "portfolio-analysis": DriftReport,
     "private-portfolio-analysis": DriftReport,
-    "research": ResearchBrief,
     "private-research": ResearchBrief,
-    "action-drafting": ProposedAction,
     "private-action-drafting": ProposedAction,
-    "spending-analysis": SpendingReport,
     "private-spending-analysis": SpendingReport,
-    "reviewer": ReviewerVerdict,
     "private-reviewer": ReviewerVerdict,
 }
 
 
 def get_skill_tools(skill_name: str) -> list:
     """Returns the authorized toolset for a given skill turn."""
-    normalized = skill_name.replace("private-", "")
+    normalized = normalize_skill_name(skill_name)
     if normalized == "research":
         return [google_search]
     return []
 
 
 def normalize_skill_name(skill_name: str) -> str:
-    """Extracts short skill ID from full resource name."""
+    """Extracts short skill ID from full resource name without prefix."""
     base = skill_name.split("/")[-1] if "/" in skill_name else skill_name
     return base.replace("private-", "")
+
+
+def normalize_private_skill_name(skill_name: str) -> str:
+    """Extracts short skill ID with 'private-' prefix for schema lookup."""
+    base = skill_name.split("/")[-1] if "/" in skill_name else skill_name
+    return base if base.startswith("private-") else f"private-{base}"
 
 
 async def resolve_skill_instructions(skill_name: str, client: Optional[AgentRegistryClient] = None) -> str:
@@ -77,7 +77,7 @@ async def dispatch_managed_skill(
     4. Validates and returns the typed Pydantic output.
     """
     short_name = skill_name.split("/")[-1] if "/" in skill_name else skill_name
-    output_schema = OUTPUT_SCHEMA_BY_SKILL.get(short_name) or OUTPUT_SCHEMA_BY_SKILL.get(normalize_skill_name(short_name))
+    output_schema = OUTPUT_SCHEMA_BY_SKILL.get(normalize_private_skill_name(short_name))
     tools = get_skill_tools(short_name)
 
     try:

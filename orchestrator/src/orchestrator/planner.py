@@ -68,6 +68,12 @@ def _short_skill_id(name: str) -> str:
     return name.split("/")[-1] if "/" in name else name
 
 
+def _normalize_skill_key(name: str) -> str:
+    """Returns normalized skill key with 'private-' prefix for dictionary lookup."""
+    short = _short_skill_id(name)
+    return short if short.startswith("private-") else f"private-{short}"
+
+
 def _skill_sort_key(skill: Any) -> int:
     skill_name = skill.name if hasattr(skill, "name") else str(skill)
     short = _short_skill_id(skill_name)
@@ -282,18 +288,8 @@ SKILL_PLANS: Dict[str, SkillPlan] = {
         build_input=_build_spending_input,
         postprocess=_postprocess_spending,
     ),
-    "spending-analysis": SkillPlan(
-        short_name="spending-analysis",
-        build_input=_build_spending_input,
-        postprocess=_postprocess_spending,
-    ),
     "private-goals-onboarding": SkillPlan(
         short_name="private-goals-onboarding",
-        build_input=_build_goals_onboarding_input,
-        postprocess=_postprocess_goals_onboarding,
-    ),
-    "goals-onboarding": SkillPlan(
-        short_name="goals-onboarding",
         build_input=_build_goals_onboarding_input,
         postprocess=_postprocess_goals_onboarding,
     ),
@@ -302,18 +298,8 @@ SKILL_PLANS: Dict[str, SkillPlan] = {
         build_input=_build_portfolio_analysis_input,
         postprocess=_postprocess_portfolio_analysis,
     ),
-    "portfolio-analysis": SkillPlan(
-        short_name="portfolio-analysis",
-        build_input=_build_portfolio_analysis_input,
-        postprocess=_postprocess_portfolio_analysis,
-    ),
     "private-research": SkillPlan(
         short_name="private-research",
-        build_input=_build_research_input,
-        postprocess=_postprocess_research,
-    ),
-    "research": SkillPlan(
-        short_name="research",
         build_input=_build_research_input,
         postprocess=_postprocess_research,
     ),
@@ -322,18 +308,8 @@ SKILL_PLANS: Dict[str, SkillPlan] = {
         build_input=_build_action_drafting_input,
         postprocess=_postprocess_action_drafting,
     ),
-    "action-drafting": SkillPlan(
-        short_name="action-drafting",
-        build_input=_build_action_drafting_input,
-        postprocess=_postprocess_action_drafting,
-    ),
     "private-reviewer": SkillPlan(
         short_name="private-reviewer",
-        build_input=_build_reviewer_input,
-        postprocess=_postprocess_reviewer,
-    ),
-    "reviewer": SkillPlan(
-        short_name="reviewer",
         build_input=_build_reviewer_input,
         postprocess=_postprocess_reviewer,
     ),
@@ -538,7 +514,7 @@ async def root_planner(ctx: Context, node_input: Any):
     for skill in ordered_skills:
         skill_name = skill.name if hasattr(skill, "name") else str(skill)
         registry_entry_id = getattr(skill, "default_revision", None)
-        short_name = _short_skill_id(skill_name)
+        short_name = _normalize_skill_key(skill_name)
         plan = SKILL_PLANS.get(short_name)
         if plan is None:
             logger.info(f"Authorized skill {skill} has no SkillPlan; executing fallback.")
