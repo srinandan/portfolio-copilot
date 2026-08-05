@@ -19,6 +19,7 @@ from orchestrator.state.preloader import (
     preload_for_research,
     preload_for_reviewer,
 )
+from orchestrator.state.spending import preload_spending_facts
 
 
 @pytest.fixture
@@ -214,3 +215,23 @@ def test_preload_reviewer_no_ips_declines():
 def test_preload_reviewer_missing_action_raises():
     with pytest.raises(ValueError, match="requires 'action'"):
         preload_for_reviewer("user_123", action=None)
+
+
+def test_preload_spending_facts_window_months_differentiation(sample_holdings):
+    mock_bq = MagicMock()
+    mock_bq.get_trailing_income_and_outflow.return_value = {
+        "total_income": 18000.0,
+        "total_outflow": 12000.0,
+    }
+    mock_bq.get_monthly_spending_totals.return_value = []
+
+    mock_fs = MagicMock()
+    mock_fs.get_holdings.return_value = sample_holdings
+
+    facts_3 = preload_spending_facts("user_123", window_months=3, bq_client=mock_bq, firestore_client=mock_fs)
+    facts_6 = preload_spending_facts("user_123", window_months=6, bq_client=mock_bq, firestore_client=mock_fs)
+
+    assert facts_3["window_months"] == 3
+    assert facts_6["window_months"] == 6
+    assert facts_3["reserve_months"] != facts_6["reserve_months"]
+    assert facts_3 != facts_6

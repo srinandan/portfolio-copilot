@@ -12,7 +12,9 @@ class BigQueryClient:
         )
         self.client = bigquery.Client(project=self.project)
 
-    def get_monthly_spending_totals(self, user_id: str, current_month_start: str) -> List[Dict[str, Any]]:
+    def get_monthly_spending_totals(
+        self, user_id: str, current_month_start: str, window_months: int = 3
+    ) -> List[Dict[str, Any]]:
         query = f"""
         WITH monthly_totals AS (
           SELECT
@@ -22,7 +24,7 @@ class BigQueryClient:
           FROM `{self.project}.portfolio_copilot.chase_transactions`
           WHERE user_id = @user_id
             AND amount < 0
-            AND transaction_date >= DATE_SUB(CAST(@current_month_start AS DATE), INTERVAL 3 MONTH)
+            AND transaction_date >= DATE_SUB(CAST(@current_month_start AS DATE), INTERVAL @window_months MONTH)
             AND transaction_date < DATE_ADD(CAST(@current_month_start AS DATE), INTERVAL 1 MONTH)
           GROUP BY normalized_category, month
         )
@@ -38,6 +40,7 @@ class BigQueryClient:
             query_parameters=[
                 bigquery.ScalarQueryParameter("user_id", "STRING", user_id),
                 bigquery.ScalarQueryParameter("current_month_start", "STRING", current_month_start),
+                bigquery.ScalarQueryParameter("window_months", "INT64", window_months),
             ]
         )
 
@@ -45,20 +48,23 @@ class BigQueryClient:
         results = query_job.result()
         return [dict(row) for row in results]
 
-    def get_trailing_income_and_outflow(self, user_id: str, current_month_start: str) -> Dict[str, float]:
+    def get_trailing_income_and_outflow(
+        self, user_id: str, current_month_start: str, window_months: int = 3
+    ) -> Dict[str, float]:
         query = f"""
         SELECT
             SUM(IF(amount > 0, amount, 0)) as total_income,
             SUM(IF(amount < 0, -amount, 0)) as total_outflow
         FROM `{self.project}.portfolio_copilot.chase_transactions`
         WHERE user_id = @user_id
-          AND transaction_date >= DATE_SUB(CAST(@current_month_start AS DATE), INTERVAL 3 MONTH)
+          AND transaction_date >= DATE_SUB(CAST(@current_month_start AS DATE), INTERVAL @window_months MONTH)
           AND transaction_date < CAST(@current_month_start AS DATE)
         """
         job_config = bigquery.QueryJobConfig(
             query_parameters=[
                 bigquery.ScalarQueryParameter("user_id", "STRING", user_id),
                 bigquery.ScalarQueryParameter("current_month_start", "STRING", current_month_start),
+                bigquery.ScalarQueryParameter("window_months", "INT64", window_months),
             ]
         )
 
