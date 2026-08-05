@@ -54,3 +54,4 @@ class ProposedAction(BaseModel):
     proposed_by_skill_version: SkillVersionRef
     status: ActionStatus
     created_at: datetime
+    broker_order_id: str | None = None

@@ -303,3 +303,49 @@ def test_get_active_ips_by_user_multiple_invariant_violation(mock_client):
     with pytest.raises(ValueError, match="invariant violated: found multiple active IPS documents"):
         client.get_active_ips_by_user("user1")
 
+
+def test_proposed_action_roundtrip_with_broker_order_id():
+    with patch("google.cloud.firestore.Client"):
+        client = FirestoreClient(project="test-project")
+        client.db = MagicMock()
+
+        from src.orchestrator.contracts.proposed_action import (
+            ActionStatus,
+            ActionType,
+            OrderType,
+            ProposedAction,
+            Side,
+            SkillVersionRef,
+        )
+        from src.orchestrator.contracts.ips import RelatedIPSVersion
+
+        action = ProposedAction(
+            action_id="act_123",
+            session_id="sess_123",
+            type=ActionType.TRADE,
+            ticker="GOOG",
+            side=Side.BUY,
+            quantity=10.0,
+            order_type=OrderType.MARKET,
+            estimated_price_usd=150.0,
+            estimated_value_usd=1500.0,
+            rationale="Rebalance",
+            ips_version_referenced=RelatedIPSVersion(ips_id="ips_1", version=1),
+            proposed_by_skill_version=SkillVersionRef(skill_name="test-skill", skill_version="1.0.0"),
+            status=ActionStatus.EXECUTED,
+            created_at=datetime.now(timezone.utc),
+            broker_order_id="broker_ord_999",
+        )
+
+        mock_doc_ref = MagicMock()
+        client.db.collection.return_value.document.return_value = mock_doc_ref
+        client.set_proposed_action(action)
+        written_dict = mock_doc_ref.set.call_args[0][0]
+        assert written_dict["broker_order_id"] == "broker_ord_999"
+
+        mock_doc_ref.get.return_value.exists = True
+        mock_doc_ref.get.return_value.to_dict.return_value = written_dict
+        loaded_action = client.get_proposed_action("act_123")
+        assert loaded_action is not None
+        assert loaded_action.broker_order_id == "broker_ord_999"
+
