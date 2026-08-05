@@ -71,3 +71,50 @@ export interface ChatMessage {
   action?: ProposedAction;
   verdict?: ReviewerVerdict;
 }
+
+export interface CategorySpending {
+  category:
+    | 'housing' | 'utilities' | 'groceries' | 'dining' | 'transportation'
+    | 'entertainment' | 'subscriptions' | 'healthcare' | 'travel' | 'shopping'
+    | 'income' | 'transfers' | 'fees' | 'other';
+  amount_usd: number;
+  percent_of_total: number;
+  monthly_average_usd?: number;
+}
+
+export interface SpendingAnomaly {
+  category: string;
+  amount_usd: number;
+  trailing_average_usd: number;
+  description: string;
+  date: string;
+}
+
+export interface SpendingReport {
+  user_id: string;
+  total_income_usd: number;
+  total_outflow_usd: number;
+  savings_rate: number;
+  reserve_months: number;
+  category_breakdown: CategorySpending[];
+  anomalies: SpendingAnomaly[];
+  narrative_summary: string;
+}
+
+export interface DriftBandItem {
+  asset_class: string;
+  current_percent: number;
+  target_percent: number;
+  min_percent: number;
+  max_percent: number;
+  in_band: boolean;
+  drift_amount_percent: number;
+}
+
+export interface DriftReport {
+  as_of: string;
+  bands: DriftBandItem[];
+  unclassified_value_usd: number;
+  rebalance_recommended: boolean;
+  has_active_ips: boolean;
+}

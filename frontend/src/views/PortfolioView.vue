@@ -66,6 +66,9 @@
       </div>
     </div>
 
+    <!-- Portfolio Drift Report Card -->
+    <DriftReportCard v-if="driftReport" :drift-report="driftReport" />
+
     <!-- Top Holdings Table -->
     <TopHoldingsTable :positions="holdings.positions" />
   </div>
@@ -73,15 +76,24 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
-import type { HoldingsSnapshot } from '../types';
+import type { HoldingsSnapshot, DriftReport } from '../types';
 import { gatewayService } from '../services/gateway';
 import TopHoldingsTable from '../components/portfolio/TopHoldingsTable.vue';
+import DriftReportCard from '../components/portfolio/DriftReportCard.vue';
 
 const holdings = ref<HoldingsSnapshot>({
   total_value_usd: 1248500,
   cash_usd: 62400,
   as_of: '2023-10-24',
   positions: []
+});
+
+const driftReport = ref<DriftReport>({
+  as_of: '2023-10-24',
+  has_active_ips: true,
+  rebalance_recommended: false,
+  unclassified_value_usd: 0,
+  bands: []
 });
 
 const totalValueFormatted = computed(() => {
@@ -93,8 +105,12 @@ const totalValueFormatted = computed(() => {
 
 onMounted(async () => {
   try {
-    const data = await gatewayService.getHoldings();
-    holdings.value = data;
+    const [holdingsData, driftData] = await Promise.all([
+      gatewayService.getHoldings(),
+      gatewayService.getDriftReport()
+    ]);
+    holdings.value = holdingsData;
+    driftReport.value = driftData;
   } catch {
     // Default values
   }
