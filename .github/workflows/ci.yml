@@ -106,6 +106,10 @@ jobs:
         working-directory: frontend
         run: npm run test -- --coverage
 
+      - name: Verify Docker build
+        if: steps.check.outputs.exists == 'true'
+        run: docker build -t frontend-ci-test frontend/
+
       - name: Skip (no package.json yet)
         if: steps.check.outputs.exists == 'false'
         run: echo "No package.json in frontend/ yet — skipping."
