@@ -89,6 +89,10 @@
       ]
     },
 
-    "created_at": { "type": "string", "format": "date-time" }
+    "created_at": { "type": "string", "format": "date-time" },
+    "broker_order_id": {
+      "type": ["string", "null"],
+      "description": "The order ID returned by the broker upon successful order submission."
+    }
   }
 }

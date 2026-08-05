@@ -73,6 +73,7 @@ type ProposedAction struct {
 	ProposedBySkillVersion SkillVersionRef `json:"proposed_by_skill_version" firestore:"proposed_by_skill_version"`
 	Status                 ActionStatus    `json:"status" firestore:"status"` // drafted, reviewed_pass, reviewed_fail, pending_approval, approved, rejected, executed, failed
 	CreatedAt              time.Time       `json:"created_at" firestore:"created_at"`
+	BrokerOrderID          *string         `json:"broker_order_id,omitempty" firestore:"broker_order_id,omitempty"`
 }
 
 // IsTrade returns true if the action type is a trade.
