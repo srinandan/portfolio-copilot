@@ -268,6 +268,9 @@ async def _postprocess_reviewer(user_id, result, ctx, input_dict, registry_entry
         registry_entry_id=registry_entry_id,
     )
 
+    if auth_verdict and hasattr(ctx, "state") and ctx.state is not None:
+        ctx.state["reviewer_verdict"] = auth_verdict.model_dump()
+
     payload = auth_verdict.model_dump() if auth_verdict else {"status": "unavailable"}
     ctx_update = {
         "reviewer_verdict": auth_verdict,
@@ -583,7 +586,9 @@ async def root_planner(ctx: Context, node_input: Any):
     if context.get("hitl_decision"):
         exec_input = {
             "hitl_decision": context.get("hitl_decision"),
-            "reviewer_verdict": context.get("reviewer_verdict"),
+            "reviewer_verdict": context.get("reviewer_verdict")
+            or ctx.state.get("reviewer_verdict")
+            or ctx.state.get("hitl_verdict"),
         }
         try:
             exec_result = await ctx.run_node(execution_gate, node_input=exec_input)
