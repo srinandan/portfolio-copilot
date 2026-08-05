@@ -5,7 +5,6 @@ Wraps the alpaca-py SDK. Owned by trusted orchestrator code per ADR-0005
 never touches the live endpoint, regardless of environment.
 """
 
-import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Optional
@@ -35,22 +34,25 @@ class ExecutionResult:
 
 
 def _load_alpaca_credentials() -> tuple[str, str]:
-    """Reads ALPACA_API_KEY_ID and ALPACA_API_SECRET from env.
+    """Reads ALPACA_API_KEY_ID and ALPACA_API_SECRET from env or Secret Manager.
 
-    Populated at deploy time by binding Secret Manager entries to env vars
-    (see scripts/setup_secrets.sh + scripts/setup_agent_engine.sh).
+    Populated at startup by secret_loader.py (see scripts/setup_secrets.sh).
 
     Raises:
         AlpacaExecutionError: if either credential is missing or empty.
     """
-    key_id = os.environ.get("ALPACA_API_KEY_ID", "").strip()
-    secret = os.environ.get("ALPACA_API_SECRET", "").strip()
-    if not key_id or not secret:
+    from ..managed_agents.secret_loader import (
+        SecretLoadError,
+        resolve_alpaca_credentials,
+    )
+
+    try:
+        return resolve_alpaca_credentials(require=True)
+    except SecretLoadError as e:
         raise AlpacaExecutionError(
             "Alpaca credentials not configured: set ALPACA_API_KEY_ID and "
             "ALPACA_API_SECRET (populated from Secret Manager at deploy time)."
-        )
-    return key_id, secret
+        ) from e
 
 
 def _to_alpaca_side(side: Side) -> OrderSide:

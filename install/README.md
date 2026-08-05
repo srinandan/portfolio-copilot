@@ -18,10 +18,7 @@ Runtime, in the order each depends on the last:
 
 This runs, in sequence:
 
-1. `setup_secrets.sh`, creates the `ALPACA_API_KEY` secret (placeholder
-   value, replace it with a real Alpaca paper-trading key afterward),
-   grants the Agent Platform Service Agent access to fetch it during
-   deployment
+1. `setup_secrets.sh`, creates `ALPACA_API_KEY_ID`, `ALPACA_API_SECRET`, and `MANAGED_AGENT_ID` secrets (placeholder values, replace Alpaca keys with real paper-trading credentials afterward), granting the Agent Platform Service Agent access to fetch them during deployment
 2. `setup_bigquery.sh`, creates the `portfolio_copilot.chase_transactions`
    dataset and table
 3. `setup_firestore.sh`, provisions the Firestore database
@@ -34,12 +31,24 @@ This runs, in sequence:
 Each script also runs standalone if you only need to redo one step:
 `./scripts/setup_bigquery.sh <PROJECT_ID>`, etc.
 
-### Replace the placeholder Alpaca key
+### Replace the placeholder Alpaca keys
 
 ```bash
-echo -n "<your real Alpaca paper-trading API key>" | \
-  gcloud secrets versions add ALPACA_API_KEY --data-file=- --project=<PROJECT_ID>
+echo -n "<your real Alpaca paper-trading key ID>" | \
+  gcloud secrets versions add ALPACA_API_KEY_ID --data-file=- --project=<PROJECT_ID>
+
+echo -n "<your real Alpaca paper-trading secret>" | \
+  gcloud secrets versions add ALPACA_API_SECRET --data-file=- --project=<PROJECT_ID>
 ```
+
+### Credentials & Secret Flow
+
+Credentials (`MANAGED_AGENT_ID`, `ALPACA_API_KEY_ID`, and `ALPACA_API_SECRET`) are stored in Google Cloud Secret Manager and resolved automatically at runtime:
+
+1. **Secret Manager**: Stored securely in Secret Manager (`projects/<PROJECT_ID>/secrets/<SECRET_NAME>/versions/latest`) and provisioned via `scripts/setup_secrets.sh`.
+2. **Startup Resolution (`secret_loader.py`)**: When the orchestrator boots in Agent Runtime or locally, `secret_loader.py` checks environment variables first. If not set, it fetches the secrets from Secret Manager using the default service account credentials (`roles/secretmanager.secretAccessor`) and binds them to environment variables (`os.environ`).
+3. **Startup Validation**: At orchestrator boot (`planner.py`), `verify_required_secrets()` validates that all required secrets can be resolved. In production/strict mode, if any are missing, startup fails immediately with a clear `SecretLoadError` rather than crashing mid-order during execution.
+4. **Executor Access**: Executors (`alpaca.py`, `worker.py`) read the resolved credentials from environment variables.
 
 ## Registering a skill
 
