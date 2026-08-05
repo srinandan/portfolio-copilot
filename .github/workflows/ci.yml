@@ -35,7 +35,7 @@ jobs:
       - name: Run tests with coverage
         env:
           PYTHONPATH: .
-        run: uv run --project orchestrator pytest --cov=orchestrator/src --cov-report=term
+        run: uv run --project orchestrator pytest --cov=orchestrator/src --cov=scripts --cov-report=term
 
   go:
     name: Go
