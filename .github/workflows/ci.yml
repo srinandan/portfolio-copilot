@@ -86,13 +86,25 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Install, build, test with coverage
+      - name: Install dependencies
         if: steps.check.outputs.exists == 'true'
         working-directory: frontend
-        run: |
-          npm ci
-          npm run build
-          npm run test -- --coverage
+        run: npm ci
+
+      - name: Run typecheck
+        if: steps.check.outputs.exists == 'true'
+        working-directory: frontend
+        run: npm run typecheck
+
+      - name: Build
+        if: steps.check.outputs.exists == 'true'
+        working-directory: frontend
+        run: npm run build
+
+      - name: Run tests with coverage
+        if: steps.check.outputs.exists == 'true'
+        working-directory: frontend
+        run: npm run test -- --coverage
 
       - name: Skip (no package.json yet)
         if: steps.check.outputs.exists == 'false'
