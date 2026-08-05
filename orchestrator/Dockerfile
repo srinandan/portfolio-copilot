@@ -16,10 +16,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN pip install --no-cache-dir uv
 
 # Copy project configuration and lock files
-COPY pyproject.toml uv.lock README.md ./
+COPY orchestrator/pyproject.toml orchestrator/uv.lock orchestrator/README.md ./
 
-# Copy source code
-COPY src/ ./src/
+# Copy source code and runtime skills
+COPY orchestrator/src/ ./src/
+COPY skills/ ./skills/
+
+ENV SKILLS_DIR=/app/skills
 
 # Install the project and dependencies using uv
 RUN uv pip install --system --no-cache .
