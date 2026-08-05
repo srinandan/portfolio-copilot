@@ -1,10 +1,17 @@
 """Shared helpers to extract skill metadata from SKILL.md YAML frontmatter and body."""
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
 import yaml
+
+
+class SkillMetadataError(RuntimeError):
+    """Raised when required skill metadata (version or approval scope) cannot be found at startup."""
+
+    pass
 
 
 @dataclass(frozen=True)
@@ -17,13 +24,51 @@ class SkillMetadata:
     approval_scope: Optional[str]  # from top-level approval_scope line — may be None if missing
 
 
+def _clean_skill_name(name: str) -> str:
+    """Strip any path prefix or 'private-' prefix to get the canonical skill directory name."""
+    short = name.split("/")[-1] if "/" in name else name
+    if short.startswith("private-"):
+        return short[len("private-"):]
+    return short
+
+
 def _find_skill_md(skill_dir_name: str) -> Optional[Path]:
-    """Walks up from this file to find <ancestor>/skills/<skill_dir_name>/SKILL.md."""
-    current = Path(__file__).resolve().parent
-    for parent in [current] + list(current.parents):
-        candidate = parent / "skills" / skill_dir_name / "SKILL.md"
+    """Finds SKILL.md for a given skill directory name across development, package, and container layouts."""
+    short_name = _clean_skill_name(skill_dir_name)
+
+    # 1. If explicit SKILLS_DIR is provided in environment, strictly check that directory only
+    if "SKILLS_DIR" in os.environ:
+        candidate = Path(os.environ["SKILLS_DIR"]) / short_name / "SKILL.md"
         if candidate.exists():
             return candidate
+        return None
+
+    # 2. Check inside Python package directory (if SKILL.md files are bundled inside orchestrator/skills/<name>/SKILL.md)
+    pkg_dir = Path(__file__).resolve().parent
+    for candidate_dir in [pkg_dir / short_name, pkg_dir / "skills" / short_name]:
+        candidate = candidate_dir / "SKILL.md"
+        if candidate.exists():
+            return candidate
+
+    # 3. Walk up ancestors for dev/repo layout (<parent>/skills/<name>/SKILL.md)
+    for parent in [pkg_dir] + list(pkg_dir.parents):
+        candidate = parent / "skills" / short_name / "SKILL.md"
+        if candidate.exists():
+            return candidate
+
+    # 4. Check importlib.resources for installed wheel/package resources
+    try:
+        import importlib.resources
+
+        ref = importlib.resources.files("orchestrator.skills").joinpath(short_name, "SKILL.md")
+        if hasattr(ref, "is_file") and ref.is_file():
+            if hasattr(ref, "as_posix"):
+                p = Path(ref.as_posix())
+                if p.exists():
+                    return p
+    except Exception:
+        pass
+
     return None
 
 
@@ -94,3 +139,34 @@ def read_skill_metadata(skill_dir_name: str) -> SkillMetadata:
         version=read_skill_version(skill_dir_name),
         approval_scope=read_skill_approval_scope(skill_dir_name),
     )
+
+
+def verify_all_skills_metadata(skill_names: Optional[list[str]] = None) -> None:
+    """Verifies at startup that SKILL.md files can be found and read for all registered skills.
+
+    Raises SkillMetadataError if any skill in PIPELINE_SKILL_ORDER cannot be resolved.
+    """
+    if skill_names is None:
+        from ..planner import PIPELINE_SKILL_ORDER
+
+        skill_names = PIPELINE_SKILL_ORDER
+
+    missing: list[str] = []
+    for name in skill_names:
+        clean = _clean_skill_name(name)
+        path = _find_skill_md(clean)
+        if path is None:
+            missing.append(clean)
+        else:
+            try:
+                read_skill_version(clean)
+                read_skill_approval_scope(clean)
+            except Exception as e:
+                raise SkillMetadataError(f"Failed reading SKILL.md metadata for {clean}: {e}") from e
+
+    if missing:
+        unique_missing = sorted(set(missing))
+        raise SkillMetadataError(
+            f"Startup verification failed: could not locate SKILL.md for skill(s): {', '.join(unique_missing)}. "
+            "Ensure SKILL.md files are bundled with the deployment or SKILLS_DIR is set."
+        )
