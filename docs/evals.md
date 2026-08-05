@@ -86,6 +86,12 @@ for dir in skills/*/; do
 done
 ```
 
+### CI/CD Evaluation Mode (Judge vs. Heuristic Scoring)
+
+In Continuous Integration (`.github/workflows/skill-evals.yml`), the evaluation suite adapts dynamically to credentials:
+- **LLM-Judge Scoring (`--llm-judge`)**: When the `GEMINI_API_KEY` repository secret is present (e.g. on branches within the primary repository), `evals.report --llm-judge` runs model-assisted judging for qualitative evaluation criteria.
+- **Heuristic Scoring Only**: When `GEMINI_API_KEY` is absent (e.g. on pull requests from external forks), the CI workflow outputs an explicit warning (`::warning title=LLM Judge Skipped::...`) and gracefully degrades to non-blocking heuristic scoring so PRs can be validated without requiring API secrets.
+
 ### Automated Unit Testing
 
 EvalSet schema compliance, JSON validation, and doc-only agent construction are covered by pytest:

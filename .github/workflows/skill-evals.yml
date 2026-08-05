@@ -49,6 +49,7 @@ jobs:
           if [ -n "$GEMINI_API_KEY" ]; then
             uv run --project orchestrator python -m evals.report --llm-judge
           else
+            echo "::warning title=LLM Judge Skipped::GEMINI_API_KEY secret not set; running heuristic scoring only (non-blocking)."
             uv run --project orchestrator python -m evals.report
           fi
 
