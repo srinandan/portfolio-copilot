@@ -21,14 +21,13 @@ import sys
 import time
 from typing import List
 
-from google.adk.memory.in_memory_memory_service import InMemoryMemoryService
 from google.adk.runners import Runner
-from google.adk.sessions.in_memory_session_service import InMemorySessionService
 from google.genai.types import Part, UserContent
 from orchestrator.contracts.audit_log import EventType
 from orchestrator.data.firestore import FirestoreClient
 from orchestrator.planner import root_agent
 from orchestrator.registry_client import AgentRegistryClient
+from orchestrator.session_manager import SessionManager
 
 
 async def _run_cycle(runner: Runner, session_id: str, cycle_name: str) -> List[dict]:
@@ -86,8 +85,9 @@ async def main() -> int:
 
     print(f"Demo: revoking skill '{skill}' in {project_id}/{location} between two planning cycles.")
 
-    session_service = InMemorySessionService()
-    memory_service = InMemoryMemoryService()
+    session_manager = SessionManager()
+    session_service = session_manager.session_service
+    memory_service = session_manager.memory_service
     runner = Runner(
         app_name="live_revocation_demo",
         agent=root_agent,
