@@ -3,14 +3,13 @@
 ## Prerequisites
 
 - `gcloud` CLI, authenticated, with a GCP project you can administer
-- `python3`, `pip`
+- `python3` (3.11+), `pip`, `uv` (recommended for Python packaging)
 - `go` (for the gateway)
-- `node`/`npm` (for the frontend, once it exists)
+- `node`/`npm` (for the frontend)
 
 ## First-time setup
 
-Provisions Secret Manager, BigQuery, Firestore, Cloud Run, and Agent
-Runtime, in the order each depends on the last:
+Provisions Secret Manager, BigQuery, Firestore, Cloud Run, Managed Agent workers, and Agent Runtime, in the order each depends on the last:
 
 ```bash
 ./scripts/setup_all.sh <PROJECT_ID> <REGION>
@@ -18,15 +17,13 @@ Runtime, in the order each depends on the last:
 
 This runs, in sequence:
 
-1. `setup_secrets.sh`, creates `ALPACA_API_KEY_ID`, `ALPACA_API_SECRET`, and `MANAGED_AGENT_ID` secrets (placeholder values, replace Alpaca keys with real paper-trading credentials afterward), granting the Agent Platform Service Agent access to fetch them during deployment
-2. `setup_bigquery.sh`, creates the `portfolio_copilot.chase_transactions`
-   dataset and table
-3. `setup_firestore.sh`, provisions the Firestore database
-4. `setup_cloudrun.sh`, deploys `gateway` and `frontend` (once it
-   exists) to Cloud Run, each with its own dedicated, least-privilege
-   service account, not the default compute service account
-5. `setup_agent_engine.sh`, provisions Agent Runtime for the
-   orchestrator, including Agent Identity configuration
+1. `setup_secrets.sh`, creates `ALPACA_API_KEY_ID`, `ALPACA_API_SECRET`, and `MANAGED_AGENT_ID` secrets (placeholder values, replace Alpaca keys with real paper-trading credentials afterward), granting the Agent Platform Service Agent access to fetch them during deployment.
+2. `setup_bigquery.sh`, creates the `portfolio_copilot.chase_transactions` dataset and table.
+3. `setup_firestore.sh`, provisions the Firestore database.
+4. `setup_cloudrun.sh`, deploys `gateway` and `frontend` to Cloud Run, each with its own dedicated, least-privilege service account, not the default compute service account.
+5. `setup_managed_agent.sh`, provisions and deploys the worker Managed Agent (`scripts/deploy_managed_agent.py`) and stores its resource ID in Secret Manager as `MANAGED_AGENT_ID`.
+6. `setup_agent_engine.sh`, provisions Agent Runtime for the orchestrator (`scripts/deploy_agent_engine.py`), including least-privilege Agent Identity IAM roles.
+7. `register_all_skills.sh`, registers all 5 runtime skills (`goals-onboarding`, `spending-analysis`, `portfolio-analysis`, `research`, `action-drafting`) in the Agent Registry.
 
 Each script also runs standalone if you only need to redo one step:
 `./scripts/setup_bigquery.sh <PROJECT_ID>`, etc.
@@ -52,28 +49,41 @@ Credentials (`MANAGED_AGENT_ID`, `ALPACA_API_KEY_ID`, and `ALPACA_API_SECRET`) a
 
 ## Registering a skill
 
-Each skill under `skills/` needs registering with the real Agent
-Registry before the orchestrator can discover it:
+Each skill under `skills/` needs registering with the real Agent Registry before the orchestrator can discover it:
 
 ```bash
+# Register a single skill:
 ./scripts/register_skill.sh <skill-name> <PROJECT_ID> <REGION>
 # e.g. ./scripts/register_skill.sh goals-onboarding <PROJECT_ID> us-central1
+
+# Or register all 5 runtime skills at once:
+./scripts/register_all_skills.sh <PROJECT_ID> <REGION>
 ```
 
-Zips the skill directory and registers it as `private-<skill-name>`.
-Re-run this any time a skill's `SKILL.md` or supporting files change,
-this pushes a new revision, it doesn't mutate the existing one.
+Zips the skill directory and registers it as `private-<skill-name>`. Re-run this any time a skill's `SKILL.md` or supporting files change, this pushes a new revision, it doesn't mutate the existing one.
+
+## Verify installation
+
+To verify that the worker Managed Agent is provisioned and reachable in your GCP project without needing a full UI test:
+
+```bash
+export PROJECT_ID=<your-project-id>
+export RUN_INTEGRATION_TESTS=1
+cd orchestrator && uv run pytest tests/integration/test_managed_agent_provisioned.py -v
+```
+
+This smoke test verifies that `resolve_managed_agent_id()` loads a live `MANAGED_AGENT_ID` from Secret Manager or environment variables and can instantiate an ADK `ManagedAgent` worker.
 
 ## Running locally
 
 ```bash
 # orchestrator (Python)
-cd orchestrator && pip install -e ".[dev]" && pytest
+cd orchestrator && uv pip install -e ".[dev]" && uv run pytest
 
 # gateway (Go)
 cd gateway && go build ./... && go test ./...
 
-# frontend (once it exists)
+# frontend (Vue + TypeScript)
 cd frontend && npm install && npm run dev
 ```
 
@@ -84,17 +94,31 @@ Depends on what changed:
 - **Gateway or frontend code**: re-run
   `./scripts/setup_cloudrun.sh <PROJECT_ID> <REGION>`, or
   `gcloud run deploy` directly against the specific service if you only
-  changed one
+  changed one.
+- **Worker Managed Agent code**: re-run
+  `./scripts/setup_managed_agent.sh <PROJECT_ID> <REGION>` (or `python scripts/deploy_managed_agent.py --project=<PROJECT_ID> --location=<REGION>`).
 - **Orchestrator code**: re-run `python scripts/deploy_agent_engine.py`
-  to redeploy to Agent Runtime
+  to redeploy to Agent Runtime.
 - **A skill's `SKILL.md` or contents**: re-run `register_skill.sh` for
-  that skill, per above
+  that skill (or `register_all_skills.sh`), per above.
 - **Infra changes** (new secrets, new BigQuery columns, IAM changes):
   re-run the specific `setup_*.sh` script that owns that resource, not
-  `setup_all.sh` wholesale, unless you're provisioning a fresh project
+  `setup_all.sh` wholesale, unless you're provisioning a fresh project.
 
 ## Demos
 
-- [Live Skill Revocation](../docs/demos/live-revocation.md) — Demonstrates
-  revoking a skill mid-session and observing the next planning cycle adapt
-  without errors or restarts.
+### Live Skill Revocation
+
+Demonstrates revoking a runtime skill mid-session via the Agent Registry and observing the next planning cycle adapt without errors or restarts:
+
+```bash
+export PROJECT_ID=<your-project-id>
+export GOOGLE_CLOUD_LOCATION=global
+export SKILL_TO_REVOKE=research   # or any registered skill
+cd orchestrator && uv run python ../scripts/demo_live_revocation.py
+
+# Restore the revoked skill afterward:
+./scripts/restore_skill.sh $SKILL_TO_REVOKE
+```
+
+See [Live Skill Revocation](../docs/demos/live-revocation.md) for step-by-step documentation and expected audit trail output.
