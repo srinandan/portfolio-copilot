@@ -26,8 +26,9 @@ def preload_spending_facts(
     bq = bq_client or BigQueryClient()
     fs = firestore_client or FirestoreClient()
     current_month_start = datetime.now(timezone.utc).replace(day=1).strftime("%Y-%m-%d")
+    valid_window = int(window_months) if isinstance(window_months, (int, float)) and window_months > 0 else 3
 
-    totals = bq.get_trailing_income_and_outflow(user_id, current_month_start)
+    totals = bq.get_trailing_income_and_outflow(user_id, current_month_start, window_months=valid_window)
     total_income = float(totals.get("total_income", 0.0) or 0.0)
     total_outflow = float(totals.get("total_outflow", 0.0) or 0.0)
     savings_rate = calculate_savings_rate(total_income, total_outflow)
@@ -35,11 +36,10 @@ def preload_spending_facts(
     holdings = fs.get_holdings(user_id)
     cash_usd = float(holdings.cash_usd) if holdings and holdings.cash_usd else 0.0
 
-    valid_window = float(window_months) if isinstance(window_months, (int, float)) and window_months > 0 else 3.0
-    avg_monthly_expenses = (total_outflow / valid_window) if total_outflow > 0 else 0.0
+    avg_monthly_expenses = (total_outflow / float(valid_window)) if total_outflow > 0 else 0.0
     reserve_months = calculate_reserve_months(cash_usd, avg_monthly_expenses)
 
-    spending_totals = bq.get_monthly_spending_totals(user_id, current_month_start)
+    spending_totals = bq.get_monthly_spending_totals(user_id, current_month_start, window_months=valid_window)
     anomalies = []
     category_breakdown = []
 
