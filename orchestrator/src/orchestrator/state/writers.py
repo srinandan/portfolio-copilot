@@ -136,7 +136,7 @@ def write_proposed_action(
             approval_scope=approval_scope,
         ),
         related_action_id=action.action_id,
-        related_ips_version=action.ips_version_referenced.model_dump(),
+        related_ips_version=action.ips_version_referenced,
         detail=f"Proposed {action.side.value} {action.quantity} {action.ticker}",
     )
     try:
@@ -207,7 +207,7 @@ def emit_review_completed_audit(
             approval_scope=approval_scope,
         ),
         related_action_id=action.action_id,
-        related_ips_version=action.ips_version_referenced.model_dump() if hasattr(action.ips_version_referenced, "model_dump") else action.ips_version_referenced,
+        related_ips_version=action.ips_version_referenced,
         detail=detail,
     )
     try:
@@ -349,7 +349,7 @@ def emit_approval_requested_audit(
             approval_scope=None,
         ),
         related_action_id=action.action_id,
-        related_ips_version=action.ips_version_referenced.model_dump(),
+        related_ips_version=action.ips_version_referenced,
         detail=f"Approval requested for {action.side.value} {action.quantity} {action.ticker}"
                + (f" (reviewer_verdict={reviewer_verdict_id})" if reviewer_verdict_id else " (no reviewer verdict available)"),
     )
@@ -377,7 +377,7 @@ def emit_approval_granted_audit(
             user_id=approving_user_id,
         ),
         related_action_id=action.action_id,
-        related_ips_version=action.ips_version_referenced.model_dump(),
+        related_ips_version=action.ips_version_referenced,
         detail=f"Human approved {action.side.value} {action.quantity} {action.ticker}"
                + (f" after {edit_rounds} edit round(s)" if edit_rounds else ""),
     )
@@ -409,7 +409,7 @@ def emit_approval_rejected_audit(
             approval_scope=None,
         ),
         related_action_id=action.action_id,
-        related_ips_version=action.ips_version_referenced.model_dump(),
+        related_ips_version=action.ips_version_referenced,
         detail=f"Rejected: {reason}",
     )
     try:
@@ -439,7 +439,7 @@ def emit_action_executed_audit(
             approval_scope=None,
         ),
         related_action_id=action.action_id,
-        related_ips_version=action.ips_version_referenced.model_dump(),
+        related_ips_version=action.ips_version_referenced,
         detail=(
             f"Alpaca accepted {action.side.value} {action.quantity} {action.ticker} "
             f"(broker_order_id={broker_order_id}, approved_by={executing_user_id or 'unknown'})"
@@ -471,7 +471,7 @@ def emit_action_failed_audit(
             approval_scope=None,
         ),
         related_action_id=action.action_id,
-        related_ips_version=action.ips_version_referenced.model_dump(),
+        related_ips_version=action.ips_version_referenced,
         detail=f"Execution failed: {error}",
     )
     try:

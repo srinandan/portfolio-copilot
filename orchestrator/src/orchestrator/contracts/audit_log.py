@@ -3,6 +3,8 @@ from enum import Enum
 
 from pydantic import BaseModel
 
+from .ips import RelatedIPSVersion
+
 
 class EventType(str, Enum):
     SKILL_INVOKED = "skill_invoked"
@@ -31,11 +33,6 @@ class Actor(BaseModel):
     skill_version: str | None = None
     registry_entry_id: str | None = None
     approval_scope: str | None = None
-
-
-class RelatedIPSVersion(BaseModel):
-    ips_id: str
-    version: int
 
 
 class AuditLogEntry(BaseModel):
