@@ -1,25 +1,50 @@
+substitutions:
+  _COMMIT_SHA: latest
+  _REGION: us-central1
+  _AGENT_DISPLAY_NAME: portfolio-copilot-agent
+  _SERVICE: portfolio-copilot-orchestrator
+  _AR_REPO: portfolio-copilot
+
 steps:
-  # Build the container image
+  # Build the container image, tagged with the commit SHA / git tag
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'gcr.io/$PROJECT_ID/portfolio-copilot-orchestrator', '-f', 'orchestrator/Dockerfile', '.']
-
-  # Push the container image to Container Registry
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'gcr.io/$PROJECT_ID/portfolio-copilot-orchestrator']
-
-  # Deploy container image to Cloud Run
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    entrypoint: gcloud
     args:
-      - 'run'
-      - 'deploy'
-      - 'portfolio-copilot-orchestrator'
-      - '--image'
-      - 'gcr.io/$PROJECT_ID/portfolio-copilot-orchestrator'
-      - '--region'
-      - 'us-central1'
-      - '--set-labels=app=portfolio-copilot,component=orchestrator'
-      - '--no-allow-unauthenticated'
+      - 'build'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:${_COMMIT_SHA}'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:latest'
+      - '-f'
+      - 'orchestrator/Dockerfile'
+      - '.'
+
+  # Push both tags to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - '--all-tags'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}'
+
+  # Deploy the container image to Vertex AI Agent Runtime (Agent Engine).
+  # Uses the SDK's container_spec deployment path (ReasoningEngineSpec.container_spec).
+  # Idempotent: updates the existing engine matching _AGENT_DISPLAY_NAME in place, or
+  # creates one if none exists yet.
+  - name: 'python:3.12-slim'
+    entrypoint: bash
+    args:
+      - '-c'
+      - |
+        set -eu
+        pip install --no-cache-dir "google-cloud-aiplatform[agent_engines,adk]" click google-auth
+        python scripts/deploy_agent_engine.py \
+          --project="${PROJECT_ID}" \
+          --location="${_REGION}" \
+          --display-name="${_AGENT_DISPLAY_NAME}" \
+          --container-uri="${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:${_COMMIT_SHA}"
 
 images:
-  - 'gcr.io/$PROJECT_ID/portfolio-copilot-orchestrator'
+  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:${_COMMIT_SHA}'
+  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:latest'
+
+options:
+  logging: CLOUD_LOGGING_ONLY

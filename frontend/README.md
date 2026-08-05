@@ -84,7 +84,7 @@ npm install
 Run the development server with Vite:
 
 ```bash
-npm run dev
+make -C frontend local        # or: npm run dev
 ```
 
 By default, Vite runs on `http://localhost:3000` and proxies `/api` and `/health` requests to `http://localhost:8080` (the default local port for the Go API Gateway).
@@ -132,26 +132,15 @@ The frontend is containerized using a multi-stage `Dockerfile`:
 - Proxies `/api/` requests to the upstream gateway service (`http://portfolio-copilot-gateway:8080/api/`).
 - Serves `/health` directly (`200 ok`) for Google Cloud Run startup and liveness checks.
 
-### Deploying via Cloud Build (`cloudbuild.yaml`)
-
-To build, push, and deploy the container image to Google Cloud Run using Google Cloud Build:
+### Deploying via the Makefile
 
 ```bash
-gcloud builds submit --config frontend/cloudbuild.yaml .
+make -C frontend deploy
 ```
 
-### Deploying via gcloud / Infrastructure Scripts
+This calls `gcloud builds submit --config=frontend/cloudbuild.yaml` with `_COMMIT_SHA=$(git rev-parse --short HEAD)` and the active gcloud region, builds+pushes the image to Artifact Registry, and deploys it to Cloud Run under the `portfolio-copilot-frontend-sa` service account created by `scripts/setup_cloudrun.sh`.
 
-See [`scripts/setup_cloudrun.sh`](../scripts/setup_cloudrun.sh) for automated Cloud Run provisioning:
-
-```bash
-gcloud run deploy portfolio-copilot-frontend \
-  --project="your-gcp-project-id" \
-  --region="us-central1" \
-  --image="your-artifact-registry-image" \
-  --service-account="portfolio-copilot-frontend-sa@your-gcp-project-id.iam.gserviceaccount.com" \
-  --no-allow-unauthenticated
-```
+For tag-based automatic releases, see [`install/README.md`](../install/README.md) — pushing `v*` git tags fires the triggers created by `scripts/setup_cloudbuild_triggers.sh`.
 
 ---
 

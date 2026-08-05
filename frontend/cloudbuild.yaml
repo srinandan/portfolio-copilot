@@ -1,25 +1,45 @@
+substitutions:
+  _COMMIT_SHA: latest
+  _REGION: us-central1
+  _SERVICE: portfolio-copilot-frontend
+  _AR_REPO: portfolio-copilot
+
 steps:
-  # Build the container image
+  # Build the container image, tagged with the commit SHA / git tag
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'gcr.io/$PROJECT_ID/portfolio-copilot-frontend', '-f', 'frontend/Dockerfile', '.']
+    args:
+      - 'build'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:${_COMMIT_SHA}'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:latest'
+      - '-f'
+      - 'frontend/Dockerfile'
+      - 'frontend/'
 
-  # Push the container image to Container Registry
+  # Push both tags to Artifact Registry
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'gcr.io/$PROJECT_ID/portfolio-copilot-frontend']
+    args:
+      - 'push'
+      - '--all-tags'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}'
 
-  # Deploy container image to Cloud Run
+  # Deploy the versioned image to Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
       - 'run'
       - 'deploy'
-      - 'portfolio-copilot-frontend'
-      - '--image'
-      - 'gcr.io/$PROJECT_ID/portfolio-copilot-frontend'
-      - '--region'
-      - 'us-central1'
-      - '--set-labels=app=portfolio-copilot,component=frontend'
+      - '${_SERVICE}'
+      - '--image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:${_COMMIT_SHA}'
+      - '--region=${_REGION}'
+      - '--service-account=portfolio-copilot-frontend-sa@${PROJECT_ID}.iam.gserviceaccount.com'
+      - '--set-labels=app=portfolio-copilot,component=frontend,commit=${_COMMIT_SHA}'
       - '--no-allow-unauthenticated'
 
 images:
-  - 'gcr.io/$PROJECT_ID/portfolio-copilot-frontend'
+  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:${_COMMIT_SHA}'
+  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:latest'
+
+options:
+  logging: CLOUD_LOGGING_ONLY

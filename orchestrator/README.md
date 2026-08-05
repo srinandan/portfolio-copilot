@@ -162,11 +162,17 @@ The orchestrator is containerized using `Dockerfile` based on `python:3.12-slim`
 - Compiles project requirements via `uv pip install --system --no-cache .`.
 - Runs under a non-root `orchestrator` user on port `8080`.
 
-### Deploying via Cloud Build (`cloudbuild.yaml`)
-
-To build, push, and deploy the orchestrator to Google Cloud Run using Google Cloud Build:
+### Running & deploying via the Makefile
 
 ```bash
-gcloud builds submit --config orchestrator/cloudbuild.yaml .
+# Run locally against your current gcloud project
+make -C orchestrator local
+
+# Trigger a manual Cloud Build → Agent Runtime deploy
+make -C orchestrator deploy
 ```
+
+The `deploy` target calls `gcloud builds submit --config=orchestrator/cloudbuild.yaml` with `_COMMIT_SHA=$(git rev-parse --short HEAD)` and the active gcloud region. The Cloud Build pipeline builds and pushes the container image to Artifact Registry, then invokes `scripts/deploy_agent_engine.py --container-uri=<image>` — which uses the Vertex AI SDK's `ReasoningEngineSpec.container_spec` path to create or update the Agent Engine identified by `--display-name` (default `portfolio-copilot-agent`). This is the Agent Runtime custom-container deployment path per [ADR-0008](../docs/adr/0008-python-for-orchestrator.md); the orchestrator does not run on Cloud Run.
+
+For tag-based automatic releases, see [`install/README.md`](../install/README.md) — pushing `v*` git tags fires the triggers created by `scripts/setup_cloudbuild_triggers.sh`.
 
