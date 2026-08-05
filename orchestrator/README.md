@@ -19,8 +19,10 @@ Deployed to Vertex AI Agent Runtime (Agent Engine) using the Python custom-agent
 
 ```
 orchestrator/
-├── pyproject.toml          # Project configuration, dependencies, and test tool settings
+├── Dockerfile              # Python 3.12-slim container build for Cloud Run / Agent Runtime
 ├── README.md               # Orchestrator documentation
+├── cloudbuild.yaml         # Cloud Build CI/CD pipeline configuration
+├── pyproject.toml          # Project configuration, dependencies, and test tool settings
 ├── src/
 │   └── orchestrator/
 │       └── planner.py      # Root dynamic planner workflow and node definitions
@@ -150,3 +152,21 @@ resume_stream = runner.run_async(
     ),
 )
 ```
+
+---
+
+## Docker & Cloud Build Deployment
+
+The orchestrator is containerized using `Dockerfile` based on `python:3.12-slim`:
+- Installs `uv` for fast dependency resolution.
+- Compiles project requirements via `uv pip install --system --no-cache .`.
+- Runs under a non-root `orchestrator` user on port `8080`.
+
+### Deploying via Cloud Build (`cloudbuild.yaml`)
+
+To build, push, and deploy the orchestrator to Google Cloud Run using Google Cloud Build:
+
+```bash
+gcloud builds submit --config orchestrator/cloudbuild.yaml .
+```
+

@@ -30,6 +30,7 @@ See [ADR-0003](../docs/adr/0003-standalone-ui-not-agentspace.md) for why Portfol
 ```
 frontend/
 ├── Dockerfile              # Multi-stage Docker build (Node 22 builder -> nginx:alpine-slim)
+├── cloudbuild.yaml         # Cloud Build CI/CD pipeline configuration
 ├── nginx.conf              # SPA routing, API reverse-proxy, and Cloud Run /health endpoint
 ├── package.json            # Scripts, Vue 3, Pinia, Vue Router, Tailwind, and Vitest dependencies
 ├── tailwind.config.js      # Stitch design system color palette, typography, and spacing
@@ -130,6 +131,14 @@ The frontend is containerized using a multi-stage `Dockerfile`:
 - Serves static SPA files from `/usr/share/nginx/html` with `try_files $uri $uri/ /index.html;`.
 - Proxies `/api/` requests to the upstream gateway service (`http://portfolio-copilot-gateway:8080/api/`).
 - Serves `/health` directly (`200 ok`) for Google Cloud Run startup and liveness checks.
+
+### Deploying via Cloud Build (`cloudbuild.yaml`)
+
+To build, push, and deploy the container image to Google Cloud Run using Google Cloud Build:
+
+```bash
+gcloud builds submit --config frontend/cloudbuild.yaml .
+```
 
 ### Deploying via gcloud / Infrastructure Scripts
 
