@@ -104,3 +104,21 @@ When creating or modifying a runtime skill in `/skills`:
 2. The eval suite must test golden paths, edge conditions, and failure/refusal modes.
 3. Validate that the eval set loads into `google.adk.evaluation.eval_set.EvalSet`.
 4. Ensure `SKILL.md` is complete and passes the doc-only agent evaluation.
+
+---
+
+## Adversarial Benchmark & Reviewer MA Catch Rate
+
+To benchmark the Reviewer Managed Agent (LLM-alone) catch rate against the deterministic governance gate (`check_all_rules`), run the adversarial benchmark suite:
+
+```bash
+# Run adversarial benchmark suite
+PYTHONPATH=orchestrator/src uv run --project orchestrator pytest evals/adversarial/test_reviewer_ma_catches.py -v
+
+# Run with live Gemini LLM evaluation (requires GEMINI_API_KEY)
+GEMINI_API_KEY=your_key PYTHONPATH=orchestrator/src uv run --project orchestrator pytest evals/adversarial/test_reviewer_ma_catches.py -m live_llm -v
+```
+
+This suite measures:
+1. `test_deterministic_gate_catches_all`: Asserts that `check_all_rules(review_input)` catches 100% of all canned adversarial violations (concentration, excluded ticker/sector, stale IPS version, allocation band direction) with 0 false positives on valid control cases.
+2. `test_reviewer_ma_llm_catch_rate`: Evaluates LLM-alone catch rates across the same adversarial scenarios, generating a summary markdown report table (`reviewer_catch_rate_report.md`) and asserting an LLM catch rate of >= 60% (typically ~70–75% LLM alone vs. 100% with the deterministic gate).

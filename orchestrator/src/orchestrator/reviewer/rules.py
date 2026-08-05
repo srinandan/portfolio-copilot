@@ -36,7 +36,8 @@ class ReviewInput:
 
 
 def rule_excluded_ticker(inp: ReviewInput) -> RuleResult:
-    if inp.action.ticker in (inp.ips.constraints.excluded_tickers or []):
+    excluded = [t.upper() for t in (inp.ips.constraints.excluded_tickers or [])]
+    if inp.action.ticker.upper() in excluded:
         return RuleResult(
             rule_id="excluded_ticker",
             description="Ticker must not be in IPS constraints.excluded_tickers",
@@ -52,7 +53,8 @@ def rule_excluded_ticker(inp: ReviewInput) -> RuleResult:
 
 def rule_excluded_sector(inp: ReviewInput) -> RuleResult:
     sector = get_mock_sector(inp.action.ticker)
-    if sector != "Unknown" and sector in (inp.ips.constraints.excluded_sectors or []):
+    excluded = [s.lower() for s in (inp.ips.constraints.excluded_sectors or [])]
+    if sector != "Unknown" and sector.lower() in excluded:
         return RuleResult(
             rule_id="excluded_sector",
             description="Sector must not be in IPS constraints.excluded_sectors",
