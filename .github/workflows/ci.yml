@@ -37,6 +37,11 @@ jobs:
           PYTHONPATH: .
         run: uv run --project orchestrator pytest --cov=orchestrator/src --cov=scripts --cov-report=term
 
+      - name: Run simulated revocation demo
+        env:
+          PYTHONPATH: orchestrator/src
+        run: uv run --project orchestrator python scripts/demo_live_revocation.py --mock-registry
+
   go:
     name: Go
     runs-on: ubuntu-latest

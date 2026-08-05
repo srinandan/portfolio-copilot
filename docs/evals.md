@@ -110,3 +110,11 @@ When creating or modifying a runtime skill in `/skills`:
 2. The eval suite must test golden paths, edge conditions, and failure/refusal modes.
 3. Validate that the eval set loads into `google.adk.evaluation.eval_set.EvalSet`.
 4. Ensure `SKILL.md` is complete and passes the doc-only agent evaluation.
+
+---
+
+## Live Skill Revocation & Nightly Demos
+
+To ensure runtime governance and skill filtering work end-to-end against live Google Cloud Agent Registry and Vertex AI Sessions services, the repository includes an automated revocation demo (`scripts/demo_live_revocation.py`):
+- **Nightly Live Demo**: Configured in `.github/workflows/nightly-demo.yml` (running daily at 05:00 UTC). Runs `scripts/demo_live_revocation.py` against a demo GCP project with `GCP_SA_KEY` and `PROJECT_ID`, verifying two-cycle skill revocation and `SKILL_REVOKED` audit log generation.
+- **PR CI Mock Demo**: Configured in `.github/workflows/ci.yml`. Runs `scripts/demo_live_revocation.py --mock-registry` as part of every pull request build without requiring GCP credentials, verifying that the orchestration loop properly filters out revoked skills when excluded from `list_authorized_skills`.
