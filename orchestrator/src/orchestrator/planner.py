@@ -602,6 +602,11 @@ from .skills._skill_metadata import verify_all_skills_metadata
 
 verify_all_skills_metadata()
 
+# Perform startup verification of required credentials per Issue #153
+from .managed_agents.secret_loader import verify_required_secrets
+
+verify_required_secrets()
+
 
 root_agent = Workflow(
     name="portfolio_copilot_planner",
