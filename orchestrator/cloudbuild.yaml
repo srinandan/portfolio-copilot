@@ -1,6 +1,7 @@
 substitutions:
   _COMMIT_SHA: latest
   _REGION: us-central1
+  _AGENT_DISPLAY_NAME: portfolio-copilot-agent
   _SERVICE: portfolio-copilot-orchestrator
   _AR_REPO: portfolio-copilot
 
@@ -24,18 +25,22 @@ steps:
       - '--all-tags'
       - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}'
 
-  # Deploy the versioned image to Cloud Run
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    entrypoint: gcloud
+  # Deploy the container image to Vertex AI Agent Runtime (Agent Engine).
+  # Uses the SDK's container_spec deployment path (ReasoningEngineSpec.container_spec).
+  # Idempotent: updates the existing engine matching _AGENT_DISPLAY_NAME in place, or
+  # creates one if none exists yet.
+  - name: 'python:3.12-slim'
+    entrypoint: bash
     args:
-      - 'run'
-      - 'deploy'
-      - '${_SERVICE}'
-      - '--image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:${_COMMIT_SHA}'
-      - '--region=${_REGION}'
-      - '--service-account=portfolio-copilot-orchestrator-sa@${PROJECT_ID}.iam.gserviceaccount.com'
-      - '--set-labels=app=portfolio-copilot,component=orchestrator,commit=${_COMMIT_SHA}'
-      - '--no-allow-unauthenticated'
+      - '-c'
+      - |
+        set -eu
+        pip install --no-cache-dir "google-cloud-aiplatform[agent_engines,adk]" click google-auth
+        python scripts/deploy_agent_engine.py \
+          --project="${PROJECT_ID}" \
+          --location="${_REGION}" \
+          --display-name="${_AGENT_DISPLAY_NAME}" \
+          --container-uri="${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:${_COMMIT_SHA}"
 
 images:
   - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:${_COMMIT_SHA}'

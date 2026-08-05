@@ -119,3 +119,21 @@ When creating or modifying a runtime skill in `/skills`:
 To ensure runtime governance and skill filtering work end-to-end against live Google Cloud Agent Registry and Vertex AI Sessions services, the repository includes an automated revocation demo (`scripts/demo_live_revocation.py`):
 - **PR CI Mock Demo**: Configured in `.github/workflows/ci.yml`. Runs `scripts/demo_live_revocation.py --mock-registry` as part of every pull request build without requiring GCP credentials, verifying that the orchestration loop properly filters out revoked skills when excluded from `list_authorized_skills`.
 - **Manual Live Demo**: Run `scripts/demo_live_revocation.py` locally against a real GCP project (with `PROJECT_ID` set and `gcloud` authenticated) when you want to verify two-cycle skill revocation and `SKILL_REVOKED` audit log generation against the live Agent Registry.
+
+---
+
+## Adversarial Benchmark & Reviewer MA Catch Rate
+
+To benchmark the Reviewer Managed Agent (LLM-alone) catch rate against the deterministic governance gate (`check_all_rules`), run the adversarial benchmark suite:
+
+```bash
+# Run adversarial benchmark suite
+PYTHONPATH=orchestrator/src uv run --project orchestrator pytest evals/adversarial/test_reviewer_ma_catches.py -v
+
+# Run with live Gemini LLM evaluation (requires GEMINI_API_KEY)
+GEMINI_API_KEY=your_key PYTHONPATH=orchestrator/src uv run --project orchestrator pytest evals/adversarial/test_reviewer_ma_catches.py -m live_llm -v
+```
+
+This suite measures:
+1. `test_deterministic_gate_catches_all`: Asserts that `check_all_rules(review_input)` catches 100% of all canned adversarial violations (concentration, excluded ticker/sector, stale IPS version, allocation band direction) with 0 false positives on valid control cases.
+2. `test_reviewer_ma_llm_catch_rate`: Evaluates LLM-alone catch rates across the same adversarial scenarios, generating a summary markdown report table (`reviewer_catch_rate_report.md`) and asserting an LLM catch rate of >= 60% (typically ~70–75% LLM alone vs. 100% with the deterministic gate).

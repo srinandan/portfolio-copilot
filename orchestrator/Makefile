@@ -32,7 +32,15 @@ deploy:
 	  --substitutions=_COMMIT_SHA=${_COMMIT_SHA},_REGION=${GOOGLE_CLOUD_LOCATION}
 
 clean:
-	gcloud run services delete portfolio-copilot-orchestrator \
+	@echo "Deleting Agent Engine(s) with display_name=portfolio-copilot-agent in ${GOOGLE_CLOUD_LOCATION}..." ;\
+	gcloud beta ai reasoning-engines list \
 	  --region=${GOOGLE_CLOUD_LOCATION} \
 	  --project=${GOOGLE_CLOUD_PROJECT} \
-	  --quiet
+	  --filter='displayName=portfolio-copilot-agent' \
+	  --format='value(name)' | while read ENGINE; do \
+	    [ -z "$$ENGINE" ] && continue ;\
+	    gcloud beta ai reasoning-engines delete "$$ENGINE" \
+	      --region=${GOOGLE_CLOUD_LOCATION} \
+	      --project=${GOOGLE_CLOUD_PROJECT} \
+	      --quiet ;\
+	  done

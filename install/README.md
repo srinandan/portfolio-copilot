@@ -134,7 +134,10 @@ git push origin v0.1.0
 
 All three builds start in parallel; each pushes a versioned image to
 Artifact Registry (`<region>-docker.pkg.dev/<project>/portfolio-copilot/<service>:v0.1.0`)
-and deploys it to Cloud Run.
+and deploys it — the gateway and frontend to Cloud Run, the orchestrator to
+Vertex AI Agent Runtime (Agent Engine) via
+[`ReasoningEngineSpec.container_spec`](https://cloud.google.com/vertex-ai/generative-ai/docs/agent-engine/deploy)
+per [ADR-0008](../docs/adr/0008-python-for-orchestrator.md).
 
 ### Triggering builds manually
 
@@ -144,7 +147,8 @@ Use the per-service `Makefile` (`orchestrator/Makefile`, `gateway/Makefile`,
 - `make local` — runs the service on your machine (uv/go/npm as appropriate).
 - `make deploy` — calls `gcloud builds submit --config=<service>/cloudbuild.yaml`
   with `_COMMIT_SHA=$(git rev-parse --short HEAD)` and the current gcloud
-  region as substitutions, then deploys to Cloud Run. No tag push required.
+  region as substitutions, then deploys — gateway/frontend to Cloud Run,
+  orchestrator to Agent Runtime. No tag push required.
 
 Environment overrides (`GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`,
 `_COMMIT_SHA`) work the same way in both flows.

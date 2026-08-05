@@ -125,9 +125,11 @@ else
 fi
 
 echo "--- 5. Grant Cloud Build SA the roles it needs ---"
-# roles/run.admin so the pipeline step can `gcloud run deploy`; roles/iam.serviceAccountUser
-# so it can act as the per-service runtime service accounts on that deploy.
-for ROLE in roles/run.admin roles/iam.serviceAccountUser roles/artifactregistry.writer; do
+# roles/run.admin so gateway/frontend can `gcloud run deploy`; roles/aiplatform.user
+# so orchestrator can create/update its Vertex AI Agent Engine (Agent Runtime);
+# roles/iam.serviceAccountUser so the pipeline can act as per-service SAs on deploy;
+# roles/artifactregistry.writer so it can push images.
+for ROLE in roles/run.admin roles/aiplatform.user roles/iam.serviceAccountUser roles/artifactregistry.writer; do
   gcloud projects add-iam-policy-binding "$PROJECT_ID" \
     --member="serviceAccount:${CB_SA}" \
     --role="$ROLE" \
