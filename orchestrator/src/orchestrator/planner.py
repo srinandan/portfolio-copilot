@@ -198,7 +198,13 @@ def _build_reviewer_input(user_id, input_dict, context):
     if not ad_result or not isinstance(ad_result, dict) or ad_result.get("status") != "drafted":
         return None  # SkillPlan returning None = skip cleanly
     input_dict["_reviewer_action"] = ad_result
-    return preload_for_reviewer(user_id=user_id, action=ad_result)
+    node_input = preload_for_reviewer(user_id=user_id, action=ad_result)
+    # Mirror the preloader's IPS + holdings into input_dict so _postprocess_reviewer
+    # can reuse them without a second Firestore round-trip. node_input flows to the
+    # Managed Agent; input_dict is what postprocess sees.
+    input_dict["_preloaded_ips"] = node_input.get("ips")
+    input_dict["_preloaded_holdings"] = node_input.get("holdings")
+    return node_input
 
 
 async def _postprocess_reviewer(user_id, result, ctx, input_dict, registry_entry_id=None):

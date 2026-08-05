@@ -1046,8 +1046,12 @@ async def test_reviewer_postprocess_populates_context(mock_emit, mock_fs_cls):
 @pytest.mark.asyncio
 @patch("src.orchestrator.planner.emit_review_completed_audit")
 @patch("src.orchestrator.planner.FirestoreClient")
-async def test_reviewer_postprocess_uses_preloaded_state_without_firestore(mock_fs_cls, mock_emit):
-    """Verify that when _preloaded_ips and _preloaded_holdings are in input_dict, no Firestore calls are made."""
+@patch("src.orchestrator.state.preloader.FirestoreClient")
+async def test_reviewer_build_input_mirrors_preloaded_state_into_input_dict(
+    mock_preload_fs_cls, mock_planner_fs_cls, mock_emit
+):
+    """Verify build_input mirrors the preloader's IPS + holdings into input_dict so
+    postprocess reuses them and never re-reads Firestore."""
     from datetime import date, datetime, timezone
 
     from src.orchestrator.contracts.holdings import HoldingsSnapshot, Position
@@ -1068,8 +1072,6 @@ async def test_reviewer_postprocess_uses_preloaded_state_without_firestore(mock_
         SkillVersionRef,
     )
     from src.orchestrator.planner import SKILL_PLANS
-
-    mock_fs = mock_fs_cls.return_value
 
     fake_ips = InvestmentPolicyStatement(
         ips_id="ips_pre",
@@ -1113,16 +1115,28 @@ async def test_reviewer_postprocess_uses_preloaded_state_without_firestore(mock_
         created_at=datetime.now(timezone.utc),
     )
 
+    # Preloader's Firestore returns the fake state; the planner's Firestore must never be
+    # touched during postprocess (that's the whole point of the refactor).
+    preload_fs = mock_preload_fs_cls.return_value
+    preload_fs.get_active_ips_by_user.return_value = fake_ips
+    preload_fs.get_holdings.return_value = fake_holdings
+
     plan = SKILL_PLANS["private-reviewer"]
-    inp = {
-        "_reviewer_action": action.model_dump(),
-        "_preloaded_ips": fake_ips.model_dump(),
-        "_preloaded_holdings": fake_holdings.model_dump(),
-    }
-    payload, ctx_update = await plan.postprocess("user_pre", None, {}, inp, registry_entry_id="rev-1")
+    input_dict: dict = {}
+    context = {"action_drafting_result": {**action.model_dump(), "status": "drafted"}}
+
+    node_input = plan.build_input("user_pre", input_dict, context)
+    assert node_input is not None
+    # build_input must mirror the preloader's IPS + holdings into input_dict.
+    assert input_dict["_preloaded_ips"] == fake_ips.model_dump()
+    assert input_dict["_preloaded_holdings"] == fake_holdings.model_dump()
+
+    # Now postprocess reads them from input_dict — no second Firestore round-trip.
+    planner_fs = mock_planner_fs_cls.return_value
+    payload, ctx_update = await plan.postprocess("user_pre", None, {}, input_dict, registry_entry_id="rev-1")
     assert ctx_update["reviewer_verdict"].action_id == "act_pre"
-    mock_fs.get_active_ips_by_user.assert_not_called()
-    mock_fs.get_holdings.assert_not_called()
+    planner_fs.get_active_ips_by_user.assert_not_called()
+    planner_fs.get_holdings.assert_not_called()
 
 
 @patch("src.orchestrator.planner.emit_skill_revoked_audit")

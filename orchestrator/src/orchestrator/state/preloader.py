@@ -148,6 +148,4 @@ def preload_for_reviewer(
         "action": action_dict,
         "ips": ips.model_dump(),
         "holdings": holdings.model_dump(),
-        "_preloaded_ips": ips.model_dump(),
-        "_preloaded_holdings": holdings.model_dump(),
     }
