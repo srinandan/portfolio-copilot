@@ -42,6 +42,21 @@ def _build_request_payload(
 ) -> Dict[str, Any]:
     """Structured payload the frontend U4 approval card consumes.
 
+    Wire Format Contract:
+        Because ADK's RequestInput.message requires a string (Optional[str]),
+        this dictionary is serialized to a JSON string via json.dumps(payload, default=str)
+        before being yielded in RequestInput(message=...).
+        Frontend clients (and tests) consuming the RequestInput.message string MUST parse
+        it with JSON.parse (or json.loads in Python) to access the underlying dictionary:
+        {
+            "kind": "hitl_approval_request",
+            "action": <ProposedAction dict>,
+            "reviewer_verdict": <ReviewerVerdict dict | None>,
+            "edit_round": <int>,
+            "max_edit_rounds": <int>,
+            "allowed_decisions": ["approve", "edit", "reject"]
+        }
+
     Deliberately dict-not-prose: the frontend renders a card, not a chat bubble.
     Verdict is optional so the gate works before #106 (Reviewer) lands.
     """
