@@ -68,6 +68,12 @@ def _short_skill_id(name: str) -> str:
     return name.split("/")[-1] if "/" in name else name
 
 
+def _normalize_skill_key(name: str) -> str:
+    """Returns normalized skill key with 'private-' prefix for dictionary lookup."""
+    short = _short_skill_id(name)
+    return short if short.startswith("private-") else f"private-{short}"
+
+
 def _skill_sort_key(skill: Any) -> int:
     skill_name = skill.name if hasattr(skill, "name") else str(skill)
     short = _short_skill_id(skill_name)
@@ -217,9 +223,23 @@ async def _postprocess_reviewer(user_id, result, ctx, input_dict, registry_entry
     ad_result_dict = input_dict.get("_reviewer_action")
     action = ProposedAction.model_validate(ad_result_dict)
 
-    fs = FirestoreClient()
-    ips_obj = fs.get_active_ips_by_user(user_id)
-    holdings_obj = fs.get_holdings(user_id)
+    from .contracts.holdings import HoldingsSnapshot
+    from .contracts.ips import InvestmentPolicyStatement
+
+    preloaded_ips_dict = input_dict.get("_preloaded_ips") or input_dict.get("ips")
+    preloaded_holdings_dict = input_dict.get("_preloaded_holdings") or input_dict.get("holdings")
+
+    if preloaded_ips_dict and isinstance(preloaded_ips_dict, dict):
+        ips_obj = InvestmentPolicyStatement.model_validate(preloaded_ips_dict)
+    else:
+        fs = FirestoreClient()
+        ips_obj = fs.get_active_ips_by_user(user_id)
+
+    if preloaded_holdings_dict and isinstance(preloaded_holdings_dict, dict):
+        holdings_obj = HoldingsSnapshot.model_validate(preloaded_holdings_dict)
+    else:
+        fs = FirestoreClient()
+        holdings_obj = fs.get_holdings(user_id)
     if ips_obj is None or holdings_obj is None:
         logger.error(f"Reviewer postprocess: missing IPS or holdings for user {user_id}")
         if llm_verdict is not None:
@@ -268,6 +288,9 @@ async def _postprocess_reviewer(user_id, result, ctx, input_dict, registry_entry
         registry_entry_id=registry_entry_id,
     )
 
+    if auth_verdict and hasattr(ctx, "state") and ctx.state is not None:
+        ctx.state["reviewer_verdict"] = auth_verdict.model_dump()
+
     payload = auth_verdict.model_dump() if auth_verdict else {"status": "unavailable"}
     ctx_update = {
         "reviewer_verdict": auth_verdict,
@@ -282,18 +305,8 @@ SKILL_PLANS: Dict[str, SkillPlan] = {
         build_input=_build_spending_input,
         postprocess=_postprocess_spending,
     ),
-    "spending-analysis": SkillPlan(
-        short_name="spending-analysis",
-        build_input=_build_spending_input,
-        postprocess=_postprocess_spending,
-    ),
     "private-goals-onboarding": SkillPlan(
         short_name="private-goals-onboarding",
-        build_input=_build_goals_onboarding_input,
-        postprocess=_postprocess_goals_onboarding,
-    ),
-    "goals-onboarding": SkillPlan(
-        short_name="goals-onboarding",
         build_input=_build_goals_onboarding_input,
         postprocess=_postprocess_goals_onboarding,
     ),
@@ -302,18 +315,8 @@ SKILL_PLANS: Dict[str, SkillPlan] = {
         build_input=_build_portfolio_analysis_input,
         postprocess=_postprocess_portfolio_analysis,
     ),
-    "portfolio-analysis": SkillPlan(
-        short_name="portfolio-analysis",
-        build_input=_build_portfolio_analysis_input,
-        postprocess=_postprocess_portfolio_analysis,
-    ),
     "private-research": SkillPlan(
         short_name="private-research",
-        build_input=_build_research_input,
-        postprocess=_postprocess_research,
-    ),
-    "research": SkillPlan(
-        short_name="research",
         build_input=_build_research_input,
         postprocess=_postprocess_research,
     ),
@@ -322,18 +325,8 @@ SKILL_PLANS: Dict[str, SkillPlan] = {
         build_input=_build_action_drafting_input,
         postprocess=_postprocess_action_drafting,
     ),
-    "action-drafting": SkillPlan(
-        short_name="action-drafting",
-        build_input=_build_action_drafting_input,
-        postprocess=_postprocess_action_drafting,
-    ),
     "private-reviewer": SkillPlan(
         short_name="private-reviewer",
-        build_input=_build_reviewer_input,
-        postprocess=_postprocess_reviewer,
-    ),
-    "reviewer": SkillPlan(
-        short_name="reviewer",
         build_input=_build_reviewer_input,
         postprocess=_postprocess_reviewer,
     ),
@@ -538,7 +531,7 @@ async def root_planner(ctx: Context, node_input: Any):
     for skill in ordered_skills:
         skill_name = skill.name if hasattr(skill, "name") else str(skill)
         registry_entry_id = getattr(skill, "default_revision", None)
-        short_name = _short_skill_id(skill_name)
+        short_name = _normalize_skill_key(skill_name)
         plan = SKILL_PLANS.get(short_name)
         if plan is None:
             logger.info(f"Authorized skill {skill} has no SkillPlan; executing fallback.")
@@ -583,7 +576,9 @@ async def root_planner(ctx: Context, node_input: Any):
     if context.get("hitl_decision"):
         exec_input = {
             "hitl_decision": context.get("hitl_decision"),
-            "reviewer_verdict": context.get("reviewer_verdict"),
+            "reviewer_verdict": context.get("reviewer_verdict")
+            or ctx.state.get("reviewer_verdict")
+            or ctx.state.get("hitl_verdict"),
         }
         try:
             exec_result = await ctx.run_node(execution_gate, node_input=exec_input)

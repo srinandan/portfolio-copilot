@@ -1,0 +1,44 @@
+name: Nightly Revocation Demo
+
+on:
+  schedule:
+    - cron: '0 5 * * *'  # Run daily at 05:00 UTC
+  workflow_dispatch:
+
+jobs:
+  live-revocation-demo:
+    name: Run Live Skill Revocation Demo
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync --project orchestrator
+
+      - name: Run Live Revocation Demo
+        env:
+          PYTHONPATH: orchestrator/src
+          PROJECT_ID: ${{ secrets.PROJECT_ID }}
+          GOOGLE_CLOUD_LOCATION: "global"
+          SKILL_TO_REVOKE: "research"
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+        run: |
+          if [ -n "$PROJECT_ID" ] && [ -n "$GCP_SA_KEY" ]; then
+            echo "$GCP_SA_KEY" > /tmp/sa_key.json
+            export GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa_key.json
+            uv run --project orchestrator python scripts/demo_live_revocation.py
+          else
+            echo "::warning title=Nightly Demo Skipped::PROJECT_ID or GCP_SA_KEY not configured; running in --mock-registry mode."
+            uv run --project orchestrator python scripts/demo_live_revocation.py --mock-registry
+          fi

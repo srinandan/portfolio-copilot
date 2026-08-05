@@ -42,6 +42,21 @@ def _build_request_payload(
 ) -> Dict[str, Any]:
     """Structured payload the frontend U4 approval card consumes.
 
+    Wire Format Contract:
+        Because ADK's RequestInput.message requires a string (Optional[str]),
+        this dictionary is serialized to a JSON string via json.dumps(payload, default=str)
+        before being yielded in RequestInput(message=...).
+        Frontend clients (and tests) consuming the RequestInput.message string MUST parse
+        it with JSON.parse (or json.loads in Python) to access the underlying dictionary:
+        {
+            "kind": "hitl_approval_request",
+            "action": <ProposedAction dict>,
+            "reviewer_verdict": <ReviewerVerdict dict | None>,
+            "edit_round": <int>,
+            "max_edit_rounds": <int>,
+            "allowed_decisions": ["approve", "edit", "reject"]
+        }
+
     Deliberately dict-not-prose: the frontend renders a card, not a chat bubble.
     Verdict is optional so the gate works before #106 (Reviewer) lands.
     """
@@ -87,9 +102,12 @@ def _extract_from_obj(obj: Any) -> Any:
         return obj
     if isinstance(obj, str):
         try:
-            return json.loads(obj)
+            parsed = json.loads(obj)
+            if isinstance(parsed, dict) and "decision" in parsed:
+                return parsed
         except Exception:
-            return obj
+            pass
+        return obj
     if hasattr(obj, "parts") and obj.parts:
         for p in obj.parts:
             if getattr(p, "function_response", None) and getattr(
@@ -97,6 +115,10 @@ def _extract_from_obj(obj: Any) -> Any:
             ):
                 res = _extract_from_obj(p.function_response.response)
                 if res is not None:
+                    return res
+            if getattr(p, "text", None):
+                res = _extract_from_obj(p.text)
+                if res is not None and isinstance(res, dict) and "decision" in res:
                     return res
     return None
 
@@ -265,14 +287,9 @@ async def hitl_approval_gate(ctx: Context, node_input: Any):
         raw_input = getattr(part, "text", None) or part
     if isinstance(raw_input, str):
         try:
-            import ast
-
-            raw_input = ast.literal_eval(raw_input)
+            raw_input = json.loads(raw_input)
         except Exception:
-            try:
-                raw_input = json.loads(raw_input)
-            except Exception:
-                pass
+            pass
     if not isinstance(raw_input, dict):
         raw_input = {}
 

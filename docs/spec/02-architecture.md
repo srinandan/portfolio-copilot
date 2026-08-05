@@ -32,6 +32,8 @@ portfolio holdings, current liabilities, and the approval/audit log.
 Needs millisecond reads, real transactional writes, and row-level
 concurrency control — none of which BigQuery is built for.
 
+**Vertex AI Sessions** — short-term conversation and workflow state (`ctx.state` and ADK session history). All values stored in `ctx.state` across workflow resumptions (such as `hitl_action`, `hitl_verdict`, and `last_authorized_skills`) MUST be strictly JSON-serializable dictionaries (`json.dumps(...)` compatible). Unlike `InMemorySessionService`, `VertexAiSessionService` enforces JSON serialization invariants and size constraints; storing raw Python objects, Pydantic model instances, or non-serializable datetimes in `ctx.state` will result in runtime serialization exceptions upon checkpointing or resuming.
+
 **Vertex AI Memory Bank** — long-term *soft* memory: preferences, summarized
 past interactions, semantic recall (e.g. "rejected trimming AAPL in
 March"). Not a substitute for a database — it doesn't hold bulk structured

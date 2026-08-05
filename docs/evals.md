@@ -57,6 +57,7 @@ Each runtime skill folder contains a `.evalset.json` file:
 | [`skills/action-drafting/`](../skills/action-drafting/) | [`action_drafting.evalset.json`](../skills/action-drafting/action_drafting.evalset.json) | • Deterministic rebalance trim calculation back to target percent<br>• Excluded ticker and sector constraint enforcement<br>• Single-stock concentration limit guardrails<br>• Strict enforcement of `status: drafted` (no execution authority)<br>• Zero-action output when portfolio is in band<br>• Low-confidence research transparency in rationale |
 | [`skills/spending-analysis/`](../skills/spending-analysis/) | [`spending_analysis.evalset.json`](../skills/spending-analysis/spending_analysis.evalset.json) | • Natural-language-to-SQL translation against Chase transactions<br>• Dual-condition anomaly detection (>1.4x avg AND > avg + $100)<br>• Savings rate and emergency cash reserve calculations<br>• Rejection of destructive/write SQL operations<br>• Clarifying question generation for ambiguous queries |
 | [`skills/research/`](../skills/research/) | [`research.evalset.json`](../skills/research/research.evalset.json) | • Public market context retrieval via Google Search grounding<br>• Strict isolation (zero private data access)<br>• Transparent reporting of inconclusive data (`confidence: low`)<br>• Rejection of speculative price guarantees |
+| [`skills/reviewer/`](../skills/reviewer/) | [`reviewer.evalset.json`](../skills/reviewer/reviewer.evalset.json) | • Enforcement of IPS excluded ticker and sector constraints<br>• Enforcement of concentration limit percent<br>• Verification of target allocation band direction<br>• Active IPS version reference verification |
 
 ---
 
@@ -86,6 +87,12 @@ for dir in skills/*/; do
 done
 ```
 
+### CI/CD Evaluation Mode (Judge vs. Heuristic Scoring)
+
+In Continuous Integration (`.github/workflows/skill-evals.yml`), the evaluation suite adapts dynamically to credentials:
+- **LLM-Judge Scoring (`--llm-judge`)**: When the `GEMINI_API_KEY` repository secret is present (e.g. on branches within the primary repository), `evals.report --llm-judge` runs model-assisted judging for qualitative evaluation criteria.
+- **Heuristic Scoring Only**: When `GEMINI_API_KEY` is absent (e.g. on pull requests from external forks), the CI workflow outputs an explicit warning (`::warning title=LLM Judge Skipped::...`) and gracefully degrades to non-blocking heuristic scoring so PRs can be validated without requiring API secrets.
+
 ### Automated Unit Testing
 
 EvalSet schema compliance, JSON validation, and doc-only agent construction are covered by pytest:
@@ -104,6 +111,14 @@ When creating or modifying a runtime skill in `/skills`:
 2. The eval suite must test golden paths, edge conditions, and failure/refusal modes.
 3. Validate that the eval set loads into `google.adk.evaluation.eval_set.EvalSet`.
 4. Ensure `SKILL.md` is complete and passes the doc-only agent evaluation.
+
+---
+
+## Live Skill Revocation & Nightly Demos
+
+To ensure runtime governance and skill filtering work end-to-end against live Google Cloud Agent Registry and Vertex AI Sessions services, the repository includes an automated revocation demo (`scripts/demo_live_revocation.py`):
+- **Nightly Live Demo**: Configured in `.github/workflows/nightly-demo.yml` (running daily at 05:00 UTC). Runs `scripts/demo_live_revocation.py` against a demo GCP project with `GCP_SA_KEY` and `PROJECT_ID`, verifying two-cycle skill revocation and `SKILL_REVOKED` audit log generation.
+- **PR CI Mock Demo**: Configured in `.github/workflows/ci.yml`. Runs `scripts/demo_live_revocation.py --mock-registry` as part of every pull request build without requiring GCP credentials, verifying that the orchestration loop properly filters out revoked skills when excluded from `list_authorized_skills`.
 
 ---
 

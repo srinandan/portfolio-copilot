@@ -35,7 +35,12 @@ jobs:
       - name: Run tests with coverage
         env:
           PYTHONPATH: .
-        run: uv run --project orchestrator pytest --cov=orchestrator/src --cov-report=term
+        run: uv run --project orchestrator pytest --cov=orchestrator/src --cov=scripts --cov-report=term
+
+      - name: Run simulated revocation demo
+        env:
+          PYTHONPATH: orchestrator/src
+        run: uv run --project orchestrator python scripts/demo_live_revocation.py --mock-registry
 
   go:
     name: Go
@@ -86,13 +91,29 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Install, build, test with coverage
+      - name: Install dependencies
         if: steps.check.outputs.exists == 'true'
         working-directory: frontend
-        run: |
-          npm ci
-          npm run build
-          npm run test -- --coverage
+        run: npm ci
+
+      - name: Run typecheck
+        if: steps.check.outputs.exists == 'true'
+        working-directory: frontend
+        run: npm run typecheck
+
+      - name: Build
+        if: steps.check.outputs.exists == 'true'
+        working-directory: frontend
+        run: npm run build
+
+      - name: Run tests with coverage
+        if: steps.check.outputs.exists == 'true'
+        working-directory: frontend
+        run: npm run test -- --coverage
+
+      - name: Verify Docker build
+        if: steps.check.outputs.exists == 'true'
+        run: docker build -t frontend-ci-test frontend/
 
       - name: Skip (no package.json yet)
         if: steps.check.outputs.exists == 'false'
