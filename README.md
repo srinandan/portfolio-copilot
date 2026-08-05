@@ -62,15 +62,16 @@ without your yes.
 
 ## Learn more
 
-How it's built, and the reasoning behind the key decisions: see
-[`docs/spec/`](docs/spec/) and [`docs/adr/`](docs/adr/).
-Contributor / coding-agent instructions: see [`AGENTS.md`](AGENTS.md).
+- **Component Documentation**:
+  - [`orchestrator/README.md`](orchestrator/README.md): Python ADK root planner & dynamic planning workflow
+  - [`frontend/README.md`](frontend/README.md): Standalone Vue 3 + TypeScript SPA & Stitch design system
+  - [`gateway/README.md`](gateway/README.md): Go API Gateway microservice (F7 contract)
+- **Specifications & Architecture**: see [`docs/spec/`](docs/spec/) and [`docs/adr/`](docs/adr/).
+- **Contributor / Coding-Agent Instructions**: see [`AGENTS.md`](AGENTS.md).
 
 ## Status
 
-Foundation, first skill, and several parallel skills implemented.
-Frontend not yet started. See [`docs/adr/`](docs/adr/) for the current
-state of each major decision.
+Foundation, orchestrator skills, Go API Gateway, and standalone Vue 3 frontend implemented. See [`docs/adr/`](docs/adr/) for the current state of each major decision.
 
 ## Built With
 
