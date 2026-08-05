@@ -1043,6 +1043,88 @@ async def test_reviewer_postprocess_populates_context(mock_emit, mock_fs_cls):
     assert mock_emit.call_args[1]["registry_entry_id"] == "rev-rev-1"
 
 
+@pytest.mark.asyncio
+@patch("src.orchestrator.planner.emit_review_completed_audit")
+@patch("src.orchestrator.planner.FirestoreClient")
+async def test_reviewer_postprocess_uses_preloaded_state_without_firestore(mock_fs_cls, mock_emit):
+    """Verify that when _preloaded_ips and _preloaded_holdings are in input_dict, no Firestore calls are made."""
+    from datetime import date, datetime, timezone
+
+    from src.orchestrator.contracts.holdings import HoldingsSnapshot, Position
+    from src.orchestrator.contracts.ips import (
+        Constraints,
+        InvestmentPolicyStatement,
+        IPSStatus,
+        RiskTolerance,
+        TargetAllocation,
+    )
+    from src.orchestrator.contracts.proposed_action import (
+        ActionStatus,
+        ActionType,
+        OrderType,
+        ProposedAction,
+        RelatedIPSVersion,
+        Side,
+        SkillVersionRef,
+    )
+    from src.orchestrator.planner import SKILL_PLANS
+
+    mock_fs = mock_fs_cls.return_value
+
+    fake_ips = InvestmentPolicyStatement(
+        ips_id="ips_pre",
+        user_id="user_pre",
+        version=1,
+        status=IPSStatus.ACTIVE,
+        effective_date=date(2026, 1, 1),
+        risk_tolerance=RiskTolerance.MODERATE,
+        time_horizon_years=10,
+        target_allocation=[
+            TargetAllocation(asset_class="Equity", target_percent=60, min_percent=50, max_percent=70)
+        ],
+        constraints=Constraints(concentration_limit_percent=15, excluded_tickers=[], excluded_sectors=[]),
+        approval_required_above_usd=25000.0,
+        approval_required_above_percent=20.0,
+        created_at=datetime.now(timezone.utc),
+    )
+    fake_holdings = HoldingsSnapshot(
+        user_id="user_pre",
+        as_of=datetime.now(timezone.utc),
+        positions=[Position(ticker="AAPL", quantity=10, asset_class="Equity", market_value_usd=10000.0)],
+        cash_usd=90000.0,
+        total_value_usd=100000.0,
+    )
+
+    action = ProposedAction(
+        action_id="act_pre",
+        session_id="s_1",
+        type=ActionType.TRADE,
+        ticker="AAPL",
+        side=Side.BUY,
+        quantity=5.0,
+        order_type=OrderType.MARKET,
+        estimated_price_usd=200.0,
+        estimated_value_usd=1000.0,
+        rationale="test",
+        supporting_research_refs=[],
+        ips_version_referenced=RelatedIPSVersion(ips_id="ips_pre", version=1),
+        proposed_by_skill_version=SkillVersionRef(skill_name="private-action-drafting", skill_version="0.1.0"),
+        status=ActionStatus.DRAFTED,
+        created_at=datetime.now(timezone.utc),
+    )
+
+    plan = SKILL_PLANS["private-reviewer"]
+    inp = {
+        "_reviewer_action": action.model_dump(),
+        "_preloaded_ips": fake_ips.model_dump(),
+        "_preloaded_holdings": fake_holdings.model_dump(),
+    }
+    payload, ctx_update = await plan.postprocess("user_pre", None, {}, inp, registry_entry_id="rev-1")
+    assert ctx_update["reviewer_verdict"].action_id == "act_pre"
+    mock_fs.get_active_ips_by_user.assert_not_called()
+    mock_fs.get_holdings.assert_not_called()
+
+
 @patch("src.orchestrator.planner.emit_skill_revoked_audit")
 def test_detect_revocations_emits_for_missing_skills(mock_emit):
     from src.orchestrator.planner import _detect_and_audit_revocations
