@@ -223,9 +223,23 @@ async def _postprocess_reviewer(user_id, result, ctx, input_dict, registry_entry
     ad_result_dict = input_dict.get("_reviewer_action")
     action = ProposedAction.model_validate(ad_result_dict)
 
-    fs = FirestoreClient()
-    ips_obj = fs.get_active_ips_by_user(user_id)
-    holdings_obj = fs.get_holdings(user_id)
+    from .contracts.holdings import HoldingsSnapshot
+    from .contracts.ips import InvestmentPolicyStatement
+
+    preloaded_ips_dict = input_dict.get("_preloaded_ips") or input_dict.get("ips")
+    preloaded_holdings_dict = input_dict.get("_preloaded_holdings") or input_dict.get("holdings")
+
+    if preloaded_ips_dict and isinstance(preloaded_ips_dict, dict):
+        ips_obj = InvestmentPolicyStatement.model_validate(preloaded_ips_dict)
+    else:
+        fs = FirestoreClient()
+        ips_obj = fs.get_active_ips_by_user(user_id)
+
+    if preloaded_holdings_dict and isinstance(preloaded_holdings_dict, dict):
+        holdings_obj = HoldingsSnapshot.model_validate(preloaded_holdings_dict)
+    else:
+        fs = FirestoreClient()
+        holdings_obj = fs.get_holdings(user_id)
     if ips_obj is None or holdings_obj is None:
         logger.error(f"Reviewer postprocess: missing IPS or holdings for user {user_id}")
         if llm_verdict is not None:
