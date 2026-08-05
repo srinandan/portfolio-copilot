@@ -309,6 +309,7 @@ def test_proposed_action_roundtrip_with_broker_order_id():
         client = FirestoreClient(project="test-project")
         client.db = MagicMock()
 
+        from src.orchestrator.contracts.ips import RelatedIPSVersion
         from src.orchestrator.contracts.proposed_action import (
             ActionStatus,
             ActionType,
@@ -317,7 +318,6 @@ def test_proposed_action_roundtrip_with_broker_order_id():
             Side,
             SkillVersionRef,
         )
-        from src.orchestrator.contracts.ips import RelatedIPSVersion
 
         action = ProposedAction(
             action_id="act_123",
