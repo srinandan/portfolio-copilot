@@ -265,14 +265,9 @@ async def hitl_approval_gate(ctx: Context, node_input: Any):
         raw_input = getattr(part, "text", None) or part
     if isinstance(raw_input, str):
         try:
-            import ast
-
-            raw_input = ast.literal_eval(raw_input)
+            raw_input = json.loads(raw_input)
         except Exception:
-            try:
-                raw_input = json.loads(raw_input)
-            except Exception:
-                pass
+            pass
     if not isinstance(raw_input, dict):
         raw_input = {}
 
