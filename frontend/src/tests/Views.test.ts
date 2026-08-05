@@ -34,6 +34,7 @@ describe('Frontend Views', () => {
   it('PortfolioView renders total value chart and top holdings list', async () => {
     render(PortfolioView);
     expect(screen.getByText('Total Value')).toBeDefined();
+    expect(screen.getByText('Portfolio Drift Report')).toBeDefined();
     expect(screen.getByText('Top Holdings')).toBeDefined();
 
     await waitFor(() => {
