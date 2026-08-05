@@ -162,11 +162,15 @@ The orchestrator is containerized using `Dockerfile` based on `python:3.12-slim`
 - Compiles project requirements via `uv pip install --system --no-cache .`.
 - Runs under a non-root `orchestrator` user on port `8080`.
 
-### Deploying via Cloud Build (`cloudbuild.yaml`)
-
-To build, push, and deploy the orchestrator to Google Cloud Run using Google Cloud Build:
+### Running & deploying via the Makefile
 
 ```bash
-gcloud builds submit --config orchestrator/cloudbuild.yaml .
+# Run locally against your current gcloud project
+make -C orchestrator local
+
+# Trigger a manual Cloud Build → Cloud Run deploy
+make -C orchestrator deploy
 ```
+
+The `deploy` target calls `gcloud builds submit --config=orchestrator/cloudbuild.yaml` with `_COMMIT_SHA=$(git rev-parse --short HEAD)` and the active gcloud region. For tag-based automatic releases, see [`install/README.md`](../install/README.md) — pushing `v*` git tags fires the triggers created by `scripts/setup_cloudbuild_triggers.sh`.
 

@@ -91,10 +91,7 @@ cd frontend && npm install && npm run dev
 
 Depends on what changed:
 
-- **Gateway or frontend code**: re-run
-  `./scripts/setup_cloudrun.sh <PROJECT_ID> <REGION>`, or
-  `gcloud run deploy` directly against the specific service if you only
-  changed one.
+- **Gateway or frontend code**: use the per-service Makefile — `make -C gateway deploy` or `make -C frontend deploy` — which calls `gcloud builds submit --config=<service>/cloudbuild.yaml`. For a tagged release, push a `v*` tag and the Cloud Build triggers set up by `scripts/setup_cloudbuild_triggers.sh` build and deploy all three services automatically (see below).
 - **Worker Managed Agent code**: re-run
   `./scripts/setup_managed_agent.sh <PROJECT_ID> <REGION>` (or `python scripts/deploy_managed_agent.py --project=<PROJECT_ID> --location=<REGION>`).
 - **Orchestrator code**: re-run `python scripts/deploy_agent_engine.py`
@@ -104,6 +101,53 @@ Depends on what changed:
 - **Infra changes** (new secrets, new BigQuery columns, IAM changes):
   re-run the specific `setup_*.sh` script that owns that resource, not
   `setup_all.sh` wholesale, unless you're provisioning a fresh project.
+
+## Cloud Build: tag-triggered releases via Developer Connect
+
+To wire the repo up so pushing a git tag builds and deploys all three
+services (orchestrator, gateway, frontend), run:
+
+```bash
+./scripts/setup_cloudbuild_triggers.sh <PROJECT_ID> <REGION>
+```
+
+This uses [Developer Connect (2nd-gen Cloud Build GitHub integration)](https://docs.cloud.google.com/build/docs/automating-builds/github/connect-repo-github?generation=2nd-gen#gcloud)
+to:
+
+1. Enable the required APIs (`developerconnect`, `cloudbuild`, `artifactregistry`, `run`, `secretmanager`).
+2. Create a Developer Connect GitHub connection. The first run pauses and prints
+   an installation URL — open it, install the Cloud Build GitHub App on
+   `srinandan/portfolio-copilot`, then re-run the script.
+3. Link the GitHub repo to the connection.
+4. Create an Artifact Registry Docker repo (`portfolio-copilot`) in the target region.
+5. Grant the Cloud Build service account `roles/run.admin`,
+   `roles/iam.serviceAccountUser`, and `roles/artifactregistry.writer`.
+6. Create one tag-triggered build trigger per service, all firing on tags
+   matching `^v.*$` (e.g. `v0.1.0`, `v1.2.3-rc1`).
+
+To cut a release once the triggers are in place:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+All three builds start in parallel; each pushes a versioned image to
+Artifact Registry (`<region>-docker.pkg.dev/<project>/portfolio-copilot/<service>:v0.1.0`)
+and deploys it to Cloud Run.
+
+### Triggering builds manually
+
+Use the per-service `Makefile` (`orchestrator/Makefile`, `gateway/Makefile`,
+`frontend/Makefile`); each exposes two targets:
+
+- `make local` — runs the service on your machine (uv/go/npm as appropriate).
+- `make deploy` — calls `gcloud builds submit --config=<service>/cloudbuild.yaml`
+  with `_COMMIT_SHA=$(git rev-parse --short HEAD)` and the current gcloud
+  region as substitutions, then deploys to Cloud Run. No tag push required.
+
+Environment overrides (`GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`,
+`_COMMIT_SHA`) work the same way in both flows.
 
 ## Demos
 

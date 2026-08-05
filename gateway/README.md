@@ -61,7 +61,7 @@ go mod download
 Run the API gateway server locally on port `8080`:
 
 ```bash
-go run ./main.go
+make -C gateway local        # or: go run ./gateway
 ```
 
 By default, the server binds to `0.0.0.0:8080`.
@@ -104,18 +104,15 @@ The gateway is containerized using a multi-stage `Dockerfile`:
 1. **Builder Stage**: Compiles a static Linux binary (`CGO_ENABLED=0 GOOS=linux`) using `golang:1.25`.
 2. **Runtime Stage**: Uses Google's minimal `gcr.io/distroless/static:nonroot` base image running as nonroot (`USER nonroot:nonroot`) on port `8080`.
 
-### Deploying via gcloud / Infrastructure Scripts
-
-See [`scripts/setup_cloudrun.sh`](../scripts/setup_cloudrun.sh) for automated Cloud Run provisioning:
+### Deploying via the Makefile
 
 ```bash
-gcloud run deploy portfolio-copilot-gateway \
-  --project="your-gcp-project-id" \
-  --region="us-central1" \
-  --image="your-artifact-registry-image" \
-  --service-account="portfolio-copilot-gateway-sa@your-gcp-project-id.iam.gserviceaccount.com" \
-  --no-allow-unauthenticated
+make -C gateway deploy
 ```
+
+This calls `gcloud builds submit --config=gateway/cloudbuild.yaml` with `_COMMIT_SHA=$(git rev-parse --short HEAD)` and the active gcloud region, builds+pushes the image to Artifact Registry, and deploys it to Cloud Run under the `portfolio-copilot-gateway-sa` service account created by `scripts/setup_cloudrun.sh`.
+
+For tag-based automatic releases, see [`install/README.md`](../install/README.md) — pushing `v*` git tags fires the triggers created by `scripts/setup_cloudbuild_triggers.sh`.
 
 ---
 
