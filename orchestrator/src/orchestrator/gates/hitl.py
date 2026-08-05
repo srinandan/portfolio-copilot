@@ -102,9 +102,12 @@ def _extract_from_obj(obj: Any) -> Any:
         return obj
     if isinstance(obj, str):
         try:
-            return json.loads(obj)
+            parsed = json.loads(obj)
+            if isinstance(parsed, dict) and "decision" in parsed:
+                return parsed
         except Exception:
-            return obj
+            pass
+        return obj
     if hasattr(obj, "parts") and obj.parts:
         for p in obj.parts:
             if getattr(p, "function_response", None) and getattr(
@@ -112,6 +115,10 @@ def _extract_from_obj(obj: Any) -> Any:
             ):
                 res = _extract_from_obj(p.function_response.response)
                 if res is not None:
+                    return res
+            if getattr(p, "text", None):
+                res = _extract_from_obj(p.text)
+                if res is not None and isinstance(res, dict) and "decision" in res:
                     return res
     return None
 
