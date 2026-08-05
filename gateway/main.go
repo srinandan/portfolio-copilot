@@ -15,7 +15,9 @@ func main() {
 	InitLogger()
 
 	r := gin.New()
-	r.Use(StructuredLogMiddleware(), gin.Recovery())
+	r.Use(StructuredLogMiddleware(), gin.Recovery(), CORSMiddleware())
+
+	srv := NewGatewayServer()
 
 	// Health check endpoint for Cloud Run
 	r.GET("/health", func(c *gin.Context) {
@@ -23,6 +25,14 @@ func main() {
 			"status": "ok",
 		})
 	})
+
+	// Data endpoints for frontend
+	r.GET("/api/holdings", srv.HandleGetHoldings)
+	r.GET("/api/spending_report", srv.HandleGetSpendingReport)
+	r.GET("/api/drift_report", srv.HandleGetDriftReport)
+	r.GET("/api/documents", srv.HandleGetDocuments)
+	r.POST("/api/proposed_actions/:action_id/approve", srv.HandleApproveAction)
+	r.POST("/api/proposed_actions/:action_id/reject", srv.HandleRejectAction)
 
 	// Setup ADC authentication simulation
 	// In production, the gateway would use ADC to authenticate requests to the orchestrator.
