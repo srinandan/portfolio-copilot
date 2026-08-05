@@ -4,10 +4,44 @@ import DashboardView from '../views/DashboardView.vue';
 import PortfolioView from '../views/PortfolioView.vue';
 import DocumentsView from '../views/DocumentsView.vue';
 import SecurityView from '../views/SecurityView.vue';
+import { gatewayService } from '../services/gateway';
 
 describe('Frontend Views', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    vi.spyOn(gatewayService, 'getDocuments').mockResolvedValue([
+      {
+        id: 'doc-1',
+        filename: 'Fidelity_Stmt_Oct2023.pdf',
+        size_bytes: 1258291,
+        uploaded_at: '2023-10-24T09:41:00Z',
+        status: 'SUCCESS',
+        records_parsed: 42
+      }
+    ]);
+    vi.spyOn(gatewayService, 'getHoldings').mockResolvedValue({
+      total_value_usd: 1248500.0,
+      cash_usd: 62400.0,
+      as_of: '2023-10-24',
+      positions: [
+        {
+          ticker: 'AAPL',
+          name: 'Apple Inc.',
+          asset_class: 'Equities (US)',
+          quantity: 120,
+          current_price_usd: 170.41,
+          current_value_usd: 20449.2,
+          change_percent: 1.2
+        }
+      ]
+    });
+    vi.spyOn(gatewayService, 'getDriftReport').mockResolvedValue({
+      as_of: '2023-10-24',
+      has_active_ips: true,
+      rebalance_recommended: true,
+      unclassified_value_usd: 0.0,
+      bands: []
+    });
   });
 
   afterEach(() => {

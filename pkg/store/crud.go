@@ -1,9 +1,9 @@
 package store
 
 import (
+	"cloud.google.com/go/firestore"
 	"context"
 	"fmt"
-	"cloud.google.com/go/firestore"
 	"portfolio-copilot/pkg/contracts"
 )
 

@@ -6,11 +6,15 @@ import (
 
 // Position represents a single portfolio position holding in HoldingsSnapshot.
 type Position struct {
-	Ticker         string       `json:"ticker" firestore:"ticker"`
-	Quantity       float64      `json:"quantity" firestore:"quantity"`
-	AssetClass     string       `json:"asset_class" firestore:"asset_class"`
-	MarketValueUSD float64      `json:"market_value_usd" firestore:"market_value_usd"`
-	AccountType    *AccountType `json:"account_type,omitempty" firestore:"account_type,omitempty"` // taxable, retirement
+	Ticker          string       `json:"ticker" firestore:"ticker"`
+	Name            string       `json:"name,omitempty" firestore:"name,omitempty"`
+	Quantity        float64      `json:"quantity" firestore:"quantity"`
+	AssetClass      string       `json:"asset_class" firestore:"asset_class"`
+	MarketValueUSD  float64      `json:"market_value_usd" firestore:"market_value_usd"`
+	CurrentPriceUSD float64      `json:"current_price_usd,omitempty" firestore:"current_price_usd,omitempty"`
+	CurrentValueUSD float64      `json:"current_value_usd,omitempty" firestore:"current_value_usd,omitempty"`
+	ChangePercent   *float64     `json:"change_percent,omitempty" firestore:"change_percent,omitempty"`
+	AccountType     *AccountType `json:"account_type,omitempty" firestore:"account_type,omitempty"` // taxable, retirement
 }
 
 // HoldingsSnapshot represents current portfolio holdings.
