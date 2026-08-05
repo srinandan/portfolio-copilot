@@ -1,8 +1,6 @@
 # Architecture
 
-This document describes how the system is built. For what it does, see
-[`01-functional.md`](01-functional.md). For the reasoning behind each
-decision below, see the linked ADRs.
+This document describes how the system is built, reflecting the completed Phase 4 architecture including sub-agent execution via Managed Agents and the three-stage Governance layer (Reviewer → HITL Gate → Execution Gate). For what it does, see [`01-functional.md`](01-functional.md). For the reasoning behind each decision below, see the linked ADRs.
 
 ## Stack summary
 
@@ -11,6 +9,7 @@ decision below, see the linked ADRs.
 | Agent implementation | **Python**, ADK dynamic workflows | [0008](../adr/0008-python-for-orchestrator.md) (supersedes [0001](../adr/0001-go-over-python-for-agents.md)) |
 | Root orchestration | ADK `DynamicNode` / Workflow orchestrator | [0004](../adr/0004-dynamic-planning-over-fixed-pipeline.md) |
 | Sub-agent execution layer | Managed Agents API (Antigravity worker agent + per-interaction SKILL.md override) | [0014](../adr/0014-managed-agents-subagent-execution-layer.md) (supersedes [0005](../adr/0005-managed-agents-hybrid-evaluation.md)), [0007](../adr/0007-skill-content-via-input-not-mounting.md), [0009](../adr/0009-managed-agent-native-class.md) |
+| Governance & safety | Reviewer/Critic Managed Agent → HITL Approval Gate (`RequestInput`) → Alpaca Execution Gate | [0014](../adr/0014-managed-agents-subagent-execution-layer.md), [0015](../adr/0015-real-user-data-antigravity-sandbox.md) |
 | Deterministic math & primitives | In-process Python functions under `orchestrator/primitives/` | [0016](../adr/0016-deterministic-primitives-in-orchestrator.md) |
 | Analytical data | BigQuery (Chase transactions) | [0002](../adr/0002-bigquery-plus-firestore-split.md), [0015](../adr/0015-real-user-data-antigravity-sandbox.md) |
 | Transactional data | Firestore (IPS, holdings, liabilities, audit log) — separate Go and Python clients | [0002](../adr/0002-bigquery-plus-firestore-split.md), [0008](../adr/0008-python-for-orchestrator.md) |
@@ -58,6 +57,7 @@ Root Orchestrator (Python, ADK, Agent Runtime)
   │       passing pre-computed inputs + SKILL.md as description
   ├─ collects typed output (DriftReport, ProposedAction, ResearchBrief,
   │    ReviewerVerdict, GoalsOnboardingResult, SpendingReport)
+  ├─ invokes Reviewer Managed Agent on any drafted ProposedAction
   ├─ owns HITL gate (RequestInput)
   ├─ writes state (IPS, ProposedAction, audit log)
   └─ owns Alpaca execution
@@ -102,3 +102,26 @@ layer).
 ## Sub-agent execution: Managed Agents
 
 All sub-agents execute as Managed Agents via the Interactions API using a unified worker agent (`portfolio-copilot-worker`), customized per-interaction with registry-resolved `SKILL.md` instructions and pre-computed inputs from in-process primitives ([ADR-0014](../adr/0014-managed-agents-subagent-execution-layer.md), [ADR-0015](../adr/0015-real-user-data-antigravity-sandbox.md), [ADR-0016](../adr/0016-deterministic-primitives-in-orchestrator.md)).
+
+## Governance layer
+
+The governance layer enforces safety, policy compliance, and human oversight before any proposed financial action is executed. It executes in a strict three-stage sequence after the dynamic skill pipeline completes:
+
+```mermaid
+graph TD
+    A[Skill Pipeline / Action Drafting] -->|context: proposed_action| B[Reviewer / Critic Managed Agent]
+    B -->|context: reviewer_verdict| C[HITL Approval Gate]
+    C -->|RequestInput / User Authorization| D{Approved?}
+    D -->|Yes| E[Execution Gate / Alpaca Paper API]
+    D -->|No| F[Audit Log: Action Rejected]
+    E -->|ExecutionResult| G[Firestore & Immutable Audit Log]
+```
+
+### 1. Reviewer / Critic Managed Agent
+When a `ProposedAction` is drafted (e.g., a rebalancing trade), the **Reviewer/Critic Managed Agent** (`reviewer`) is invoked to independently audit the proposal against the user's Investment Policy Statement (IPS) and deterministic risk rules ([ADR-0014](../adr/0014-managed-agents-subagent-execution-layer.md), [ADR-0015](../adr/0015-real-user-data-antigravity-sandbox.md)). It returns a structured `ReviewerVerdict` (`APPROVED`, `REJECTED`, or `NEEDS_REVISION`) along with an audit rationale and risk score.
+
+### 2. Human-in-the-Loop (HITL) Approval Gate
+Following the Reviewer, the **HITL approval gate** (`gates/hitl.py`) suspends workflow execution via `RequestInput`. It surfaces the `ProposedAction` and the independent `ReviewerVerdict` to the user in the frontend UI. No financial action can bypass explicit human authorization.
+
+### 3. Execution Gate
+Once explicitly approved by the user, the **Execution gate** (`gates/execution.py`) invokes the `AlpacaExecutor` (`executors/alpaca.py`) to submit the order to Alpaca's paper-trading API. The broker order ID, execution timestamp, and final status are recorded in Firestore and emitted to the immutable audit log.
