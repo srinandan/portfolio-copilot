@@ -8,12 +8,14 @@ sandbox never sees Alpaca write credentials.
 Behavior matrix:
   HITL outcome | Reviewer verdict | Action
   -------------|------------------|--------
-  approved     | pass or absent   | execute
-  approved     | fail             | refuse, emit ACTION_FAILED
+  approved     | pass             | execute
+  approved     | absent/revoked   | refuse, emit ACTION_FAILED ("reviewer_verdict_missing_or_reviewer_revoked")
+  approved     | fail             | refuse, emit ACTION_FAILED ("reviewer_verdict_failed")
   rejected     | (any)            | skip silently (already audited by HITL gate)
   missing      | (any)            | skip silently (nothing was drafted or gated)
 """
 
+import os
 from typing import Any, Dict, Optional
 
 from google.adk import Context
@@ -46,6 +48,23 @@ def _extract_verdict(context: Dict[str, Any]) -> Optional[ReviewerVerdict]:
     if isinstance(raw, dict):
         return ReviewerVerdict.model_validate(raw)
     return None
+
+
+def _is_reviewer_authorized(ctx: Optional[Context]) -> bool:
+    if ctx is None or not hasattr(ctx, "state") or ctx.state is None:
+        return False
+    authorized_list = ctx.state.get("last_authorized_skills")
+    if not isinstance(authorized_list, list):
+        return False
+    for item in authorized_list:
+        if isinstance(item, dict):
+            name = item.get("name", "")
+        else:
+            name = str(item)
+        short_name = name.split("/")[-1] if "/" in name else name
+        if short_name in ("reviewer", "private-reviewer"):
+            return True
+    return False
 
 
 @node(name="execution_gate", rerun_on_resume=False)
@@ -108,8 +127,37 @@ async def execution_gate(ctx: Context, node_input: Any):
         else ProposedAction.model_validate(raw_action)
     )
 
-    # Reviewer verdict gate — enforce only when present. Before #106 lands, absent verdict is OK.
     verdict = _extract_verdict(node_input)
+    admin_bypass = os.environ.get("PORTFOLIO_COPILOT_ADMIN_BYPASS_REVIEWER", "").lower() == "true"
+
+    if verdict is None:
+        if admin_bypass:
+            logger.warning(
+                f"Execution gate: reviewer verdict absent for {action.action_id}, but PORTFOLIO_COPILOT_ADMIN_BYPASS_REVIEWER=true; allowing execution."
+            )
+        else:
+            if not _is_reviewer_authorized(ctx):
+                logger.warning(
+                    f"Execution gate: reviewer skill 'private-reviewer' not authorized in registry for {action.action_id}; refusing execution."
+                )
+            else:
+                logger.warning(
+                    f"Execution gate: reviewer verdict missing for {action.action_id} (LLM crash or no verdict produced); refusing execution."
+                )
+            db_client = FirestoreClient()
+            db_client.update_proposed_action_status(action.action_id, ActionStatus.FAILED)
+            emit_action_failed_audit(
+                action,
+                error="reviewer_verdict_missing_or_reviewer_revoked",
+                db_client=db_client,
+            )
+            return {
+                "status": "failed",
+                "action_id": action.action_id,
+                "broker_order_id": None,
+                "reason": "reviewer_verdict_missing_or_reviewer_revoked",
+            }
+
     if verdict is not None and not verdict.overall_pass:
         logger.warning(
             f"Execution gate: reviewer verdict failed for {action.action_id}; refusing execution."
