@@ -1,9 +1,15 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, fireEvent, screen, cleanup } from '@testing-library/vue';
+import { deriveRiskTolerance, getDefaultAllocationBands } from '../services/onboarding';
+import { gatewayService } from '../services/gateway';
+
 import WelcomeStep from '../components/onboarding/WelcomeStep.vue';
-import RiskGoalsStep from '../components/onboarding/RiskGoalsStep.vue';
+import GoalsStep from '../components/onboarding/GoalsStep.vue';
+import LiabilitiesStep from '../components/onboarding/LiabilitiesStep.vue';
+import RiskCalibrationStep from '../components/onboarding/RiskCalibrationStep.vue';
 import TargetAllocationStep from '../components/onboarding/TargetAllocationStep.vue';
-import StatementUploadStep from '../components/onboarding/StatementUploadStep.vue';
+import ConstraintsStep from '../components/onboarding/ConstraintsStep.vue';
+import SubmissionStep from '../components/onboarding/SubmissionStep.vue';
 import OnboardingView from '../views/OnboardingView.vue';
 
 const mockPush = vi.fn();
@@ -13,188 +19,317 @@ vi.mock('vue-router', () => ({
   })
 }));
 
-describe('Onboarding Components', () => {
+describe('Goals & Onboarding Interview (Issue #28 / S1)', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
   });
 
-  describe('WelcomeStep.vue', () => {
-    it('renders welcome hero, value props, and emits next on CTA click', async () => {
-      const { emitted } = render(WelcomeStep);
+  describe('Deterministic Risk Tolerance Derivation (SKILL.md §Risk tolerance)', () => {
+    it('maps >= 15 years with hold/buy_more to aggressive', () => {
+      expect(deriveRiskTolerance(15, 'hold')).toBe('aggressive');
+      expect(deriveRiskTolerance(20, 'buy_more')).toBe('aggressive');
+    });
 
+    it('maps >= 7 years with hold/buy_more to moderate', () => {
+      expect(deriveRiskTolerance(7, 'hold')).toBe('moderate');
+      expect(deriveRiskTolerance(10, 'buy_more')).toBe('moderate');
+    });
+
+    it('maps any horizon with sell reaction to conservative', () => {
+      expect(deriveRiskTolerance(30, 'sell')).toBe('conservative');
+      expect(deriveRiskTolerance(10, 'sell')).toBe('conservative');
+      expect(deriveRiskTolerance(3, 'sell')).toBe('conservative');
+    });
+
+    it('maps < 7 years with hold/buy_more to moderate', () => {
+      expect(deriveRiskTolerance(5, 'hold')).toBe('moderate');
+      expect(deriveRiskTolerance(2, 'buy_more')).toBe('moderate');
+    });
+
+    it('returns valid default allocation bands for all tiers', () => {
+      const cons = getDefaultAllocationBands('conservative');
+      expect(cons[0].target_percent).toBe(30);
+      expect(cons[0].min_percent).toBe(20);
+      expect(cons[0].max_percent).toBe(40);
+
+      const mod = getDefaultAllocationBands('moderate');
+      expect(mod[0].target_percent).toBe(60);
+      expect(mod[0].min_percent).toBe(50);
+      expect(mod[0].max_percent).toBe(70);
+
+      const agg = getDefaultAllocationBands('aggressive');
+      expect(agg[0].target_percent).toBe(85);
+      expect(agg[0].min_percent).toBe(75);
+      expect(agg[0].max_percent).toBe(95);
+    });
+  });
+
+  describe('WelcomeStep.vue', () => {
+    it('renders hero and emits next when Start Setup is clicked', async () => {
+      const { emitted } = render(WelcomeStep);
       expect(screen.getByText('Welcome to Portfolio Copilot')).toBeDefined();
       expect(screen.getByText('Security through Privacy')).toBeDefined();
-      expect(screen.getByText('No Bank Logins')).toBeDefined();
 
       const startBtn = screen.getByTestId('start-setup-btn');
       await fireEvent.click(startBtn);
-
       expect(emitted().next).toBeTruthy();
     });
   });
 
-  describe('RiskGoalsStep.vue', () => {
-    it('renders objective options and telemetry preview', async () => {
-      const { emitted } = render(RiskGoalsStep);
+  describe('Turn 1: GoalsStep.vue', () => {
+    it('collects goal name, target amount, target date, horizon, and near-term expenses', async () => {
+      const { emitted } = render(GoalsStep);
 
-      expect(screen.getByText('Aggressive Capital Appreciation')).toBeDefined();
-      expect(screen.getByText('Balanced Growth & Income')).toBeDefined();
-      expect(screen.getByText('Capital Preservation')).toBeDefined();
+      const nameInput = screen.getByTestId('input-goal-name');
+      const amountInput = screen.getByTestId('input-target-amount');
+      const expensesInput = screen.getByTestId('input-upcoming-expenses');
 
-      // Click Aggressive
-      const aggressiveOpt = screen.getByTestId('objective-opt-aggressive');
-      await fireEvent.click(aggressiveOpt);
+      await fireEvent.update(nameInput, 'Retirement Nest Egg');
+      await fireEvent.update(amountInput, '2000000');
+      await fireEvent.update(expensesInput, '25000');
 
-      // Confirm
-      const confirmBtn = screen.getByTestId('confirm-objective-btn');
+      const confirmBtn = screen.getByTestId('confirm-goals-btn');
       await fireEvent.click(confirmBtn);
 
-      expect(emitted().select).toBeTruthy();
-      const payload = (emitted().select as any)[0][0];
-      expect(payload.riskTolerance).toBe('aggressive');
-      expect(payload.allocation.equity).toBe(85);
-      expect(payload.allocation.fixed_income).toBe(10);
-      expect(payload.allocation.cash).toBe(5);
+      expect(emitted().next).toBeTruthy();
+      const payload = (emitted().next as any)[0][0];
+      expect(payload.goals[0].name).toBe('Retirement Nest Egg');
+      expect(payload.goals[0].target_amount_usd).toBe(2000000);
+      expect(payload.knownUpcomingExpensesUsd).toBe(25000);
+      expect(payload.timeHorizonYears).toBeGreaterThan(0);
     });
   });
 
-  describe('TargetAllocationStep.vue', () => {
-    it('renders projected return, risk score, and allows slider overrides', async () => {
+  describe('Turn 2: LiabilitiesStep.vue', () => {
+    it('captures debts, displays total liabilities, and handles zero debt toggle', async () => {
+      const { emitted } = render(LiabilitiesStep);
+
+      expect(screen.getByTestId('total-liabilities-display')).toBeDefined();
+
+      // Add another liability
+      const addBtn = screen.getByTestId('add-liability-btn');
+      await fireEvent.click(addBtn);
+
+      const balanceInputs = screen.getAllByTestId('input-liability-balance');
+      expect(balanceInputs.length).toBeGreaterThan(1);
+
+      const confirmBtn = screen.getByTestId('confirm-liabilities-btn');
+      await fireEvent.click(confirmBtn);
+
+      expect(emitted().next).toBeTruthy();
+    });
+
+    it('submits empty liabilities array when no debt toggle is checked', async () => {
+      const { emitted } = render(LiabilitiesStep);
+
+      const noDebtToggle = screen.getByTestId('no-debt-toggle');
+      await fireEvent.click(noDebtToggle);
+
+      const confirmBtn = screen.getByTestId('confirm-liabilities-btn');
+      await fireEvent.click(confirmBtn);
+
+      expect(emitted().next).toBeTruthy();
+      expect((emitted().next as any)[0][0]).toEqual([]);
+    });
+  });
+
+  describe('Turn 3: RiskCalibrationStep.vue', () => {
+    it('dynamically calibrates risk tolerance from drawdown reaction and horizon', async () => {
+      const { emitted } = render(RiskCalibrationStep, {
+        props: { initialHorizonYears: 15, initialReaction: 'hold' }
+      });
+
+      expect(screen.getByTestId('derived-tier-display').textContent).toContain('aggressive');
+
+      // Click Sell reaction -> switches to conservative
+      const sellOpt = screen.getByTestId('reaction-opt-sell');
+      await fireEvent.click(sellOpt);
+      expect(screen.getByTestId('derived-tier-display').textContent).toContain('conservative');
+
+      const confirmBtn = screen.getByTestId('confirm-risk-calibration-btn');
+      await fireEvent.click(confirmBtn);
+
+      expect(emitted().next).toBeTruthy();
+      const payload = (emitted().next as any)[0][0];
+      expect(payload.riskTolerance).toBe('conservative');
+      expect(payload.drawdownReaction).toBe('sell');
+      expect(payload.defaultBands.length).toBe(3);
+    });
+  });
+
+  describe('Turn 4: TargetAllocationStep.vue', () => {
+    it('renders target allocation and min-max tolerance bands, validating 100% total', async () => {
       const { emitted } = render(TargetAllocationStep, {
         props: {
-          initialAllocation: { equity: 60, fixed_income: 30, cash: 10 }
+          initialBands: [
+            { asset_class: 'Equities (US & Global)', target_percent: 60, min_percent: 50, max_percent: 70 },
+            { asset_class: 'Fixed Income (Bonds)', target_percent: 30, min_percent: 20, max_percent: 40 },
+            { asset_class: 'Cash & Equivalents', target_percent: 10, min_percent: 5, max_percent: 15 }
+          ]
         }
       });
 
-      expect(screen.getByTestId('projected-return').textContent).toContain('6.1%');
-      expect(screen.getByTestId('risk-score').textContent).toBe('Moderate');
       expect(screen.getByTestId('total-percent-display').textContent).toBe('100%');
+      expect(screen.getByTestId('projected-return').textContent).toContain('6.1%');
+      expect(screen.getAllByTestId('band-row').length).toBe(3);
 
-      // Change equity to 70 (total becomes 110%)
-      const inputEquity = screen.getByTestId('input-equity');
-      await fireEvent.update(inputEquity, '70');
+      // Adjust equity target to 70% (total becomes 110%)
+      const inputEq = screen.getByTestId('input-target-0');
+      await fireEvent.update(inputEq, '70');
 
-      // Check warning toast and disabled button
-      expect(screen.getByTestId('allocation-warning').textContent).toContain('Total allocation must equal 100%. Currently: 110%');
+      expect(screen.getByTestId('allocation-warning')).toBeDefined();
       const confirmBtn = screen.getByTestId('confirm-allocation-btn') as HTMLButtonElement;
       expect(confirmBtn.disabled).toBe(true);
 
-      // Balance it out: reduce fixed income to 20% (total becomes 100%)
-      const inputFixed = screen.getByTestId('input-fixed');
-      await fireEvent.update(inputFixed, '20');
+      // Fix total to 100%: adjust fixed income to 20%
+      const inputFi = screen.getByTestId('input-target-1');
+      await fireEvent.update(inputFi, '20');
 
       expect(screen.queryByTestId('allocation-warning')).toBeNull();
       expect(confirmBtn.disabled).toBe(false);
 
       await fireEvent.click(confirmBtn);
       expect(emitted().confirm).toBeTruthy();
-      expect((emitted().confirm as any)[0][0]).toEqual({
-        equity: 70,
-        fixed_income: 20,
-        cash: 10
-      });
+      const confirmedBands = (emitted().confirm as any)[0][0];
+      expect(confirmedBands[0].target_percent).toBe(70);
+      expect(confirmedBands[1].target_percent).toBe(20);
     });
   });
 
-  describe('StatementUploadStep.vue', () => {
-    it('handles file selection, displays parsed rows, and allows removal', async () => {
-      const { emitted } = render(StatementUploadStep);
+  describe('Turn 5: ConstraintsStep.vue', () => {
+    it('collects reserve months, concentration limits, exclusions, and approval thresholds', async () => {
+      const { emitted } = render(ConstraintsStep);
 
-      const dropzone = screen.getByTestId('onboarding-dropzone');
-      expect(dropzone).toBeDefined();
+      await fireEvent.update(screen.getByTestId('input-reserve-months'), '9');
+      await fireEvent.update(screen.getByTestId('input-concentration-limit'), '10');
+      await fireEvent.update(screen.getByTestId('input-excluded-tickers'), 'TSLA, XOM');
+      await fireEvent.update(screen.getByTestId('input-excluded-sectors'), 'tobacco, defense');
+      await fireEvent.update(screen.getByTestId('input-approval-usd'), '2500');
+      await fireEvent.update(screen.getByTestId('input-approval-pct'), '10');
 
-      const fileInput = screen.getByTestId('onboarding-file-input');
-      const file = new File(['ticker,shares\nAAPL,10'], 'statement.csv', { type: 'text/csv' });
+      const confirmBtn = screen.getByTestId('confirm-constraints-btn');
+      await fireEvent.click(confirmBtn);
 
-      await fireEvent.change(fileInput, {
-        target: { files: [file] }
-      });
-
-      expect(screen.getByTestId('uploaded-file-card')).toBeDefined();
-      expect(screen.getByTestId('file-name').textContent).toContain('statement.csv');
-
-      const beginBtn = screen.getByTestId('begin-analysis-btn');
-      await fireEvent.click(beginBtn);
-
-      expect(emitted().complete).toBeTruthy();
-
-      // Remove file
-      const removeBtn = screen.getByTestId('remove-file-btn');
-      await fireEvent.click(removeBtn);
-
-      expect(screen.getByTestId('onboarding-dropzone')).toBeDefined();
-    });
-
-    it('handles drag and drop file upload', async () => {
-      render(StatementUploadStep);
-
-      const dropzone = screen.getByTestId('onboarding-dropzone');
-      const file = new File(['content'], 'brokerage.pdf', { type: 'application/pdf' });
-
-      await fireEvent.dragOver(dropzone);
-      await fireEvent.drop(dropzone, {
-        dataTransfer: { files: [file] }
-      });
-
-      expect(screen.getByTestId('uploaded-file-card')).toBeDefined();
-      expect(screen.getByTestId('file-name').textContent).toContain('brokerage.pdf');
+      expect(emitted().next).toBeTruthy();
+      const payload = (emitted().next as any)[0][0];
+      expect(payload.reserveMonths).toBe(9);
+      expect(payload.constraints.concentration_limit_percent).toBe(10);
+      expect(payload.constraints.excluded_tickers).toEqual(['TSLA', 'XOM']);
+      expect(payload.constraints.excluded_sectors).toEqual(['tobacco', 'defense']);
+      expect(payload.thresholds.approval_required_above_usd).toBe(2500);
+      expect(payload.thresholds.approval_required_above_percent).toBe(10);
     });
   });
 
-  describe('OnboardingView.vue (Full Wizard)', () => {
-    it('navigates turn-by-turn through all 4 steps and completes setup', async () => {
+  describe('Turn 6: SubmissionStep.vue', () => {
+    it('renders synthesized IPS summary and invokes gatewayService.triggerPlan on submit', async () => {
+      const planSpy = vi.spyOn(gatewayService, 'triggerPlan').mockResolvedValue(new Response('{}', { status: 200 }));
+
+      render(SubmissionStep, {
+        props: {
+          state: {
+            step: 7,
+            user_id: 'test_user',
+            goals: [{ name: 'Growth', target_amount_usd: 1000000, target_date: '2035-01-01' }],
+            time_horizon_years: 15,
+            known_upcoming_expenses_usd: 0,
+            liabilities: [{ liability_id: '1', type: 'credit_card', description: 'Card', balance_usd: 1000, interest_rate_percent: 20, minimum_payment_usd: 50 }],
+            drawdown_reaction: 'buy_more',
+            risk_tolerance: 'aggressive',
+            target_bands: [
+              { asset_class: 'Equities (US & Global)', target_percent: 85, min_percent: 75, max_percent: 95 },
+              { asset_class: 'Fixed Income (Bonds)', target_percent: 10, min_percent: 0, max_percent: 20 },
+              { asset_class: 'Cash & Equivalents', target_percent: 5, min_percent: 0, max_percent: 10 }
+            ],
+            reserve_months: 6,
+            constraints: { concentration_limit_percent: 15, excluded_tickers: [], excluded_sectors: [] },
+            approval_thresholds: { approval_required_above_usd: 1000, approval_required_above_percent: 5 }
+          }
+        }
+      });
+
+      expect(screen.getByTestId('summary-risk-tier').textContent).toContain('aggressive');
+      expect(screen.getByTestId('summary-horizon').textContent).toContain('15 Years');
+      expect(screen.getAllByTestId('summary-band-row').length).toBe(3);
+
+      const submitBtn = screen.getByTestId('submit-ips-btn');
+      await fireEvent.click(submitBtn);
+
+      expect(planSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          user_id: 'test_user'
+        })
+      );
+
+      // Dashboard CTA is displayed after submission
+      const dashboardBtn = screen.getByTestId('go-to-dashboard-btn');
+      await fireEvent.click(dashboardBtn);
+      expect(mockPush).toHaveBeenCalledWith('/');
+    });
+  });
+
+  describe('OnboardingView.vue (Full 7-Step Turn-by-Turn Wizard)', () => {
+    it('walks through all turns, computes deterministic risk, overrides bands, and submits to gateway', async () => {
+      vi.spyOn(gatewayService, 'triggerPlan').mockResolvedValue(new Response('{}', { status: 200 }));
+
       render(OnboardingView);
 
       // Step 1: Welcome
-      expect(screen.getByTestId('step-title').textContent).toContain('Welcome to Portfolio Copilot');
       expect(screen.getByTestId('welcome-step')).toBeDefined();
-      expect(screen.getByTestId('progress-bar').getAttribute('style')).toContain('width: 0%');
-
+      expect(screen.getByTestId('step-title').textContent).toContain('Welcome to Portfolio Copilot');
       await fireEvent.click(screen.getByTestId('start-setup-btn'));
 
-      // Step 2: Risk & Objectives
-      expect(screen.getByTestId('step-title').textContent).toContain('Step 1: Risk & Objectives');
-      expect(screen.getByTestId('risk-goals-step')).toBeDefined();
-      expect(screen.getByTestId('progress-bar').getAttribute('style')).toContain('width: 33%');
+      // Step 2: Goals & Timeline
+      expect(screen.getByTestId('goals-step')).toBeDefined();
+      expect(screen.getByTestId('step-title').textContent).toContain('Turn 1: Goals & Timeline');
+      await fireEvent.click(screen.getByTestId('confirm-goals-btn'));
 
-      await fireEvent.click(screen.getByTestId('objective-opt-aggressive'));
-      await fireEvent.click(screen.getByTestId('confirm-objective-btn'));
+      // Step 3: Liabilities & Debt
+      expect(screen.getByTestId('liabilities-step')).toBeDefined();
+      expect(screen.getByTestId('step-title').textContent).toContain('Turn 2: Liabilities & Debt');
+      await fireEvent.click(screen.getByTestId('confirm-liabilities-btn'));
 
-      // Step 3: Target Allocation Review
-      expect(screen.getByTestId('step-title').textContent).toContain('Step 2: Target Allocation Review');
+      // Step 4: Risk Calibration
+      expect(screen.getByTestId('risk-calibration-step')).toBeDefined();
+      expect(screen.getByTestId('step-title').textContent).toContain('Turn 3: Risk Calibration');
+      await fireEvent.click(screen.getByTestId('confirm-risk-calibration-btn'));
+
+      // Step 5: Target Allocation & Bands
       expect(screen.getByTestId('target-allocation-step')).toBeDefined();
-      expect(screen.getByTestId('progress-bar').getAttribute('style')).toContain('width: 66%');
-
+      expect(screen.getByTestId('step-title').textContent).toContain('Turn 4: Target Allocation Bands');
       await fireEvent.click(screen.getByTestId('confirm-allocation-btn'));
 
-      // Step 4: Statement Upload
-      expect(screen.getByTestId('step-title').textContent).toContain('Step 3: Document Upload');
-      expect(screen.getByTestId('statement-upload-step')).toBeDefined();
-      expect(screen.getByTestId('progress-bar').getAttribute('style')).toContain('width: 100%');
+      // Step 6: Policy Constraints & Guardrails
+      expect(screen.getByTestId('constraints-step')).toBeDefined();
+      expect(screen.getByTestId('step-title').textContent).toContain('Turn 5: Policy Guardrails');
+      await fireEvent.click(screen.getByTestId('confirm-constraints-btn'));
 
-      // Upload file and complete
-      const file = new File(['data'], 'schwab_jan2026.pdf', { type: 'application/pdf' });
-      await fireEvent.change(screen.getByTestId('onboarding-file-input'), {
-        target: { files: [file] }
-      });
+      // Step 7: Final Review & Submission
+      expect(screen.getByTestId('submission-step')).toBeDefined();
+      expect(screen.getByTestId('step-title').textContent).toContain('Turn 6: Review & Submission');
 
-      await fireEvent.click(screen.getByTestId('begin-analysis-btn'));
+      await fireEvent.click(screen.getByTestId('submit-ips-btn'));
+      await fireEvent.click(screen.getByTestId('go-to-dashboard-btn'));
+
       expect(mockPush).toHaveBeenCalledWith('/');
     });
 
-    it('navigates backwards when clicking the back button', async () => {
+    it('supports backward navigation via header back button', async () => {
       render(OnboardingView);
 
-      // Advance to step 2
       await fireEvent.click(screen.getByTestId('start-setup-btn'));
-      expect(screen.getByTestId('risk-goals-step')).toBeDefined();
+      expect(screen.getByTestId('goals-step')).toBeDefined();
 
-      // Click back -> returns to step 1
+      // Click back -> returns to Welcome
       await fireEvent.click(screen.getByTestId('onboarding-back-btn'));
       expect(screen.getByTestId('welcome-step')).toBeDefined();
 
-      // Click back on step 1 -> redirects to /
+      // Click back on Step 1 -> navigates to /
       await fireEvent.click(screen.getByTestId('onboarding-back-btn'));
       expect(mockPush).toHaveBeenCalledWith('/');
     });

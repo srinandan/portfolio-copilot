@@ -1,6 +1,6 @@
 <template>
   <div class="flex flex-col min-h-screen bg-surface text-on-surface" data-testid="onboarding-view">
-    <!-- Header with Back Button and Dynamic Step Title -->
+    <!-- Header with Back Button, Step Title, and Progress Bar -->
     <header class="fixed top-0 w-full z-50 pt-safe bg-surface/80 backdrop-blur-xl shadow-sm border-b border-outline-variant/30">
       <div class="flex items-center h-16 px-margin-mobile md:px-margin-desktop gap-md">
         <button
@@ -35,24 +35,51 @@
         @next="goToStep(2)"
       />
 
-      <!-- Step 2: Risk Profile & Objectives -->
-      <RiskGoalsStep
+      <!-- Step 2: Goals & Timeline -->
+      <GoalsStep
         v-else-if="currentStep === 2"
-        :initial-risk-tolerance="state.risk_tolerance"
-        @select="onObjectiveSelected"
+        :initial-goals="state.goals"
+        :initial-horizon-years="state.time_horizon_years"
+        :initial-upcoming-expenses="state.known_upcoming_expenses_usd"
+        @next="onGoalsConfirmed"
       />
 
-      <!-- Step 3: Target Allocation Review -->
-      <TargetAllocationStep
+      <!-- Step 3: Liabilities & Debt -->
+      <LiabilitiesStep
         v-else-if="currentStep === 3"
-        :initial-allocation="state.target_allocation"
+        :initial-liabilities="state.liabilities"
+        @next="onLiabilitiesConfirmed"
+      />
+
+      <!-- Step 4: Risk Calibration -->
+      <RiskCalibrationStep
+        v-else-if="currentStep === 4"
+        :initial-horizon-years="state.time_horizon_years"
+        :initial-reaction="state.drawdown_reaction"
+        @next="onRiskCalibrationConfirmed"
+      />
+
+      <!-- Step 5: Target Allocation & Bands -->
+      <TargetAllocationStep
+        v-else-if="currentStep === 5"
+        :initial-bands="state.target_bands"
         @confirm="onAllocationConfirmed"
       />
 
-      <!-- Step 4: Statement Upload -->
-      <StatementUploadStep
-        v-else-if="currentStep === 4"
-        @complete="onCompleteOnboarding"
+      <!-- Step 6: Policy Constraints & Guardrails -->
+      <ConstraintsStep
+        v-else-if="currentStep === 6"
+        :initial-reserve-months="state.reserve_months"
+        :initial-constraints="state.constraints"
+        :initial-thresholds="state.approval_thresholds"
+        @next="onConstraintsConfirmed"
+      />
+
+      <!-- Step 7: Final Review & Submission -->
+      <SubmissionStep
+        v-else-if="currentStep === 7"
+        :state="state"
+        @complete="onComplete"
       />
     </main>
   </div>
@@ -61,11 +88,25 @@
 <script setup lang="ts">
 import { ref, reactive, computed } from 'vue';
 import { useRouter } from 'vue-router';
-import type { OnboardingState, RiskToleranceTier, TargetAllocationInput } from '../types';
+import type {
+  OnboardingState,
+  Goal,
+  LiabilityItem,
+  RiskToleranceTier,
+  DrawdownReaction,
+  AllocationBand,
+  IPSConstraints,
+  ApprovalThresholds
+} from '../types';
+import { getDefaultAllocationBands } from '../services/onboarding';
+
 import WelcomeStep from '../components/onboarding/WelcomeStep.vue';
-import RiskGoalsStep from '../components/onboarding/RiskGoalsStep.vue';
+import GoalsStep from '../components/onboarding/GoalsStep.vue';
+import LiabilitiesStep from '../components/onboarding/LiabilitiesStep.vue';
+import RiskCalibrationStep from '../components/onboarding/RiskCalibrationStep.vue';
 import TargetAllocationStep from '../components/onboarding/TargetAllocationStep.vue';
-import StatementUploadStep from '../components/onboarding/StatementUploadStep.vue';
+import ConstraintsStep from '../components/onboarding/ConstraintsStep.vue';
+import SubmissionStep from '../components/onboarding/SubmissionStep.vue';
 
 const router = useRouter();
 
@@ -73,34 +114,57 @@ const currentStep = ref(1);
 
 const state = reactive<OnboardingState>({
   step: 1,
-  objective: 'Balanced Growth & Income',
-  time_horizon_years: 10,
+  user_id: 'demo_user',
+  goals: [
+    {
+      name: 'Retirement Compounding & Growth',
+      target_amount_usd: 1500000,
+      target_date: '2039-12-31'
+    }
+  ],
+  time_horizon_years: 15,
+  known_upcoming_expenses_usd: 0,
+  liabilities: [
+    {
+      liability_id: 'liab_001',
+      type: 'credit_card',
+      description: 'Chase Sapphire Reserve',
+      balance_usd: 4850,
+      interest_rate_percent: 24.99,
+      minimum_payment_usd: 150
+    }
+  ],
   drawdown_reaction: 'hold',
-  risk_tolerance: 'moderate',
-  target_allocation: {
-    equity: 60,
-    fixed_income: 30,
-    cash: 10
+  risk_tolerance: 'aggressive',
+  target_bands: getDefaultAllocationBands('aggressive'),
+  reserve_months: 6,
+  constraints: {
+    concentration_limit_percent: 15,
+    excluded_tickers: [],
+    excluded_sectors: [],
+    account_type: 'taxable',
+    tax_loss_harvesting_enabled: true
+  },
+  approval_thresholds: {
+    approval_required_above_usd: 1000,
+    approval_required_above_percent: 5
   }
 });
 
 const progressPercent = computed(() => {
-  switch (currentStep.value) {
-    case 1: return 0;
-    case 2: return 33;
-    case 3: return 66;
-    case 4: return 100;
-    default: return 0;
-  }
+  return Math.round(((currentStep.value - 1) / 6) * 100);
 });
 
 const stepTitle = computed(() => {
   switch (currentStep.value) {
     case 1: return 'Welcome to Portfolio Copilot';
-    case 2: return 'Step 1: Risk & Objectives';
-    case 3: return 'Step 2: Target Allocation Review';
-    case 4: return 'Step 3: Document Upload';
-    default: return 'Onboarding';
+    case 2: return 'Turn 1: Goals & Timeline';
+    case 3: return 'Turn 2: Liabilities & Debt';
+    case 4: return 'Turn 3: Risk Calibration';
+    case 5: return 'Turn 4: Target Allocation Bands';
+    case 6: return 'Turn 5: Policy Guardrails';
+    case 7: return 'Turn 6: Review & Submission';
+    default: return 'Goals & Onboarding';
   }
 });
 
@@ -118,26 +182,50 @@ function goBack() {
   }
 }
 
-function onObjectiveSelected(payload: {
-  objective: string;
-  riskTolerance: RiskToleranceTier;
-  allocation: TargetAllocationInput;
+function onGoalsConfirmed(payload: {
+  goals: Goal[];
+  timeHorizonYears: number;
+  knownUpcomingExpensesUsd: number;
 }) {
-  state.objective = payload.objective;
-  state.risk_tolerance = payload.riskTolerance;
-  state.target_allocation = payload.allocation;
+  state.goals = payload.goals;
+  state.time_horizon_years = payload.timeHorizonYears;
+  state.known_upcoming_expenses_usd = payload.knownUpcomingExpensesUsd;
   goToStep(3);
 }
 
-function onAllocationConfirmed(allocation: TargetAllocationInput) {
-  state.target_allocation = allocation;
+function onLiabilitiesConfirmed(liabilities: LiabilityItem[]) {
+  state.liabilities = liabilities;
   goToStep(4);
 }
 
-function onCompleteOnboarding(file: any) {
-  if (file) {
-    state.uploaded_file = file;
-  }
+function onRiskCalibrationConfirmed(payload: {
+  drawdownReaction: DrawdownReaction;
+  riskTolerance: RiskToleranceTier;
+  defaultBands: AllocationBand[];
+}) {
+  state.drawdown_reaction = payload.drawdownReaction;
+  state.risk_tolerance = payload.riskTolerance;
+  state.target_bands = payload.defaultBands;
+  goToStep(5);
+}
+
+function onAllocationConfirmed(bands: AllocationBand[]) {
+  state.target_bands = bands;
+  goToStep(6);
+}
+
+function onConstraintsConfirmed(payload: {
+  reserveMonths: number;
+  constraints: IPSConstraints;
+  thresholds: ApprovalThresholds;
+}) {
+  state.reserve_months = payload.reserveMonths;
+  state.constraints = payload.constraints;
+  state.approval_thresholds = payload.thresholds;
+  goToStep(7);
+}
+
+function onComplete() {
   router.push('/');
 }
 </script>
