@@ -34,7 +34,7 @@ steps:
       - '--image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:${_COMMIT_SHA}'
       - '--region=${_REGION}'
       - '--service-account=portfolio-copilot-gateway-sa@${PROJECT_ID}.iam.gserviceaccount.com'
-      - '--set-labels=app=portfolio-copilot,component=gateway,commit=${_COMMIT_SHA}'
+      - '--labels=app=portfolio-copilot,component=gateway,commit=${_COMMIT_SHA}'
       - '--no-allow-unauthenticated'
 
 images:

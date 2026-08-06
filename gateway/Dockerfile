@@ -13,7 +13,7 @@ RUN go mod download
 COPY . .
 
 # Build the gateway
-RUN CGO_ENABLED=0 GOOS=linux go build -o /app/gateway-bin ./gateway/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -o /app/gateway-bin ./gateway
 
 # Final stage
 FROM gcr.io/distroless/static:nonroot
