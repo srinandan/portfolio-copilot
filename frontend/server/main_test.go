@@ -125,6 +125,31 @@ func TestBuildProxy_UpstreamDown_Returns502(t *testing.T) {
 	}
 }
 
+func TestBuildProxy_ForwardsUpstream401AndItsWWWAuthenticate(t *testing.T) {
+	// The diagnostic transport must not swallow the upstream 401 or its
+	// WWW-Authenticate header — the operator needs both in the browser
+	// devtools to reason about audience vs. IAM.
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Www-Authenticate", `Bearer error="invalid_token"`)
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer upstream.Close()
+
+	target, _ := url.Parse(upstream.URL)
+	h := buildProxy(target, stubTokenSource{token: "tok"})
+
+	req := httptest.NewRequest(http.MethodGet, "http://frontend.local/api/holdings", nil)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("status = %d, want 401", w.Code)
+	}
+	if got := w.Header().Get("Www-Authenticate"); got == "" {
+		t.Errorf("Www-Authenticate not forwarded; expected the upstream reason to reach the browser")
+	}
+}
+
 func TestNewAPIHandler_UnsetGatewayURL_Returns503(t *testing.T) {
 	h := newAPIHandler("")
 
