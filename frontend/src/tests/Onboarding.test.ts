@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, fireEvent, screen, cleanup } from '@testing-library/vue';
 import { deriveRiskTolerance, getDefaultAllocationBands } from '../services/onboarding';
-import { gatewayService } from '../services/gateway';
+import { apiService } from '../services/api';
 
 import WelcomeStep from '../components/onboarding/WelcomeStep.vue';
 import GoalsStep from '../components/onboarding/GoalsStep.vue';
@@ -227,8 +227,8 @@ describe('Goals & Onboarding Interview (Issue #28 / S1)', () => {
   });
 
   describe('Turn 6: SubmissionStep.vue', () => {
-    it('renders synthesized IPS summary and invokes gatewayService.triggerPlan on submit', async () => {
-      const planSpy = vi.spyOn(gatewayService, 'triggerPlan').mockResolvedValue(new Response('{}', { status: 200 }));
+    it('renders synthesized IPS summary and invokes apiService.triggerPlan on submit', async () => {
+      const planSpy = vi.spyOn(apiService, 'triggerPlan').mockResolvedValue(new Response('{}', { status: 200 }));
 
       render(SubmissionStep, {
         props: {
@@ -274,8 +274,8 @@ describe('Goals & Onboarding Interview (Issue #28 / S1)', () => {
   });
 
   describe('OnboardingView.vue (Full 7-Step Turn-by-Turn Wizard)', () => {
-    it('walks through all turns, computes deterministic risk, overrides bands, and submits to gateway', async () => {
-      vi.spyOn(gatewayService, 'triggerPlan').mockResolvedValue(new Response('{}', { status: 200 }));
+    it('walks through all turns, computes deterministic risk, overrides bands, and submits plan', async () => {
+      vi.spyOn(apiService, 'triggerPlan').mockResolvedValue(new Response('{}', { status: 200 }));
 
       render(OnboardingView);
 

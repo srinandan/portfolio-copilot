@@ -13,13 +13,13 @@ import (
 	"portfolio-copilot/pkg/store"
 )
 
-// GatewayServer holds dependencies for HTTP handlers, including the Firestore store client.
-type GatewayServer struct {
+// Server holds dependencies for HTTP handlers, including the Firestore store client.
+type Server struct {
 	Store *store.Client
 }
 
-// NewGatewayServer initializes a GatewayServer, attempting to connect to Firestore if configured.
-func NewGatewayServer() *GatewayServer {
+// NewServer initializes a Server, attempting to connect to Firestore if configured.
+func NewServer() *Server {
 	ctx := context.Background()
 	projectID := os.Getenv("FIRESTORE_PROJECT_ID")
 	if projectID == "" {
@@ -41,14 +41,14 @@ func NewGatewayServer() *GatewayServer {
 			slog.Info("Connected to Firestore store client", "project_id", projectID)
 		}
 	} else {
-		slog.Info("No PROJECT_ID set; gateway running in fallback mode")
+		slog.Info("No PROJECT_ID set; server running in fallback mode")
 	}
-	return &GatewayServer{
+	return &Server{
 		Store: storeClient,
 	}
 }
 
-func (s *GatewayServer) HandleGetHoldings(c *gin.Context) {
+func (s *Server) HandleGetHoldings(c *gin.Context) {
 	userID := c.DefaultQuery("user_id", "usr_default")
 	if s.Store != nil {
 		snapshot, err := s.Store.GetHoldings(c.Request.Context(), userID)
@@ -63,7 +63,7 @@ func (s *GatewayServer) HandleGetHoldings(c *gin.Context) {
 	c.JSON(http.StatusOK, defaultHoldings())
 }
 
-func (s *GatewayServer) HandleGetSpendingReport(c *gin.Context) {
+func (s *Server) HandleGetSpendingReport(c *gin.Context) {
 	userID := c.DefaultQuery("user_id", "usr_default")
 	if s.Store != nil {
 		report, err := s.Store.GetSpendingReport(c.Request.Context(), userID)
@@ -78,7 +78,7 @@ func (s *GatewayServer) HandleGetSpendingReport(c *gin.Context) {
 	c.JSON(http.StatusOK, defaultSpendingReport())
 }
 
-func (s *GatewayServer) HandleGetDriftReport(c *gin.Context) {
+func (s *Server) HandleGetDriftReport(c *gin.Context) {
 	userID := c.DefaultQuery("user_id", "usr_default")
 	if s.Store != nil {
 		report, err := s.Store.GetDriftReport(c.Request.Context(), userID)
@@ -93,7 +93,7 @@ func (s *GatewayServer) HandleGetDriftReport(c *gin.Context) {
 	c.JSON(http.StatusOK, defaultDriftReport())
 }
 
-func (s *GatewayServer) HandleGetDocuments(c *gin.Context) {
+func (s *Server) HandleGetDocuments(c *gin.Context) {
 	userID := c.DefaultQuery("user_id", "usr_default")
 	if s.Store != nil {
 		items, err := s.Store.GetDocuments(c.Request.Context(), userID)
@@ -108,7 +108,7 @@ func (s *GatewayServer) HandleGetDocuments(c *gin.Context) {
 	c.JSON(http.StatusOK, defaultDocuments())
 }
 
-func (s *GatewayServer) HandleApproveAction(c *gin.Context) {
+func (s *Server) HandleApproveAction(c *gin.Context) {
 	actionID := c.Param("action_id")
 	if actionID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "action_id required"})
@@ -128,7 +128,7 @@ func (s *GatewayServer) HandleApproveAction(c *gin.Context) {
 	c.JSON(http.StatusOK, defaultProposedAction(actionID, contracts.ActionStatusApproved))
 }
 
-func (s *GatewayServer) HandleRejectAction(c *gin.Context) {
+func (s *Server) HandleRejectAction(c *gin.Context) {
 	actionID := c.Param("action_id")
 	if actionID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "action_id required"})

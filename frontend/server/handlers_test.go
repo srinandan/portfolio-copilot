@@ -14,7 +14,7 @@ func setupTestRouter() *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	r.Use(CORSMiddleware())
-	srv := NewGatewayServer()
+	srv := NewServer()
 	r.GET("/api/holdings", srv.HandleGetHoldings)
 	r.GET("/api/spending_report", srv.HandleGetSpendingReport)
 	r.GET("/api/drift_report", srv.HandleGetDriftReport)
@@ -158,17 +158,17 @@ func TestCORSHeaders(t *testing.T) {
 	}
 }
 
-func TestNewGatewayServer_WithProjectID(t *testing.T) {
+func TestNewServer_WithProjectID(t *testing.T) {
 	t.Setenv("FIRESTORE_PROJECT_ID", "test-project-id")
-	srv := NewGatewayServer()
+	srv := NewServer()
 	if srv == nil {
-		t.Fatalf("expected NewGatewayServer to return non-nil")
+		t.Fatalf("expected NewServer to return non-nil")
 	}
 }
 
 func TestHandlers_WithStoreFallback(t *testing.T) {
 	t.Setenv("FIRESTORE_PROJECT_ID", "test-project-id")
-	srv := NewGatewayServer()
+	srv := NewServer()
 
 	r := gin.New()
 	r.GET("/api/holdings", srv.HandleGetHoldings)
@@ -202,7 +202,7 @@ func TestHandlers_WithStoreFallback(t *testing.T) {
 
 func TestApproveReject_MissingActionID(t *testing.T) {
 	r := gin.New()
-	srv := NewGatewayServer()
+	srv := NewServer()
 	r.POST("/api/proposed_actions/approve", srv.HandleApproveAction)
 	r.POST("/api/proposed_actions/reject", srv.HandleRejectAction)
 

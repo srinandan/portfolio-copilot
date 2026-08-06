@@ -16,9 +16,8 @@ This document describes how the system is built, reflecting the completed Phase 
 | Session state | Vertex AI Sessions | — |
 | Long-term memory | Vertex AI Memory Bank | — |
 | Deployment / runtime | Vertex AI Agent Runtime (Agent Engine) — Python custom-agent contract | [0008](../adr/0008-python-for-orchestrator.md) |
-| Deployment identities | Dedicated Cloud Run SAs (`portfolio-copilot-gateway-sa`, `portfolio-copilot-frontend-sa`) + Agent Identity (`orchestrator`) | [0011](../adr/0011-least-privilege-identities.md) |
-| Frontend | TypeScript + Vue.js, Cloud Run | [0003](../adr/0003-standalone-ui-not-agentspace.md) |
-| API gateway | **Go** (unaffected by the Python pivot — not an agent), Cloud Run | [0003](../adr/0003-standalone-ui-not-agentspace.md), [0008](../adr/0008-python-for-orchestrator.md) |
+| Deployment identities | Dedicated Cloud Run SA (`portfolio-copilot-frontend-sa`) + Agent Identity (`orchestrator`) | [0011](../adr/0011-least-privilege-identities.md), [0017](../adr/0017-unified-gateway-and-frontend.md) |
+| Web application | Vue 3 + TypeScript SPA hosted by Go backend server (`frontend/server`), Cloud Run | [0003](../adr/0003-standalone-ui-not-agentspace.md), [0017](../adr/0017-unified-gateway-and-frontend.md) |
 | Trade execution (paper) | Alpaca API (orchestrator-owned execution outside sandbox) | [0005](../adr/0005-managed-agents-hybrid-evaluation.md), [0014](../adr/0014-managed-agents-subagent-execution-layer.md) |
 
 ## Data layer
@@ -42,10 +41,7 @@ data.
 ## Deployment topology
 
 ```
-Frontend (Vue, Cloud Run)
-        │
-        ▼
-API Gateway (Go, Cloud Run) — auth, streaming, fan-out reads
+Frontend Web Application (Vue SPA + Go server, Cloud Run) — static assets, auth, streaming, fan-out reads
         │
         ▼
 Root Orchestrator (Python, ADK, Agent Runtime)
@@ -78,21 +74,19 @@ primitives/ (Python, in-process to orchestrator):
 
 The frontend is a standalone custom UI, not built on Gemini
 Enterprise/Agentspace — see [ADR-0003](../adr/0003-standalone-ui-not-agentspace.md)
-for why. All Cloud Run services are deployed with `--no-allow-unauthenticated`,
-with IAM-authenticated invocation granted from the frontend service account to the gateway
-([ADR-0013](../adr/0013-authenticated-cloud-run.md)).
+for why. The web application service is deployed with `--no-allow-unauthenticated`
+([ADR-0013](../adr/0013-authenticated-cloud-run.md), [ADR-0017](../adr/0017-unified-gateway-and-frontend.md)).
 
 ## Deployment identities
 
-Every deployed component operates under a least-privilege, scoped identity (see [ADR-0011](../adr/0011-least-privilege-identities.md) and [ADR-0013](../adr/0013-authenticated-cloud-run.md)):
-- **`portfolio-copilot-gateway-sa`** (Cloud Run): Granted `roles/datastore.user` (Firestore audit log + holdings) and `roles/bigquery.dataViewer` (fan-out chart queries). Does not have Secret Manager access.
-- **`portfolio-copilot-frontend-sa`** (Cloud Run): Dedicated service account with `roles/run.invoker` on the gateway service (communicates strictly with the Gateway API via authenticated IAM tokens).
+Every deployed component operates under a least-privilege, scoped identity (see [ADR-0011](../adr/0011-least-privilege-identities.md) and [ADR-0017](../adr/0017-unified-gateway-and-frontend.md)):
+- **`portfolio-copilot-frontend-sa`** (Cloud Run): Granted `roles/datastore.user` (Firestore audit log + holdings) and `roles/bigquery.dataViewer` (fan-out chart queries). Does not have Secret Manager access.
 - **`orchestrator` Agent Identity** (Agent Runtime): Uses SPIFFE-based per-agent cryptographic identity with `roles/datastore.user`, `roles/bigquery.dataViewer`, and `roles/secretmanager.secretAccessor` (Alpaca API credentials and `MANAGED_AGENT_ID`). The Agent Platform Service Agent holds deployment-time secret accessor permissions.
 
 ## Language
 
-**Python for the orchestrator, primitives, and skill metadata; Go for the gateway.**
-Agent Runtime's deployment contract is Python-only, while the API gateway remains in Go as a high-performance, stateless proxy. See [ADR-0008](../adr/0008-python-for-orchestrator.md).
+**Python for the orchestrator, primitives, and skill metadata; Go for frontend backend host and shared libraries.**
+Agent Runtime's deployment contract is Python-only, while the web host server and shared contracts remain in Go. See [ADR-0008](../adr/0008-python-for-orchestrator.md) and [ADR-0017](../adr/0017-unified-gateway-and-frontend.md).
 
 ## Lifecycle
 

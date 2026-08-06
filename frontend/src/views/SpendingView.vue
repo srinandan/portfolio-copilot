@@ -29,7 +29,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import type { SpendingReport } from '../types';
-import { gatewayService } from '../services/gateway';
+import { apiService } from '../services/api';
 import SpendingSummaryCard from '../components/spending/SpendingSummaryCard.vue';
 import CategoryBreakdownTable from '../components/spending/CategoryBreakdownTable.vue';
 import AnomalyAlertCard from '../components/spending/AnomalyAlertCard.vue';
@@ -47,7 +47,7 @@ const report = ref<SpendingReport>({
 
 onMounted(async () => {
   try {
-    const data = await gatewayService.getSpendingReport();
+    const data = await apiService.getSpendingReport();
     report.value = data;
   } catch {
     // Default fallback

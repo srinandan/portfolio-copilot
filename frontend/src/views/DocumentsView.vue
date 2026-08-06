@@ -79,7 +79,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import type { DocumentItem } from '../types';
-import { gatewayService } from '../services/gateway';
+import { apiService } from '../services/api';
 import UploadDropzone from '../components/documents/UploadDropzone.vue';
 import StatusPill from '../components/common/StatusPill.vue';
 
@@ -87,7 +87,7 @@ const documents = ref<DocumentItem[]>([]);
 
 onMounted(async () => {
   try {
-    const data = await gatewayService.getDocuments();
+    const data = await apiService.getDocuments();
     documents.value = data;
   } catch {
     // Empty default

@@ -4,12 +4,12 @@ import DashboardView from '../views/DashboardView.vue';
 import PortfolioView from '../views/PortfolioView.vue';
 import DocumentsView from '../views/DocumentsView.vue';
 import SecurityView from '../views/SecurityView.vue';
-import { gatewayService } from '../services/gateway';
+import { apiService } from '../services/api';
 
 describe('Frontend Views', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
-    vi.spyOn(gatewayService, 'getDocuments').mockResolvedValue([
+    vi.spyOn(apiService, 'getDocuments').mockResolvedValue([
       {
         id: 'doc-1',
         filename: 'Fidelity_Stmt_Oct2023.pdf',
@@ -19,7 +19,7 @@ describe('Frontend Views', () => {
         records_parsed: 42
       }
     ]);
-    vi.spyOn(gatewayService, 'getHoldings').mockResolvedValue({
+    vi.spyOn(apiService, 'getHoldings').mockResolvedValue({
       total_value_usd: 1248500.0,
       cash_usd: 62400.0,
       as_of: '2023-10-24',
@@ -35,7 +35,7 @@ describe('Frontend Views', () => {
         }
       ]
     });
-    vi.spyOn(gatewayService, 'getDriftReport').mockResolvedValue({
+    vi.spyOn(apiService, 'getDriftReport').mockResolvedValue({
       as_of: '2023-10-24',
       has_active_ips: true,
       rebalance_recommended: true,

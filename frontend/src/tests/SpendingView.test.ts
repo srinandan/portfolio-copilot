@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, cleanup } from '@testing-library/vue';
 import SpendingView from '../views/SpendingView.vue';
-import { gatewayService } from '../services/gateway';
+import { apiService } from '../services/api';
 import type { SpendingReport } from '../types';
 
 describe('SpendingView.vue', () => {
@@ -37,7 +37,7 @@ describe('SpendingView.vue', () => {
   };
 
   it('renders spending summary metrics (savings rate and reserve months)', async () => {
-    vi.spyOn(gatewayService, 'getSpendingReport').mockResolvedValue(mockReport);
+    vi.spyOn(apiService, 'getSpendingReport').mockResolvedValue(mockReport);
     render(SpendingView);
 
     await waitFor(() => {
@@ -47,7 +47,7 @@ describe('SpendingView.vue', () => {
   });
 
   it('renders category breakdown items sorted descending by amount', async () => {
-    vi.spyOn(gatewayService, 'getSpendingReport').mockResolvedValue(mockReport);
+    vi.spyOn(apiService, 'getSpendingReport').mockResolvedValue(mockReport);
     render(SpendingView);
 
     await waitFor(() => {
@@ -60,7 +60,7 @@ describe('SpendingView.vue', () => {
   });
 
   it('conditionally renders anomaly alert card when anomalies are present', async () => {
-    vi.spyOn(gatewayService, 'getSpendingReport').mockResolvedValue(mockReport);
+    vi.spyOn(apiService, 'getSpendingReport').mockResolvedValue(mockReport);
     render(SpendingView);
 
     await waitFor(() => {
