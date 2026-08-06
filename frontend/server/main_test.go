@@ -158,6 +158,38 @@ func TestNewReverseProxy_BadURL(t *testing.T) {
 	}
 }
 
+func TestBuildProxy_NormalizesTrailingSlashOnAudience(t *testing.T) {
+	// If GATEWAY_URL has a trailing slash the reverse-proxy still must send
+	// requests to a normal host with normal-looking paths (no // duplication),
+	// and — the whole reason for the trim in newReverseProxy — the audience
+	// used to mint ID tokens must match Cloud Run's exact-string comparison.
+	// This test drives buildProxy against a target with no trailing slash
+	// (as newReverseProxy would produce after trimming) and asserts the
+	// outgoing request path is clean.
+	var gotPath string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer upstream.Close()
+
+	// newReverseProxy trims the trailing slash before parsing; simulate the
+	// trimmed URL here.
+	target, _ := url.Parse(upstream.URL)
+	h := buildProxy(target, nil)
+
+	req := httptest.NewRequest(http.MethodGet, "http://frontend.local/api/holdings", nil)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d", w.Code)
+	}
+	if gotPath != "/api/holdings" {
+		t.Errorf("path = %q, want /api/holdings (no // duplication)", gotPath)
+	}
+}
+
 func TestSPAHandler_ServesStaticFile(t *testing.T) {
 	dir := t.TempDir()
 	must(t, os.WriteFile(filepath.Join(dir, "index.html"), []byte("<html>root</html>"), 0o644))

@@ -91,6 +91,12 @@ func newAPIHandler(gatewayURL string) http.Handler {
 // newReverseProxy is separated from newAPIHandler so tests can drive it
 // directly with an injected TokenSource.
 func newReverseProxy(gatewayURL string) (http.Handler, error) {
+	// Trim a trailing slash — Cloud Run's ID-token audience check compares
+	// exact strings, and the URL from `gcloud run services describe --format
+	// value(status.url)` never has one. Normalizing here lets an operator set
+	// GATEWAY_URL with or without a slash without hitting a 401 mismatch.
+	gatewayURL = strings.TrimRight(gatewayURL, "/")
+
 	u, err := url.Parse(gatewayURL)
 	if err != nil {
 		return nil, fmt.Errorf("parse GATEWAY_URL %q: %w", gatewayURL, err)
@@ -111,6 +117,18 @@ func newReverseProxy(gatewayURL string) (http.Handler, error) {
 		if err != nil {
 			return nil, fmt.Errorf("id-token source for %s: %w", gatewayURL, err)
 		}
+		// Warm-mint a token at startup so the operator sees any auth failure in
+		// the boot logs, not a 401 later. This also validates that the compute
+		// metadata server is reachable and roles/iam.serviceAccountTokenCreator /
+		// run.invoker are in place.
+		tok, err := ts.Token()
+		if err != nil {
+			return nil, fmt.Errorf("warm-mint id-token for audience %q: %w", gatewayURL, err)
+		}
+		slog.Info("id-token source ready",
+			"audience", gatewayURL,
+			"token_length", len(tok.AccessToken),
+		)
 	}
 
 	return buildProxy(u, ts), nil
@@ -131,7 +149,11 @@ func buildProxy(target *url.URL, ts oauth2.TokenSource) http.Handler {
 		}
 		tok, err := ts.Token()
 		if err != nil {
-			slog.WarnContext(r.Context(), "id-token fetch failed — request will likely 401", "error", err)
+			slog.WarnContext(r.Context(),
+				"id-token fetch failed — request will likely 401",
+				"error", err,
+				"audience", target.String(),
+			)
 			return
 		}
 		r.Header.Set("Authorization", "Bearer "+tok.AccessToken)

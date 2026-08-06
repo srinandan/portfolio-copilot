@@ -11,12 +11,18 @@ import type {
 export class GatewayService {
   private baseUrl: string;
 
-  constructor(baseUrl?: string) {
-    if (baseUrl !== undefined) {
-      this.baseUrl = baseUrl;
-    } else {
-      this.baseUrl = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GATEWAY_URL) || '';
-    }
+  // In production the SPA is served by the frontend Go container
+  // (frontend/server/main.go), which reverse-proxies /api and /health to the
+  // gateway with a Google-signed ID token. Fetches must be relative so the
+  // browser stays on the frontend origin — otherwise the request goes
+  // straight to the gateway from the browser with no token attached, and
+  // Cloud Run returns 401. In Vite dev, the same relative fetch is caught
+  // by the dev proxy in vite.config.ts. Baking a hard-coded gateway URL into
+  // the JS bundle at build time (the previous VITE_GATEWAY_URL path) is what
+  // was making the browser call localhost:8080 directly on Cloud Run — it
+  // must not come back. Tests pass an explicit baseUrl.
+  constructor(baseUrl: string = '') {
+    this.baseUrl = baseUrl;
   }
 
   async checkHealth(): Promise<HealthStatus> {
