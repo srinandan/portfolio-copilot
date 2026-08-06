@@ -1,0 +1,36 @@
+{
+  "user_id": "demo_user",
+  "as_of": "2026-08-01T00:00:00Z",
+  "positions": [
+    {
+      "ticker": "VTI",
+      "quantity": 400,
+      "asset_class": "Equity",
+      "market_value_usd": 110000,
+      "account_type": "taxable"
+    },
+    {
+      "ticker": "AAPL",
+      "quantity": 100,
+      "asset_class": "Equity",
+      "market_value_usd": 25000,
+      "account_type": "taxable"
+    },
+    {
+      "ticker": "BND",
+      "quantity": 400,
+      "asset_class": "Bonds",
+      "market_value_usd": 35000,
+      "account_type": "taxable"
+    },
+    {
+      "ticker": "BTC",
+      "quantity": 0.15,
+      "asset_class": "Crypto",
+      "market_value_usd": 10000,
+      "account_type": "taxable"
+    }
+  ],
+  "cash_usd": 20000,
+  "total_value_usd": 200000
+}

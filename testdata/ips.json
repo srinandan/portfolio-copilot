@@ -1,0 +1,62 @@
+{
+  "ips_id": "ips_demo_001",
+  "user_id": "demo_user",
+  "version": 1,
+  "status": "active",
+  "superseded_by": null,
+  "effective_date": "2026-01-01",
+  "risk_tolerance": "moderate",
+  "time_horizon_years": 15,
+  "goals": [
+    {
+      "name": "Retirement",
+      "target_amount_usd": 1500000,
+      "target_date": "2041-01-01"
+    },
+    {
+      "name": "Emergency Fund",
+      "target_amount_usd": 30000,
+      "target_date": "2026-12-31"
+    }
+  ],
+  "liquidity_needs": {
+    "reserve_months": 6,
+    "known_upcoming_expenses_usd": 5000
+  },
+  "target_allocation": [
+    {
+      "asset_class": "Equity",
+      "target_percent": 60,
+      "min_percent": 50,
+      "max_percent": 65
+    },
+    {
+      "asset_class": "Bonds",
+      "target_percent": 30,
+      "min_percent": 25,
+      "max_percent": 35
+    },
+    {
+      "asset_class": "Cash",
+      "target_percent": 10,
+      "min_percent": 5,
+      "max_percent": 15
+    }
+  ],
+  "constraints": {
+    "concentration_limit_percent": 15,
+    "excluded_tickers": ["TSLA", "GME"],
+    "excluded_sectors": ["Energy", "Tobacco"],
+    "tax_loss_harvesting_enabled": true,
+    "account_type": "taxable"
+  },
+  "rebalancing_rules": {
+    "trigger_type": "threshold",
+    "drift_threshold_percent": 5,
+    "rebalancing_frequency_days": 90
+  },
+  "approval_required_above_usd": 25000,
+  "approval_required_above_percent": 20,
+  "created_at": "2026-01-01T00:00:00Z",
+  "updated_at": "2026-01-01T00:00:00Z"
+}
