@@ -57,7 +57,13 @@ gcloud projects add-iam-policy-binding "$PROJECT_ID" \
   --condition=None \
   --quiet
 
-# Note: Frontend needs no GCP API roles at all (it calls gateway, never GCP services directly per ADR-0003).
+# Frontend SA needs TokenCreator permission to mint audience-scoped ID tokens for the gateway
+echo "Configuring IAM policy bindings for portfolio-copilot-frontend-sa..."
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:$FRONTEND_SA" \
+  --role="roles/iam.serviceAccountTokenCreator" \
+  --condition=None \
+  --quiet
 
 # 3. Deploy Cloud Run placeholders with explicit service accounts
 IMAGE="us-docker.pkg.dev/cloudrun/container/hello"
