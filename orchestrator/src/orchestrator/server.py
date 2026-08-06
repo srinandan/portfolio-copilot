@@ -40,7 +40,7 @@ from .session_manager import SessionManager
 
 logger = logging.getLogger(__name__)
 
-APP_NAME = os.environ.get("ORCHESTRATOR_APP_NAME", "portfolio_copilot")
+APP_NAME = os.environ.get("AGENT_ENGINE_ID") or os.environ.get("ORCHESTRATOR_APP_NAME", "portfolio_copilot")
 
 
 class InvokeRequest(BaseModel):

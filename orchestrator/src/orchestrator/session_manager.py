@@ -42,21 +42,23 @@ class SessionManager:
             )
 
     async def get_or_create_session(self, app_name: str, user_id: str, session_id: str | None = None):
+        target_app = self.agent_engine_id or app_name
         if session_id:
             try:
                 session = await self.session_service.get_session(
-                    app_name=app_name, user_id=user_id, session_id=session_id
+                    app_name=target_app, user_id=user_id, session_id=session_id
                 )
                 if session:
                     return session
             except Exception as e:
                 logger.warning(f"Failed to retrieve session {session_id}: {e}")
 
-        session = await self.session_service.create_session(app_name=app_name, user_id=user_id)
+        session = await self.session_service.create_session(app_name=target_app, user_id=user_id)
         return session
 
     async def add_session_to_memory(self, app_name: str, user_id: str, session_id: str):
         """Adds the specified session to the Memory Bank."""
+        target_app = self.agent_engine_id or app_name
         if not self.memory_service:
             logger.warning("Memory service not configured. Skipping.")
             return
