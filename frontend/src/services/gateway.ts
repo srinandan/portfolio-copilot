@@ -11,8 +11,12 @@ import type {
 export class GatewayService {
   private baseUrl: string;
 
-  constructor(baseUrl = '') {
-    this.baseUrl = baseUrl;
+  constructor(baseUrl?: string) {
+    if (baseUrl !== undefined) {
+      this.baseUrl = baseUrl;
+    } else {
+      this.baseUrl = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GATEWAY_URL) || '';
+    }
   }
 
   async checkHealth(): Promise<HealthStatus> {

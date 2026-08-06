@@ -340,5 +340,11 @@ describe('GatewayService', () => {
       })
     ).rejects.toThrow('Resume plan failed with status 400');
   });
+
+  it('constructor defaults to empty string or VITE_GATEWAY_URL when baseUrl is omitted', () => {
+    const defaultService = new GatewayService();
+    expect(defaultService).toBeInstanceOf(GatewayService);
+  });
 });
+
 

@@ -17,13 +17,14 @@ local: install
 	export GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT} ;\
 	export GOOGLE_CLOUD_PROJECT_NUMBER=${PROJECT_NUMBER} ;\
 	export GOOGLE_CLOUD_REGION=${GOOGLE_CLOUD_LOCATION} ;\
+	export VITE_GATEWAY_URL=$${VITE_GATEWAY_URL:-$${GATEWAY_URL}} ;\
 	npm run dev
 
 # `make local-server` builds the SPA and runs the production Go server
 # (the same binary the container ships) — useful for smoke-testing the
 # authed proxy path against a local gateway before deploying.
 local-server: build
-	cd .. && GATEWAY_URL=$${GATEWAY_URL:-http://localhost:8080} \
+	cd .. && GATEWAY_URL=$${GATEWAY_URL:-$${VITE_GATEWAY_URL:-http://localhost:8080}} \
 	  STATIC_DIR=$(CURDIR)/dist \
 	  PORT=$${PORT:-8081} \
 	  go run ./frontend/server
