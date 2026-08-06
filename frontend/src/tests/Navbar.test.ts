@@ -8,6 +8,7 @@ const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/', name: 'dashboard', component: { template: '<div></div>' } },
+    { path: '/onboarding', name: 'onboarding', component: { template: '<div></div>' } },
     { path: '/portfolio', name: 'portfolio', component: { template: '<div></div>' } },
     { path: '/spending', name: 'spending', component: { template: '<div></div>' } },
     { path: '/documents', name: 'documents', component: { template: '<div></div>' } },
@@ -34,6 +35,7 @@ describe('Navbar.vue', () => {
 
     expect(screen.getByText('Portfolio Copilot')).toBeDefined();
     expect(screen.getByText('Dashboard')).toBeDefined();
+    expect(screen.getByText('Onboarding')).toBeDefined();
     expect(screen.getByText('Portfolio')).toBeDefined();
     expect(screen.getByText('Spending')).toBeDefined();
     expect(screen.getByText('Documents')).toBeDefined();

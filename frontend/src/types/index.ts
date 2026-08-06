@@ -118,3 +118,67 @@ export interface DriftReport {
   rebalance_recommended: boolean;
   has_active_ips: boolean;
 }
+
+export type RiskToleranceTier = 'conservative' | 'moderate' | 'aggressive';
+export type DrawdownReaction = 'sell' | 'hold' | 'buy_more';
+
+export interface Goal {
+  name: string;
+  target_amount_usd: number;
+  target_date: string;
+}
+
+export interface LiabilityItem {
+  liability_id: string;
+  type: 'credit_card' | 'mortgage' | 'auto_loan' | 'student_loan' | 'heloc' | 'other';
+  description: string;
+  balance_usd: number;
+  interest_rate_percent: number;
+  minimum_payment_usd: number;
+}
+
+export interface AllocationBand {
+  asset_class: string;
+  target_percent: number;
+  min_percent: number;
+  max_percent: number;
+}
+
+export interface IPSConstraints {
+  concentration_limit_percent: number;
+  excluded_tickers: string[];
+  excluded_sectors: string[];
+  account_type?: 'taxable' | 'ira' | 'roth_ira' | '401k';
+  tax_loss_harvesting_enabled?: boolean;
+}
+
+export interface ApprovalThresholds {
+  approval_required_above_usd: number;
+  approval_required_above_percent: number;
+}
+
+export interface OnboardingState {
+  step: number;
+  user_id: string;
+  // Goals & Horizon
+  goals: Goal[];
+  time_horizon_years: number;
+  known_upcoming_expenses_usd: number;
+  // Liabilities
+  liabilities: LiabilityItem[];
+  // Risk Calibration
+  drawdown_reaction: DrawdownReaction;
+  risk_tolerance: RiskToleranceTier;
+  // Target Allocation Bands
+  target_bands: AllocationBand[];
+  // Constraints & Thresholds
+  reserve_months: number;
+  constraints: IPSConstraints;
+  approval_thresholds: ApprovalThresholds;
+  // Execution / Submission
+  submitting?: boolean;
+  submission_error?: string;
+  submitted?: boolean;
+}
+
+

@@ -270,4 +270,75 @@ describe('GatewayService', () => {
 
     await expect(service.rejectAction('act_100')).rejects.toThrow('Reject action failed with status 500');
   });
+
+  it('triggerPlan posts plan request to /api/plan', async () => {
+    (global.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      status: 200
+    });
+
+    const res = await service.triggerPlan({ user_id: 'user_1', message: 'start plan' });
+    expect(res.status).toBe(200);
+    expect(global.fetch).toHaveBeenCalledWith('http://localhost:8080/api/plan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: 'user_1', message: 'start plan' })
+    });
+  });
+
+  it('triggerPlan throws on error response', async () => {
+    (global.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: false,
+      status: 503
+    });
+
+    await expect(service.triggerPlan({ user_id: 'user_1', message: 'start' })).rejects.toThrow(
+      'Trigger plan failed with status 503'
+    );
+  });
+
+  it('resumePlan posts payload to /api/plan/resume', async () => {
+    (global.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      status: 200
+    });
+
+    const res = await service.resumePlan({
+      user_id: 'user_1',
+      session_id: 'sess_1',
+      invocation_id: 'inv_1',
+      interrupt_id: 'int_1',
+      payload: { decision: 'approved' }
+    });
+    expect(res.status).toBe(200);
+    expect(global.fetch).toHaveBeenCalledWith('http://localhost:8080/api/plan/resume', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_id: 'user_1',
+        session_id: 'sess_1',
+        invocation_id: 'inv_1',
+        interrupt_id: 'int_1',
+        payload: { decision: 'approved' }
+      })
+    });
+  });
+
+  it('resumePlan throws on error response', async () => {
+    (global.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: false,
+      status: 400
+    });
+
+    await expect(
+      service.resumePlan({
+        user_id: 'user_1',
+        session_id: 'sess_1',
+        invocation_id: 'inv_1',
+        interrupt_id: 'int_1',
+        payload: {}
+      })
+    ).rejects.toThrow('Resume plan failed with status 400');
+  });
 });
+

@@ -189,3 +189,13 @@ The shape language is **Rounded**, using `0.5rem` (8px) as the base radius for s
 ### Input Fields
 - White background, 1px Slate border. 
 - **Monospaced Inputs:** Any input field for dollar amounts or ticker symbols must use JetBrains Mono.
+
+### Onboarding & Calibration Flow (`/onboarding`)
+- **Step Progress Bar:** Header-level animated progress bar showing fractional completion across the 4 setup turns (0% -> 33% -> 66% -> 100%).
+- **Interactive Objective Cards:** Single-select objective vectors (Aggressive Capital Appreciation, Balanced Growth & Income, Capital Preservation) with primary-bordered active states.
+- **Real-Time Telemetry Canvas:** Desktop 60% right panel dynamically updates model-generated allocation forecasts (Equities, Fixed Income, Cash) and Projected Return metrics as the user explores risk profiles.
+
+### Target Allocation Donut Chart & Sliders
+- **SVG Donut Chart:** Inline vector chart computed via stroke-dasharray and stroke-dashoffset based on the circle's circumference ($2\pi r = 251.2$). Segmented by Equities (`#131B2E`), Fixed Income (`#B9C7E0`), and Cash (`#565E74`).
+- **Synchronized Sliders & Inputs:** Dual-control range sliders and monospaced number inputs for granular target band overrides.
+- **100% Total Validation:** Fail-closed error toast (`bg-error-container text-on-error-container`) warning the user whenever allocations sum to $\ne 100\%$, disabling the "Confirm Allocation" CTA until balanced.

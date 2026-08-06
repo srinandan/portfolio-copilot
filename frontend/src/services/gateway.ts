@@ -110,6 +110,36 @@ export class GatewayService {
     }
     return res.json();
   }
+
+  async triggerPlan(req: { user_id: string; message: string; session_id?: string }): Promise<Response> {
+    const res = await fetch(`${this.baseUrl}/api/plan`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req)
+    });
+    if (!res.ok) {
+      throw new Error(`Trigger plan failed with status ${res.status}`);
+    }
+    return res;
+  }
+
+  async resumePlan(req: {
+    user_id: string;
+    session_id: string;
+    invocation_id: string;
+    interrupt_id: string;
+    payload: Record<string, unknown>;
+  }): Promise<Response> {
+    const res = await fetch(`${this.baseUrl}/api/plan/resume`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req)
+    });
+    if (!res.ok) {
+      throw new Error(`Resume plan failed with status ${res.status}`);
+    }
+    return res;
+  }
 }
 
 export const gatewayService = new GatewayService();

@@ -102,4 +102,18 @@ describe('Frontend Views', () => {
     await fireEvent.click(exportBtn);
     expect(alertSpy).toHaveBeenCalledWith('Backup export initiated. Check your downloads.');
   });
+
+  it('OnboardingView renders initial step and step title', async () => {
+    const OnboardingView = (await import('../views/OnboardingView.vue')).default;
+    const { router } = await import('../router');
+    render(OnboardingView, {
+      global: {
+        plugins: [router]
+      }
+    });
+
+    expect(screen.getAllByText('Welcome to Portfolio Copilot').length).toBeGreaterThan(0);
+    expect(screen.getByTestId('step-title').textContent).toContain('Welcome to Portfolio Copilot');
+  });
 });
+
