@@ -6,9 +6,14 @@ RUN npm ci
 COPY frontend/ ./
 RUN npm run build
 
-# Stage 2: Build the Go gateway server
+# Stage 2: Build the Go backend server
 FROM golang:1.25.12 AS go-builder
 WORKDIR /app
+
+# Download the specific version (e.g., 1.7.1) and make it executable
+RUN curl -L -o /usr/local/bin/jq https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux64 && \
+    chmod +x /usr/local/bin/jq
+
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .

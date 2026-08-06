@@ -12,6 +12,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
+# Download the specific version (e.g., 1.7.1) and make it executable
+RUN curl -L -o /usr/local/bin/jq https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux64 && \
+    chmod +x /usr/local/bin/jq
+
 # Install uv for fast Python package management
 RUN pip install --no-cache-dir uv
 

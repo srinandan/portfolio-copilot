@@ -93,6 +93,29 @@ def _find_existing_engine(client: vertexai.Client, display_name: str):
     return None
 
 
+try:
+    from vertexai import agentplatform
+except ImportError:
+    try:
+        from google.cloud.aiplatform import agentplatform
+    except ImportError:
+        agentplatform = None
+
+
+def _get_client(project: str, location: str):
+    """Return an agentplatform.Client if available, falling back to vertexai.Client."""
+    if agentplatform is not None and hasattr(agentplatform, "Client"):
+        try:
+            return agentplatform.Client(project=project, location=location)
+        except Exception as e:
+            logger.debug(f"agentplatform.Client init failed ({e}); falling back to vertexai.Client")
+    return vertexai.Client(
+        project=project,
+        location=location,
+        http_options=dict(api_version="v1beta1"),
+    )
+
+
 @click.command()
 @click.option("--project", default=None, help="GCP project ID")
 @click.option("--location", default="us-central1", help="GCP region")
@@ -117,11 +140,7 @@ def deploy_agent_engine(
         _, project = google.auth.default()
 
     staging_bucket = f"gs://{project}-portfolio-copilot-staging"
-    client = vertexai.Client(
-        project=project,
-        location=location,
-        http_options=dict(api_version="v1beta1"),
-    )
+    client = _get_client(project=project, location=location)
     vertexai.init(project=project, location=location, staging_bucket=staging_bucket)
 
     existing = _find_existing_engine(client, display_name)
