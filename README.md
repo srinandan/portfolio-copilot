@@ -1,5 +1,12 @@
 # Portfolio Copilot
 
+[![CI](https://github.com/srinandan/portfolio-copilot/actions/workflows/ci.yml/badge.svg)](https://github.com/srinandan/portfolio-copilot/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/srinandan/portfolio-copilot)](./LICENSE)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/srinandan/portfolio-copilot?filename=go.mod)](./go.mod)
+[![Python Version](https://img.shields.io/badge/python-3.12+-blue.svg)](./orchestrator/pyproject.toml)
+[![Node Version](https://img.shields.io/badge/node-20+-green.svg)](./frontend/package.json)
+[![CodeQL](https://github.com/srinandan/portfolio-copilot/actions/workflows/codeql.yml/badge.svg)](https://github.com/srinandan/portfolio-copilot/actions/workflows/codeql.yml)
+
 Portfolio Copilot is a personal finance and investing assistant that
 plans its own next move.
 
