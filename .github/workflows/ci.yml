@@ -113,7 +113,7 @@ jobs:
 
       - name: Verify Docker build
         if: steps.check.outputs.exists == 'true'
-        run: docker build -t gateway-ci-test -f gateway/Dockerfile .
+        run: docker build -t frontend-ci-test -f frontend/Dockerfile .
 
       - name: Skip (no package.json yet)
         if: steps.check.outputs.exists == 'false'

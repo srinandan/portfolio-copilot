@@ -1,12 +1,12 @@
 substitutions:
   _COMMIT_SHA: latest
   _REGION: us-central1
-  _SERVICE: portfolio-copilot-gateway
+  _SERVICE: portfolio-copilot-frontend
   _AR_REPO: portfolio-copilot
   _AGENT_DISPLAY_NAME: portfolio-copilot-agent
 
 steps:
-  # Build the container image, tagged with the commit SHA / git tag.
+  # Build the unified container image (Vue SPA + Go backend server)
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'build'
@@ -15,26 +15,17 @@ steps:
       - '-t'
       - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:latest'
       - '-f'
-      - 'gateway/Dockerfile'
+      - 'frontend/Dockerfile'
       - '.'
 
-  # Push both tags to Artifact Registry.
+  # Push both tags to Artifact Registry
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
       - '--all-tags'
       - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}'
 
-  # Deploy to Cloud Run.
-  # AGENT_ENGINE_ID is resolved at deploy time so the gateway's
-  # OrchestratorClient (gateway/plan.go) knows which Vertex AI Agent Engine
-  # to :streamQuery against. We look it up by display name — the orchestrator
-  # cloudbuild deploys to `${_AGENT_DISPLAY_NAME}` (default
-  # `portfolio-copilot-agent`, matching orchestrator/cloudbuild.yaml).
-  # If no engine exists yet (first-time bring-up before the orchestrator
-  # ships), the deploy still succeeds — the /api/plan routes will 503 with a
-  # clear message until the orchestrator is deployed, at which point a
-  # gateway redeploy picks up the resource name.
+  # Deploy unified web service to Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: bash
     args:
@@ -50,8 +41,8 @@ steps:
           run deploy ${_SERVICE}
           --image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:${_COMMIT_SHA}
           --region=${_REGION}
-          --service-account=portfolio-copilot-gateway-sa@${PROJECT_ID}.iam.gserviceaccount.com
-          --labels=app=portfolio-copilot,component=gateway,commit=${_COMMIT_SHA}
+          --service-account=portfolio-copilot-frontend-sa@${PROJECT_ID}.iam.gserviceaccount.com
+          --labels=app=portfolio-copilot,component=frontend,commit=${_COMMIT_SHA}
           --no-allow-unauthenticated
         )
 
@@ -60,7 +51,7 @@ steps:
           DEPLOY_ARGS+=(--set-env-vars=AGENT_ENGINE_ID=$${AGENT_ENGINE_ID})
         else
           echo "WARN: no Agent Engine found with displayName=${_AGENT_DISPLAY_NAME} in ${_REGION};"
-          echo "      /api/plan will return 503 until an orchestrator is deployed and the gateway is re-run."
+          echo "      /api/plan will return 503 until an orchestrator is deployed."
         fi
 
         gcloud "$${DEPLOY_ARGS[@]}"

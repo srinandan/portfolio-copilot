@@ -25,38 +25,31 @@ full picture before making non-trivial changes.
 ```
 docs/{spec,adr}/   Spec-driven design — read before changing architecture
 skills/            Runtime skills (Agent Registry-facing, see above)
-orchestrator/      Python — ADK root planner (DynamicNode), deployed to Agent Runtime (currently empty, awaiting Python)
+orchestrator/      Python — ADK root planner (DynamicNode), deployed to Agent Runtime
 pkg/               Go — contracts, BigQuery, Agent Registry client, Firestore store
-                    (library code for gateway/; not consumed by orchestrator's Python)
-gateway/           Go — unified API gateway & Vue SPA host (Cloud Run)
-frontend/          TypeScript + Vue.js (compiled into gateway container)
+                    (library code for frontend/server; not consumed by orchestrator's Python)
+frontend/          Vue 3 TypeScript SPA + Go backend server (Cloud Run)
 scripts/           bash/gcloud/python and Makefiles for infra provisioning
 .agent/skills/     Engineering-practice skills (this repo's coding agent, see above)
 ```
 
 **Language note:** orchestrator is Python (Agent Runtime's deployment
 contract is Python-only — see
-[ADR-0008](docs/adr/0008-python-for-orchestrator.md)); gateway is Go,
-since it isn't an agent and never touches that contract. Don't assume
-one language across the whole repo.
+[ADR-0008](docs/adr/0008-python-for-orchestrator.md)); frontend web host
+and shared libraries are Go, since they are not agents.
 
 ## Build & test
 
-Not yet implemented — filling in as each component is scaffolded.
-Expected shape:
-
 ```bash
 # orchestrator/ (Python)
-pip install -e ".[dev]"
-pytest --cov
+cd orchestrator && uv run pytest --cov
 
-# gateway/ (Go)
+# Go shared libraries & frontend server (Go)
 go build ./...
 go test ./... -cover
 
-# frontend/ (Vue + TS)
-npm run build
-npm run test -- --coverage
+# frontend UI (Vue + TS)
+cd frontend && npm run build && npm run test -- --coverage
 ```
 
 ## Before writing code
