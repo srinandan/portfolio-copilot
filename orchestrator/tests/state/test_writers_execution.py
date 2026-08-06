@@ -56,6 +56,7 @@ def test_emit_action_executed_audit_writes_entry(sample_proposed_action):
     assert audit_entry.related_action_id == "act_exec_123"
     assert audit_entry.actor.type == ActorType.AGENT
     assert audit_entry.actor.skill_name == "orchestrator-execution-gate"
+    assert audit_entry.actor.skill_version == "0.1.0"
     assert audit_entry.actor.registry_entry_id is None
     assert audit_entry.actor.approval_scope is None
     assert "broker-ord-555" in audit_entry.detail
@@ -77,9 +78,25 @@ def test_emit_action_failed_audit_writes_entry(sample_proposed_action):
     assert audit_entry.related_action_id == "act_exec_123"
     assert audit_entry.actor.type == ActorType.AGENT
     assert audit_entry.actor.skill_name == "orchestrator-execution-gate"
+    assert audit_entry.actor.skill_version == "0.1.0"
     assert audit_entry.actor.registry_entry_id is None
     assert audit_entry.actor.approval_scope is None
     assert "insufficient funds" in audit_entry.detail
+
+
+def test_execution_gate_uses_orchestrator_build_sha(sample_proposed_action, monkeypatch):
+    mock_client = MagicMock()
+    monkeypatch.setenv("ORCHESTRATOR_BUILD_SHA", "sha-exec-987654")
+
+    emit_action_executed_audit(
+        sample_proposed_action,
+        broker_order_id="broker-1",
+        db_client=mock_client,
+    )
+    audit_entry = mock_client.append_audit_log.call_args[0][0]
+    assert audit_entry.actor.skill_version == "sha-exec-987654"
+    assert audit_entry.actor.registry_entry_id is None
+    assert audit_entry.actor.approval_scope is None
 
 
 @pytest.mark.parametrize(

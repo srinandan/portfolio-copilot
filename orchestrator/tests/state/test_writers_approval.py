@@ -41,7 +41,7 @@ def sample_proposed_action():
     )
 
 
-def test_emit_approval_requested_audit_writes_entry(sample_proposed_action):
+def test_emit_approval_requested_audit(sample_proposed_action):
     mock_client = MagicMock()
 
     emit_approval_requested_audit(
@@ -55,6 +55,8 @@ def test_emit_approval_requested_audit_writes_entry(sample_proposed_action):
     assert audit_entry.event_type == EventType.APPROVAL_REQUESTED
     assert audit_entry.related_action_id == "act_123"
     assert audit_entry.actor.type == ActorType.AGENT
+    assert audit_entry.actor.skill_name == "orchestrator-hitl-gate"
+    assert audit_entry.actor.skill_version == "0.1.0"
     assert audit_entry.actor.registry_entry_id is None
     assert audit_entry.actor.approval_scope is None
     assert "verdict_99" in audit_entry.detail
@@ -94,6 +96,7 @@ def test_emit_approval_rejected_audit_agent_actor_when_no_user_id(
     assert audit1.event_type == EventType.APPROVAL_REJECTED
     assert audit1.actor.type == ActorType.AGENT
     assert audit1.actor.skill_name == "orchestrator-hitl-gate"
+    assert audit1.actor.skill_version == "0.1.0"
     assert audit1.actor.registry_entry_id is None
     assert audit1.actor.approval_scope is None
 
@@ -110,6 +113,36 @@ def test_emit_approval_rejected_audit_agent_actor_when_no_user_id(
     assert audit2.event_type == EventType.APPROVAL_REJECTED
     assert audit2.actor.type == ActorType.HUMAN
     assert audit2.actor.user_id == "user_reject"
+
+
+def test_built_in_gate_uses_orchestrator_build_sha(sample_proposed_action, monkeypatch):
+    mock_client = MagicMock()
+    monkeypatch.setenv("ORCHESTRATOR_BUILD_SHA", "git-sha-abcdef123456")
+
+    emit_approval_requested_audit(
+        sample_proposed_action,
+        db_client=mock_client,
+    )
+    audit_entry = mock_client.append_audit_log.call_args[0][0]
+    assert audit_entry.actor.skill_version == "git-sha-abcdef123456"
+    assert audit_entry.actor.registry_entry_id is None
+    assert audit_entry.actor.approval_scope is None
+
+
+def test_agent_actor_invariants_built_in_vs_registry_skills(sample_proposed_action):
+    """Guards the invariant:
+    - Registry skills (private-*) carry registry_entry_id and approval_scope.
+    - Built-in orchestrator gates (orchestrator-*) carry skill_version, with registry_entry_id=None and approval_scope=None.
+    """
+    mock_client = MagicMock()
+
+    # Built-in gate
+    emit_approval_requested_audit(sample_proposed_action, db_client=mock_client)
+    gate_entry = mock_client.append_audit_log.call_args[0][0]
+    assert gate_entry.actor.skill_name.startswith("orchestrator-")
+    assert gate_entry.actor.skill_version is not None
+    assert gate_entry.actor.registry_entry_id is None
+    assert gate_entry.actor.approval_scope is None
 
 
 @pytest.mark.parametrize(

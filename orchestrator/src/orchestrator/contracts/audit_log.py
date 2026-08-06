@@ -27,6 +27,19 @@ class ActorType(str, Enum):
 
 
 class Actor(BaseModel):
+    """Identifies the entity responsible for an audit log entry.
+
+    - For human actors (APPROVAL_GRANTED, human APPROVAL_REJECTED):
+      type = HUMAN, user_id is set, and skill fields are None.
+    - For Registry-discovered skills (private-* skills):
+      type = AGENT, skill_name, skill_version, registry_entry_id (revision ID),
+      and approval_scope (from SKILL.md YAML frontmatter) are all populated.
+    - For built-in orchestrator gates (orchestrator-hitl-gate, orchestrator-execution-gate):
+      type = AGENT, skill_name is set, skill_version carries the orchestrator package /
+      build SHA version, and registry_entry_id = None and approval_scope = None because
+      built-in gates are hard-wired workflow nodes rather than Agent Registry-discovered skills.
+    """
+
     type: ActorType
     user_id: str | None = None
     skill_name: str | None = None
@@ -36,6 +49,12 @@ class Actor(BaseModel):
 
 
 class AuditLogEntry(BaseModel):
+    """One immutable entry per governance-relevant event.
+
+    Ensures that every agent decision or state write is traceable to its
+    originating skill identity, code version, registry entry, and authorization scope.
+    """
+
     log_id: str
     event_type: EventType
     timestamp: datetime

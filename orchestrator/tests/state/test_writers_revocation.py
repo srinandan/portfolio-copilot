@@ -23,6 +23,7 @@ def test_emit_skill_revoked_audit_writes_entry():
     assert entry.actor.type == ActorType.AGENT
     assert entry.actor.skill_name == "private-research"
     assert entry.actor.registry_entry_id == "projects/test/revisions/rev-research-1"
+    assert entry.actor.approval_scope == "read:external_market_data"
     assert "Observed missing on planning cycle" in entry.detail
 
 

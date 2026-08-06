@@ -168,6 +168,11 @@ this is what makes the "traceable to skill version, registry entry, and
 approval scope" claim in the functional spec actually true, rather than
 aspirational.
 
+"Where applicable" distinguishes Registry-discovered skills from built-in
+workflow gates:
+- **Registry skills (`private-*`)**: Carry `registry_entry_id` (revision ID pinned from Agent Registry) and `approval_scope` (parsed from `SKILL.md` YAML frontmatter).
+- **Built-in orchestrator gates (`orchestrator-hitl-gate`, `orchestrator-execution-gate`)**: Carry `skill_version` (pinned to the orchestrator build SHA / package version), while `registry_entry_id = None` and `approval_scope = None` because built-in gates are hard-wired workflow nodes rather than Agent Registry-discovered skills.
+
 See [`audit-log-entry.schema.json`](../../schemas/audit-log-entry.schema.json).
 
 ## Changing these contracts
