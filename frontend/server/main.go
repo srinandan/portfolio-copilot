@@ -158,11 +158,47 @@ func buildProxy(target *url.URL, ts oauth2.TokenSource) http.Handler {
 		}
 		r.Header.Set("Authorization", "Bearer "+tok.AccessToken)
 	}
+	// Log every non-2xx from the gateway with the fields that answer the
+	// obvious "why is it 401?" questions: was Authorization attached, what
+	// audience is the token minted for, and what does Cloud Run's own
+	// WWW-Authenticate response header say ("Missing token" vs
+	// "invalid_token"). Happy path is silent.
+	proxy.Transport = &authDiagnosticTransport{
+		base:     http.DefaultTransport,
+		audience: target.String(),
+	}
 	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
 		slog.WarnContext(r.Context(), "gateway proxy error", "error", err, "path", r.URL.Path)
 		http.Error(w, "upstream gateway error", http.StatusBadGateway)
 	}
 	return proxy
+}
+
+// authDiagnosticTransport wraps a round tripper to log outbound request /
+// response context whenever the gateway returns >= 400. Silent on 2xx/3xx.
+type authDiagnosticTransport struct {
+	base     http.RoundTripper
+	audience string
+}
+
+func (t *authDiagnosticTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	authAttached := r.Header.Get("Authorization") != ""
+	resp, err := t.base.RoundTrip(r)
+	if err != nil {
+		return resp, err
+	}
+	if resp.StatusCode >= 400 {
+		slog.WarnContext(r.Context(),
+			"gateway returned error status",
+			"status", resp.StatusCode,
+			"path", r.URL.Path,
+			"host", r.Host,
+			"authorization_attached", authAttached,
+			"audience", t.audience,
+			"www_authenticate", resp.Header.Get("Www-Authenticate"),
+		)
+	}
+	return resp, err
 }
 
 // spaHandler serves files from dir with an index.html fallback for
