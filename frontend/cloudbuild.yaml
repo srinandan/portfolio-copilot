@@ -32,10 +32,11 @@ steps:
       - '-c'
       - |
         set -eu
-        AGENT_ENGINE_ID=$(gcloud beta ai reasoning-engines list \
-          --region=${_REGION} \
-          --filter="displayName=${_AGENT_DISPLAY_NAME}" \
-          --format='value(name)' | head -n1)
+        TOKEN=$(gcloud auth print-access-token)
+        AGENT_ENGINE_ID=$(curl -s -H "Authorization: Bearer $${TOKEN}" \
+          "https://${_REGION}-aiplatform.googleapis.com/v1beta1/projects/${PROJECT_ID}/locations/${_REGION}/reasoningEngines" \
+          | jq -r --arg name "${_AGENT_DISPLAY_NAME}" '.reasoningEngines[]? | select(.displayName == $name) | .name // empty' \
+          | head -n1 || echo "")
 
         DEPLOY_ARGS=(
           run deploy ${_SERVICE}
