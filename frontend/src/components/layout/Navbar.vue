@@ -47,6 +47,7 @@ import { gatewayService } from '../../services/gateway';
 
 const navItems = [
   { name: 'Dashboard', path: '/' },
+  { name: 'Onboarding', path: '/onboarding' },
   { name: 'Portfolio', path: '/portfolio' },
   { name: 'Spending', path: '/spending' },
   { name: 'Documents', path: '/documents' },

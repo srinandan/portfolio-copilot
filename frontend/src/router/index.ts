@@ -4,6 +4,7 @@ import PortfolioView from '../views/PortfolioView.vue';
 import SpendingView from '../views/SpendingView.vue';
 import DocumentsView from '../views/DocumentsView.vue';
 import SecurityView from '../views/SecurityView.vue';
+import OnboardingView from '../views/OnboardingView.vue';
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -12,6 +13,11 @@ export const router = createRouter({
       path: '/',
       name: 'dashboard',
       component: DashboardView
+    },
+    {
+      path: '/onboarding',
+      name: 'onboarding',
+      component: OnboardingView
     },
     {
       path: '/portfolio',

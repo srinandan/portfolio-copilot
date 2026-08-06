@@ -118,3 +118,26 @@ export interface DriftReport {
   rebalance_recommended: boolean;
   has_active_ips: boolean;
 }
+
+export type RiskToleranceTier = 'conservative' | 'moderate' | 'aggressive';
+
+export interface TargetAllocationInput {
+  equity: number;
+  fixed_income: number;
+  cash: number;
+}
+
+export interface OnboardingState {
+  step: number;
+  objective: string;
+  time_horizon_years: number;
+  drawdown_reaction: 'sell' | 'hold' | 'buy_more';
+  risk_tolerance: RiskToleranceTier;
+  target_allocation: TargetAllocationInput;
+  uploaded_file?: {
+    name: string;
+    size_bytes: number;
+    records_parsed: number;
+  };
+}
+
