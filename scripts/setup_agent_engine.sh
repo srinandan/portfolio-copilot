@@ -66,7 +66,7 @@ fi
 # 3. Deploy Agent Engine instance with Agent Identity
 if command -v uv &> /dev/null; then
     echo "Running Python deployment script with uv..."
-    uv run --with "google-cloud-aiplatform>=1.60.0" --with "google-auth" --with "click" python scripts/deploy_agent_engine.py --project="$PROJECT_ID" --location="$REGION"
+    uv run --with "google-cloud-aiplatform[agent_engines]>=1.60.0" --with "cloudpickle" --with "google-auth" --with "click" python scripts/deploy_agent_engine.py --project="$PROJECT_ID" --location="$REGION"
 elif command -v python3 &> /dev/null; then
     echo "Running Python deployment script (make sure vertexai, google-auth, click are installed)..."
     python3 scripts/deploy_agent_engine.py --project="$PROJECT_ID" --location="$REGION"

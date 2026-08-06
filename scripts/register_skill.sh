@@ -113,6 +113,11 @@ else
     --type=simple \
     --display-name="$DISPLAY_NAME" \
     --description="$DESCRIPTION"
+
+  # Re-evaluate registered name in case the registry assigned a private- prefix
+  if gcloud alpha agent-registry skills describe "private-${SKILL_NAME}" --project="$PROJECT_ID" --location="$REGION" &>/dev/null; then
+    REGISTERED_NAME="private-${SKILL_NAME}"
+  fi
 fi
 
 # Step 2: Create a skill revision with the payload

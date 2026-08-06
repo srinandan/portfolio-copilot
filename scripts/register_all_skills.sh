@@ -30,6 +30,7 @@ SKILLS=(
   "portfolio-analysis"
   "research"
   "action-drafting"
+  "reviewer"
 )
 
 for SKILL in "${SKILLS[@]}"; do
@@ -38,5 +39,5 @@ for SKILL in "${SKILLS[@]}"; do
 done
 
 echo "========================================"
-echo "All 5 skills registered successfully in $PROJECT_ID ($REGION)!"
+echo "All runtime skills registered successfully in $PROJECT_ID ($REGION)!"
 echo "========================================"

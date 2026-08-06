@@ -35,7 +35,11 @@ echo "2. Ensuring Firestore database exists..."
 
 # Run Python loader to seed data
 echo "3. Seeding data fixtures..."
-python3 "$SCRIPT_DIR/load_test_data.py" --project="$PROJECT_ID" --location="$LOCATION"
+if command -v uv &> /dev/null; then
+  uv run --with jsonschema --with google-cloud-bigquery --with google-cloud-firestore python "$SCRIPT_DIR/load_test_data.py" --project="$PROJECT_ID" --location="$LOCATION"
+elif command -v python3 &> /dev/null; then
+  python3 "$SCRIPT_DIR/load_test_data.py" --project="$PROJECT_ID" --location="$LOCATION"
+fi
 
 echo "=================================================="
 echo "✓ All test fixtures loaded successfully!"

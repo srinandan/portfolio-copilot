@@ -116,12 +116,13 @@ def deploy_agent_engine(
     if not project:
         _, project = google.auth.default()
 
+    staging_bucket = f"gs://{project}-portfolio-copilot-staging"
     client = vertexai.Client(
         project=project,
         location=location,
         http_options=dict(api_version="v1beta1"),
     )
-    vertexai.init(project=project, location=location)
+    vertexai.init(project=project, location=location, staging_bucket=staging_bucket)
 
     existing = _find_existing_engine(client, display_name)
 
@@ -173,6 +174,7 @@ def deploy_agent_engine(
             config={
                 "display_name": display_name,
                 "identity_type": types.IdentityType.AGENT_IDENTITY,
+                "staging_bucket": staging_bucket,
             },
         )
         print(
