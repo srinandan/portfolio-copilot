@@ -11,6 +11,7 @@ This directory contains the runtime skills for **Portfolio Copilot**, discovered
 | [`action-drafting/`](action-drafting/) | Drafts specific rebalancing orders (`status: drafted`) obeying concentration limits and exclusion rules. | [`action_drafting.evalset.json`](action-drafting/action_drafting.evalset.json) |
 | [`spending-analysis/`](spending-analysis/) | Translates spending questions into read-only, user-scoped BigQuery SQL queries and detects anomalies. | [`spending_analysis.evalset.json`](spending-analysis/spending_analysis.evalset.json) |
 | [`research/`](research/) | Gathers external market context with strict data isolation via Google Search grounding. | [`research.evalset.json`](research/research.evalset.json) |
+| [`reviewer/`](reviewer/) | Independently verifies proposed trades against active IPS, holdings, and concentration limits. | [`reviewer.evalset.json`](reviewer/reviewer.evalset.json) |
 
 ## Skill Evaluation with Native ADK
 

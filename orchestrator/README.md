@@ -19,15 +19,27 @@ Deployed to Vertex AI Agent Runtime (Agent Engine) using the Python custom-agent
 
 ```
 orchestrator/
-├── Dockerfile              # Python 3.12-slim container build for Cloud Run / Agent Runtime
+├── Dockerfile              # Python 3.12-slim container build for Agent Runtime
 ├── README.md               # Orchestrator documentation
 ├── cloudbuild.yaml         # Cloud Build CI/CD pipeline configuration
-├── pyproject.toml          # Project configuration, dependencies, and test tool settings
+├── pyproject.toml          # Project configuration, dependencies, and test settings
 ├── src/
 │   └── orchestrator/
-│       └── planner.py      # Root dynamic planner workflow and node definitions
+│       ├── __init__.py     # Package initialization and version
+│       ├── contracts/      # Typed Pydantic data models (IPS, Holdings, Actions, Audit, etc.)
+│       ├── data/           # Firestore, BigQuery, and Secret Manager data clients
+│       ├── executors/      # Broker (Alpaca paper trading) and Managed Agent worker executors
+│       ├── planner.py      # Root dynamic planner workflow, node definitions, and dispatch logic
+│       ├── registry/       # Agent Registry client and skill discovery
+│       ├── skills/         # Skill metadata parsing and local skill adapters
+│       └── state/          # State preloader and fail-closed audit log/state writers
 └── tests/
-    └── test_planner.py     # Unit and async tests (planning trace, checkpointing)
+    ├── integration/        # End-to-end full pipeline and Vertex AI Sessions integration tests
+    ├── reviewer/           # Reviewer deterministic and adversarial test suites
+    ├── skills/             # Per-skill golden-path and error-path workflow tests
+    ├── state/              # Preloader and writer transactional unit tests
+    ├── test_testdata_fixtures.py # Canonical test fixtures schema verification
+    └── test_planner.py     # Root planner dynamic graph, checkpointing, and revocation tests
 ```
 
 ---

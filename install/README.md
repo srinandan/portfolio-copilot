@@ -56,11 +56,27 @@ Each skill under `skills/` needs registering with the real Agent Registry before
 ./scripts/register_skill.sh <skill-name> <PROJECT_ID> <REGION>
 # e.g. ./scripts/register_skill.sh goals-onboarding <PROJECT_ID> us-central1
 
-# Or register all 5 runtime skills at once:
+# Or register all runtime skills at once:
 ./scripts/register_all_skills.sh <PROJECT_ID> <REGION>
 ```
 
 Zips the skill directory and registers it as `private-<skill-name>`. Re-run this any time a skill's `SKILL.md` or supporting files change, this pushes a new revision, it doesn't mutate the existing one.
+
+## Loading test and seed data
+
+To seed your BigQuery dataset and Firestore database with canonical test fixtures from `testdata/`:
+
+```bash
+# Setup schemas and seed BigQuery + Firestore:
+./scripts/load_test_data.sh <PROJECT_ID> <REGION>
+
+# Or run dry-run validation locally without GCP calls:
+python3 scripts/load_test_data.py --dry-run
+```
+
+This populates:
+- **BigQuery (`portfolio_copilot.chase_transactions`)**: 4 months of transaction history exercising the dual-condition spending anomaly rule.
+- **Firestore (`ips/ips_demo_001_v1`, `holdings/demo_user`, `liabilities/demo_user`)**: Canonical active IPS reference policy, multi-asset class holdings (with out-of-band equity drift and unclassified crypto asset class), and credit liabilities.
 
 ## Verify installation
 
