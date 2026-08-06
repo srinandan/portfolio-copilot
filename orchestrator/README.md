@@ -173,6 +173,10 @@ The orchestrator is containerized using `Dockerfile` based on `python:3.12-slim`
 - Installs `uv` for fast dependency resolution.
 - Compiles project requirements via `uv pip install --system --no-cache .`.
 - Runs under a non-root `orchestrator` user on port `8080`.
+- Container CMD runs `uvicorn orchestrator.server:app` — the FastAPI wrapper
+  around `root_agent` that serves the Agent Runtime custom-container contract
+  (`/livez`, `/readyz`, `POST /v1/invoke`, `POST /v1/resume`; SSE-encoded ADK
+  event streams). `PORT` from the environment is honored (defaults to 8080).
 
 ### Running & deploying via the Makefile
 

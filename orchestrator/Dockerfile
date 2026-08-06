@@ -31,8 +31,10 @@ RUN uv pip install --system --no-cache .
 RUN useradd -m -u 10001 orchestrator && chown -R orchestrator:orchestrator /app
 USER orchestrator
 
-# Expose port 8080 for Cloud Run / Vertex AI Agent Runtime
+# Expose port 8080 for Vertex AI Agent Runtime (Agent Engine) custom-container serving.
+# Agent Runtime probes /livez + /readyz and proxies query requests to the container.
 EXPOSE 8080
 
-# Run the ADK orchestrator service
-CMD ["python", "-m", "orchestrator.planner"]
+# Serve the ADK planner over HTTP so Agent Runtime can invoke it.
+# PORT is honored (Agent Runtime may set it); default 8080.
+CMD ["sh", "-c", "uvicorn orchestrator.server:app --host 0.0.0.0 --port ${PORT:-8080}"]

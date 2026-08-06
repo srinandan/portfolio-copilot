@@ -13,7 +13,8 @@ local:
 	export GOOGLE_CLOUD_REGION=${GOOGLE_CLOUD_LOCATION} ;\
 	export SERVICE_ACCOUNT_EMAIL=${SERVICE_ACCOUNT_EMAIL} ;\
 	export PYTHONPATH=src ;\
-	uv sync && uv run python -m orchestrator.planner
+	export PORT=$${PORT:-8080} ;\
+	uv sync && uv run uvicorn orchestrator.server:app --host 0.0.0.0 --port $${PORT}
 
 test:
 	uv run pytest
