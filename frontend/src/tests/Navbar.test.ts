@@ -1,8 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor, cleanup } from '@testing-library/vue';
+import { render, screen, cleanup } from '@testing-library/vue';
 import Navbar from '../components/layout/Navbar.vue';
 import { createRouter, createWebHistory } from 'vue-router';
-import { gatewayService } from '../services/gateway';
 
 const router = createRouter({
   history: createWebHistory(),
@@ -26,7 +25,6 @@ describe('Navbar.vue', () => {
   });
 
   it('renders brand title and navigation links', async () => {
-    vi.spyOn(gatewayService, 'checkHealth').mockResolvedValue({ status: 'ok' });
     render(Navbar, {
       global: {
         plugins: [router]
@@ -42,29 +40,14 @@ describe('Navbar.vue', () => {
     expect(screen.getByText('Security')).toBeDefined();
   });
 
-  it('shows Gateway Online when checkHealth succeeds', async () => {
-    vi.spyOn(gatewayService, 'checkHealth').mockResolvedValue({ status: 'ok' });
+  it('does not display gateway status badge or profile photo', async () => {
     render(Navbar, {
       global: {
         plugins: [router]
       }
     });
 
-    await waitFor(() => {
-      expect(screen.getByTestId('gateway-status').textContent).toContain('Online');
-    });
-  });
-
-  it('shows Gateway Offline when checkHealth fails', async () => {
-    vi.spyOn(gatewayService, 'checkHealth').mockRejectedValue(new Error('Network error'));
-    render(Navbar, {
-      global: {
-        plugins: [router]
-      }
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId('gateway-status').textContent).toContain('Offline');
-    });
+    expect(screen.queryByTestId('gateway-status')).toBeNull();
+    expect(screen.queryByAltText('Profile')).toBeNull();
   });
 });

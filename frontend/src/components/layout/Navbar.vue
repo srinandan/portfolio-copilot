@@ -22,29 +22,11 @@
           </router-link>
         </nav>
       </div>
-      <div class="flex items-center gap-md">
-        <!-- Gateway Health Indicator -->
-        <div class="flex items-center gap-xs px-2.5 py-1 rounded-full bg-surface-container text-xs font-body-mono" data-testid="gateway-status">
-          <span
-            :class="[
-              'w-2 h-2 rounded-full',
-              gatewayConnected ? 'bg-tertiary-fixed-dim' : 'bg-error'
-            ]"
-          ></span>
-          <span class="text-on-surface-variant">
-            Gateway: {{ gatewayConnected ? 'Online' : 'Offline' }}
-          </span>
-        </div>
-        <img alt="Profile" class="w-8 h-8 rounded-full object-cover border border-outline/20" src="/images/profile.png" />
-      </div>
     </div>
   </header>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
-import { gatewayService } from '../../services/gateway';
-
 const navItems = [
   { name: 'Dashboard', path: '/' },
   { name: 'Onboarding', path: '/onboarding' },
@@ -53,15 +35,4 @@ const navItems = [
   { name: 'Documents', path: '/documents' },
   { name: 'Security', path: '/security' }
 ];
-
-const gatewayConnected = ref(true);
-
-onMounted(async () => {
-  try {
-    const health = await gatewayService.checkHealth();
-    gatewayConnected.value = health.status === 'ok';
-  } catch {
-    gatewayConnected.value = false;
-  }
-});
 </script>
