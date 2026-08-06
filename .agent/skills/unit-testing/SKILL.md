@@ -1,8 +1,8 @@
 ---
 name: unit-testing
 description: >-
-  Testing conventions for this repo — table-driven Go tests for the
-  gateway, pytest conventions for the orchestrator, fakes for external
+  Testing conventions for this repo — table-driven Go tests for pkg
+  and frontend server, pytest conventions for the orchestrator, fakes for external
   calls, coverage expectations for golden and error paths. Use when
   writing or reviewing any new function, handler, or component with
   logic beyond pure markup.
@@ -17,7 +17,7 @@ Applies to all code in this repo. Every new exported function, HTTP
 handler, or Vue component with logic beyond pure markup needs a test
 before the PR is considered done — not added later.
 
-Orchestrator is Python, gateway is Go — see
+Orchestrator is Python, packages and frontend server are Go — see
 [ADR-0008](../../../docs/adr/0008-python-for-orchestrator.md). Don't assume
 one language's conventions apply to both.
 
@@ -43,7 +43,7 @@ one language's conventions apply to both.
   paths as thoroughly as the approval path. This is the governance
   surface — undertested rejection logic defeats the point of the demo.
 
-## Go (`gateway/` only — orchestrator is Python, see above)
+## Go (`pkg/` and `frontend/server/`)
 
 - Table-driven tests, co-located as `*_test.go` next to the code under
   test.

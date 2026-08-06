@@ -2,7 +2,7 @@
 name: code-coverage
 description: >-
   Coverage targets and exclusions for this repo (Python for the
-  orchestrator, Go for the gateway), and why coverage should be treated
+  orchestrator, Go for pkg and frontend server), and why coverage should be treated
   as a signal rather than a target. Use when assessing whether a change
   has adequate test coverage, or when coverage drops in CI.
 metadata:
@@ -19,9 +19,8 @@ tests against. Don't add a test whose only purpose is moving the number.
 
 - `orchestrator/` (Python): **80% line coverage**, measured with
   `pytest --cov=orchestrator --cov-report=term-missing`
-- `gateway/` (Go): **80% line coverage**, measured with
-  `go test ./... -coverprofile=coverage.out && go tool cover
-  -func=coverage.out`
+- Go packages (`pkg/`, `frontend/server/`): **80% line coverage**, measured with
+  `go test ./... -coverprofile=coverage.out && go tool cover -func=coverage.out`
 - `frontend/` (Vue/TS): **60% line coverage**, advisory rather than
   enforced — UI code has a lower ratio of logic to markup, so the number
   is less meaningful here
@@ -46,7 +45,7 @@ a PR:
 
 ```bash
 pytest --cov            # orchestrator/
-go test ./... -cover    # gateway/
+go test ./... -cover    # pkg/ and frontend/server/
 npm run test -- --coverage    # frontend/
 ```
 

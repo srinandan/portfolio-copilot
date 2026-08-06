@@ -12,8 +12,8 @@ metadata:
 
 # Concise code
 
-Applies to all code in this repo (`orchestrator/` — Python, `gateway/` —
-Go, `frontend/` — TypeScript/Vue). See
+Applies to all code in this repo (`orchestrator/` — Python, `pkg/` and `frontend/server/` —
+Go, `frontend/src/` — TypeScript/Vue). See
 [ADR-0008](../../../docs/adr/0008-python-for-orchestrator.md) for why the
 languages split this way.
 

@@ -1,6 +1,6 @@
-# --- Go (orchestrator/, gateway/) ---
-orchestrator/bin/
-gateway/bin/
+# --- Go (frontend/server, pkg/) ---
+frontend/bin/
+bin/
 *.exe
 *.test
 *.out

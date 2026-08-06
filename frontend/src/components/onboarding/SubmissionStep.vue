@@ -124,7 +124,7 @@
       </div>
       <p class="font-body-base text-xs">
         {{
-          submitting ? 'Writing InvestmentPolicyStatement v1 and LiabilitiesSnapshot to long-term memory via gateway /api/plan SSE bridge.' :
+          submitting ? 'Writing InvestmentPolicyStatement v1 and LiabilitiesSnapshot to long-term memory via /api/plan SSE bridge.' :
           submissionSuccess ? 'Your policy reference plan is now active. All subsequent portfolio reviews, drift scans, and proposed actions will validate against this IPS.' :
           submissionError
         }}
@@ -162,7 +162,7 @@
 import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import type { OnboardingState } from '../../types';
-import { gatewayService } from '../../services/gateway';
+import { apiService } from '../../services/api';
 
 const props = defineProps<{
   state: OnboardingState;
@@ -191,11 +191,11 @@ async function handleSubmit() {
       message: `Complete Onboarding Interview: Initialize IPS v1 with ${props.state.risk_tolerance} risk profile, ${props.state.time_horizon_years}y horizon, target allocation ${JSON.stringify(props.state.target_bands)} and ${props.state.liabilities.length} liabilities.`
     };
 
-    // Trigger plan via gateway POST /api/plan
-    await gatewayService.triggerPlan(payload);
+    // Trigger plan via POST /api/plan
+    await apiService.triggerPlan(payload);
     submissionSuccess.value = true;
   } catch (err: any) {
-    // If gateway /api/plan returns offline or error in standalone dev, mark success gracefully while reporting status
+    // If /api/plan returns offline or error in standalone dev, mark success gracefully while reporting status
     submissionSuccess.value = true;
   } finally {
     submitting.value = false;

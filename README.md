@@ -42,7 +42,7 @@ Setup instructions: [`install/`](install/).
 
 ## How to use it
 
-Portfolio Copilot provides a standalone Vue 3 + TypeScript web interface connected to the Go API Gateway and Python orchestrator:
+Portfolio Copilot provides a standalone Vue 3 + TypeScript web interface connected to the backend server and Python orchestrator:
 
 ### First time: onboarding (`/` and `/documents`)
 You answer a structured onboarding interview: your financial goals, time horizon, risk tolerance, and current debt obligations. From this, the agent synthesizes your active Investment Policy Statement (IPS) and Liabilities snapshot, stored in Firestore as the reference policy for all future actions.
@@ -62,14 +62,13 @@ If rebalancing or an investment trade is warranted:
 
 - **Component Documentation**:
   - [`orchestrator/README.md`](orchestrator/README.md): Python ADK root planner & dynamic planning workflow
-  - [`frontend/README.md`](frontend/README.md): Standalone Vue 3 + TypeScript SPA & Stitch design system
-  - [`gateway/README.md`](gateway/README.md): Go API Gateway microservice (F7 contract)
+  - [`frontend/README.md`](frontend/README.md): Standalone Vue 3 + TypeScript SPA & Go backend host
 - **Specifications & Architecture**: see [`docs/spec/`](docs/spec/) and [`docs/adr/`](docs/adr/).
 - **Contributor / Coding-Agent Instructions**: see [`AGENTS.md`](AGENTS.md).
 
 ## Status
 
-Foundation, orchestrator skills, Go API Gateway, and standalone Vue 3 frontend implemented. See [`docs/adr/`](docs/adr/) for the current state of each major decision.
+Foundation, orchestrator skills, Go backend server, and standalone Vue 3 frontend implemented. See [`docs/adr/`](docs/adr/) for the current state of each major decision.
 
 ## Built With
 

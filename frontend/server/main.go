@@ -18,7 +18,7 @@ func main() {
 	r := gin.New()
 	r.Use(StructuredLogMiddleware(), gin.Recovery(), CORSMiddleware())
 
-	srv := NewGatewayServer()
+	srv := NewServer()
 	oc := NewOrchestratorClient()
 
 	// Health check endpoint for Cloud Run

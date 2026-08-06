@@ -53,7 +53,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import type { HoldingsSnapshot, ChatMessage, ProposedAction } from '../types';
-import { gatewayService } from '../services/gateway';
+import { apiService } from '../services/api';
 import NetWorthCard from '../components/dashboard/NetWorthCard.vue';
 import AssetAllocationCard from '../components/dashboard/AssetAllocationCard.vue';
 import TopHoldingsTable from '../components/portfolio/TopHoldingsTable.vue';
@@ -107,7 +107,7 @@ const messages = ref<ChatMessage[]>([
 
 onMounted(async () => {
   try {
-    const data = await gatewayService.getHoldings();
+    const data = await apiService.getHoldings();
     holdings.value = data;
   } catch {
     // Fallback initialized above

@@ -77,7 +77,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import type { HoldingsSnapshot, DriftReport } from '../types';
-import { gatewayService } from '../services/gateway';
+import { apiService } from '../services/api';
 import TopHoldingsTable from '../components/portfolio/TopHoldingsTable.vue';
 import DriftReportCard from '../components/portfolio/DriftReportCard.vue';
 
@@ -106,8 +106,8 @@ const totalValueFormatted = computed(() => {
 onMounted(async () => {
   try {
     const [holdingsData, driftData] = await Promise.all([
-      gatewayService.getHoldings(),
-      gatewayService.getDriftReport()
+      apiService.getHoldings(),
+      apiService.getDriftReport()
     ]);
     holdings.value = holdingsData;
     driftReport.value = driftData;
