@@ -131,23 +131,43 @@ def deploy_agent_engine(
             f"Deploying Agent Engine '{display_name}' from container "
             f"{container_uri} to {project} in {location}..."
         )
-        config = {
-            "display_name": display_name,
-            "identity_type": types.IdentityType.AGENT_IDENTITY,
-            "container_spec": {"image_uri": container_uri},
-        }
         try:
             if existing is not None:
+                engine_id = existing.api_resource.name.split("/")[-1]
+                config = {
+                    "display_name": display_name,
+                    "identity_type": types.IdentityType.AGENT_IDENTITY,
+                    "container_spec": {"image_uri": container_uri},
+                    "env_vars": {"AGENT_ENGINE_ID": engine_id},
+                }
                 remote_app = client.agent_engines.update(
                     name=existing.api_resource.name, config=config
                 )
                 print(
-                    f"Updated existing Agent Engine: {remote_app.api_resource.name}"
+                    f"Updated existing Agent Engine: {remote_app.api_resource.name} (AGENT_ENGINE_ID={engine_id})"
                 )
             else:
-                remote_app = client.agent_engines.create(config=config)
+                initial_config = {
+                    "display_name": display_name,
+                    "identity_type": types.IdentityType.AGENT_IDENTITY,
+                    "container_spec": {"image_uri": container_uri},
+                }
+                remote_app = client.agent_engines.create(config=initial_config)
+                engine_id = remote_app.api_resource.name.split("/")[-1]
                 print(
-                    f"Successfully deployed Agent Engine: {remote_app.api_resource.name}"
+                    f"Created Agent Engine: {remote_app.api_resource.name}. Updating with AGENT_ENGINE_ID={engine_id}..."
+                )
+                update_config = {
+                    "display_name": display_name,
+                    "identity_type": types.IdentityType.AGENT_IDENTITY,
+                    "container_spec": {"image_uri": container_uri},
+                    "env_vars": {"AGENT_ENGINE_ID": engine_id},
+                }
+                remote_app = client.agent_engines.update(
+                    name=remote_app.api_resource.name, config=update_config
+                )
+                print(
+                    f"Successfully deployed Agent Engine: {remote_app.api_resource.name} (AGENT_ENGINE_ID={engine_id})"
                 )
             _apply_identity_iam(project, remote_app)
         except Exception as e:
