@@ -35,30 +35,21 @@ Setup instructions: [`install/`](install/).
 
 ## How to use it
 
-*This section is a placeholder. There's no frontend yet, so nothing
-below is real usage documentation, it's a sketch of the intended flow
-so the eventual UI has a clear target rather than being designed from
-scratch. Replace this whole section once `frontend/` exists.*
+Portfolio Copilot provides a standalone Vue 3 + TypeScript web interface connected to the Go API Gateway and Python orchestrator:
 
-### First time: onboarding
+### First time: onboarding (`/` and `/documents`)
+You answer a structured onboarding interview: your financial goals, time horizon, risk tolerance, and current debt obligations. From this, the agent synthesizes your active Investment Policy Statement (IPS) and Liabilities snapshot, stored in Firestore as the reference policy for all future actions.
 
-You'll answer a short interview: your goals, time horizon, how you'd
-react to a market drop, what you're carrying in debt. From that, the
-agent builds your Investment Policy Statement, the reference plan
-everything else checks against.
+### Day to day: checking in (`/dashboard`, `/portfolio`, `/spending`)
+- **Dashboard (`/`)**: View real-time agent planning conversations, net worth summaries, and current asset allocations.
+- **Portfolio & Drift (`/portfolio`)**: Inspect current holdings alongside the live **Portfolio Drift Report**, comparing current allocations against your IPS target bands.
+- **Spending Analysis (`/spending`)**: Review 30-day income, outflows, savings rate, reserve months, and dual-condition anomaly detections against Chase transaction history.
 
-### Day to day: checking in
-
-Ask it how your spending looks, whether your portfolio has drifted from
-target, or what's going on with a specific holding. It answers using
-live data, not a cached summary.
-
-### When it wants to act: approving a trade
-
-If it thinks a trade is warranted, it drafts a specific proposal, ticker,
-quantity, and rationale, checks it against your policy, and shows you
-exactly what it wants to do before anything happens. Nothing executes
-without your yes.
+### When it wants to act: approving a trade (`<ApprovalCard />`)
+If rebalancing or an investment trade is warranted:
+1. **Action Drafting** drafts a specific trade proposal (`ProposedAction`).
+2. **Reviewer & Critic** independently verifies the trade against your active IPS, holdings, and concentration limits, generating an itemized Policy Safety Checklist (`ReviewerVerdict`).
+3. **Human-in-the-Loop Gate** presents an interactive card in the conversational UI where you can inspect rule results, edit trade quantities or rationales, and approve or reject before execution via Alpaca's paper trading API.
 
 ## Learn more
 
