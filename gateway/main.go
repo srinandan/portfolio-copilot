@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -94,6 +95,13 @@ func main() {
 		c.Writer.Flush()
 	})
 
-	// Run on port 8080 by default (Cloud Run default)
-	r.Run(":8080")
+	// Mount SPA static file serving and Vue client route fallback
+	setupSPARoutes(r, "")
+
+	// Run on dynamic PORT (Cloud Run default: 8080)
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	r.Run(":" + port)
 }

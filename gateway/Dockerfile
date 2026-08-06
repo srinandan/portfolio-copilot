@@ -1,31 +1,31 @@
-# Build stage
-FROM golang:1.25.12 AS builder
-
+# Stage 1: Build the Vue SPA frontend
+FROM node:20-alpine AS ui-builder
 WORKDIR /app
+COPY frontend/package*.json ./
+RUN npm ci
+COPY frontend/ ./
+RUN npm run build
 
-# Copy the go mod files from the root
+# Stage 2: Build the Go gateway binary
+FROM golang:1.25.12 AS go-builder
+WORKDIR /app
 COPY go.mod go.sum ./
-
-# Download dependencies
 RUN go mod download
-
-# Copy the entire project
 COPY . .
-
-# Build the gateway
 RUN CGO_ENABLED=0 GOOS=linux go build -o /app/gateway-bin ./gateway
 
-# Final stage
+# Stage 3: Minimal static runtime container
 FROM gcr.io/distroless/static:nonroot
+WORKDIR /app
 
-WORKDIR /
+# Copy binary from go-builder
+COPY --from=go-builder /app/gateway-bin /app/gateway
 
-# Copy binary from builder
-COPY --from=builder /app/gateway-bin /gateway
+# Copy built frontend SPA assets from ui-builder
+COPY --from=ui-builder /app/dist /app/dist
 
-# Use nonroot user
+ENV STATIC_DIR=/app/dist
 USER nonroot:nonroot
-
 EXPOSE 8080
 
-ENTRYPOINT ["/gateway"]
+ENTRYPOINT ["/app/gateway"]
