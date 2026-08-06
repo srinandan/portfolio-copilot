@@ -125,6 +125,31 @@ func TestBuildProxy_UpstreamDown_Returns502(t *testing.T) {
 	}
 }
 
+func TestBuildProxy_LogsUpstream4xx_ForwardsStatus(t *testing.T) {
+	// Ensure the diagnostic transport we install to warn on gateway >=400 also
+	// forwards status + WWW-Authenticate untouched to the SPA. Otherwise a
+	// diagnostic wrap would mask the actual failure the browser needs to see.
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Www-Authenticate", `Bearer error="invalid_token"`)
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer upstream.Close()
+
+	target, _ := url.Parse(upstream.URL)
+	h := buildProxy(target, stubTokenSource{token: "tok"})
+
+	req := httptest.NewRequest(http.MethodGet, "http://frontend.local/api/holdings", nil)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("status = %d, want 401 (proxy must forward upstream 401)", w.Code)
+	}
+	if got := w.Header().Get("Www-Authenticate"); got == "" {
+		t.Errorf("Www-Authenticate not forwarded; got empty (need it for browser to see the reason)")
+	}
+}
+
 func TestNewAPIHandler_UnsetGatewayURL_Returns503(t *testing.T) {
 	h := newAPIHandler("")
 
