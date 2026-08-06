@@ -83,6 +83,22 @@ gcloud run services add-iam-policy-binding portfolio-copilot-gateway \
   --condition=None \
   --quiet || echo "Failed to bind invoker role to frontend-sa"
 
+# Resolve the gateway's Cloud Run URL so the frontend container can address it.
+# The frontend Go proxy (frontend/server/main.go) uses GATEWAY_URL as both the
+# reverse-proxy target and the audience for ID tokens minted per request.
+GATEWAY_URL=$(gcloud run services describe portfolio-copilot-gateway \
+  --project="$PROJECT_ID" \
+  --region="$REGION" \
+  --format='value(status.url)' 2>/dev/null || echo "")
+
+FRONTEND_ENV="app=portfolio-copilot"
+FRONTEND_DEPLOY_ARGS=()
+if [ -n "$GATEWAY_URL" ]; then
+  FRONTEND_DEPLOY_ARGS+=(--set-env-vars="GATEWAY_URL=${GATEWAY_URL}")
+else
+  echo "WARN: could not resolve portfolio-copilot-gateway URL; frontend will be deployed without GATEWAY_URL set."
+fi
+
 echo "Deploying Cloud Run service: portfolio-copilot-frontend"
 gcloud run deploy portfolio-copilot-frontend \
   --project="$PROJECT_ID" \
@@ -92,6 +108,7 @@ gcloud run deploy portfolio-copilot-frontend \
   --labels="app=portfolio-copilot,component=frontend" \
   --no-allow-unauthenticated \
   --max-instances=1 \
+  "${FRONTEND_DEPLOY_ARGS[@]}" \
   --quiet || echo "Failed to deploy portfolio-copilot-frontend"
 
 echo "Cloud Run setup complete."

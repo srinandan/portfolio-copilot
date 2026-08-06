@@ -1,20 +1,37 @@
-# Build stage
-FROM node:22-alpine AS builder
+# Stage 1: build the Vue SPA
+FROM node:22-alpine AS ui-builder
+
+WORKDIR /ui
+
+COPY frontend/package*.json ./
+RUN npm ci
+
+COPY frontend/ ./
+RUN npm run build
+
+# Stage 2: build the Go server (static-file host + authed proxy to gateway)
+FROM golang:1.25 AS go-builder
 
 WORKDIR /app
 
-COPY package*.json ./
-RUN npm ci
+COPY go.mod go.sum ./
+RUN go mod download
 
 COPY . .
-RUN npm run build
+RUN CGO_ENABLED=0 GOOS=linux go build -o /app/frontend-bin ./frontend/server
 
-# Final stage
-FROM nginx:alpine-slim
+# Stage 3: distroless runtime
+FROM gcr.io/distroless/static:nonroot
 
-RUN rm /etc/nginx/conf.d/default.conf
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-COPY --from=builder /app/dist /usr/share/nginx/html
+WORKDIR /
+
+COPY --from=go-builder /app/frontend-bin /frontend
+COPY --from=ui-builder /ui/dist /dist
+
+ENV STATIC_DIR=/dist
+
+USER nonroot:nonroot
 
 EXPOSE 8080
-CMD ["nginx", "-g", "daemon off;"]
+
+ENTRYPOINT ["/frontend"]
