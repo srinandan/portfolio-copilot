@@ -83,13 +83,16 @@ gcloud run services add-iam-policy-binding portfolio-copilot-gateway \
   --condition=None \
   --quiet || echo "Failed to bind invoker role to frontend-sa"
 
+PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format="value(projectNumber)" 2>/dev/null || echo "")
+
 echo "Deploying Cloud Run service: portfolio-copilot-frontend"
 gcloud run deploy portfolio-copilot-frontend \
   --project="$PROJECT_ID" \
   --image="$IMAGE" \
   --region="$REGION" \
   --service-account="$FRONTEND_SA" \
-  --set-labels="app=portfolio-copilot,component=frontend" \
+  --labels="app=portfolio-copilot,component=frontend" \
+  --set-env-vars="PROJECT_NUMBER=${PROJECT_NUMBER},REGION=${REGION}" \
   --no-allow-unauthenticated \
   --max-instances=1 \
   --quiet || echo "Failed to deploy portfolio-copilot-frontend"
