@@ -18,6 +18,7 @@ func main() {
 	r.Use(StructuredLogMiddleware(), gin.Recovery(), CORSMiddleware())
 
 	srv := NewGatewayServer()
+	oc := NewOrchestratorClient()
 
 	// Health check endpoint for Cloud Run
 	r.GET("/health", func(c *gin.Context) {
@@ -33,6 +34,12 @@ func main() {
 	r.GET("/api/documents", srv.HandleGetDocuments)
 	r.POST("/api/proposed_actions/:action_id/approve", srv.HandleApproveAction)
 	r.POST("/api/proposed_actions/:action_id/reject", srv.HandleRejectAction)
+
+	// Orchestrator bridge: streams ADK planner events back to the frontend as SSE.
+	// Backend is either an HTTP orchestrator (ORCHESTRATOR_URL) or Agent Engine
+	// (AGENT_ENGINE_ID); see plan.go for the selection logic.
+	r.POST("/api/plan", oc.HandlePlan)
+	r.POST("/api/plan/resume", oc.HandlePlanResume)
 
 	// Setup ADC authentication simulation
 	// In production, the gateway would use ADC to authenticate requests to the orchestrator.
