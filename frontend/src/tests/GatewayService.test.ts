@@ -341,9 +341,24 @@ describe('GatewayService', () => {
     ).rejects.toThrow('Resume plan failed with status 400');
   });
 
-  it('constructor defaults to empty string or VITE_GATEWAY_URL when baseUrl is omitted', () => {
-    const defaultService = new GatewayService();
-    expect(defaultService).toBeInstanceOf(GatewayService);
+  it('defaults to relative URLs so requests hit the frontend origin (never the gateway directly)', async () => {
+    // Regression: an earlier build baked VITE_GATEWAY_URL into the bundle, and the browser
+    // then called the gateway (or worse, http://localhost:8080) directly, bypassing the
+    // frontend Go proxy that mints ID tokens. That must not happen — the constructor with
+    // no args must produce a service that fetches relative paths.
+    const service = new GatewayService();
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ status: 'ok' }), { status: 200 })
+    );
+
+    await service.checkHealth();
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const calledURL = fetchSpy.mock.calls[0][0] as string;
+    expect(calledURL).toBe('/health');
+    expect(calledURL).not.toMatch(/^https?:\/\//);
+
+    fetchSpy.mockRestore();
   });
 });
 
