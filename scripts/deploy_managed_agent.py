@@ -162,13 +162,33 @@ def provision_managed_agent(
     display_name: str,
     allow_placeholder: bool = False,
 ) -> str:
-    """Provisions a worker Managed Agent and returns the server-assigned resource ID.
+    """Provisions a worker Managed Agent and returns the server-assigned resource ID."""
+    # 1. Try google.genai SDK
+    try:
+        from google.genai import Client
+        client = Client(enterprise=True, location=location)
+        try:
+            agent = client.agents.get(id=display_name)
+            if agent and hasattr(agent, "name") and agent.name:
+                logger.info(f"Found existing Managed Agent via genai SDK: {agent.name}")
+                return agent.name
+        except Exception:
+            pass
 
-    1. Checks if an agent with display_name already exists (idempotency).
-    2. Creates a new Managed Agent via gcloud agent-registry / agents CLI.
-    3. Captures and returns the server-assigned resource ID.
-    4. Fails loud if creation fails, unless allow_placeholder=True is explicitly set.
-    """
+        logger.info(f"Creating Managed Agent '{display_name}' via genai SDK...")
+        client.agents.create(
+            id=display_name,
+            base_agent="antigravity-preview-05-2026",
+            description="Worker Agent for Portfolio Copilot runtime skills",
+        )
+        agent = client.agents.get(id=display_name)
+        if agent and hasattr(agent, "name") and agent.name:
+            logger.info(f"Successfully created Managed Agent: {agent.name}")
+            return agent.name
+        return f"projects/{project}/locations/{location}/agents/{display_name}"
+    except Exception as e:
+        logger.info(f"genai SDK provisioning skipped/failed ({e}); trying gcloud fallback...")
+
     existing = find_existing_managed_agent(project, location, display_name)
     if existing:
         return existing

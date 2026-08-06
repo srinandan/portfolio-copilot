@@ -52,7 +52,11 @@ class AgentRegistryClient:
     async def _get_client(self) -> httpx.AsyncClient:
         if self._http_client is None:
             credentials, _ = google_auth_default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
-            self._http_client = httpx.AsyncClient(auth=GoogleAuth(credentials), timeout=httpx.Timeout(30.0, connect=10.0))
+            self._http_client = httpx.AsyncClient(
+                auth=GoogleAuth(credentials),
+                timeout=httpx.Timeout(30.0, connect=10.0),
+                follow_redirects=True,
+            )
         return self._http_client
 
     async def close(self) -> None:

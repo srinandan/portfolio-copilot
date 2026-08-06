@@ -343,7 +343,7 @@ SKILL_PLANS: Dict[str, SkillPlan] = {
 async def get_skills_from_registry(ctx: Context, node_input: Any):
     """Queries the Agent Registry for available skills."""
     project_id = os.environ.get("PROJECT_ID") or os.environ.get("GOOGLE_CLOUD_PROJECT") or "dummy-project"
-    location = os.environ.get("GOOGLE_CLOUD_LOCATION", "global")
+    location = os.environ.get("AGENT_REGISTRY_LOCATION", "global")
     logger.info(f"Goal received: {node_input}")
     client = AgentRegistryClient(project_id=project_id, location=location)
     skills = await client.list_authorized_skills()
