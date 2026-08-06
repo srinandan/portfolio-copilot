@@ -94,7 +94,18 @@ go test ./... -cover
 |---|---|---|
 | `GET` | `/health` | Liveness and readiness probe for Google Cloud Run (`200 OK`). |
 | `GET` | `/api/auth-check` | Verifies Google Cloud Application Default Credentials (ADC) and project configuration. |
-| `GET` | `/api/stream` | Server-Sent Events (SSE) stream returning real-time agent planning and governance events. |
+| `GET` | `/api/stream` | Server-Sent Events (SSE) stream — legacy heartbeat scaffold. |
+| `POST` | `/api/plan` | Starts a planning turn on the orchestrator. Body: `{"user_id","message","session_id"?}`. Streams ADK events back as SSE (`data: <event-json>\n\n`). |
+| `POST` | `/api/plan/resume` | Resumes a HITL-paused session. Body: `{"user_id","session_id","invocation_id","interrupt_id","payload"}`. Streams ADK events back as SSE. |
+
+### `/api/plan` backend selection
+
+`/api/plan` and `/api/plan/resume` proxy to the orchestrator. Backend is picked by env var:
+
+- **`ORCHESTRATOR_URL`** (dev / local) — HTTP URL of the orchestrator's FastAPI server (e.g. `http://localhost:8080`). The gateway `POST`s to `<URL>/v1/invoke` and `<URL>/v1/resume` and streams the SSE response back unchanged.
+- **`AGENT_ENGINE_ID`** (cloud) — full Vertex AI Agent Engine resource name, e.g. `projects/<num>/locations/us-central1/reasoningEngines/<id>`. The gateway calls `https://<region>-aiplatform.googleapis.com/v1beta1/<name>:streamQuery` with an ADC bearer token, wraps the frontend body in the reasoning-engine input envelope, and re-emits each streamed JSON object as one SSE `data:` frame.
+
+If neither env var is set, both routes return `503`.
 
 ---
 
