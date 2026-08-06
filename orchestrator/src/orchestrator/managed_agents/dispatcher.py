@@ -52,7 +52,14 @@ def normalize_private_skill_name(skill_name: str) -> str:
 
 async def resolve_skill_instructions(skill_name: str, client: Optional[AgentRegistryClient] = None) -> str:
     """Resolves SKILL.md content from Agent Registry."""
-    project_id = os.environ.get("PROJECT_ID") or os.environ.get("GOOGLE_CLOUD_PROJECT") or "dummy-project"
+    project_id = os.environ.get("PROJECT_ID") or os.environ.get("GOOGLE_CLOUD_PROJECT")
+    if not project_id:
+        try:
+            _, project_id = google_auth_default()
+        except Exception:
+            pass
+    if not project_id:
+        project_id = "dummy-project"
     location = os.environ.get("AGENT_REGISTRY_LOCATION", "global")
     norm_name = normalize_skill_name(skill_name)
 

@@ -156,13 +156,22 @@ def deploy_agent_engine(
             f"{container_uri} to {project} in {location}..."
         )
         try:
+            env_vars = {
+                "AGENT_ENGINE_ID": "",
+                "PROJECT_ID": project,
+                "GOOGLE_CLOUD_PROJECT": project,
+                "GOOGLE_CLOUD_LOCATION": location,
+                "AGENT_REGISTRY_LOCATION": "global",
+                "GOOGLE_GENAI_USE_VERTEXAI": "true",
+            }
             if existing is not None:
                 engine_id = existing.api_resource.name.split("/")[-1]
+                env_vars["AGENT_ENGINE_ID"] = engine_id
                 config = {
                     "display_name": display_name,
                     "identity_type": types.IdentityType.AGENT_IDENTITY,
                     "container_spec": {"image_uri": container_uri},
-                    "env_vars": {"AGENT_ENGINE_ID": engine_id},
+                    "env_vars": env_vars,
                 }
                 remote_app = client.agent_engines.update(
                     name=existing.api_resource.name, config=config
@@ -181,11 +190,12 @@ def deploy_agent_engine(
                 print(
                     f"Created Agent Engine: {remote_app.api_resource.name}. Updating with AGENT_ENGINE_ID={engine_id}..."
                 )
+                env_vars["AGENT_ENGINE_ID"] = engine_id
                 update_config = {
                     "display_name": display_name,
                     "identity_type": types.IdentityType.AGENT_IDENTITY,
                     "container_spec": {"image_uri": container_uri},
-                    "env_vars": {"AGENT_ENGINE_ID": engine_id},
+                    "env_vars": env_vars,
                 }
                 remote_app = client.agent_engines.update(
                     name=remote_app.api_resource.name, config=update_config

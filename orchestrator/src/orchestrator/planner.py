@@ -342,9 +342,16 @@ SKILL_PLANS: Dict[str, SkillPlan] = {
 @node(name="get_skills", rerun_on_resume=False)
 async def get_skills_from_registry(ctx: Context, node_input: Any):
     """Queries the Agent Registry for available skills."""
-    project_id = os.environ.get("PROJECT_ID") or os.environ.get("GOOGLE_CLOUD_PROJECT") or "dummy-project"
+    project_id = os.environ.get("PROJECT_ID") or os.environ.get("GOOGLE_CLOUD_PROJECT")
+    if not project_id:
+        try:
+            _, project_id = google_auth_default()
+        except Exception:
+            pass
+    if not project_id:
+        project_id = "dummy-project"
     location = os.environ.get("AGENT_REGISTRY_LOCATION", "global")
-    logger.info(f"Goal received: {node_input}")
+    logger.info(f"Goal received: {node_input}, project_id: {project_id}, location: {location}")
     client = AgentRegistryClient(project_id=project_id, location=location)
     skills = await client.list_authorized_skills()
     return skills
