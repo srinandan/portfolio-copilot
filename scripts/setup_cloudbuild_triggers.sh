@@ -140,7 +140,6 @@ done
 echo "--- 6. Create tag-triggered build triggers ---"
 declare -A SERVICES=(
   ["orchestrator"]="orchestrator/cloudbuild.yaml"
-  ["gateway"]="gateway/cloudbuild.yaml"
   ["frontend"]="frontend/cloudbuild.yaml"
 )
 
@@ -169,10 +168,9 @@ echo ""
 echo "========================================"
 echo "Cloud Build triggers ready."
 echo "Push a tag (e.g. 'git tag v0.1.0 && git push origin v0.1.0')"
-echo "to build and deploy all three services."
+echo "to build and deploy both services."
 echo ""
 echo "For manual builds without a tag, use the per-service Makefiles:"
 echo "  make -C orchestrator deploy"
-echo "  make -C gateway deploy"
 echo "  make -C frontend deploy"
 echo "========================================"

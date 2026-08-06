@@ -2,14 +2,11 @@ substitutions:
   _COMMIT_SHA: latest
   _REGION: us-central1
   _SERVICE: portfolio-copilot-frontend
-  _GATEWAY_SERVICE: portfolio-copilot-gateway
   _AR_REPO: portfolio-copilot
+  _AGENT_DISPLAY_NAME: portfolio-copilot-agent
 
 steps:
-  # Build the container image, tagged with the commit SHA / git tag.
-  # Build context is the repo root because the frontend Dockerfile now copies
-  # go.mod / go.sum + ./frontend/server (the Go static-file host + authed
-  # proxy binary that replaced the nginx runtime stage).
+  # Build the unified container image (Vue SPA + Go backend server)
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'build'
@@ -21,38 +18,44 @@ steps:
       - 'frontend/Dockerfile'
       - '.'
 
-  # Push both tags to Artifact Registry.
+  # Push both tags to Artifact Registry
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
       - '--all-tags'
       - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}'
 
-  # Deploy the versioned image to Cloud Run.
-  # GATEWAY_URL is looked up at deploy time so we don't have to hardcode the
-  # project-number-embedded hostname. The frontend Go proxy uses this URL as
-  # both the reverse-proxy target and the ID-token audience.
+  # Deploy unified web service to Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: bash
     args:
       - '-c'
       - |
         set -eu
-        GATEWAY_URL=$(gcloud run services describe ${_GATEWAY_SERVICE} \
-          --region=${_REGION} \
-          --format='value(status.url)')
-        if [ -z "$${GATEWAY_URL}" ]; then
-          echo "Could not resolve URL for ${_GATEWAY_SERVICE} in ${_REGION}" >&2
-          exit 1
-        fi
-        echo "Deploying ${_SERVICE} with GATEWAY_URL=$${GATEWAY_URL}"
-        gcloud run deploy ${_SERVICE} \
-          --image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:${_COMMIT_SHA} \
-          --region=${_REGION} \
-          --service-account=portfolio-copilot-frontend-sa@${PROJECT_ID}.iam.gserviceaccount.com \
-          --set-env-vars=GATEWAY_URL=$${GATEWAY_URL} \
-          --labels=app=portfolio-copilot,component=frontend,commit=${_COMMIT_SHA} \
+        TOKEN=$(gcloud auth print-access-token)
+        AGENT_ENGINE_ID=$(curl -s -H "Authorization: Bearer $${TOKEN}" \
+          "https://${_REGION}-aiplatform.googleapis.com/v1beta1/projects/${PROJECT_ID}/locations/${_REGION}/reasoningEngines" \
+          | jq -r --arg name "${_AGENT_DISPLAY_NAME}" '.reasoningEngines[]? | select(.displayName == $name) | .name // empty' \
+          | head -n1 || echo "")
+
+        DEPLOY_ARGS=(
+          run deploy ${_SERVICE}
+          --image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:${_COMMIT_SHA}
+          --region=${_REGION}
+          --service-account=portfolio-copilot-frontend-sa@${PROJECT_ID}.iam.gserviceaccount.com
+          --labels=app=portfolio-copilot,component=frontend,commit=${_COMMIT_SHA}
           --no-allow-unauthenticated
+        )
+
+        if [ -n "$${AGENT_ENGINE_ID}" ]; then
+          echo "Deploying ${_SERVICE} with AGENT_ENGINE_ID=$${AGENT_ENGINE_ID}"
+          DEPLOY_ARGS+=(--set-env-vars=AGENT_ENGINE_ID=$${AGENT_ENGINE_ID})
+        else
+          echo "WARN: no Agent Engine found with displayName=${_AGENT_DISPLAY_NAME} in ${_REGION};"
+          echo "      /api/plan will return 503 until an orchestrator is deployed."
+        fi
+
+        gcloud "$${DEPLOY_ARGS[@]}"
 
 images:
   - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:${_COMMIT_SHA}'

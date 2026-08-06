@@ -33,15 +33,16 @@ deploy:
 	  --substitutions=_COMMIT_SHA=${_COMMIT_SHA},_REGION=${GOOGLE_CLOUD_LOCATION}
 
 clean:
-	@echo "Deleting Agent Engine(s) with display_name=portfolio-copilot-agent in ${GOOGLE_CLOUD_LOCATION}..." ;\
-	gcloud beta ai reasoning-engines list \
-	  --region=${GOOGLE_CLOUD_LOCATION} \
-	  --project=${GOOGLE_CLOUD_PROJECT} \
-	  --filter='displayName=portfolio-copilot-agent' \
-	  --format='value(name)' | while read ENGINE; do \
-	    [ -z "$$ENGINE" ] && continue ;\
-	    gcloud beta ai reasoning-engines delete "$$ENGINE" \
-	      --region=${GOOGLE_CLOUD_LOCATION} \
-	      --project=${GOOGLE_CLOUD_PROJECT} \
-	      --quiet ;\
-	  done
+	@echo "Deleting Agent Engine(s) with displayName=portfolio-copilot-agent in ${GOOGLE_CLOUD_LOCATION}..." ;\
+	TOKEN=$$(gcloud auth print-access-token 2>/dev/null || echo "") ;\
+	if [ -n "$$TOKEN" ]; then \
+	  curl -s -H "Authorization: Bearer $$TOKEN" \
+	    "https://${GOOGLE_CLOUD_LOCATION}-aiplatform.googleapis.com/v1beta1/projects/${GOOGLE_CLOUD_PROJECT}/locations/${GOOGLE_CLOUD_LOCATION}/reasoningEngines" \
+	    | jq -r '.reasoningEngines[]? | select(.displayName == "portfolio-copilot-agent") | .name // empty' \
+	    | while read ENGINE; do \
+	        [ -z "$$ENGINE" ] && continue ;\
+	        echo "Deleting $$ENGINE..." ;\
+	        curl -s -X DELETE -H "Authorization: Bearer $$TOKEN" \
+	          "https://${GOOGLE_CLOUD_LOCATION}-aiplatform.googleapis.com/v1beta1/$$ENGINE" ;\
+	      done ;\
+	fi

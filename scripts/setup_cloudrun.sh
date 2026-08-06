@@ -10,26 +10,14 @@ if [ -z "$PROJECT_ID" ]; then
   PROJECT_ID=$(gcloud config get-value project)
 fi
 
-echo "Setting up Cloud Run services in project $PROJECT_ID ($REGION)..."
+echo "Setting up Cloud Run service (portfolio-copilot-frontend) in project $PROJECT_ID ($REGION)..."
 
 # Enable Cloud Run API
 gcloud services enable run.googleapis.com --project="$PROJECT_ID"
 
-# 1. Create dedicated service accounts for Cloud Run services
+# 1. Create dedicated service account for unified frontend service
 # Note: orchestrator deploys to Agent Runtime, not Cloud Run (ADR-0008).
 
-# Gateway Service Account
-GATEWAY_SA="portfolio-copilot-gateway-sa@${PROJECT_ID}.iam.gserviceaccount.com"
-if ! gcloud iam service-accounts describe "$GATEWAY_SA" --project="$PROJECT_ID" &>/dev/null; then
-  echo "Creating service account: portfolio-copilot-gateway-sa"
-  gcloud iam service-accounts create portfolio-copilot-gateway-sa \
-    --project="$PROJECT_ID" \
-    --display-name="Portfolio Copilot gateway"
-else
-  echo "Service account portfolio-copilot-gateway-sa already exists."
-fi
-
-# Frontend Service Account
 FRONTEND_SA="portfolio-copilot-frontend-sa@${PROJECT_ID}.iam.gserviceaccount.com"
 if ! gcloud iam service-accounts describe "$FRONTEND_SA" --project="$PROJECT_ID" &>/dev/null; then
   echo "Creating service account: portfolio-copilot-frontend-sa"
@@ -40,70 +28,25 @@ else
   echo "Service account portfolio-copilot-frontend-sa already exists."
 fi
 
-# 2. Grant least-privilege IAM roles to gateway-sa
+# 2. Grant least-privilege IAM roles to frontend-sa
 # - Firestore (roles/datastore.user): reads holdings, writes audit log directly (ADR-0003)
 # - BigQuery (roles/bigquery.dataViewer): fan-out chart reads
-# Note: Gateway does NOT need Secret Manager access (Alpaca access is orchestrator-only per ADR-0005).
-echo "Configuring IAM policy bindings for portfolio-copilot-gateway-sa..."
+# Note: Frontend does NOT need Secret Manager access (Alpaca access is orchestrator-only per ADR-0005).
+echo "Configuring IAM policy bindings for portfolio-copilot-frontend-sa..."
 gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-  --member="serviceAccount:$GATEWAY_SA" \
+  --member="serviceAccount:$FRONTEND_SA" \
   --role="roles/datastore.user" \
   --condition=None \
   --quiet
 
 gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-  --member="serviceAccount:$GATEWAY_SA" \
+  --member="serviceAccount:$FRONTEND_SA" \
   --role="roles/bigquery.dataViewer" \
   --condition=None \
   --quiet
 
-# Frontend SA needs TokenCreator permission to mint audience-scoped ID tokens for the gateway
-echo "Configuring IAM policy bindings for portfolio-copilot-frontend-sa..."
-gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-  --member="serviceAccount:$FRONTEND_SA" \
-  --role="roles/iam.serviceAccountTokenCreator" \
-  --condition=None \
-  --quiet
-
-# 3. Deploy Cloud Run placeholders with explicit service accounts
+# 3. Deploy Cloud Run placeholder with explicit service account
 IMAGE="us-docker.pkg.dev/cloudrun/container/hello"
-
-echo "Deploying Cloud Run service: portfolio-copilot-gateway"
-gcloud run deploy portfolio-copilot-gateway \
-  --project="$PROJECT_ID" \
-  --image="$IMAGE" \
-  --region="$REGION" \
-  --service-account="$GATEWAY_SA" \
-  --labels="app=portfolio-copilot,component=gateway" \
-  --no-allow-unauthenticated \
-  --max-instances=1 \
-  --quiet || echo "Failed to deploy portfolio-copilot-gateway"
-
-# Grant frontend SA permission to invoke the gateway service (ADR-0013)
-echo "Granting roles/run.invoker to portfolio-copilot-frontend-sa on portfolio-copilot-gateway..."
-gcloud run services add-iam-policy-binding portfolio-copilot-gateway \
-  --project="$PROJECT_ID" \
-  --region="$REGION" \
-  --member="serviceAccount:$FRONTEND_SA" \
-  --role="roles/run.invoker" \
-  --condition=None \
-  --quiet || echo "Failed to bind invoker role to frontend-sa"
-
-# Resolve the gateway's Cloud Run URL so the frontend container can address it.
-# The frontend Go proxy (frontend/server/main.go) uses GATEWAY_URL as both the
-# reverse-proxy target and the audience for ID tokens minted per request.
-GATEWAY_URL=$(gcloud run services describe portfolio-copilot-gateway \
-  --project="$PROJECT_ID" \
-  --region="$REGION" \
-  --format='value(status.url)' 2>/dev/null || echo "")
-
-FRONTEND_ENV="app=portfolio-copilot"
-FRONTEND_DEPLOY_ARGS=()
-if [ -n "$GATEWAY_URL" ]; then
-  FRONTEND_DEPLOY_ARGS+=(--set-env-vars="GATEWAY_URL=${GATEWAY_URL}")
-else
-  echo "WARN: could not resolve portfolio-copilot-gateway URL; frontend will be deployed without GATEWAY_URL set."
-fi
 
 echo "Deploying Cloud Run service: portfolio-copilot-frontend"
 gcloud run deploy portfolio-copilot-frontend \
@@ -114,7 +57,6 @@ gcloud run deploy portfolio-copilot-frontend \
   --labels="app=portfolio-copilot,component=frontend" \
   --no-allow-unauthenticated \
   --max-instances=1 \
-  "${FRONTEND_DEPLOY_ARGS[@]}" \
   --quiet || echo "Failed to deploy portfolio-copilot-frontend"
 
 echo "Cloud Run setup complete."
