@@ -31,6 +31,7 @@ AGENT_IDENTITY_ROLES = [
     "roles/datastore.user",  # Firestore: IPS, holdings, liabilities
     "roles/bigquery.dataViewer",  # BigQuery: spending analysis
     "roles/secretmanager.secretAccessor",  # Secret Manager: Alpaca API key & MANAGED_AGENT_ID
+    "roles/agentregistry.viewer",  # Agent Registry: list authorized skills
 ]
 
 
