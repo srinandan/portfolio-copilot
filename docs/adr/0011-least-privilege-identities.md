@@ -16,6 +16,7 @@ Different components in the Portfolio Copilot architecture have distinct operati
    - `portfolio-copilot-frontend-sa@${PROJECT_ID}.iam.gserviceaccount.com`:
      - Granted `roles/datastore.user` (Firestore) for reading holdings and appending to audit log.
      - Granted `roles/bigquery.dataViewer` for fan-out chart queries.
+     - Granted `roles/aiplatform.user` for streaming reasoning engine plan invocations.
      - **No Secret Manager access** (Alpaca key access is strictly confined to the orchestrator).
    - `orchestrator` is deployed exclusively via Agent Runtime ([ADR-0008](0008-python-for-orchestrator.md)).
 

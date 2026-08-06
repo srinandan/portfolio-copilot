@@ -31,19 +31,16 @@ fi
 # 2. Grant least-privilege IAM roles to frontend-sa
 # - Firestore (roles/datastore.user): reads holdings, writes audit log directly (ADR-0003)
 # - BigQuery (roles/bigquery.dataViewer): fan-out chart reads
+# - Vertex AI (roles/aiplatform.user): invokes ReasoningEngine / Agent Engine /api/plan streamQuery
 # Note: Frontend does NOT need Secret Manager access (Alpaca access is orchestrator-only per ADR-0005).
 echo "Configuring IAM policy bindings for portfolio-copilot-frontend-sa..."
-gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-  --member="serviceAccount:$FRONTEND_SA" \
-  --role="roles/datastore.user" \
-  --condition=None \
-  --quiet
-
-gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-  --member="serviceAccount:$FRONTEND_SA" \
-  --role="roles/bigquery.dataViewer" \
-  --condition=None \
-  --quiet
+for ROLE in roles/datastore.user roles/bigquery.dataViewer roles/aiplatform.user; do
+  gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+    --member="serviceAccount:$FRONTEND_SA" \
+    --role="$ROLE" \
+    --condition=None \
+    --quiet
+done
 
 # 3. Deploy Cloud Run placeholder with explicit service account
 IMAGE="us-docker.pkg.dev/cloudrun/container/hello"

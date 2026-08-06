@@ -80,7 +80,7 @@ for why. The web application service is deployed with `--no-allow-unauthenticate
 ## Deployment identities
 
 Every deployed component operates under a least-privilege, scoped identity (see [ADR-0011](../adr/0011-least-privilege-identities.md) and [ADR-0017](../adr/0017-unified-gateway-and-frontend.md)):
-- **`portfolio-copilot-frontend-sa`** (Cloud Run): Granted `roles/datastore.user` (Firestore audit log + holdings) and `roles/bigquery.dataViewer` (fan-out chart queries). Does not have Secret Manager access.
+- **`portfolio-copilot-frontend-sa`** (Cloud Run): Granted `roles/datastore.user` (Firestore audit log + holdings), `roles/bigquery.dataViewer` (fan-out chart queries), and `roles/aiplatform.user` (Reasoning Engine streaming query bridge). Does not have Secret Manager access.
 - **`orchestrator` Agent Identity** (Agent Runtime): Uses SPIFFE-based per-agent cryptographic identity with `roles/datastore.user`, `roles/bigquery.dataViewer`, and `roles/secretmanager.secretAccessor` (Alpaca API credentials and `MANAGED_AGENT_ID`). The Agent Platform Service Agent holds deployment-time secret accessor permissions.
 
 ## Language
