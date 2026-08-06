@@ -29,7 +29,12 @@ class GoogleAuth(httpx.Auth):
     def auth_flow(self, request: httpx.Request):
         if not self.credentials.valid:
             self.credentials.refresh(self._auth_request)
-        self.credentials.apply(request.headers)
+        if hasattr(self.credentials, "token") and isinstance(self.credentials.token, str) and self.credentials.token:
+            request.headers["Authorization"] = f"Bearer {self.credentials.token}"
+        elif hasattr(self.credentials, "apply"):
+            self.credentials.apply(request.headers)
+        elif hasattr(self.credentials, "before_request"):
+            self.credentials.before_request(self._auth_request, request.method, str(request.url), request.headers)
         yield request
 
 

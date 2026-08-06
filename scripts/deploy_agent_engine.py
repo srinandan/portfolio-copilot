@@ -67,10 +67,14 @@ def _apply_identity_iam(project: str, remote_app) -> None:
         None,
     )
     if not effective_identity:
-        logger.warning(
-            "Agent Engine did not expose an effective_identity; skipping IAM grants."
-        )
-        return
+        resource_name = getattr(getattr(remote_app, "api_resource", None), "name", None)
+        if resource_name:
+            effective_identity = f"principal://agents.global.org-975672035171.system.id.goog/resources/aiplatform/{resource_name}"
+        else:
+            logger.warning(
+                "Agent Engine did not expose an effective_identity or resource name; skipping IAM grants."
+            )
+            return
 
     principal = (
         effective_identity
