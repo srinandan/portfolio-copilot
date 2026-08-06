@@ -97,18 +97,22 @@ def seed_bigquery(project_id: str, location: str, dataset_name: str, table_name:
     try:
         from google.cloud import bigquery
 
-        client = bigquery.Client(project=project_id, location=location)
+        client = bigquery.Client(project=project_id)
         dataset_ref = bigquery.DatasetReference(project_id, dataset_name)
 
-        # Ensure dataset exists
+        # Ensure dataset exists and obtain its actual location
         try:
-            client.get_dataset(dataset_ref)
+            dataset = client.get_dataset(dataset_ref)
+            ds_location = dataset.location
         except Exception:
             dataset = bigquery.Dataset(dataset_ref)
             dataset.location = location
             dataset.labels = {"app": "portfolio-copilot"}
-            client.create_dataset(dataset, exists_ok=True)
+            dataset = client.create_dataset(dataset, exists_ok=True)
+            ds_location = dataset.location
             print(f"  Created dataset {dataset_name}")
+
+        client = bigquery.Client(project=project_id, location=ds_location)
 
         job_config = bigquery.LoadJobConfig(
             source_format=bigquery.SourceFormat.CSV,

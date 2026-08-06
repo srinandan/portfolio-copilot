@@ -133,6 +133,7 @@ def store_secret(project: str, secret_id: str, secret_value: str) -> None:
 def find_existing_managed_agent(project: str, location: str, display_name: str) -> Optional[str]:
     """Lists agents in the project/location and returns server-assigned resource ID if matching display_name exists."""
     candidate_commands = [
+        ["gcloud", "agent-registry", "agents", "list", f"--project={project}", f"--location={location}", "--format=json"],
         ["gcloud", "alpha", "agent-registry", "agents", "list", f"--project={project}", f"--location={location}", "--format=json"],
         ["gcloud", "alpha", "agents", "list", f"--project={project}", f"--location={location}", "--format=json"],
     ]
@@ -173,6 +174,13 @@ def provision_managed_agent(
         return existing
 
     candidate_commands = [
+        [
+            "gcloud", "agent-registry", "services", "create", display_name,
+            f"--project={project}", f"--location={location}", f"--display-name={display_name}",
+            "--description=Worker Agent for Portfolio Copilot", "--agent-spec-type=no-spec",
+            f"--interfaces=[{{\"protocolBinding\": \"http-json\", \"url\": \"https://{location}-aiplatform.googleapis.com\"}}]",
+            "--format=json",
+        ],
         ["gcloud", "alpha", "agent-registry", "agents", "create", f"--project={project}", f"--location={location}", f"--display-name={display_name}", "--format=json"],
         ["gcloud", "alpha", "agents", "create", f"--project={project}", f"--location={location}", f"--display-name={display_name}", "--format=json"],
     ]
@@ -183,11 +191,11 @@ def provision_managed_agent(
             logger.info(f"Attempting Managed Agent creation with {' '.join(cmd[:4])}...")
             proc = subprocess.run(cmd, capture_output=True, text=True, check=True)
             agent_data = json.loads(proc.stdout)
-            server_id = agent_data.get("name")
+            server_id = agent_data.get("registryResource") or agent_data.get("name")
             if server_id:
                 logger.info(f"Successfully provisioned Managed Agent with server ID: {server_id}")
                 return server_id
-            raise ValueError(f"Command returned response without 'name' resource field: {agent_data}")
+            raise ValueError(f"Command returned response without 'name' or 'registryResource' field: {agent_data}")
         except Exception as e:
             last_error = e
 
