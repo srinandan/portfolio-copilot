@@ -23,7 +23,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"golang.org/x/oauth2"
 	"google.golang.org/api/idtoken"
 )
 
@@ -89,7 +88,7 @@ func newAPIHandler(gatewayURL string) http.Handler {
 }
 
 // newReverseProxy is separated from newAPIHandler so tests can drive it
-// directly with an injected TokenSource.
+// directly with an injected RoundTripper.
 func newReverseProxy(gatewayURL string) (http.Handler, error) {
 	// Trim a trailing slash — Cloud Run's ID-token audience check compares
 	// exact strings, and the URL from `gcloud run services describe --format
@@ -105,38 +104,27 @@ func newReverseProxy(gatewayURL string) (http.Handler, error) {
 		return nil, fmt.Errorf("GATEWAY_URL must be http(s), got scheme %q", u.Scheme)
 	}
 
-	var ts oauth2.TokenSource
+	var transport http.RoundTripper = http.DefaultTransport
 	if u.Scheme == "https" {
-		// idtoken.NewTokenSource uses the metadata server on Cloud Run to mint an
-		// audience-scoped ID token, or a service-account key file if
-		// GOOGLE_APPLICATION_CREDENTIALS points at one. User creds (gcloud auth
-		// application-default login) can't mint ID tokens, so local runs against
-		// an https Cloud Run gateway fail here — that's fine, local dev uses the
-		// http localhost gateway.
-		ts, err = idtoken.NewTokenSource(context.Background(), gatewayURL)
+		// idtoken.NewClient uses the metadata server on Cloud Run (or ADC) to create
+		// an HTTP client whose transport automatically mints, attaches, and refreshes
+		// audience-scoped Google ID tokens on outbound requests.
+		client, err := idtoken.NewClient(context.Background(), gatewayURL)
 		if err != nil {
-			return nil, fmt.Errorf("id-token source for %s: %w", gatewayURL, err)
+			return nil, fmt.Errorf("id-token client for %s: %w", gatewayURL, err)
 		}
-		// Warm-mint a token at startup so the operator sees any auth failure in
-		// the boot logs, not a 401 later. This also validates that the compute
-		// metadata server is reachable and roles/iam.serviceAccountTokenCreator /
-		// run.invoker are in place.
-		tok, err := ts.Token()
-		if err != nil {
-			return nil, fmt.Errorf("warm-mint id-token for audience %q: %w", gatewayURL, err)
-		}
-		slog.Info("id-token source ready",
-			"audience", gatewayURL,
-			"token_length", len(tok.AccessToken),
-		)
+		transport = client.Transport
+		slog.Info("id-token authenticated transport ready", "audience", gatewayURL)
 	}
 
-	return buildProxy(u, ts), nil
+	return buildProxy(u, transport), nil
 }
 
-// buildProxy assembles the httputil.ReverseProxy with optional ID-token
-// injection. Split out for tests, which pass a stub TokenSource.
-func buildProxy(target *url.URL, ts oauth2.TokenSource) http.Handler {
+// buildProxy assembles the httputil.ReverseProxy with the authenticated transport.
+func buildProxy(target *url.URL, transport http.RoundTripper) http.Handler {
+	if transport == nil {
+		transport = http.DefaultTransport
+	}
 	proxy := httputil.NewSingleHostReverseProxy(target)
 	origDirector := proxy.Director
 	proxy.Director = func(r *http.Request) {
@@ -144,19 +132,6 @@ func buildProxy(target *url.URL, ts oauth2.TokenSource) http.Handler {
 		// Cloud Run routes on the Host header; the reverse proxy default keeps
 		// the incoming Host, which won't match the *.run.app hostname.
 		r.Host = target.Host
-		if ts == nil {
-			return
-		}
-		tok, err := ts.Token()
-		if err != nil {
-			slog.WarnContext(r.Context(),
-				"id-token fetch failed — request will likely 401",
-				"error", err,
-				"audience", target.String(),
-			)
-			return
-		}
-		r.Header.Set("Authorization", "Bearer "+tok.AccessToken)
 	}
 	// Log every non-2xx from the gateway with the fields that answer the
 	// obvious "why is it 401?" questions: was Authorization attached, what
@@ -164,7 +139,7 @@ func buildProxy(target *url.URL, ts oauth2.TokenSource) http.Handler {
 	// WWW-Authenticate response header say ("Missing token" vs
 	// "invalid_token"). Happy path is silent.
 	proxy.Transport = &authDiagnosticTransport{
-		base:     http.DefaultTransport,
+		base:     transport,
 		audience: target.String(),
 	}
 	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {

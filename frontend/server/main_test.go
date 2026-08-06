@@ -9,20 +9,21 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"golang.org/x/oauth2"
 )
 
-type stubTokenSource struct {
+type stubAuthTransport struct {
 	token string
 	err   error
 }
 
-func (s stubTokenSource) Token() (*oauth2.Token, error) {
+func (s stubAuthTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	if s.err != nil {
 		return nil, s.err
 	}
-	return &oauth2.Token{AccessToken: s.token}, nil
+	if s.token != "" {
+		r.Header.Set("Authorization", "Bearer "+s.token)
+	}
+	return http.DefaultTransport.RoundTrip(r)
 }
 
 func TestBuildProxy_AttachesIDTokenAndOverridesHost(t *testing.T) {
@@ -44,7 +45,7 @@ func TestBuildProxy_AttachesIDTokenAndOverridesHost(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse upstream: %v", err)
 	}
-	h := buildProxy(target, stubTokenSource{token: "tok-abc"})
+	h := buildProxy(target, stubAuthTransport{token: "tok-abc"})
 
 	req := httptest.NewRequest(http.MethodGet, "http://frontend.local/api/holdings", nil)
 	w := httptest.NewRecorder()
@@ -96,7 +97,7 @@ func TestBuildProxy_TokenSourceFails_ForwardsWithoutAuth(t *testing.T) {
 	defer upstream.Close()
 
 	target, _ := url.Parse(upstream.URL)
-	h := buildProxy(target, stubTokenSource{err: io.ErrUnexpectedEOF})
+	h := buildProxy(target, stubAuthTransport{token: ""})
 
 	req := httptest.NewRequest(http.MethodGet, "http://frontend.local/api/x", nil)
 	w := httptest.NewRecorder()
@@ -136,7 +137,7 @@ func TestBuildProxy_ForwardsUpstream401AndItsWWWAuthenticate(t *testing.T) {
 	defer upstream.Close()
 
 	target, _ := url.Parse(upstream.URL)
-	h := buildProxy(target, stubTokenSource{token: "tok"})
+	h := buildProxy(target, stubAuthTransport{token: "tok"})
 
 	req := httptest.NewRequest(http.MethodGet, "http://frontend.local/api/holdings", nil)
 	w := httptest.NewRecorder()
