@@ -125,3 +125,53 @@ def test_sse_serializes_error_events():
     out = asyncio.run(collect())
     assert "event: error" in out
     assert "boom" in out
+
+
+def test_stream_reasoning_engine_invoke(client_with_runner):
+    client, fake_runner, fake_sm = client_with_runner
+    with client.stream(
+        "POST",
+        "/api/stream_reasoning_engine",
+        json={"class_method": "invoke", "input": {"user_id": "u1", "message": "hello"}},
+    ) as r:
+        assert r.status_code == 200
+        assert "application/x-ndjson" in r.headers["content-type"]
+        body = b"".join(r.iter_bytes()).decode("utf-8").strip()
+
+    payload = json.loads(body)
+    assert payload == {"kind": "test_event", "output": "hello"}
+    fake_sm.get_or_create_session.assert_awaited_once()
+
+
+def test_stream_reasoning_engine_resume(client_with_runner):
+    client, fake_runner, _ = client_with_runner
+    with client.stream(
+        "POST",
+        "/api/stream_reasoning_engine",
+        json={
+            "class_method": "resume",
+            "input": {
+                "user_id": "u1",
+                "session_id": "sess_abc",
+                "invocation_id": "inv_1",
+                "interrupt_id": "int_1",
+                "payload": {"decision": "approve"},
+            },
+        },
+    ) as r:
+        assert r.status_code == 200
+        body = b"".join(r.iter_bytes()).decode("utf-8").strip()
+
+    payload = json.loads(body)
+    assert payload == {"kind": "test_event", "output": "hello"}
+
+
+def test_reasoning_engine_query(client_with_runner):
+    client, fake_runner, _ = client_with_runner
+    r = client.post(
+        "/api/reasoning_engine",
+        json={"input": {"user_id": "u1", "message": "hello"}},
+    )
+    assert r.status_code == 200
+    assert r.json() == {"events": [{"kind": "test_event", "output": "hello"}]}
+

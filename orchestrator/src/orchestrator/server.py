@@ -29,7 +29,7 @@ import os
 from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator, Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from google.adk.runners import Runner
 from google.genai.types import Part, UserContent
@@ -123,6 +123,92 @@ async def _sse(events: AsyncIterator[Any]) -> AsyncIterator[bytes]:
     except Exception as e:
         err = json.dumps({"error": str(e)})
         yield f"event: error\ndata: {err}\n\n".encode("utf-8")
+
+
+async def _stream_json_lines(events: AsyncIterator[Any]) -> AsyncIterator[bytes]:
+    try:
+        async for event in events:
+            payload = json.dumps(_event_to_wire(event), default=str)
+            yield f"{payload}\n".encode("utf-8")
+    except Exception as e:
+        err = json.dumps({"error": str(e)})
+        yield f"{err}\n".encode("utf-8")
+
+
+@app.post("/api/stream_reasoning_engine")
+async def stream_reasoning_engine(request: Request) -> StreamingResponse:
+    """Agent Runtime (Reasoning Engine :streamQuery) endpoint."""
+    if state.runner is None:
+        raise HTTPException(status_code=503, detail="runner not initialized")
+
+    body = await request.json()
+    class_method = body.get("class_method", "invoke")
+    input_data = body.get("input", body)
+    if not isinstance(input_data, dict):
+        input_data = {}
+
+    user_id = input_data.get("user_id", "usr_default")
+    session_id = input_data.get("session_id")
+    message = input_data.get("message", "")
+
+    if class_method in ("resume", "stream_query_resume") or "interrupt_id" in input_data:
+        interrupt_id = input_data.get("interrupt_id", "")
+        invocation_id = input_data.get("invocation_id", "")
+        payload = input_data.get("payload", {})
+        response_part = Part.from_function_response(
+            name="adk_request_input",
+            response={"interruptId": interrupt_id, "payload": payload},
+        )
+        if response_part.function_response is not None:
+            response_part.function_response.id = interrupt_id
+
+        events = state.runner.run_async(
+            user_id=user_id,
+            session_id=session_id,
+            invocation_id=invocation_id,
+            new_message=UserContent(parts=[response_part]),
+        )
+    else:
+        session = await state.session_manager.get_or_create_session(
+            app_name=APP_NAME, user_id=user_id, session_id=session_id
+        )
+        events = state.runner.run_async(
+            user_id=user_id,
+            session_id=session.id,
+            new_message=UserContent(parts=[Part.from_text(text=message)]),
+        )
+
+    return StreamingResponse(_stream_json_lines(events), media_type="application/x-ndjson")
+
+
+@app.post("/api/reasoning_engine")
+async def reasoning_engine(request: Request) -> dict[str, Any]:
+    """Agent Runtime (Reasoning Engine :query) non-streaming endpoint."""
+    if state.runner is None:
+        raise HTTPException(status_code=503, detail="runner not initialized")
+
+    body = await request.json()
+    input_data = body.get("input", body)
+    if not isinstance(input_data, dict):
+        input_data = {}
+
+    user_id = input_data.get("user_id", "usr_default")
+    session_id = input_data.get("session_id")
+    message = input_data.get("message", "")
+
+    session = await state.session_manager.get_or_create_session(
+        app_name=APP_NAME, user_id=user_id, session_id=session_id
+    )
+    events = state.runner.run_async(
+        user_id=user_id,
+        session_id=session.id,
+        new_message=UserContent(parts=[Part.from_text(text=message)]),
+    )
+
+    collected = []
+    async for event in events:
+        collected.append(_event_to_wire(event))
+    return {"events": collected}
 
 
 @app.post("/v1/invoke")
