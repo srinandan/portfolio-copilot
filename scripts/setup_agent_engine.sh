@@ -21,12 +21,25 @@ gcloud services enable aiplatform.googleapis.com --project="$PROJECT_ID"
 PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format="value(projectNumber)" 2>/dev/null || echo "")
 if [ -n "$PROJECT_NUMBER" ]; then
   AI_SERVICE_AGENT="service-${PROJECT_NUMBER}@gcp-sa-aiplatform.iam.gserviceaccount.com"
+  AI_RE_SERVICE_AGENT="service-${PROJECT_NUMBER}@gcp-sa-aiplatform-re.iam.gserviceaccount.com"
   echo "Granting Secret Manager access to Agent Platform Service Agent ($AI_SERVICE_AGENT)..."
   gcloud projects add-iam-policy-binding "$PROJECT_ID" \
     --member="serviceAccount:${AI_SERVICE_AGENT}" \
     --role="roles/secretmanager.secretAccessor" \
     --condition=None \
     --quiet || echo "Warning: Failed to grant Secret Manager access to AI Service Agent $AI_SERVICE_AGENT"
+
+  echo "Granting Artifact Registry reader access to Reasoning Engine Service Agents..."
+  gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+    --member="serviceAccount:${AI_SERVICE_AGENT}" \
+    --role="roles/artifactregistry.reader" \
+    --condition=None \
+    --quiet || echo "Warning: Failed to grant Artifact Registry reader to $AI_SERVICE_AGENT"
+  gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+    --member="serviceAccount:${AI_RE_SERVICE_AGENT}" \
+    --role="roles/artifactregistry.reader" \
+    --condition=None \
+    --quiet || echo "Warning: Failed to grant Artifact Registry reader to $AI_RE_SERVICE_AGENT"
 fi
 
 # 2. Grant project-level least-privilege IAM roles to Agent Runtime Agent Identities
