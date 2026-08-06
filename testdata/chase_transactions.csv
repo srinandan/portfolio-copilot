@@ -1,0 +1,37 @@
+user_id,transaction_date,amount,description,raw_category,normalized_category
+demo_user,2026-05-01,6000.00,EMPLOYER PAYROLL DIRECT DEP,Income,income
+demo_user,2026-05-02,-2000.00,MAIN STREET APARTMENTS RENT,Mortgage & Rent,housing
+demo_user,2026-05-05,-150.00,CITY POWER & WATER,Utilities,utilities
+demo_user,2026-05-08,-245.50,WHOLE FOODS MARKET #102,Groceries,groceries
+demo_user,2026-05-12,-15.00,NETFLIX.COM STREAMING,Entertainment,subscriptions
+demo_user,2026-05-15,-95.00,TRADER JOE'S #44,Groceries,groceries
+demo_user,2026-05-18,-110.00,OSTERIA LA BUCA DINING,Food & Drink,dining
+demo_user,2026-05-22,-190.00,SUSHI GEN RESTAURANT,Food & Drink,dining
+demo_user,2026-05-28,-160.00,SAFEWAY STORE #882,Groceries,groceries
+demo_user,2026-06-01,6000.00,EMPLOYER PAYROLL DIRECT DEP,Income,income
+demo_user,2026-06-02,-2000.00,MAIN STREET APARTMENTS RENT,Mortgage & Rent,housing
+demo_user,2026-06-05,-150.00,CITY POWER & WATER,Utilities,utilities
+demo_user,2026-06-09,-260.00,WHOLE FOODS MARKET #102,Groceries,groceries
+demo_user,2026-06-12,-15.00,NETFLIX.COM STREAMING,Entertainment,subscriptions
+demo_user,2026-06-15,-120.00,TRADER JOE'S #44,Groceries,groceries
+demo_user,2026-06-19,-140.00,BESTIA DINING,Food & Drink,dining
+demo_user,2026-06-25,-160.00,REPUBLIC RESTAURANT,Food & Drink,dining
+demo_user,2026-06-29,-120.00,SAFEWAY STORE #882,Groceries,groceries
+demo_user,2026-07-01,6000.00,EMPLOYER PAYROLL DIRECT DEP,Income,income
+demo_user,2026-07-02,-2000.00,MAIN STREET APARTMENTS RENT,Mortgage & Rent,housing
+demo_user,2026-07-05,-150.00,CITY POWER & WATER,Utilities,utilities
+demo_user,2026-07-08,-250.00,WHOLE FOODS MARKET #102,Groceries,groceries
+demo_user,2026-07-12,-15.00,NETFLIX.COM STREAMING,Entertainment,subscriptions
+demo_user,2026-07-16,-100.00,TRADER JOE'S #44,Groceries,groceries
+demo_user,2026-07-20,-150.00,NOBU RESTAURANT,Food & Drink,dining
+demo_user,2026-07-24,-150.00,FELIX TRATTORIA,Food & Drink,dining
+demo_user,2026-07-29,-150.00,SAFEWAY STORE #882,Groceries,groceries
+demo_user,2026-08-01,6000.00,EMPLOYER PAYROLL DIRECT DEP,Income,income
+demo_user,2026-08-02,-2000.00,MAIN STREET APARTMENTS RENT,Mortgage & Rent,housing
+demo_user,2026-08-05,-150.00,CITY POWER & WATER,Utilities,utilities
+demo_user,2026-08-08,-255.00,WHOLE FOODS MARKET #102,Groceries,groceries
+demo_user,2026-08-11,-35.00,SPOTIFY + NETFLIX BUNDLE,Entertainment,subscriptions
+demo_user,2026-08-14,-100.00,TRADER JOE'S #44,Groceries,groceries
+demo_user,2026-08-17,-320.00,FRENCH LAUNDRY DINING,Food & Drink,dining
+demo_user,2026-08-21,-330.00,PROVIDENCE RESTAURANT,Food & Drink,dining
+demo_user,2026-08-28,-145.00,SAFEWAY STORE #882,Groceries,groceries

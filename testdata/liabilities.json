@@ -1,0 +1,31 @@
+{
+  "user_id": "demo_user",
+  "as_of": "2026-08-01T00:00:00Z",
+  "liabilities": [
+    {
+      "liability_id": "liab_cc_001",
+      "type": "credit_card",
+      "description": "Chase Sapphire Reserve",
+      "balance_usd": 4500,
+      "interest_rate_percent": 24.99,
+      "minimum_payment_usd": 150
+    },
+    {
+      "liability_id": "liab_mort_001",
+      "type": "mortgage",
+      "description": "Primary Residence 30-Year Fixed",
+      "balance_usd": 320000,
+      "interest_rate_percent": 3.75,
+      "minimum_payment_usd": 1850
+    },
+    {
+      "liability_id": "liab_auto_001",
+      "type": "auto_loan",
+      "description": "Credit Union Auto Loan",
+      "balance_usd": 14000,
+      "interest_rate_percent": 4.99,
+      "minimum_payment_usd": 350
+    }
+  ],
+  "total_liabilities_usd": 338500
+}
