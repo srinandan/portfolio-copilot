@@ -29,9 +29,10 @@ See [ADR-0003](../docs/adr/0003-standalone-ui-not-agentspace.md) for why Portfol
 
 ```
 frontend/
-├── Dockerfile              # Multi-stage Docker build (Node 22 builder -> nginx:alpine-slim)
+├── Dockerfile              # Multi-stage build: Node 22 (SPA) + Go 1.25 (server) -> distroless static
 ├── cloudbuild.yaml         # Cloud Build CI/CD pipeline configuration
-├── nginx.conf              # SPA routing, API reverse-proxy, and Cloud Run /health endpoint
+├── server/                 # Go static-file host + authed reverse proxy to the gateway
+│   └── main.go             # Serves /dist and proxies /api + /health with a Google ID token
 ├── package.json            # Scripts, Vue 3, Pinia, Vue Router, Tailwind, and Vitest dependencies
 ├── tailwind.config.js      # Stitch design system color palette, typography, and spacing
 ├── vite.config.ts          # Vite build config and local dev proxy to http://localhost:8080
@@ -124,13 +125,21 @@ npm run test -- --coverage
 ## Docker & Cloud Run Deployment
 
 The frontend is containerized using a multi-stage `Dockerfile`:
-1. **Builder Stage**: Uses `node:22-alpine` to execute `npm ci` and `npm run build`.
-2. **Runtime Stage**: Uses lightweight `nginx:alpine-slim` running as a nonroot user on port `8080`.
+1. **UI Builder Stage**: Uses `node:22-alpine` to execute `npm ci` and `npm run build`, producing static assets in `dist/`.
+2. **Go Builder Stage**: Uses `golang:1.25` to compile `./frontend/server` — a small binary that serves the built SPA and reverse-proxies `/api/*` + `/health` to the gateway Cloud Run service.
+3. **Runtime Stage**: Uses `gcr.io/distroless/static:nonroot`, ships the Go binary plus the `dist/` assets, and runs on port `8080` as the `nonroot` user.
 
-### Custom Nginx Configuration (`nginx.conf`)
-- Serves static SPA files from `/usr/share/nginx/html` with `try_files $uri $uri/ /index.html;`.
-- Proxies `/api/` requests to the upstream gateway service (`http://portfolio-copilot-gateway:8080/api/`).
-- Serves `/health` directly (`200 ok`) for Google Cloud Run startup and liveness checks.
+### Go Static/Proxy Server (`server/main.go`)
+
+nginx cannot mint Google-signed ID tokens, so the frontend container runs a Go binary (`frontend/server/`) instead. Its two jobs:
+
+- **Serve the SPA**: static files from `$STATIC_DIR` (defaults to `/dist` inside the container), with an `index.html` fallback for client-side routes (Vue Router history mode). Paths containing a file extension (`/missing.js`) 404 normally so the browser doesn't eval `index.html` as JavaScript.
+- **Proxy `/api/*` and `/health` to the gateway**: reverse-proxies to `$GATEWAY_URL`. When the target is HTTPS (Cloud Run) the proxy attaches an `Authorization: Bearer <id_token>` header per request, using `google.golang.org/api/idtoken.NewTokenSource(ctx, GATEWAY_URL)` — the Cloud Run metadata server mints the token under the frontend service account (`portfolio-copilot-frontend-sa`, granted `roles/run.invoker` on the gateway by `scripts/setup_cloudrun.sh`). When the target is HTTP (local dev against `make -C gateway local`) the proxy forwards without auth.
+
+Env vars:
+- `GATEWAY_URL` — required in production; must be the exact `https://portfolio-copilot-gateway-*.run.app` URL (looked up by `frontend/cloudbuild.yaml` at deploy time and injected via `--set-env-vars`). Missing → `/api` and `/health` return `503`.
+- `STATIC_DIR` — override the static file root (default `/dist`).
+- `PORT` — override listen port (default `8080`).
 
 ### Deploying via the Makefile
 
