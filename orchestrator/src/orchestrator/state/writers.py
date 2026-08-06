@@ -1,5 +1,4 @@
-"""Orchestrator state write operations and transactional updates."""
-
+import os
 import uuid
 from datetime import datetime, timezone
 from typing import Optional, Tuple
@@ -15,6 +14,15 @@ from ..logger import get_logger
 from ..skills._skill_metadata import read_skill_approval_scope, read_skill_version
 
 logger = get_logger(__name__)
+
+
+def get_orchestrator_version() -> str:
+    """Returns the orchestrator build SHA or package version for built-in gate traceability."""
+    return (
+        os.environ.get("ORCHESTRATOR_BUILD_SHA")
+        or os.environ.get("ORCHESTRATOR_VERSION")
+        or "0.1.0"
+    )
 
 
 def write_ips_from_interview_result(
@@ -335,7 +343,11 @@ def emit_approval_requested_audit(
     reviewer_verdict_id: Optional[str] = None,
     db_client: Optional[FirestoreClient] = None,
 ) -> None:
-    """Emits APPROVAL_REQUESTED right before the gate yields RequestInput. Fail-closed."""
+    """Emits APPROVAL_REQUESTED right before the gate yields RequestInput. Fail-closed.
+
+    Note: registry_entry_id and approval_scope are None because orchestrator-hitl-gate
+    is a built-in workflow node rather than an Agent Registry-discovered skill.
+    """
     client = db_client or FirestoreClient()
     audit_entry = AuditLogEntry(
         log_id=str(uuid.uuid4()),
@@ -344,7 +356,7 @@ def emit_approval_requested_audit(
         actor=Actor(
             type=ActorType.AGENT,
             skill_name="orchestrator-hitl-gate",
-            skill_version="0.1.0",
+            skill_version=get_orchestrator_version(),
             registry_entry_id=None,
             approval_scope=None,
         ),
@@ -394,7 +406,11 @@ def emit_approval_rejected_audit(
     rejecting_user_id: Optional[str] = None,
     db_client: Optional[FirestoreClient] = None,
 ) -> None:
-    """Emits APPROVAL_REJECTED after human reject (or edit-limit exceeded). Fail-closed."""
+    """Emits APPROVAL_REJECTED after human reject (or edit-limit exceeded). Fail-closed.
+
+    Note: When rejected by the gate agent actor, registry_entry_id and approval_scope
+    are None because orchestrator-hitl-gate is a built-in workflow node.
+    """
     client = db_client or FirestoreClient()
     audit_entry = AuditLogEntry(
         log_id=str(uuid.uuid4()),
@@ -404,7 +420,7 @@ def emit_approval_rejected_audit(
             type=ActorType.HUMAN if rejecting_user_id else ActorType.AGENT,
             user_id=rejecting_user_id,
             skill_name=None if rejecting_user_id else "orchestrator-hitl-gate",
-            skill_version=None if rejecting_user_id else "0.1.0",
+            skill_version=None if rejecting_user_id else get_orchestrator_version(),
             registry_entry_id=None,
             approval_scope=None,
         ),
@@ -425,7 +441,11 @@ def emit_action_executed_audit(
     executing_user_id: Optional[str] = None,
     db_client: Optional[FirestoreClient] = None,
 ) -> None:
-    """Emits ACTION_EXECUTED after successful Alpaca submission. Fail-closed."""
+    """Emits ACTION_EXECUTED after successful Alpaca submission. Fail-closed.
+
+    Note: registry_entry_id and approval_scope are None because orchestrator-execution-gate
+    is a built-in workflow node rather than an Agent Registry-discovered skill.
+    """
     client = db_client or FirestoreClient()
     audit_entry = AuditLogEntry(
         log_id=str(uuid.uuid4()),
@@ -434,7 +454,7 @@ def emit_action_executed_audit(
         actor=Actor(
             type=ActorType.AGENT,
             skill_name="orchestrator-execution-gate",
-            skill_version="0.1.0",
+            skill_version=get_orchestrator_version(),
             registry_entry_id=None,
             approval_scope=None,
         ),
@@ -457,7 +477,11 @@ def emit_action_failed_audit(
     error: str,
     db_client: Optional[FirestoreClient] = None,
 ) -> None:
-    """Emits ACTION_FAILED when Alpaca rejects the order or the executor errors. Fail-closed."""
+    """Emits ACTION_FAILED when Alpaca rejects the order or the executor errors. Fail-closed.
+
+    Note: registry_entry_id and approval_scope are None because orchestrator-execution-gate
+    is a built-in workflow node rather than an Agent Registry-discovered skill.
+    """
     client = db_client or FirestoreClient()
     audit_entry = AuditLogEntry(
         log_id=str(uuid.uuid4()),
@@ -466,7 +490,7 @@ def emit_action_failed_audit(
         actor=Actor(
             type=ActorType.AGENT,
             skill_name="orchestrator-execution-gate",
-            skill_version="0.1.0",
+            skill_version=get_orchestrator_version(),
             registry_entry_id=None,
             approval_scope=None,
         ),

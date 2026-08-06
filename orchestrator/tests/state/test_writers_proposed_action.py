@@ -122,8 +122,18 @@ def test_emit_skill_invoked_audit_and_failed_audit(monkeypatch):
         lambda skill_name: "1.2.3",
     )
 
-    emit_skill_invoked_audit("research", detail="Starting research", db_client=mock_client)
-    emit_skill_failed_audit("private-portfolio-analysis", error="No IPS", db_client=mock_client)
+    emit_skill_invoked_audit(
+        "research",
+        detail="Starting research",
+        registry_entry_id="projects/test/revisions/rev-123",
+        db_client=mock_client,
+    )
+    emit_skill_failed_audit(
+        "private-portfolio-analysis",
+        error="No IPS",
+        registry_entry_id="projects/test/revisions/rev-456",
+        db_client=mock_client,
+    )
 
     assert mock_client.append_audit_log.call_count == 2
 
@@ -131,10 +141,14 @@ def test_emit_skill_invoked_audit_and_failed_audit(monkeypatch):
     assert invoked_entry.event_type == EventType.SKILL_INVOKED
     assert invoked_entry.actor.skill_name == "private-research"
     assert invoked_entry.actor.skill_version == "1.2.3"
+    assert invoked_entry.actor.registry_entry_id == "projects/test/revisions/rev-123"
+    assert invoked_entry.actor.approval_scope == "read:external_market_data"
     assert invoked_entry.detail == "Starting research"
 
     failed_entry = mock_client.append_audit_log.call_args_list[1][0][0]
     assert failed_entry.event_type == EventType.SKILL_INVOCATION_FAILED
     assert failed_entry.actor.skill_name == "private-portfolio-analysis"
     assert failed_entry.actor.skill_version == "1.2.3"
+    assert failed_entry.actor.registry_entry_id == "projects/test/revisions/rev-456"
+    assert failed_entry.actor.approval_scope == "read:holdings,read:ips"
     assert "No IPS" in failed_entry.detail

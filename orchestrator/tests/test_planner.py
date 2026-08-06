@@ -933,6 +933,58 @@ async def test_root_planner_threads_registry_entry_id_to_action_proposed_audit()
         assert mock_write.call_args[1]["registry_entry_id"] == "rev-action-99"
 
 
+@pytest.mark.asyncio
+async def test_root_planner_threads_registry_entry_id_to_goals_onboarding_write():
+    agent = Workflow(
+        name="test_root",
+        edges=[("START", root_planner)],
+    )
+    session_service = InMemorySessionService()
+    runner = Runner(
+        app_name="test_app",
+        agent=agent,
+        session_service=session_service,
+        auto_create_session=True,
+    )
+
+    with (
+        patch(
+            "src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock
+        ) as mock_list,
+        patch("src.orchestrator.planner.emit_skill_invoked_audit"),
+        patch("src.orchestrator.planner.dispatch_managed_skill", new_callable=AsyncMock) as mock_dispatch,
+        patch("src.orchestrator.planner.write_ips_from_interview_result") as mock_write,
+    ):
+        mock_list.return_value = [
+            Skill(
+                name="skills/private-goals-onboarding",
+                target_state="TARGET_STATE_ACTIVE",
+                default_revision="rev-goals-77",
+            ),
+        ]
+        mock_write.return_value = (
+            MagicMock(ips_id="ips-77", version=1, risk_tolerance=RiskTolerance.MODERATE, time_horizon_years=10),
+            MagicMock(),
+        )
+        mock_dispatch.return_value = GoalsOnboardingResult(
+            user_id="u_trace_3",
+            primary_goal=Goal(name="House", target_amount_usd=200000.0, target_date="2030-01-01"),
+            risk_tolerance=RiskTolerance.MODERATE,
+            time_horizon_years=5,
+            target_allocation=[],
+            interview_summary="Onboarding complete",
+        )
+
+        response_stream = runner.run_async(
+            user_id="u_trace_3",
+            session_id="sess_trace_3",
+            new_message=UserContent(parts=[Part.from_text(text='{"user_id": "u_trace_3", "trigger": "initial"}')]),
+        )
+        _ = [e async for e in response_stream]
+        mock_write.assert_called_once()
+        assert mock_write.call_args[1]["registry_entry_id"] == "rev-goals-77"
+
+
 def test_reviewer_skips_when_no_drafted_action():
     from src.orchestrator.planner import SKILL_PLANS
 
