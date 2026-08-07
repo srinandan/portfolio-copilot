@@ -10,6 +10,7 @@ from typing import Any, Awaitable, Callable, Dict, Optional
 from google.adk import Context
 from google.adk.events import Event
 from google.adk.workflow import Workflow, node
+from google.auth import default as google_auth_default
 from google.genai.types import Part, UserContent
 
 from .contracts.goals_onboarding import GoalsOnboardingResult

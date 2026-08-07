@@ -5,6 +5,7 @@ from typing import Any, Dict, Optional, Type
 
 from google.adk import Context
 from google.adk.tools import google_search
+from google.auth import default as google_auth_default
 from pydantic import BaseModel, ValidationError
 
 from ..contracts.drift_report import DriftReport
