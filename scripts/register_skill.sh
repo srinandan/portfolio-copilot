@@ -129,12 +129,13 @@ gcloud alpha agent-registry skills revisions create "$REV_ID" \
   --location="$REGION" \
   --payload="$ZIP_PATH"
 
-# Step 3: Ensure default revision is set to the newly created revision
+# Step 3: Ensure default revision is set to the newly created revision and activate skill
 FULL_REV_NAME="projects/${PROJECT_ID}/locations/${REGION}/skills/${REGISTERED_NAME}/revisions/${REV_ID}"
-echo "Calling Agent Registry API (Step 3: Setting default revision to '$FULL_REV_NAME')..."
+echo "Calling Agent Registry API (Step 3: Setting default revision to '$FULL_REV_NAME' and activating)..."
 gcloud alpha agent-registry skills update "$REGISTERED_NAME" \
   --project="$PROJECT_ID" \
   --location="$REGION" \
-  --default-revision="$FULL_REV_NAME"
+  --default-revision="$FULL_REV_NAME" \
+  --target-state="TARGET_STATE_ACTIVE"
 
 echo "Skill '$SKILL_NAME' successfully registered/updated as '$REGISTERED_NAME' with default revision '$REV_ID'."

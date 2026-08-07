@@ -35,6 +35,7 @@ steps:
       - '-c'
       - |
         set -eu
+        pip install --upgrade --no-cache-dir pip
         pip install --no-cache-dir "google-cloud-aiplatform[agent_engines,adk]" click google-auth
         python scripts/deploy_agent_engine.py \
           --project="${PROJECT_ID}" \

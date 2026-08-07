@@ -31,6 +31,7 @@ AGENT_IDENTITY_ROLES = [
     "roles/datastore.user",  # Firestore: IPS, holdings, liabilities
     "roles/bigquery.dataViewer",  # BigQuery: spending analysis
     "roles/secretmanager.secretAccessor",  # Secret Manager: Alpaca API key & MANAGED_AGENT_ID
+    "roles/agentregistry.viewer",  # Agent Registry: list authorized skills
 ]
 
 
@@ -66,10 +67,14 @@ def _apply_identity_iam(project: str, remote_app) -> None:
         None,
     )
     if not effective_identity:
-        logger.warning(
-            "Agent Engine did not expose an effective_identity; skipping IAM grants."
-        )
-        return
+        resource_name = getattr(getattr(remote_app, "api_resource", None), "name", None)
+        if resource_name:
+            effective_identity = f"principal://agents.global.org-975672035171.system.id.goog/resources/aiplatform/{resource_name}"
+        else:
+            logger.warning(
+                "Agent Engine did not expose an effective_identity or resource name; skipping IAM grants."
+            )
+            return
 
     principal = (
         effective_identity
@@ -91,6 +96,29 @@ def _find_existing_engine(client: vertexai.Client, display_name: str):
     except Exception as e:
         logger.warning(f"agent_engines.list failed: {e}")
     return None
+
+
+try:
+    from vertexai import agentplatform
+except ImportError:
+    try:
+        from google.cloud.aiplatform import agentplatform
+    except ImportError:
+        agentplatform = None
+
+
+def _get_client(project: str, location: str):
+    """Return an agentplatform.Client if available, falling back to vertexai.Client."""
+    if agentplatform is not None and hasattr(agentplatform, "Client"):
+        try:
+            return agentplatform.Client(project=project, location=location)
+        except Exception as e:
+            logger.debug(f"agentplatform.Client init failed ({e}); falling back to vertexai.Client")
+    return vertexai.Client(
+        project=project,
+        location=location,
+        http_options=dict(api_version="v1beta1"),
+    )
 
 
 @click.command()
@@ -117,11 +145,7 @@ def deploy_agent_engine(
         _, project = google.auth.default()
 
     staging_bucket = f"gs://{project}-portfolio-copilot-staging"
-    client = vertexai.Client(
-        project=project,
-        location=location,
-        http_options=dict(api_version="v1beta1"),
-    )
+    client = _get_client(project=project, location=location)
     vertexai.init(project=project, location=location, staging_bucket=staging_bucket)
 
     existing = _find_existing_engine(client, display_name)
@@ -132,13 +156,21 @@ def deploy_agent_engine(
             f"{container_uri} to {project} in {location}..."
         )
         try:
+            env_vars = {
+                "AGENT_ENGINE_ID": "",
+                "PROJECT_ID": project,
+                "AGENT_REGISTRY_LOCATION": "global",
+                "GOOGLE_GENAI_USE_ENTERPRISE": "true",
+                "GOOGLE_CLOUD_LOCATION": location,
+            }
             if existing is not None:
                 engine_id = existing.api_resource.name.split("/")[-1]
+                env_vars["AGENT_ENGINE_ID"] = engine_id
                 config = {
                     "display_name": display_name,
                     "identity_type": types.IdentityType.AGENT_IDENTITY,
                     "container_spec": {"image_uri": container_uri},
-                    "env_vars": {"AGENT_ENGINE_ID": engine_id},
+                    "env_vars": env_vars,
                 }
                 remote_app = client.agent_engines.update(
                     name=existing.api_resource.name, config=config
@@ -157,11 +189,12 @@ def deploy_agent_engine(
                 print(
                     f"Created Agent Engine: {remote_app.api_resource.name}. Updating with AGENT_ENGINE_ID={engine_id}..."
                 )
+                env_vars["AGENT_ENGINE_ID"] = engine_id
                 update_config = {
                     "display_name": display_name,
                     "identity_type": types.IdentityType.AGENT_IDENTITY,
                     "container_spec": {"image_uri": container_uri},
-                    "env_vars": {"AGENT_ENGINE_ID": engine_id},
+                    "env_vars": env_vars,
                 }
                 remote_app = client.agent_engines.update(
                     name=remote_app.api_resource.name, config=update_config

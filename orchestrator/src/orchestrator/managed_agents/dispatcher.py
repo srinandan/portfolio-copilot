@@ -5,6 +5,7 @@ from typing import Any, Dict, Optional, Type
 
 from google.adk import Context
 from google.adk.tools import google_search
+from google.auth import default as google_auth_default
 from pydantic import BaseModel, ValidationError
 
 from ..contracts.drift_report import DriftReport
@@ -52,8 +53,15 @@ def normalize_private_skill_name(skill_name: str) -> str:
 
 async def resolve_skill_instructions(skill_name: str, client: Optional[AgentRegistryClient] = None) -> str:
     """Resolves SKILL.md content from Agent Registry."""
-    project_id = os.environ.get("PROJECT_ID") or os.environ.get("GOOGLE_CLOUD_PROJECT") or "dummy-project"
-    location = os.environ.get("GOOGLE_CLOUD_LOCATION", "global")
+    project_id = os.environ.get("PROJECT_ID") or os.environ.get("GOOGLE_CLOUD_PROJECT")
+    if not project_id:
+        try:
+            _, project_id = google_auth_default()
+        except Exception:
+            pass
+    if not project_id:
+        project_id = "dummy-project"
+    location = os.environ.get("AGENT_REGISTRY_LOCATION", "global")
     norm_name = normalize_skill_name(skill_name)
 
     if client:

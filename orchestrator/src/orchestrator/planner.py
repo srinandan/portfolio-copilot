@@ -8,7 +8,9 @@ from datetime import datetime, timezone
 from typing import Any, Awaitable, Callable, Dict, Optional
 
 from google.adk import Context
+from google.adk.events import Event
 from google.adk.workflow import Workflow, node
+from google.auth import default as google_auth_default
 from google.genai.types import Part, UserContent
 
 from .contracts.goals_onboarding import GoalsOnboardingResult
@@ -342,9 +344,16 @@ SKILL_PLANS: Dict[str, SkillPlan] = {
 @node(name="get_skills", rerun_on_resume=False)
 async def get_skills_from_registry(ctx: Context, node_input: Any):
     """Queries the Agent Registry for available skills."""
-    project_id = os.environ.get("PROJECT_ID") or os.environ.get("GOOGLE_CLOUD_PROJECT") or "dummy-project"
-    location = os.environ.get("GOOGLE_CLOUD_LOCATION", "global")
-    logger.info(f"Goal received: {node_input}")
+    project_id = os.environ.get("PROJECT_ID") or os.environ.get("GOOGLE_CLOUD_PROJECT")
+    if not project_id:
+        try:
+            _, project_id = google_auth_default()
+        except Exception:
+            pass
+    if not project_id:
+        project_id = "dummy-project"
+    location = os.environ.get("AGENT_REGISTRY_LOCATION", "global")
+    logger.info(f"Goal received: {node_input}, project_id: {project_id}, location: {location}")
     client = AgentRegistryClient(project_id=project_id, location=location)
     skills = await client.list_authorized_skills()
     return skills
@@ -360,9 +369,9 @@ async def dummy_skill_execution(ctx: Context, node_input: Any):
 async def memory_interaction(ctx: Context, node_input: Any):
     """Reads and writes to the memory bank to satisfy acceptance criteria."""
     part = Part.from_text(text="User prefers low-risk investments")
-    placeholder_fact = UserContent(parts=[part])
+    event = Event(author="user", content=UserContent(parts=[part]))
     try:
-        await ctx.add_events_to_memory(events=[placeholder_fact])
+        await ctx.add_events_to_memory(events=[event])
     except NotImplementedError:
         logger.warning("add_events_to_memory not fully implemented by the memory service yet, continuing...")
     except Exception as e:
