@@ -160,6 +160,8 @@ def deploy_agent_engine(
                 "AGENT_ENGINE_ID": "",
                 "PROJECT_ID": project,
                 "AGENT_REGISTRY_LOCATION": "global",
+                "GOOGLE_GENAI_USE_ENTERPRISE": "true",
+                "GOOGLE_CLOUD_LOCATION": location,
             }
             if existing is not None:
                 engine_id = existing.api_resource.name.split("/")[-1]
