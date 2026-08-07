@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from typing import Any, Awaitable, Callable, Dict, Optional
 
 from google.adk import Context
+from google.adk.events import Event
 from google.adk.workflow import Workflow, node
 from google.genai.types import Part, UserContent
 
@@ -367,9 +368,9 @@ async def dummy_skill_execution(ctx: Context, node_input: Any):
 async def memory_interaction(ctx: Context, node_input: Any):
     """Reads and writes to the memory bank to satisfy acceptance criteria."""
     part = Part.from_text(text="User prefers low-risk investments")
-    placeholder_fact = UserContent(parts=[part])
+    event = Event(author="user", content=UserContent(parts=[part]))
     try:
-        await ctx.add_events_to_memory(events=[placeholder_fact])
+        await ctx.add_events_to_memory(events=[event])
     except NotImplementedError:
         logger.warning("add_events_to_memory not fully implemented by the memory service yet, continuing...")
     except Exception as e:

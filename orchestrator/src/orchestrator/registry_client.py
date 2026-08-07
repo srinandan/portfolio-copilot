@@ -29,8 +29,9 @@ class GoogleAuth(httpx.Auth):
     def auth_flow(self, request: httpx.Request):
         if not self.credentials.valid:
             self.credentials.refresh(self._auth_request)
-        if hasattr(self.credentials, "token") and isinstance(self.credentials.token, str) and self.credentials.token:
-            request.headers["Authorization"] = f"Bearer {self.credentials.token}"
+        token = getattr(self.credentials, "token", None)
+        if token and isinstance(token, str):
+            request.headers["Authorization"] = f"Bearer {token}"
         elif hasattr(self.credentials, "apply"):
             self.credentials.apply(request.headers)
         elif hasattr(self.credentials, "before_request"):
@@ -57,6 +58,11 @@ class AgentRegistryClient:
     async def _get_client(self) -> httpx.AsyncClient:
         if self._http_client is None:
             credentials, _ = google_auth_default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
+            try:
+                if not credentials.valid:
+                    credentials.refresh(GoogleAuthRequest())
+            except Exception:
+                pass
             self._http_client = httpx.AsyncClient(
                 auth=GoogleAuth(credentials),
                 timeout=httpx.Timeout(30.0, connect=10.0),
