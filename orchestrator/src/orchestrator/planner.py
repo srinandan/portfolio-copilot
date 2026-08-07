@@ -8,7 +8,6 @@ from datetime import datetime, timezone
 from typing import Any, Awaitable, Callable, Dict, Optional
 
 from google.adk import Context
-from google.adk.events import Event
 from google.adk.workflow import Workflow, node
 from google.auth import default as google_auth_default
 from google.genai.types import Part, UserContent
@@ -365,25 +364,6 @@ async def dummy_skill_execution(ctx: Context, node_input: Any):
     return f"{node_input}_completed"
 
 
-@node(name="memory_interaction", rerun_on_resume=False)
-async def memory_interaction(ctx: Context, node_input: Any):
-    """Reads and writes to the memory bank to satisfy acceptance criteria."""
-    part = Part.from_text(text="User prefers low-risk investments")
-    event = Event(author="user", content=UserContent(parts=[part]))
-    try:
-        await ctx.add_events_to_memory(events=[event])
-    except NotImplementedError:
-        logger.warning("add_events_to_memory not fully implemented by the memory service yet, continuing...")
-    except Exception as e:
-        logger.warning(f"add_events_to_memory failed: {e}")
-    try:
-        await ctx.search_memory("investment preferences")
-    except NotImplementedError:
-        logger.warning("search_memory not fully implemented by the memory service yet, continuing...")
-    except Exception as e:
-        logger.warning(f"search_memory failed (expected if memory service is InMemory): {e}")
-    return "memory_interaction_completed"
-
 
 async def _execute_skill(
     plan: SkillPlan,
@@ -505,9 +485,6 @@ def _detect_and_audit_revocations(
 async def root_planner(ctx: Context, node_input: Any):
     """Registry-driven dynamic planner. Iterates authorized skills in canonical order,
     dispatching each to the worker Managed Agent via a per-skill SkillPlan."""
-
-    await ctx.run_node(memory_interaction, node_input="test_memory")
-
     skills = await ctx.run_node(get_skills_from_registry, node_input=node_input)
     logger.info(f"Available skills: {skills}")
 
