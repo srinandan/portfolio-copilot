@@ -217,4 +217,91 @@ describe('ApiService', () => {
     });
     expect(res).toBe(mockResponse);
   });
+
+  it('readSSEStream parses SSE data lines and calls onEvent', async () => {
+    const sseText = 'data: {"event_id": "1", "message": "hello"}\n\ndata: {"event_id": "2", "kind": "hitl_approval_request"}\n\n';
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(sseText));
+        controller.close();
+      }
+    });
+    const mockResponse = new Response(stream);
+    const events: any[] = [];
+    const { readSSEStream } = await import('../services/api');
+
+    await readSSEStream(mockResponse, (e) => events.push(e));
+    expect(events).toHaveLength(2);
+    expect(events[0]).toEqual({ event_id: '1', message: 'hello' });
+    expect(events[1]).toEqual({ event_id: '2', kind: 'hitl_approval_request' });
+  });
+
+  it('readSSEStream handles non-JSON raw strings and unreadable response', async () => {
+    const sseText = 'data: raw plain message\n\n';
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(sseText));
+        controller.close();
+      }
+    });
+    const mockResponse = new Response(stream);
+    const events: any[] = [];
+    const { readSSEStream } = await import('../services/api');
+
+    await readSSEStream(mockResponse, (e) => events.push(e));
+    expect(events).toHaveLength(1);
+    expect(events[0]).toEqual({ raw: 'raw plain message' });
+
+    // Test with response having no body
+    const emptyResponse = { body: null } as unknown as Response;
+    await readSSEStream(emptyResponse, () => {});
+  });
+
+  it('streamPlan calls triggerPlan and streams events', async () => {
+    const sseText = 'data: {"status": "in_progress"}\n\n';
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(sseText));
+        controller.close();
+      }
+    });
+    const mockResponse = new Response(stream, { status: 200 });
+    globalThis.fetch = vi.fn().mockResolvedValue(mockResponse);
+
+    const events: any[] = [];
+    await service.streamPlan(
+      { user_id: 'usr_test', message: 'test plan' },
+      (e) => events.push(e)
+    );
+
+    expect(globalThis.fetch).toHaveBeenCalledWith('http://localhost:8080/api/plan', expect.any(Object));
+    expect(events).toEqual([{ status: 'in_progress' }]);
+  });
+
+  it('streamPlanResume calls resumePlan and streams events', async () => {
+    const sseText = 'data: {"status": "executed"}\n\n';
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(sseText));
+        controller.close();
+      }
+    });
+    const mockResponse = new Response(stream, { status: 200 });
+    globalThis.fetch = vi.fn().mockResolvedValue(mockResponse);
+
+    const events: any[] = [];
+    await service.streamPlanResume(
+      {
+        user_id: 'usr_test',
+        session_id: 'sess_1',
+        invocation_id: 'inv_1',
+        interrupt_id: 'int_1',
+        payload: { decision: 'approve' }
+      },
+      (e) => events.push(e)
+    );
+
+    expect(globalThis.fetch).toHaveBeenCalledWith('http://localhost:8080/api/plan/resume', expect.any(Object));
+    expect(events).toEqual([{ status: 'executed' }]);
+  });
 });

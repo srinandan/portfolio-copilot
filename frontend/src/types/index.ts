@@ -70,6 +70,9 @@ export interface ChatMessage {
   timestamp: string;
   action?: ProposedAction;
   verdict?: ReviewerVerdict;
+  session_id?: string;
+  invocation_id?: string;
+  interrupt_id?: string;
 }
 
 export interface CategorySpending {

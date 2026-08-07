@@ -57,12 +57,127 @@ describe('Frontend Views', () => {
     expect(screen.getByTestId('approval-card')).toBeDefined();
   });
 
-  it('DashboardView allows approving and rejecting drafted actions in stream', async () => {
+  it('DashboardView triggers live plan, streams SSE events, and renders new HITL approval card', async () => {
+    const streamPlanSpy = vi.spyOn(apiService, 'streamPlan').mockImplementation(async (_req, onEvent) => {
+      onEvent({
+        id: 'int_live_123',
+        invocation_id: 'inv_live_456',
+        session_id: 'sess_live_789',
+        kind: 'hitl_approval_request',
+        action: {
+          action_id: 'act_rebal_999',
+          session_id: 'sess_live_789',
+          type: 'TRADE',
+          ticker: 'MSFT',
+          side: 'BUY',
+          quantity: 20,
+          rationale: 'Add MSFT per tech allocation band',
+          status: 'DRAFTED'
+        },
+        reviewer_verdict: {
+          verdict_id: 'verd_999',
+          action_id: 'act_rebal_999',
+          overall_pass: true,
+          requires_human_approval: true,
+          rule_results: [
+            { rule_id: 'rule_target', description: 'Moves closer to IPS target', passed: true }
+          ]
+        }
+      });
+    });
+
     render(DashboardView);
+    const input = screen.getByPlaceholderText(/Ask Copilot/i);
+    await fireEvent.update(input, 'Rebalance my portfolio now');
+
+    const triggerBtn = screen.getByTestId('btn-trigger-plan');
+    await fireEvent.click(triggerBtn);
+
+    expect(streamPlanSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        user_id: 'usr_default',
+        message: 'Rebalance my portfolio now'
+      }),
+      expect.any(Function),
+      expect.any(Function)
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Action ID: act_rebal_999')).toBeDefined();
+      expect(screen.getByText('MSFT')).toBeDefined();
+    });
+  });
+
+  it('DashboardView allows approving actions and resumes plan via apiService.streamPlanResume', async () => {
+    const resumeSpy = vi.spyOn(apiService, 'streamPlanResume').mockResolvedValue();
+    render(DashboardView);
+
     const approveBtn = screen.getByTestId('btn-approve');
     await fireEvent.click(approveBtn);
 
+    expect(resumeSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        user_id: 'usr_default',
+        payload: { decision: 'approve', user_id: 'usr_default' }
+      }),
+      expect.any(Function),
+      expect.any(Function)
+    );
+
     expect(screen.getByText(/APPROVED — Execution Triggered/i)).toBeDefined();
+  });
+
+  it('DashboardView allows rejecting actions and resumes plan via apiService.streamPlanResume', async () => {
+    const resumeSpy = vi.spyOn(apiService, 'streamPlanResume').mockResolvedValue();
+    render(DashboardView);
+
+    const rejectBtn = screen.getByTestId('btn-reject');
+    await fireEvent.click(rejectBtn);
+
+    expect(resumeSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        user_id: 'usr_default',
+        payload: {
+          decision: 'reject',
+          reason: 'User rejected proposed trade',
+          user_id: 'usr_default'
+        }
+      }),
+      expect.any(Function),
+      expect.any(Function)
+    );
+
+    expect(screen.getByText(/REJECTED — Trade Aborted/i)).toBeDefined();
+  });
+
+  it('DashboardView allows editing actions and saves changes via apiService.streamPlanResume', async () => {
+    const resumeSpy = vi.spyOn(apiService, 'streamPlanResume').mockResolvedValue();
+    render(DashboardView);
+
+    const editBtn = screen.getByTestId('btn-edit');
+    await fireEvent.click(editBtn);
+
+    const qtyInput = screen.getByTestId('edit-quantity-input');
+    await fireEvent.update(qtyInput, '30');
+
+    const saveBtn = screen.getByText('Save Changes');
+    await fireEvent.click(saveBtn);
+
+    expect(resumeSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        user_id: 'usr_default',
+        payload: {
+          decision: 'edit',
+          changes: {
+            quantity: 30,
+            rationale: 'Trim AAPL position to rebalance US Equities within 55% IPS target allocation.'
+          },
+          user_id: 'usr_default'
+        }
+      }),
+      expect.any(Function),
+      expect.any(Function)
+    );
   });
 
   it('PortfolioView renders total value chart and top holdings list', async () => {
