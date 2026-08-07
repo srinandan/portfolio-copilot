@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -106,46 +105,6 @@ func (s *Server) HandleGetDocuments(c *gin.Context) {
 		}
 	}
 	c.JSON(http.StatusOK, defaultDocuments())
-}
-
-func (s *Server) HandleApproveAction(c *gin.Context) {
-	actionID := c.Param("action_id")
-	if actionID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "action_id required"})
-		return
-	}
-	if s.Store != nil {
-		err := s.Store.UpdateProposedActionStatus(c.Request.Context(), actionID, contracts.ActionStatusApproved)
-		if err != nil && !store.IsNotFound(err) {
-			slog.ErrorContext(c.Request.Context(), "Error updating action status to APPROVED", "error", err)
-		}
-		action, err := s.Store.GetProposedAction(c.Request.Context(), actionID)
-		if err == nil && action != nil {
-			c.JSON(http.StatusOK, action)
-			return
-		}
-	}
-	c.JSON(http.StatusOK, defaultProposedAction(actionID, contracts.ActionStatusApproved))
-}
-
-func (s *Server) HandleRejectAction(c *gin.Context) {
-	actionID := c.Param("action_id")
-	if actionID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "action_id required"})
-		return
-	}
-	if s.Store != nil {
-		err := s.Store.UpdateProposedActionStatus(c.Request.Context(), actionID, contracts.ActionStatusRejected)
-		if err != nil && !store.IsNotFound(err) {
-			slog.ErrorContext(c.Request.Context(), "Error updating action status to REJECTED", "error", err)
-		}
-		action, err := s.Store.GetProposedAction(c.Request.Context(), actionID)
-		if err == nil && action != nil {
-			c.JSON(http.StatusOK, action)
-			return
-		}
-	}
-	c.JSON(http.StatusOK, defaultProposedAction(actionID, contracts.ActionStatusRejected))
 }
 
 func ptrInt(i int) *int {
@@ -279,17 +238,5 @@ func defaultDocuments() []contracts.DocumentItem {
 			Status:        "SUCCESS",
 			RecordsParsed: ptrInt(42),
 		},
-	}
-}
-
-func defaultProposedAction(actionID string, status contracts.ActionStatus) *contracts.ProposedAction {
-	now := time.Now().UTC()
-	return &contracts.ProposedAction{
-		ActionID:  actionID,
-		SessionID: "sess-default",
-		Type:      contracts.ActionTypeTrade,
-		Status:    status,
-		Rationale: fmt.Sprintf("Action %s changed status to %s by human in UI.", actionID, status),
-		CreatedAt: now,
 	}
 }

@@ -156,34 +156,6 @@ describe('ApiService', () => {
     expect(result).toEqual(mockDrift);
   });
 
-  it('approveAction calls POST /api/proposed_actions/:id/approve', async () => {
-    const mockAction = { action_id: 'act_1', status: 'APPROVED' };
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve(mockAction)
-    });
-
-    const result = await service.approveAction('act_1');
-    expect(globalThis.fetch).toHaveBeenCalledWith('http://localhost:8080/api/proposed_actions/act_1/approve', {
-      method: 'POST'
-    });
-    expect(result).toEqual(mockAction);
-  });
-
-  it('rejectAction calls POST /api/proposed_actions/:id/reject', async () => {
-    const mockAction = { action_id: 'act_1', status: 'REJECTED' };
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve(mockAction)
-    });
-
-    const result = await service.rejectAction('act_1');
-    expect(globalThis.fetch).toHaveBeenCalledWith('http://localhost:8080/api/proposed_actions/act_1/reject', {
-      method: 'POST'
-    });
-    expect(result).toEqual(mockAction);
-  });
-
   it('triggerPlan posts plan payload to /api/plan', async () => {
     const mockResponse = { ok: true, status: 200 } as unknown as Response;
     globalThis.fetch = vi.fn().mockResolvedValue(mockResponse);
