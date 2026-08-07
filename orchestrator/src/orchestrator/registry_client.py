@@ -9,6 +9,10 @@ import httpx
 from google.auth import default as google_auth_default
 from google.auth.transport.requests import Request as GoogleAuthRequest
 
+from .logger import get_logger
+
+logger = get_logger(__name__)
+
 DEFAULT_BASE_URL = "https://agentregistry.googleapis.com/v1alpha"
 
 
@@ -28,7 +32,10 @@ class GoogleAuth(httpx.Auth):
 
     def auth_flow(self, request: httpx.Request):
         if not self.credentials.valid:
-            self.credentials.refresh(self._auth_request)
+            try:
+                self.credentials.refresh(self._auth_request)
+            except Exception as e:
+                logger.warning(f"Credential refresh in auth_flow failed: {e}")
         token = getattr(self.credentials, "token", None)
         if token and isinstance(token, str):
             request.headers["Authorization"] = f"Bearer {token}"
@@ -58,11 +65,11 @@ class AgentRegistryClient:
     async def _get_client(self) -> httpx.AsyncClient:
         if self._http_client is None:
             credentials, _ = google_auth_default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
-            try:
-                if not credentials.valid:
+            if not credentials.valid:
+                try:
                     credentials.refresh(GoogleAuthRequest())
-            except Exception:
-                pass
+                except Exception as e:
+                    logger.warning(f"Initial credential refresh in _get_client failed: {e}")
             self._http_client = httpx.AsyncClient(
                 auth=GoogleAuth(credentials),
                 timeout=httpx.Timeout(30.0, connect=10.0),
