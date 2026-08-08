@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -148,10 +149,43 @@ func TestHandlers_WithStoreFallback(t *testing.T) {
 
 	for _, ep := range endpoints {
 		req, _ := http.NewRequest(ep.method, ep.path, nil)
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel() // immediately cancel context to trigger non-NotFound upstream error
+		req = req.WithContext(ctx)
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		if w.Code != http.StatusBadGateway {
+			t.Errorf("endpoint %s %s returned %d, expected 502 BadGateway on upstream error", ep.method, ep.path, w.Code)
+		}
+	}
+}
+
+func TestHandlers_NilStoreReturnsFallback(t *testing.T) {
+	srv := &Server{Store: nil}
+
+	r := gin.New()
+	r.GET("/api/holdings", srv.HandleGetHoldings)
+	r.GET("/api/spending_report", srv.HandleGetSpendingReport)
+	r.GET("/api/drift_report", srv.HandleGetDriftReport)
+	r.GET("/api/documents", srv.HandleGetDocuments)
+
+	endpoints := []struct {
+		method string
+		path   string
+	}{
+		{http.MethodGet, "/api/holdings?user_id=usr_test"},
+		{http.MethodGet, "/api/spending_report?user_id=usr_test"},
+		{http.MethodGet, "/api/drift_report?user_id=usr_test"},
+		{http.MethodGet, "/api/documents?user_id=usr_test"},
+	}
+
+	for _, ep := range endpoints {
+		req, _ := http.NewRequest(ep.method, ep.path, nil)
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 		if w.Code != http.StatusOK {
-			t.Errorf("endpoint %s %s returned %d, expected 200", ep.method, ep.path, w.Code)
+			t.Errorf("endpoint %s %s returned %d, expected 200 OK when Store is nil", ep.method, ep.path, w.Code)
 		}
 	}
 }

@@ -49,62 +49,78 @@ func NewServer() *Server {
 
 func (s *Server) HandleGetHoldings(c *gin.Context) {
 	userID := c.DefaultQuery("user_id", "usr_default")
-	if s.Store != nil {
-		snapshot, err := s.Store.GetHoldings(c.Request.Context(), userID)
-		if err == nil && snapshot != nil {
-			c.JSON(http.StatusOK, snapshot)
-			return
-		}
-		if !store.IsNotFound(err) {
-			slog.ErrorContext(c.Request.Context(), "Error reading holdings from Firestore", "error", err)
-		}
+	if s.Store == nil {
+		c.JSON(http.StatusOK, defaultHoldings())
+		return
 	}
-	c.JSON(http.StatusOK, defaultHoldings())
+	snapshot, err := s.Store.GetHoldings(c.Request.Context(), userID)
+	switch {
+	case err == nil && snapshot != nil:
+		c.JSON(http.StatusOK, snapshot)
+	case store.IsNotFound(err):
+		c.JSON(http.StatusOK, defaultHoldings())
+	default:
+		slog.ErrorContext(c.Request.Context(), "Error reading holdings from Firestore", "user_id", userID, "error", err)
+		c.JSON(http.StatusBadGateway, gin.H{"error": "upstream data unavailable"})
+	}
 }
 
 func (s *Server) HandleGetSpendingReport(c *gin.Context) {
 	userID := c.DefaultQuery("user_id", "usr_default")
-	if s.Store != nil {
-		report, err := s.Store.GetSpendingReport(c.Request.Context(), userID)
-		if err == nil && report != nil {
-			c.JSON(http.StatusOK, report)
-			return
-		}
-		if !store.IsNotFound(err) {
-			slog.ErrorContext(c.Request.Context(), "Error reading spending report from Firestore", "error", err)
-		}
+	if s.Store == nil {
+		c.JSON(http.StatusOK, defaultSpendingReport())
+		return
 	}
-	c.JSON(http.StatusOK, defaultSpendingReport())
+	report, err := s.Store.GetSpendingReport(c.Request.Context(), userID)
+	switch {
+	case err == nil && report != nil:
+		c.JSON(http.StatusOK, report)
+	case store.IsNotFound(err):
+		c.JSON(http.StatusOK, defaultSpendingReport())
+	default:
+		slog.ErrorContext(c.Request.Context(), "Error reading spending report from Firestore", "user_id", userID, "error", err)
+		c.JSON(http.StatusBadGateway, gin.H{"error": "upstream data unavailable"})
+	}
 }
 
 func (s *Server) HandleGetDriftReport(c *gin.Context) {
 	userID := c.DefaultQuery("user_id", "usr_default")
-	if s.Store != nil {
-		report, err := s.Store.GetDriftReport(c.Request.Context(), userID)
-		if err == nil && report != nil {
-			c.JSON(http.StatusOK, report)
-			return
-		}
-		if !store.IsNotFound(err) {
-			slog.ErrorContext(c.Request.Context(), "Error reading drift report from Firestore", "error", err)
-		}
+	if s.Store == nil {
+		c.JSON(http.StatusOK, defaultDriftReport())
+		return
 	}
-	c.JSON(http.StatusOK, defaultDriftReport())
+	report, err := s.Store.GetDriftReport(c.Request.Context(), userID)
+	switch {
+	case err == nil && report != nil:
+		c.JSON(http.StatusOK, report)
+	case store.IsNotFound(err):
+		c.JSON(http.StatusOK, defaultDriftReport())
+	default:
+		slog.ErrorContext(c.Request.Context(), "Error reading drift report from Firestore", "user_id", userID, "error", err)
+		c.JSON(http.StatusBadGateway, gin.H{"error": "upstream data unavailable"})
+	}
 }
 
 func (s *Server) HandleGetDocuments(c *gin.Context) {
 	userID := c.DefaultQuery("user_id", "usr_default")
-	if s.Store != nil {
-		items, err := s.Store.GetDocuments(c.Request.Context(), userID)
-		if err == nil && len(items) > 0 {
-			c.JSON(http.StatusOK, items)
-			return
-		}
-		if !store.IsNotFound(err) {
-			slog.ErrorContext(c.Request.Context(), "Error reading documents from Firestore", "error", err)
-		}
+	if s.Store == nil {
+		c.JSON(http.StatusOK, defaultDocuments())
+		return
 	}
-	c.JSON(http.StatusOK, defaultDocuments())
+	items, err := s.Store.GetDocuments(c.Request.Context(), userID)
+	switch {
+	case err == nil:
+		if len(items) == 0 {
+			c.JSON(http.StatusOK, defaultDocuments())
+		} else {
+			c.JSON(http.StatusOK, items)
+		}
+	case store.IsNotFound(err):
+		c.JSON(http.StatusOK, defaultDocuments())
+	default:
+		slog.ErrorContext(c.Request.Context(), "Error reading documents from Firestore", "user_id", userID, "error", err)
+		c.JSON(http.StatusBadGateway, gin.H{"error": "upstream data unavailable"})
+	}
 }
 
 func ptrInt(i int) *int {
