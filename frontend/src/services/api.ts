@@ -3,7 +3,6 @@ import type {
   AuthCheckResult,
   HoldingsSnapshot,
   DocumentItem,
-  ProposedAction,
   SpendingReport,
   DriftReport
 } from '../types';
@@ -87,26 +86,6 @@ export class ApiService {
     const res = await fetch(`${this.baseUrl}/api/drift_report`);
     if (!res.ok) {
       throw new Error(`Get drift report failed with status ${res.status}`);
-    }
-    return res.json();
-  }
-
-  async approveAction(actionId: string): Promise<ProposedAction> {
-    const res = await fetch(`${this.baseUrl}/api/proposed_actions/${encodeURIComponent(actionId)}/approve`, {
-      method: 'POST'
-    });
-    if (!res.ok) {
-      throw new Error(`Approve action failed with status ${res.status}`);
-    }
-    return res.json();
-  }
-
-  async rejectAction(actionId: string): Promise<ProposedAction> {
-    const res = await fetch(`${this.baseUrl}/api/proposed_actions/${encodeURIComponent(actionId)}/reject`, {
-      method: 'POST'
-    });
-    if (!res.ok) {
-      throw new Error(`Reject action failed with status ${res.status}`);
     }
     return res.json();
   }
