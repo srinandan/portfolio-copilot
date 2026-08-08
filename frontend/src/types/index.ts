@@ -49,18 +49,39 @@ export interface ReviewerVerdict {
   requires_human_approval: boolean;
 }
 
+export type ActionType = 'trade' | 'transfer' | 'rebalance' | 'TRADE' | 'TRANSFER' | 'REBALANCE';
+export type ActionSide = 'buy' | 'sell' | 'BUY' | 'SELL';
+export type ActionStatus =
+  | 'drafted'
+  | 'reviewed_pass'
+  | 'reviewed_fail'
+  | 'pending_approval'
+  | 'approved'
+  | 'rejected'
+  | 'executed'
+  | 'failed'
+  | 'DRAFTED'
+  | 'REVIEWED_PASS'
+  | 'REVIEWED_FAIL'
+  | 'PENDING_APPROVAL'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'EXECUTED'
+  | 'FAILED'
+  | 'PENDING';
+
 export interface ProposedAction {
   action_id: string;
   session_id: string;
-  type: 'TRADE' | 'TRANSFER' | 'REBALANCE';
+  type: ActionType;
   ticker?: string;
-  side?: 'BUY' | 'SELL';
+  side?: ActionSide;
   quantity?: number;
   order_type?: string;
   estimated_price_usd?: number;
   estimated_value_usd?: number;
   rationale: string;
-  status: 'DRAFTED' | 'APPROVED' | 'REJECTED' | 'EXECUTED' | 'FAILED';
+  status: ActionStatus;
 }
 
 export interface ChatMessage {

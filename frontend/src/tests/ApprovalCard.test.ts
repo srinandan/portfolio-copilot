@@ -6,12 +6,12 @@ import type { ProposedAction, ReviewerVerdict } from '../types';
 const mockAction: ProposedAction = {
   action_id: 'act_test_001',
   session_id: 'sess_1',
-  type: 'TRADE',
+  type: 'trade',
   ticker: 'AAPL',
-  side: 'BUY',
+  side: 'buy',
   quantity: 10,
   rationale: 'Rebalancing US equities per IPS target',
-  status: 'DRAFTED'
+  status: 'drafted'
 };
 
 const mockVerdict: ReviewerVerdict = {
@@ -33,19 +33,43 @@ describe('ApprovalCard.vue', () => {
     cleanup();
   });
 
-  it('renders pending trade details and policy rules checklist', () => {
+  it('renders pending trade details and policy rules checklist with lowercase backend contracts', () => {
     render(ApprovalCard, {
       props: { action: mockAction, verdict: mockVerdict }
     });
     expect(screen.getByText('Action ID: act_test_001')).toBeDefined();
     expect(screen.getByText('AAPL')).toBeDefined();
-    expect(screen.getByText('BUY')).toBeDefined();
+    expect(screen.getByText('buy')).toBeDefined();
     expect(screen.getByText('10')).toBeDefined();
     expect(screen.getByText('Within IPS target range')).toBeDefined();
     expect(screen.getByTestId('action-buttons')).toBeDefined();
   });
 
-  it('emits approve event when Approve Trade button is clicked', async () => {
+  it('renders pending_approval and reviewed_pass statuses as pending', () => {
+    const pendingAction: ProposedAction = {
+      ...mockAction,
+      status: 'pending_approval'
+    };
+    render(ApprovalCard, {
+      props: { action: pendingAction, verdict: mockVerdict }
+    });
+    expect(screen.getByTestId('action-buttons')).toBeDefined();
+    expect(screen.queryByTestId('completed-banner')).toBeNull();
+  });
+
+  it('renders sell side with error styling and correct side text', () => {
+    const sellAction: ProposedAction = {
+      ...mockAction,
+      side: 'sell'
+    };
+    render(ApprovalCard, {
+      props: { action: sellAction, verdict: mockVerdict }
+    });
+    const sideElem = screen.getByText('sell');
+    expect(sideElem.className).toContain('text-error');
+  });
+
+  it('emits approve event with lowercase status when Approve Trade button is clicked', async () => {
     const { emitted } = render(ApprovalCard, {
       props: { action: mockAction, verdict: mockVerdict }
     });
@@ -53,11 +77,11 @@ describe('ApprovalCard.vue', () => {
     await fireEvent.click(approveBtn);
     expect(emitted().approve).toHaveLength(1);
     expect(emitted().approve[0]).toEqual([
-      { ...mockAction, status: 'APPROVED' }
+      { ...mockAction, status: 'approved' }
     ]);
   });
 
-  it('emits reject event when Reject button is clicked', async () => {
+  it('emits reject event with lowercase status when Reject button is clicked', async () => {
     const { emitted } = render(ApprovalCard, {
       props: { action: mockAction, verdict: mockVerdict }
     });
@@ -65,7 +89,7 @@ describe('ApprovalCard.vue', () => {
     await fireEvent.click(rejectBtn);
     expect(emitted().reject).toHaveLength(1);
     expect(emitted().reject[0]).toEqual([
-      { ...mockAction, status: 'REJECTED' }
+      { ...mockAction, status: 'rejected' }
     ]);
   });
 
@@ -111,10 +135,10 @@ describe('ApprovalCard.vue', () => {
     expect(emitted().update).toBeUndefined();
   });
 
-  it('renders approved completed state banner and hides action buttons', () => {
+  it('renders approved and executed completed state banner and hides action buttons', () => {
     const approvedAction: ProposedAction = {
       ...mockAction,
-      status: 'APPROVED'
+      status: 'approved'
     };
     render(ApprovalCard, {
       props: { action: approvedAction, verdict: mockVerdict }
@@ -125,10 +149,10 @@ describe('ApprovalCard.vue', () => {
     expect(screen.queryByTestId('action-buttons')).toBeNull();
   });
 
-  it('renders rejected completed state banner and hides action buttons', () => {
+  it('renders rejected and failed completed state banner and hides action buttons', () => {
     const rejectedAction: ProposedAction = {
       ...mockAction,
-      status: 'REJECTED'
+      status: 'rejected'
     };
     render(ApprovalCard, {
       props: { action: rejectedAction, verdict: mockVerdict }

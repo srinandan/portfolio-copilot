@@ -19,11 +19,11 @@
         <span class="font-label-caps text-label-caps text-on-surface-variant uppercase block mb-1">Side</span>
         <span
           :class="[
-            'font-body-mono text-body-mono font-bold',
-            action.side === 'BUY' ? 'text-tertiary-container' : 'text-error'
+            'font-body-mono text-body-mono font-bold uppercase',
+            (action.side || '').toLowerCase() === 'buy' ? 'text-tertiary-container' : 'text-error'
           ]"
         >
-          {{ action.side || 'BUY' }}
+          {{ action.side || 'buy' }}
         </span>
       </div>
       <div>
@@ -128,19 +128,24 @@ const editQuantity = ref(props.action.quantity || 0);
 const editRationale = ref(props.action.rationale || '');
 
 const isPending = computed(() => {
-  const s = (props.action.status || '').toUpperCase();
-  return s === 'DRAFTED' || s === 'PENDING';
+  const s = (props.action.status || '').toLowerCase();
+  return (
+    s === 'drafted' ||
+    s === 'pending' ||
+    s === 'pending_approval' ||
+    s === 'reviewed_pass'
+  );
 });
 
 const isApproved = computed(() => {
-  const s = (props.action.status || '').toUpperCase();
-  return s === 'APPROVED' || s === 'EXECUTED';
+  const s = (props.action.status || '').toLowerCase();
+  return s === 'approved' || s === 'executed';
 });
 
 const currentStatusBadge = computed(() => {
-  const s = (props.action.status || '').toUpperCase();
-  if (s === 'APPROVED' || s === 'EXECUTED') return 'APPROVED';
-  if (s === 'REJECTED') return 'REJECTED';
+  const s = (props.action.status || '').toLowerCase();
+  if (s === 'approved' || s === 'executed') return 'APPROVED';
+  if (s === 'rejected' || s === 'reviewed_fail' || s === 'failed') return 'REJECTED';
   return 'PENDING';
 });
 
@@ -165,10 +170,10 @@ function cancelEdit() {
 }
 
 function onApprove() {
-  emit('approve', { ...props.action, status: 'APPROVED' });
+  emit('approve', { ...props.action, status: 'approved' });
 }
 
 function onReject() {
-  emit('reject', { ...props.action, status: 'REJECTED' });
+  emit('reject', { ...props.action, status: 'rejected' });
 }
 </script>
