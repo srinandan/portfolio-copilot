@@ -128,16 +128,19 @@ const editQuantity = ref(props.action.quantity || 0);
 const editRationale = ref(props.action.rationale || '');
 
 const isPending = computed(() => {
-  return props.action.status === 'DRAFTED' || props.action.status === 'PENDING' as string;
+  const s = (props.action.status || '').toUpperCase();
+  return s === 'DRAFTED' || s === 'PENDING';
 });
 
 const isApproved = computed(() => {
-  return props.action.status === 'APPROVED' || props.action.status === 'EXECUTED';
+  const s = (props.action.status || '').toUpperCase();
+  return s === 'APPROVED' || s === 'EXECUTED';
 });
 
 const currentStatusBadge = computed(() => {
-  if (isApproved.value) return 'APPROVED';
-  if (props.action.status === 'REJECTED') return 'REJECTED';
+  const s = (props.action.status || '').toUpperCase();
+  if (s === 'APPROVED' || s === 'EXECUTED') return 'APPROVED';
+  if (s === 'REJECTED') return 'REJECTED';
   return 'PENDING';
 });
 
