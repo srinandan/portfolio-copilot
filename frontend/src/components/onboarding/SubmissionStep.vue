@@ -191,6 +191,18 @@ async function handleSubmit() {
 
   // Map the wizard's typed state to the orchestrator's GoalsOnboardingResult contract.
   // Structured all the way — no LLM re-parsing of prose.
+  // Wizard IPSConstraints.account_type carries a finer union
+  // ('taxable' | 'ira' | 'roth_ira' | '401k') for future UI use, but the
+  // backend IPS contract accepts only 'taxable' | 'retirement'. Collapse
+  // the retirement subtypes so the write is valid.
+  const rawAccountType = s.constraints.account_type;
+  let normalizedAccountType: 'taxable' | 'retirement' | undefined;
+  if (rawAccountType === 'taxable') {
+    normalizedAccountType = 'taxable';
+  } else if (rawAccountType === 'ira' || rawAccountType === 'roth_ira' || rawAccountType === '401k') {
+    normalizedAccountType = 'retirement';
+  }
+
   const result: Record<string, unknown> = {
     user_id: userId,
     primary_goal: primaryGoal ?? null,
@@ -203,9 +215,7 @@ async function handleSubmit() {
       excluded_sectors: s.constraints.excluded_sectors ?? [],
       concentration_limit_percent: s.constraints.concentration_limit_percent,
       tax_loss_harvesting_enabled: s.constraints.tax_loss_harvesting_enabled ?? false,
-      account_type: s.constraints.account_type === 'taxable' || s.constraints.account_type === 'retirement'
-        ? s.constraints.account_type
-        : undefined
+      account_type: normalizedAccountType
     },
     liquidity_needs: {
       reserve_months: s.reserve_months,
