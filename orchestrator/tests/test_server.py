@@ -53,6 +53,18 @@ def test_livez_always_ok():
         assert r.json() == {"status": "ok"}
 
 
+def test_lifespan_runs_startup_verifications():
+    from src.orchestrator import server
+
+    with patch("src.orchestrator.skills._skill_metadata.verify_all_skills_metadata") as mock_verify_skills, \
+         patch("src.orchestrator.managed_agents.secret_loader.verify_required_secrets") as mock_verify_secrets, \
+         patch("src.orchestrator.server.SessionManager"), \
+         patch("src.orchestrator.server.Runner"):
+        with TestClient(server.app):
+            mock_verify_skills.assert_called_once()
+            mock_verify_secrets.assert_called_once()
+
+
 def test_readyz_503_before_startup_completes():
     from src.orchestrator import server
 

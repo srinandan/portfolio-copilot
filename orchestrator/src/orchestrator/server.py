@@ -68,9 +68,13 @@ state = ServerState()
 
 @asynccontextmanager
 async def _lifespan(_app: FastAPI):
-    # importing planner already ran verify_all_skills_metadata + verify_required_secrets
-    # at module import time (see planner.py); if either failed the process wouldn't have
-    # reached here. Wire the Runner now so requests find it ready.
+    # Startup verification of SKILL.md metadata reachability and required secrets
+    from .managed_agents.secret_loader import verify_required_secrets
+    from .skills._skill_metadata import verify_all_skills_metadata
+
+    verify_all_skills_metadata()
+    verify_required_secrets()
+
     state.session_manager = SessionManager()
     state.runner = Runner(
         app_name=APP_NAME,
