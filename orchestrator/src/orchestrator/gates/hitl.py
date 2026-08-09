@@ -145,7 +145,7 @@ async def hitl_approval_gate(ctx: Context, node_input: Any):
     node_input shape:
       {
         "action": ProposedAction | dict,
-        "reviewer_verdict": ReviewerVerdict | dict | None,  # optional until #106 lands
+        "reviewer_verdict": ReviewerVerdict | dict | None,
       }
 
     Returns: HITLDecision (as model_dump dict -- outer planner will keep as-is
