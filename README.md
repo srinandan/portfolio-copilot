@@ -70,11 +70,6 @@ If rebalancing or an investment trade is warranted:
 
 Foundation, orchestrator skills, Go backend server, and standalone Vue 3 frontend implemented. See [`docs/adr/`](docs/adr/) for the current state of each major decision.
 
-## Built With
-
-This application was built with the assistance of
-[Stitch](https://stitch.withgoogle.com/) and [Jules](https://jules.google.com).
-
 ## Contributing
 
 Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for details on how to
