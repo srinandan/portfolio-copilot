@@ -8,7 +8,7 @@ Deployed to Vertex AI Agent Runtime (Agent Engine) using the Python custom-agent
 
 ## What It Does
 
-- **Registry-Driven Dynamic Planning**: At runtime, the root planner queries the Agent Registry to discover which skills (`research`, `action_drafting`, `spending_analysis`, `portfolio_analysis`, `goals_onboarding`) are currently authorized and available, composing an execution plan dynamically.
+- **Registry-Driven Dynamic Planning**: At runtime, the root planner queries the Agent Registry to discover which skills (`research`, `action_drafting`, `spending_analysis`, `portfolio_analysis`, `goals_onboarding`, `reviewer`) are currently authorized and available, composing an execution plan dynamically.
 - **Dynamic Workflows**: Uses ADK's programmatic control flow (`@node`, `Workflow`, `Context.run_node`) to coordinate sub-tasks and adapt mid-session without restarting.
 - **State Checkpointing & Resumption**: Leverages ADK session management to pause execution for Human-in-the-Loop (HITL) approvals and resume without re-executing already-completed sub-nodes.
 - **Governance & Auditability**: Ensures all planned and executed actions map directly to registered skill versions and approved user scopes.
@@ -27,18 +27,27 @@ orchestrator/
 │   └── orchestrator/
 │       ├── __init__.py     # Package initialization and version
 │       ├── contracts/      # Typed Pydantic data models (IPS, Holdings, Actions, Audit, etc.)
-│       ├── data/           # Firestore, BigQuery, and Secret Manager data clients
-│       ├── executors/      # Broker (Alpaca paper trading) and Managed Agent worker executors
+│       ├── data/           # Firestore and BigQuery data clients
+│       ├── executors/      # Broker (Alpaca paper trading) execution client
+│       ├── gates/          # HITL approval and execution governance gates
+│       ├── logger.py       # Structured JSON logger with trace propagation
+│       ├── managed_agents/ # Managed Agent dispatcher, worker wrapper, and secret loader
 │       ├── planner.py      # Root dynamic planner workflow, node definitions, and dispatch logic
-│       ├── registry/       # Agent Registry client and skill discovery
-│       ├── skills/         # Skill metadata parsing and local skill adapters
+│       ├── primitives/     # Deterministic evaluation logic (action drafting, portfolio, spending)
+│       ├── registry_client.py # Agent Registry client and runtime skill discovery
+│       ├── reviewer/       # Deterministic safety rule evaluation for reviewer verdicts
+│       ├── server.py       # FastAPI HTTP server (/livez, /readyz, /v1/invoke, /v1/resume)
+│       ├── session_manager.py # ADK session & memory service manager
+│       ├── skills/         # SKILL.md metadata parsing and verification
 │       └── state/          # State preloader and fail-closed audit log/state writers
 └── tests/
     ├── integration/        # End-to-end full pipeline and Vertex AI Sessions integration tests
+    ├── primitives/         # Deterministic logic unit tests (drafting, portfolio, spending)
     ├── reviewer/           # Reviewer deterministic and adversarial test suites
     ├── skills/             # Per-skill golden-path and error-path workflow tests
     ├── state/              # Preloader and writer transactional unit tests
     ├── test_testdata_fixtures.py # Canonical test fixtures schema verification
+    ├── test_server.py      # Server lifespan and HTTP endpoint tests
     └── test_planner.py     # Root planner dynamic graph, checkpointing, and revocation tests
 ```
 

@@ -4,8 +4,8 @@
 
 - `gcloud` CLI, authenticated, with a GCP project you can administer
 - `python3` (3.11+), `pip`, `uv` (recommended for Python packaging)
-- `go` (for the gateway)
-- `node`/`npm` (for the frontend)
+- `go` (for the Go backend server)
+- `node`/`npm` (for the Vue frontend)
 
 ## First-time setup
 
@@ -20,10 +20,10 @@ This runs, in sequence:
 1. `setup_secrets.sh`, creates `ALPACA_API_KEY_ID`, `ALPACA_API_SECRET`, and `MANAGED_AGENT_ID` secrets (placeholder values, replace Alpaca keys with real paper-trading credentials afterward), granting the Agent Platform Service Agent access to fetch them during deployment.
 2. `setup_bigquery.sh`, creates the `portfolio_copilot.chase_transactions` dataset and table.
 3. `setup_firestore.sh`, provisions the Firestore database.
-4. `setup_cloudrun.sh`, deploys `gateway` and `frontend` to Cloud Run, each with its own dedicated, least-privilege service account, not the default compute service account.
+4. `setup_cloudrun.sh`, deploys `frontend` (unified web host and backend API server) to Cloud Run with its own dedicated, least-privilege service account, not the default compute service account.
 5. `setup_managed_agent.sh`, provisions and deploys the worker Managed Agent (`scripts/deploy_managed_agent.py`) and stores its resource ID in Secret Manager as `MANAGED_AGENT_ID`.
 6. `setup_agent_engine.sh`, provisions Agent Runtime for the orchestrator (`scripts/deploy_agent_engine.py`), including least-privilege Agent Identity IAM roles.
-7. `register_all_skills.sh`, registers all 5 runtime skills (`goals-onboarding`, `spending-analysis`, `portfolio-analysis`, `research`, `action-drafting`) in the Agent Registry.
+7. `register_all_skills.sh`, registers all 6 runtime skills (`goals-onboarding`, `spending-analysis`, `portfolio-analysis`, `research`, `action-drafting`, `reviewer`) in the Agent Registry.
 
 Each script also runs standalone if you only need to redo one step:
 `./scripts/setup_bigquery.sh <PROJECT_ID>`, etc.
@@ -96,18 +96,16 @@ This smoke test verifies that `resolve_managed_agent_id()` loads a live `MANAGED
 # orchestrator (Python)
 cd orchestrator && uv pip install -e ".[dev]" && uv run pytest
 
-# gateway (Go)
-cd gateway && go build ./... && go test ./...
-
-# frontend (Vue + TypeScript)
-cd frontend && npm install && npm run dev
+# frontend UI & Go backend server
+cd frontend && npm install && npm run build
+go build -o bin/server ./frontend/server && ./bin/server
 ```
 
 ## Updating / redeploying after code changes
 
 Depends on what changed:
 
-- **Gateway or frontend code**: use the per-service Makefile — `make -C gateway deploy` or `make -C frontend deploy` — which calls `gcloud builds submit --config=<service>/cloudbuild.yaml`. For a tagged release, push a `v*` tag and the Cloud Build triggers set up by `scripts/setup_cloudbuild_triggers.sh` build and deploy all three services automatically (see below).
+- **Frontend code**: use the frontend Makefile — `make -C frontend deploy` — which calls `gcloud builds submit --config=frontend/cloudbuild.yaml`. For a tagged release, push a `v*` tag and the Cloud Build triggers set up by `scripts/setup_cloudbuild_triggers.sh` build and deploy both services automatically (see below).
 - **Worker Managed Agent code**: re-run
   `./scripts/setup_managed_agent.sh <PROJECT_ID> <REGION>` (or `python scripts/deploy_managed_agent.py --project=<PROJECT_ID> --location=<REGION>`).
 - **Orchestrator code**: re-run `python scripts/deploy_agent_engine.py`
@@ -120,8 +118,8 @@ Depends on what changed:
 
 ## Cloud Build: tag-triggered releases via Developer Connect
 
-To wire the repo up so pushing a git tag builds and deploys all three
-services (orchestrator, gateway, frontend), run:
+To wire the repo up so pushing a git tag builds and deploys both
+services (orchestrator and frontend), run:
 
 ```bash
 ./scripts/setup_cloudbuild_triggers.sh <PROJECT_ID> <REGION>
@@ -138,7 +136,7 @@ to:
 4. Create an Artifact Registry Docker repo (`portfolio-copilot`) in the target region.
 5. Grant the Cloud Build service account `roles/run.admin`,
    `roles/iam.serviceAccountUser`, and `roles/artifactregistry.writer`.
-6. Create one tag-triggered build trigger per service, all firing on tags
+6. Create one tag-triggered build trigger per service (orchestrator and frontend), all firing on tags
    matching `^v.*$` (e.g. `v0.1.0`, `v1.2.3-rc1`).
 
 To cut a release once the triggers are in place:
@@ -148,22 +146,22 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-All three builds start in parallel; each pushes a versioned image to
+Both builds start in parallel; each pushes a versioned image to
 Artifact Registry (`<region>-docker.pkg.dev/<project>/portfolio-copilot/<service>:v0.1.0`)
-and deploys it — the gateway and frontend to Cloud Run, the orchestrator to
+and deploys it — the frontend to Cloud Run, the orchestrator to
 Vertex AI Agent Runtime (Agent Engine) via
 [`ReasoningEngineSpec.container_spec`](https://cloud.google.com/vertex-ai/generative-ai/docs/agent-engine/deploy)
 per [ADR-0008](../docs/adr/0008-python-for-orchestrator.md).
 
 ### Triggering builds manually
 
-Use the per-service `Makefile` (`orchestrator/Makefile`, `gateway/Makefile`,
+Use the per-service `Makefile` (`orchestrator/Makefile`,
 `frontend/Makefile`); each exposes two targets:
 
 - `make local` — runs the service on your machine (uv/go/npm as appropriate).
 - `make deploy` — calls `gcloud builds submit --config=<service>/cloudbuild.yaml`
   with `_COMMIT_SHA=$(git rev-parse --short HEAD)` and the current gcloud
-  region as substitutions, then deploys — gateway/frontend to Cloud Run,
+  region as substitutions, then deploys — frontend to Cloud Run,
   orchestrator to Agent Runtime. No tag push required.
 
 Environment overrides (`GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`,
