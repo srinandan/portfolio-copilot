@@ -1,4 +1,4 @@
-"""HTTP entrypoint for the orchestrator container on Vertex AI Agent Runtime.
+"""HTTP entrypoint for the orchestrator container on Agent Platform Agent Runtime.
 
 Agent Runtime custom containers must serve HTTP on `$PORT` (defaults to 8080)
 and expose `/livez` + `/readyz` probes; requests are proxied through to the

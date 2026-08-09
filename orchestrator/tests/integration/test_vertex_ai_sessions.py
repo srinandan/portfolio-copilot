@@ -33,7 +33,7 @@ def test_session_manager_in_memory_default():
 
 
 def test_session_manager_vertex_ai_services():
-    """Verify SessionManager instantiates Vertex AI services when AGENT_ENGINE_ID is set."""
+    """Verify SessionManager instantiates Agent Platform services when AGENT_ENGINE_ID is set."""
     with (
         patch.dict(os.environ, {"AGENT_ENGINE_ID": "projects/p/locations/l/agentEngines/test-engine"}),
         patch("orchestrator.session_manager.VertexAiSessionService") as mock_session_cls,
@@ -53,7 +53,7 @@ def test_session_manager_vertex_ai_services():
 def test_hitl_state_json_serializable_invariant():
     """Verifies that all structures saved in ctx.state are strictly JSON-serializable
 
-    for Vertex AI Sessions compatibility and round-trip without corruption.
+    for Agent Platform Sessions compatibility and round-trip without corruption.
     """
     action = ProposedAction(
         action_id="act_vtx_1",
@@ -109,11 +109,11 @@ def test_hitl_state_json_serializable_invariant():
 
 @pytest.mark.skipif(
     _should_skip(),
-    reason="No live AGENT_ENGINE_ID in env (or RUN_INTEGRATION_TESTS!=1); skipping live Vertex AI Sessions test.",
+    reason="No live AGENT_ENGINE_ID in env (or RUN_INTEGRATION_TESTS!=1); skipping live Agent Platform Sessions test.",
 )
 @pytest.mark.asyncio
 async def test_live_vertex_ai_session_service_smoke():
-    """Live smoke test against real Vertex AI Sessions service."""
+    """Live smoke test against real Agent Platform Sessions service."""
     from google.adk.sessions.vertex_ai_session_service import VertexAiSessionService
 
     engine_id = os.environ["AGENT_ENGINE_ID"]

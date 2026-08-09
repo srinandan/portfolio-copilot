@@ -35,7 +35,7 @@ RUN uv pip install --system --no-cache .
 RUN useradd -m -u 10001 orchestrator && chown -R orchestrator:orchestrator /app
 USER orchestrator
 
-# Expose port 8080 for Vertex AI Agent Runtime (Agent Engine) custom-container serving.
+# Expose port 8080 for Agent Platform Agent Runtime custom-container serving.
 # Agent Runtime probes /livez + /readyz and proxies query requests to the container.
 EXPOSE 8080
 

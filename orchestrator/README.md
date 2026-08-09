@@ -2,7 +2,7 @@
 
 The orchestrator is the dynamic planning engine for Portfolio Copilot. Built with Google Agent Development Kit (ADK) 2.0 dynamic workflows, it discovers capabilities at runtime by querying the Google Cloud Agent Registry rather than relying on a static, hardcoded pipeline.
 
-Deployed to Vertex AI Agent Runtime (Agent Engine) using the Python custom-agent contract (see [ADR-0008](../docs/adr/0008-python-for-orchestrator.md)).
+Deployed to Agent Platform Agent Runtime using the Python custom-agent contract (see [ADR-0008](../docs/adr/0008-python-for-orchestrator.md)).
 
 ---
 
@@ -41,7 +41,7 @@ orchestrator/
 │       ├── skills/         # SKILL.md metadata parsing and verification
 │       └── state/          # State preloader and fail-closed audit log/state writers
 └── tests/
-    ├── integration/        # End-to-end full pipeline and Vertex AI Sessions integration tests
+    ├── integration/        # End-to-end full pipeline and Agent Platform Sessions integration tests
     ├── primitives/         # Deterministic logic unit tests (drafting, portfolio, spending)
     ├── reviewer/           # Reviewer deterministic and adversarial test suites
     ├── skills/             # Per-skill golden-path and error-path workflow tests
@@ -57,7 +57,7 @@ orchestrator/
 
 - **Python 3.12+**
 - **[uv](https://docs.astral.sh/uv/)** (recommended) or standard `pip` + `venv`
-- Google Cloud credentials configured if connecting to live GCP services (`Agent Registry`, `Vertex AI`)
+- Google Cloud credentials configured if connecting to live GCP services (`Agent Registry`, `Agent Platform`)
 
 ---
 
@@ -197,7 +197,7 @@ make -C orchestrator local
 make -C orchestrator deploy
 ```
 
-The `deploy` target calls `gcloud builds submit --config=orchestrator/cloudbuild.yaml` with `_COMMIT_SHA=$(git rev-parse --short HEAD)` and the active gcloud region. The Cloud Build pipeline builds and pushes the container image to Artifact Registry, then invokes `scripts/deploy_agent_engine.py --container-uri=<image>` — which uses the Vertex AI SDK's `ReasoningEngineSpec.container_spec` path to create or update the Agent Engine identified by `--display-name` (default `portfolio-copilot-agent`). This is the Agent Runtime custom-container deployment path per [ADR-0008](../docs/adr/0008-python-for-orchestrator.md); the orchestrator does not run on Cloud Run.
+The `deploy` target calls `gcloud builds submit --config=orchestrator/cloudbuild.yaml` with `_COMMIT_SHA=$(git rev-parse --short HEAD)` and the active gcloud region. The Cloud Build pipeline builds and pushes the container image to Artifact Registry, then invokes `scripts/deploy_agent_engine.py --container-uri=<image>` — which uses the Agent Platform SDK's `ReasoningEngineSpec.container_spec` path to create or update the Agent Engine identified by `--display-name` (default `portfolio-copilot-agent`). This is the Agent Platform Agent Runtime custom-container deployment path per [ADR-0008](../docs/adr/0008-python-for-orchestrator.md); the orchestrator does not run on Cloud Run.
 
 For tag-based automatic releases, see [`install/README.md`](../install/README.md) — pushing `v*` git tags fires the triggers created by `scripts/setup_cloudbuild_triggers.sh`.
 

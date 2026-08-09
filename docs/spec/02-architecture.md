@@ -13,9 +13,9 @@ This document describes how the system is built, reflecting the completed Phase 
 | Deterministic math & primitives | In-process Python functions under `orchestrator/primitives/` | [0016](../adr/0016-deterministic-primitives-in-orchestrator.md) |
 | Analytical data | BigQuery (Chase transactions) | [0002](../adr/0002-bigquery-plus-firestore-split.md), [0015](../adr/0015-real-user-data-antigravity-sandbox.md) |
 | Transactional data | Firestore (IPS, holdings, liabilities, audit log) — separate Go and Python clients | [0002](../adr/0002-bigquery-plus-firestore-split.md), [0008](../adr/0008-python-for-orchestrator.md) |
-| Session state | Vertex AI Sessions | — |
-| Long-term memory | Vertex AI Memory Bank | — |
-| Deployment / runtime | Vertex AI Agent Runtime (Agent Engine) — Python custom-agent contract | [0008](../adr/0008-python-for-orchestrator.md) |
+| Session state | Agent Platform Sessions | — |
+| Long-term memory | Agent Platform Memory Bank | — |
+| Deployment / runtime | Agent Platform Agent Runtime — Python custom-agent contract | [0008](../adr/0008-python-for-orchestrator.md) |
 | Deployment identities | Dedicated Cloud Run SA (`portfolio-copilot-frontend-sa`) + Agent Identity (`orchestrator`) | [0011](../adr/0011-least-privilege-identities.md), [0017](../adr/0017-unified-gateway-and-frontend.md) |
 | Web application | Vue 3 + TypeScript SPA hosted by Go backend server (`frontend/server`), Cloud Run | [0003](../adr/0003-standalone-ui-not-agentspace.md), [0017](../adr/0017-unified-gateway-and-frontend.md) |
 | Trade execution (paper) | Alpaca API (orchestrator-owned execution outside sandbox) | [0005](../adr/0005-managed-agents-hybrid-evaluation.md), [0014](../adr/0014-managed-agents-subagent-execution-layer.md) |
@@ -31,9 +31,9 @@ portfolio holdings, current liabilities, and the approval/audit log.
 Needs millisecond reads, real transactional writes, and row-level
 concurrency control — none of which BigQuery is built for.
 
-**Vertex AI Sessions** — short-term conversation and workflow state (`ctx.state` and ADK session history). All values stored in `ctx.state` across workflow resumptions (such as `hitl_action`, `hitl_verdict`, and `last_authorized_skills`) MUST be strictly JSON-serializable dictionaries (`json.dumps(...)` compatible). Unlike `InMemorySessionService`, `VertexAiSessionService` enforces JSON serialization invariants and size constraints; storing raw Python objects, Pydantic model instances, or non-serializable datetimes in `ctx.state` will result in runtime serialization exceptions upon checkpointing or resuming.
+**Agent Platform Sessions** — short-term conversation and workflow state (`ctx.state` and ADK session history). All values stored in `ctx.state` across workflow resumptions (such as `hitl_action`, `hitl_verdict`, and `last_authorized_skills`) MUST be strictly JSON-serializable dictionaries (`json.dumps(...)` compatible). Unlike `InMemorySessionService`, Agent Platform Session service enforces JSON serialization invariants and size constraints; storing raw Python objects, Pydantic model instances, or non-serializable datetimes in `ctx.state` will result in runtime serialization exceptions upon checkpointing or resuming.
 
-**Vertex AI Memory Bank** — long-term *soft* memory: preferences, summarized
+**Agent Platform Memory Bank** — long-term *soft* memory: preferences, summarized
 past interactions, semantic recall (e.g. "rejected trimming AAPL in
 March"). Not a substitute for a database — it doesn't hold bulk structured
 data.

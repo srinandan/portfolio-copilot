@@ -5,7 +5,7 @@ Accepted
 
 ## Context
 Needed somewhere to persist Chase transaction data, portfolio holdings,
-the IPS document, and the approval/audit log. Vertex AI Memory Bank was
+the IPS document, and the approval/audit log. Agent Platform Memory Bank was
 already decided for soft/semantic memory, but isn't built for bulk
 structured data or transactional writes.
 

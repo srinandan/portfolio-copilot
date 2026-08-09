@@ -1,4 +1,4 @@
-"""Deploy or update the orchestrator on Vertex AI Agent Runtime (Agent Engine).
+"""Deploy or update the orchestrator on Agent Platform Agent Runtime (Agent Engine).
 
 Two modes:
 

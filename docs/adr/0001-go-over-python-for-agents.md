@@ -23,7 +23,7 @@ Checked official ADK docs directly rather than assuming parity:
   programmatic control flow): supported in Python v2.0.0 **and** Go
   v2.0.0. Full parity, not a lagging feature.
 - **Memory Bank**: Go's `memory` package implements the same
-  `MemoryService` interface as Python, including the Vertex AI-backed
+  `MemoryService` interface as Python, including the Agent Platform-backed
   service. Mature (Go since v0.1.0).
 - **Agent Engine deployment**: Go supported since v1.2.0 via
   `adkgo deploy agentengine`.

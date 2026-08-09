@@ -6,7 +6,7 @@ Accepted (Supersedes ADR-0013's split frontend/gateway deployment model)
 ## Context
 Previously, `frontend` and `gateway` were maintained as two separate top-level directories and deployed as two separate Cloud Run services:
 1. `portfolio-copilot-frontend`: Ran a Go binary serving Vue 3 static assets and reverse-proxying `/api/*` to the gateway with minted IAM ID tokens.
-2. `portfolio-copilot-gateway`: Handled API routes, SSE streaming, Firestore, BigQuery, and Vertex AI Agent Runtime orchestration.
+2. `portfolio-copilot-gateway`: Handled API routes, SSE streaming, Firestore, BigQuery, and Agent Platform Agent Runtime orchestration.
 
 This split introduced significant friction:
 - Required cross-service machine-to-machine IAM tokens (`roles/run.invoker`, `roles/iam.serviceAccountTokenCreator`).

@@ -14,7 +14,7 @@ once tagged. Nothing has been released yet — see the note under `[Unreleased]`
 
 ### Added
 
-**Orchestrator (Python, ADK on Vertex AI Agent Runtime)**
+**Orchestrator (Python, ADK on Agent Platform Agent Runtime)**
 - Registry-driven dynamic planner: at each planning turn, queries the Google
   Cloud Agent Registry for authorized skills and composes a plan from what it
   finds — no hardcoded skill roster (ADR-0004).
@@ -45,7 +45,7 @@ once tagged. Nothing has been released yet — see the note under `[Unreleased]`
   interview flow.
 - Startup verification of SKILL.md metadata and required secrets, wired into
   the FastAPI `lifespan`.
-- Session + Memory Bank via Vertex AI services when `AGENT_ENGINE_ID` is
+- Session + Memory Bank via Agent Platform services when `AGENT_ENGINE_ID` is
   set; in-memory fallback for tests.
 
 **Contracts and data**

@@ -150,7 +150,7 @@ writes:
   zero.
 
 A summarized version (risk tolerance, goals, key constraints — not the
-full document) is also pushed by the orchestrator to Vertex AI Memory Bank
+full document) is also pushed by the orchestrator to Agent Platform Memory Bank
 for semantic recall in future sessions.
 
 ## Failure mode: incomplete interview
@@ -169,7 +169,7 @@ than starting over, if practical.
 - Orchestrator (outside sandbox):
   - Firestore: read `holdings`, read `liabilities`, read/write `ips`, write `liabilities`, write `audit_log`
   - BigQuery: read `chase_transactions` (aggregate queries only)
-  - Vertex AI Memory Bank: write (summarized preferences)
+  - Agent Platform Memory Bank: write (summarized preferences)
 - **No** trade-execution tools, no Alpaca access, no write access inside the sandbox.
 
 ## Registry metadata
