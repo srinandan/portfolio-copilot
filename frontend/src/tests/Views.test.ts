@@ -191,19 +191,12 @@ describe('Frontend Views', () => {
     });
   });
 
-  it('DocumentsView renders recognized formats and processing log, and supports clearing log', async () => {
+  it('DocumentsView renders a coming-soon placeholder and links back to the dashboard', () => {
     render(DocumentsView);
-    expect(screen.getByText('Recognized Formats')).toBeDefined();
-    expect(screen.getByText('Processing Log')).toBeDefined();
-
-    await waitFor(() => {
-      expect(screen.getAllByTestId('doc-item').length).toBeGreaterThan(0);
-    });
-
-    const clearBtn = screen.getByText('CLEAR ALL');
-    await fireEvent.click(clearBtn);
-
-    expect(screen.getByText('No documents uploaded yet.')).toBeDefined();
+    expect(screen.getByTestId('documents-view')).toBeDefined();
+    expect(screen.getByText('Statement upload — coming soon')).toBeDefined();
+    const backLink = screen.getByTestId('documents-back-to-dashboard') as HTMLAnchorElement;
+    expect(backLink.getAttribute('href')).toBe('/');
   });
 
   it('SecurityView renders privacy intro, 2FA toggle, and export button', async () => {
