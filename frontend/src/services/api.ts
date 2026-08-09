@@ -1,6 +1,5 @@
 import type {
   HealthStatus,
-  AuthCheckResult,
   HoldingsSnapshot,
   DocumentItem,
   SpendingReport,
@@ -20,42 +19,6 @@ export class ApiService {
       throw new Error(`Health check failed with status ${res.status}`);
     }
     return res.json();
-  }
-
-  async checkAuth(): Promise<AuthCheckResult> {
-    const res = await fetch(`${this.baseUrl}/api/auth-check`);
-    if (!res.ok) {
-      throw new Error(`Auth check failed with status ${res.status}`);
-    }
-    return res.json();
-  }
-
-  connectStream(
-    onMessage: (data: Record<string, unknown>) => void,
-    onClose?: () => void,
-    onError?: (err: Event) => void
-  ): EventSource {
-    const source = new EventSource(`${this.baseUrl}/api/stream`);
-
-    source.addEventListener('message', (event) => {
-      try {
-        const parsed = JSON.parse(event.data);
-        onMessage(parsed);
-      } catch {
-        onMessage({ message: event.data });
-      }
-    });
-
-    source.addEventListener('close', () => {
-      source.close();
-      onClose?.();
-    });
-
-    source.onerror = (err) => {
-      onError?.(err);
-    };
-
-    return source;
   }
 
   async getHoldings(): Promise<HoldingsSnapshot> {

@@ -2,12 +2,6 @@ export interface HealthStatus {
   status: string;
 }
 
-export interface AuthCheckResult {
-  project_id?: string;
-  message?: string;
-  error?: string;
-}
-
 export interface Position {
   ticker: string;
   name: string;
