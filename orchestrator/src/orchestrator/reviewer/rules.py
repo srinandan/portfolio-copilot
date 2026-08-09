@@ -54,7 +54,20 @@ def rule_excluded_ticker(inp: ReviewInput) -> RuleResult:
 def rule_excluded_sector(inp: ReviewInput) -> RuleResult:
     sector = get_mock_sector(inp.action.ticker)
     excluded = [s.lower() for s in (inp.ips.constraints.excluded_sectors or [])]
-    if sector != "Unknown" and sector.lower() in excluded:
+    if not excluded:
+        return RuleResult(
+            rule_id="excluded_sector",
+            description="Sector must not be in IPS constraints.excluded_sectors",
+            passed=True,
+        )
+    if sector == "Unknown":
+        return RuleResult(
+            rule_id="excluded_sector",
+            description="Sector must not be in IPS constraints.excluded_sectors",
+            passed=False,
+            detail=f"Cannot classify sector for {inp.action.ticker}; IPS defines excluded_sectors so trade requires manual verification",
+        )
+    if sector.lower() in excluded:
         return RuleResult(
             rule_id="excluded_sector",
             description="Sector must not be in IPS constraints.excluded_sectors",
