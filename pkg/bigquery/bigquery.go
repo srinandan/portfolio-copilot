@@ -15,9 +15,12 @@ var (
 	lineCommentRegex  = regexp.MustCompile(`(--|#)[^\n]*`)
 	selectStartRegex  = regexp.MustCompile(`(?i)^SELECT\b`)
 	chaseTableRegex   = regexp.MustCompile(`(?i)\bchase_transactions\b`)
-	portfolioTableRef = regexp.MustCompile(`(?i)\bportfolio_copilot\.chase_transactions\b`)
-	limitRegex        = regexp.MustCompile(`(?i)\blimit\s+\d+\s*;?\s*$`)
-	restrictedRegex   = regexp.MustCompile(`(?i)\b(INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|TRUNCATE|MERGE|EXPORT|LOAD|CALL|EXECUTE)\b`)
+	// qualifiedChaseRefBacktick matches `foo.bar.chase_transactions` (backtick-quoted, any prefix).
+	qualifiedChaseRefBacktick = regexp.MustCompile("`[^`]*\\bchase_transactions`")
+	// qualifiedChaseRefBare matches word.word[.word]*.chase_transactions (unquoted, any prefix depth).
+	qualifiedChaseRefBare = regexp.MustCompile(`(?i)\b(?:[A-Za-z_][\w-]*\.)+chase_transactions\b`)
+	limitRegex            = regexp.MustCompile(`(?i)\blimit\s+\d+\s*;?\s*$`)
+	restrictedRegex       = regexp.MustCompile(`(?i)\b(INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|TRUNCATE|MERGE|EXPORT|LOAD|CALL|EXECUTE)\b`)
 )
 
 func stripCommentsAndSpace(sql string) string {
@@ -58,9 +61,12 @@ func PrepareSecureSQL(generatedSQL, userID string) (string, map[string]interface
 		return "", nil, fmt.Errorf("query must target chase_transactions table")
 	}
 
-	// 5. CTE-based row-level user scoping
-	// Shadow the chase_transactions table inside a CTE scoped to @user_id
-	cleanUserSQL := portfolioTableRef.ReplaceAllString(sqlWithoutTrailingSemicolon, "chase_transactions")
+	// 5. CTE-based row-level user scoping.
+	// Strip ANY qualifier prefix from chase_transactions so the CTE below shadows
+	// every reference. BigQuery CTEs only shadow unqualified names — a query using
+	// `project.dataset.chase_transactions` would otherwise skip user_id scoping.
+	cleanUserSQL := qualifiedChaseRefBacktick.ReplaceAllString(sqlWithoutTrailingSemicolon, "chase_transactions")
+	cleanUserSQL = qualifiedChaseRefBare.ReplaceAllString(cleanUserSQL, "chase_transactions")
 
 	// 6. Ensure LIMIT safeguard
 	if !limitRegex.MatchString(cleanUserSQL) {

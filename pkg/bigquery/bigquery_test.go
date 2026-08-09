@@ -132,6 +132,48 @@ func TestPrepareSecureSQL(t *testing.T) {
 				}
 			},
 		},
+		{
+			// Regression test: BigQuery CTEs only shadow unqualified names. A query
+			// using `otherproj.otherds.chase_transactions` would otherwise skip the
+			// user_id scoping entirely.
+			name:         "Query with foreign project qualifier is stripped to CTE",
+			generatedSQL: "SELECT * FROM `otherproj.otherds.chase_transactions` WHERE amount > 50",
+			expectError:  false,
+			checkQuery: func(t *testing.T, secureSQL string, params map[string]interface{}) {
+				if strings.Contains(secureSQL, "otherproj") || strings.Contains(secureSQL, "otherds") {
+					t.Errorf("Expected foreign qualifier stripped, got: %s", secureSQL)
+				}
+				// Must reference the unqualified name (which is the CTE).
+				if !strings.Contains(secureSQL, "FROM chase_transactions WHERE amount > 50") {
+					t.Errorf("Expected main query to reference bare chase_transactions, got: %s", secureSQL)
+				}
+			},
+		},
+		{
+			name:         "Query with bare project.dataset.chase_transactions qualifier is stripped",
+			generatedSQL: "SELECT * FROM myproj.myds.chase_transactions WHERE amount > 50",
+			expectError:  false,
+			checkQuery: func(t *testing.T, secureSQL string, params map[string]interface{}) {
+				if strings.Contains(secureSQL, "myproj") || strings.Contains(secureSQL, "myds") {
+					t.Errorf("Expected foreign qualifier stripped, got: %s", secureSQL)
+				}
+				if !strings.Contains(secureSQL, "FROM chase_transactions WHERE amount > 50") {
+					t.Errorf("Expected main query to reference bare chase_transactions, got: %s", secureSQL)
+				}
+			},
+		},
+		{
+			// A join between the scoped CTE and a foreign-qualified copy would
+			// otherwise leak all users' data via the second reference.
+			name:         "Query joining foreign chase_transactions is stripped so both sides hit CTE",
+			generatedSQL: "SELECT c1.amount FROM chase_transactions c1 JOIN `otherproj.otherds.chase_transactions` c2 ON c1.txn_id = c2.txn_id",
+			expectError:  false,
+			checkQuery: func(t *testing.T, secureSQL string, params map[string]interface{}) {
+				if strings.Contains(secureSQL, "otherproj") {
+					t.Errorf("Expected foreign qualifier stripped, got: %s", secureSQL)
+				}
+			},
+		},
 	}
 
 	for _, tt := range tests {
