@@ -44,7 +44,7 @@ Setup instructions: [`install/`](install/).
 
 Portfolio Copilot provides a standalone Vue 3 + TypeScript web interface connected to the backend server and Python orchestrator:
 
-### First time: onboarding (`/` and `/documents`)
+### First time: onboarding (`/onboarding`)
 You answer a structured onboarding interview: your financial goals, time horizon, risk tolerance, and current debt obligations. From this, the agent synthesizes your active Investment Policy Statement (IPS) and Liabilities snapshot, stored in Firestore as the reference policy for all future actions.
 
 ### Day to day: checking in (`/dashboard`, `/portfolio`, `/spending`)
