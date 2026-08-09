@@ -125,6 +125,27 @@ def test_excluded_sector_constraint():
         calculate_draft_action(drift_report, holdings, ips)
 
 
+def test_excluded_sector_fails_on_unknown_ticker():
+    ips = get_base_ips()
+    ips.constraints.excluded_sectors = ["Energy"]
+    holdings = get_base_holdings()
+    drift_report = {"requested_trade": {"ticker": "UNKNOWN_TICKER", "side": "buy", "quantity": 10}}
+
+    with pytest.raises(ValueError, match="Cannot classify sector"):
+        calculate_draft_action(drift_report, holdings, ips)
+
+
+def test_excluded_sector_allows_unknown_ticker_when_no_exclusions():
+    ips = get_base_ips()
+    ips.constraints.excluded_sectors = []
+    holdings = get_base_holdings()
+    drift_report = {"requested_trade": {"ticker": "UNKNOWN_TICKER", "side": "buy", "quantity": 10}}
+
+    action = calculate_draft_action(drift_report, holdings, ips)
+    assert action is not None
+    assert action["ticker"] == "UNKNOWN_TICKER"
+
+
 def test_concentration_limit_on_buy_with_existing_position():
     """Verifies B2/B3: Buying more of an existing position that pushes total over limit is blocked."""
     ips = get_base_ips()

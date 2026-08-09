@@ -148,8 +148,13 @@ def calculate_draft_action(
         raise ValueError(f"Drafting failed: {ticker} is in excluded_tickers")
 
     sector = sector_fn(ticker)
-    if sector != "Unknown" and sector in ips.constraints.excluded_sectors:
-        raise ValueError(f"Drafting failed: {ticker} is in excluded_sectors ({sector})")
+    if ips.constraints.excluded_sectors:
+        if sector == "Unknown":
+            raise ValueError(
+                f"Drafting failed: Cannot classify sector for {ticker} with active excluded_sectors constraint"
+            )
+        if sector.lower() in [s.lower() for s in ips.constraints.excluded_sectors]:
+            raise ValueError(f"Drafting failed: {ticker} is in excluded_sectors ({sector})")
 
     # B2: Check concentration limit
     current_position = next((p for p in holdings.positions if p.ticker == ticker), None)

@@ -33,9 +33,23 @@ def test_excluded_ticker_fails_when_ticker_excluded(happy_review_input):
     assert "TSLA is in excluded_tickers" in res.detail
 
 
-def test_excluded_sector_passes_when_unknown(happy_review_input):
+def test_excluded_sector_fails_when_unknown_and_excluded_sectors_set(happy_review_input):
+    # When excluded_sectors is non-empty, an unknown ticker must fail-closed
     action = happy_review_input.action.model_copy(update={"ticker": "UNKNOWN_TICKER"})
     inp = ReviewInput(action=action, ips=happy_review_input.ips, holdings=happy_review_input.holdings)
+    res = rule_excluded_sector(inp)
+    assert res.passed is False
+    assert res.rule_id == "excluded_sector"
+    assert "Cannot classify sector for UNKNOWN_TICKER" in res.detail
+
+
+def test_excluded_sector_passes_when_unknown_and_no_excluded_sectors(happy_review_input):
+    # When excluded_sectors is empty, unknown tickers pass
+    ips = happy_review_input.ips.model_copy(
+        update={"constraints": happy_review_input.ips.constraints.model_copy(update={"excluded_sectors": []})}
+    )
+    action = happy_review_input.action.model_copy(update={"ticker": "UNKNOWN_TICKER"})
+    inp = ReviewInput(action=action, ips=ips, holdings=happy_review_input.holdings)
     res = rule_excluded_sector(inp)
     assert res.passed is True
     assert res.rule_id == "excluded_sector"
@@ -49,6 +63,15 @@ def test_excluded_sector_fails_when_sector_excluded(happy_review_input):
     assert res.passed is False
     assert res.rule_id == "excluded_sector"
     assert "in excluded sector Energy" in res.detail
+
+
+def test_excluded_sector_passes_when_sector_not_excluded(happy_review_input):
+    # AAPL is in Technology sector in KNOWN_SECTOR_MAP, which is not in happy_ips excluded_sectors (Energy)
+    action = happy_review_input.action.model_copy(update={"ticker": "AAPL"})
+    inp = ReviewInput(action=action, ips=happy_review_input.ips, holdings=happy_review_input.holdings)
+    res = rule_excluded_sector(inp)
+    assert res.passed is True
+    assert res.rule_id == "excluded_sector"
 
 
 def test_concentration_limit_passes_below(happy_review_input):

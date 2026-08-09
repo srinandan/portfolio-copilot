@@ -60,7 +60,8 @@ Fails if `proposed_action.ticker` appears in `active_ips.constraints.excluded_ti
 Fails if the sector of `proposed_action.ticker` appears in
 `active_ips.constraints.excluded_sectors`. Sector lookup uses the same
 static map the orchestrator's `primitives/action_drafting.py::KNOWN_SECTOR_MAP` provides;
-if ticker isn't in the map, the sector is `Unknown` and this rule passes.
+if `excluded_sectors` is defined in the IPS and the ticker isn't in the map (sector is `Unknown`),
+this rule fails-closed to prevent unverified sector exposure.
 
 ### `concentration_limit`
 Fails if the *resulting* position value (after the trade) exceeds
