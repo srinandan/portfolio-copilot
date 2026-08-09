@@ -7,7 +7,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # Stage 2: Build the Go backend server
-FROM golang:1.23-bookworm AS go-builder
+FROM golang:1.25.12 AS go-builder
 WORKDIR /app
 
 COPY go.mod go.sum ./
