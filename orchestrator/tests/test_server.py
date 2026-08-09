@@ -187,3 +187,101 @@ def test_reasoning_engine_query(client_with_runner):
     assert r.status_code == 200
     assert r.json() == {"events": [{"kind": "test_event", "output": "hello"}]}
 
+
+def test_onboarding_apply_persists_via_writer(client_with_runner):
+    """POST /v1/onboarding/apply must call write_ips_from_interview_result and
+    return the actual ips_id + version rather than fabricating success."""
+    from src.orchestrator.contracts.ips import (
+        InvestmentPolicyStatement,
+        IPSStatus,
+        RiskTolerance,
+    )
+    from src.orchestrator.contracts.liabilities import LiabilitiesSnapshot
+
+    client, _, _ = client_with_runner
+
+    fake_ips = InvestmentPolicyStatement(
+        ips_id="ips-wiz-1",
+        user_id="u_wiz",
+        version=1,
+        status=IPSStatus.ACTIVE,
+        effective_date="2026-01-01",
+        risk_tolerance=RiskTolerance.MODERATE,
+        time_horizon_years=10,
+        target_allocation=[],
+        constraints=__import__(
+            "src.orchestrator.contracts.ips", fromlist=["Constraints"]
+        ).Constraints(concentration_limit_percent=10.0),
+        created_at=__import__("datetime").datetime.now(
+            __import__("datetime").timezone.utc
+        ),
+    )
+    fake_liab = LiabilitiesSnapshot(
+        user_id="u_wiz",
+        as_of=__import__("datetime").datetime.now(
+            __import__("datetime").timezone.utc
+        ),
+        liabilities=[],
+    )
+
+    with patch(
+        "src.orchestrator.server.write_ips_from_interview_result",
+        return_value=(fake_ips, fake_liab),
+    ) as mock_writer:
+        r = client.post(
+            "/v1/onboarding/apply",
+            json={
+                "result": {
+                    "user_id": "u_wiz",
+                    "risk_tolerance": "moderate",
+                    "time_horizon_years": 10,
+                    "target_allocation": [],
+                    "identified_liabilities": [],
+                    "additional_goals": [],
+                    "interview_summary": "wizard",
+                },
+                "trigger": "initial",
+                "approval_required_above_usd": 5000,
+                "approval_required_above_percent": 5,
+            },
+        )
+        assert r.status_code == 200
+        body = r.json()
+        assert body == {
+            "status": "applied",
+            "ips_id": "ips-wiz-1",
+            "version": 1,
+            "liabilities_count": 0,
+        }
+        # Thresholds must be threaded through to the writer.
+        _, kwargs = mock_writer.call_args
+        assert kwargs["approval_required_above_usd"] == 5000
+        assert kwargs["approval_required_above_percent"] == 5
+        assert kwargs["trigger"] == "initial"
+
+
+def test_onboarding_apply_returns_500_on_writer_failure(client_with_runner):
+    """UI must not be able to fabricate success — a writer failure has to surface."""
+    client, _, _ = client_with_runner
+
+    with patch(
+        "src.orchestrator.server.write_ips_from_interview_result",
+        side_effect=RuntimeError("firestore down"),
+    ):
+        r = client.post(
+            "/v1/onboarding/apply",
+            json={
+                "result": {
+                    "user_id": "u_wiz",
+                    "risk_tolerance": "moderate",
+                    "time_horizon_years": 10,
+                    "target_allocation": [],
+                    "identified_liabilities": [],
+                    "additional_goals": [],
+                    "interview_summary": "wizard",
+                }
+            },
+        )
+        assert r.status_code == 500
+        assert "apply_failed" in r.json()["detail"]
+

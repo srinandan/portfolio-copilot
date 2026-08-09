@@ -106,6 +106,34 @@ export class ApiService {
     const res = await this.resumePlan(req);
     await readSSEStream(res, onEvent, onError);
   }
+
+  /**
+   * Submit a completed onboarding wizard directly to the orchestrator's
+   * /v1/onboarding/apply endpoint (via /api/onboarding proxy). Bypasses the
+   * LLM interview — writes IPS + Liabilities using the same code path the
+   * LLM interview would end up in, so audit entries are identical either way.
+   *
+   * Resolves with { ips_id, version } on real persistence, rejects on any
+   * upstream error so the UI can show a truthful failure state.
+   */
+  async applyOnboarding(req: {
+    user_id: string;
+    result: Record<string, unknown>;
+    trigger?: string;
+    approval_required_above_usd?: number;
+    approval_required_above_percent?: number;
+  }): Promise<{ status: string; ips_id: string; version: number; liabilities_count: number }> {
+    const res = await fetch(`${this.baseUrl}/api/onboarding`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req)
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Apply onboarding failed (${res.status}): ${text}`);
+    }
+    return res.json();
+  }
 }
 
 export async function readSSEStream(

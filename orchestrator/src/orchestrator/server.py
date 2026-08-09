@@ -35,8 +35,10 @@ from google.adk.runners import Runner
 from google.genai.types import Part, UserContent
 from pydantic import BaseModel
 
+from .contracts.goals_onboarding import GoalsOnboardingResult
 from .planner import root_agent
 from .session_manager import SessionManager
+from .state import write_ips_from_interview_result
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +57,22 @@ class ResumeRequest(BaseModel):
     invocation_id: str
     interrupt_id: str
     payload: Any
+
+
+class ApplyOnboardingRequest(BaseModel):
+    """Structured wizard submission bypassing the LLM interview.
+
+    The frontend wizard collects clean typed data; there's no need for an LLM
+    to re-parse a prose serialization of it. This body is validated as a
+    GoalsOnboardingResult plus optional approval thresholds and written
+    directly by the same writer the LLM path uses, so the IPS_CREATED audit
+    entry is identical either way.
+    """
+
+    result: GoalsOnboardingResult
+    trigger: str = "initial"
+    approval_required_above_usd: Optional[float] = None
+    approval_required_above_percent: Optional[float] = None
 
 
 class ServerState:
@@ -229,6 +247,32 @@ async def invoke(req: InvokeRequest) -> StreamingResponse:
         new_message=UserContent(parts=[Part.from_text(text=req.message)]),
     )
     return StreamingResponse(_sse(events), media_type="text/event-stream")
+
+
+@app.post("/v1/onboarding/apply")
+async def apply_onboarding(req: ApplyOnboardingRequest) -> dict[str, Any]:
+    """Persist a wizard-collected GoalsOnboardingResult directly, skipping the LLM.
+
+    Returns the created/superseded IPS's ips_id and version so the frontend can
+    confirm real persistence rather than fabricating success.
+    """
+    try:
+        new_ips, liab = write_ips_from_interview_result(
+            user_id=req.result.user_id,
+            result=req.result,
+            trigger=req.trigger,
+            approval_required_above_usd=req.approval_required_above_usd,
+            approval_required_above_percent=req.approval_required_above_percent,
+        )
+    except Exception as e:
+        logger.exception("onboarding apply failed for user %s", req.result.user_id)
+        raise HTTPException(status_code=500, detail=f"apply_failed: {e}") from e
+    return {
+        "status": "applied",
+        "ips_id": new_ips.ips_id,
+        "version": new_ips.version,
+        "liabilities_count": len(liab.liabilities),
+    }
 
 
 @app.post("/v1/resume")

@@ -35,6 +35,10 @@ func main() {
 	r.POST("/api/plan", oc.HandlePlan)
 	r.POST("/api/plan/resume", oc.HandlePlanResume)
 
+	// Structured wizard submission: bypasses the LLM interview and writes the
+	// IPS directly via the same writer the LLM path uses. See onboarding.go.
+	r.POST("/api/onboarding", oc.HandleApplyOnboarding)
+
 	// Mount SPA static file serving and Vue client route fallback
 	setupSPARoutes(r, "")
 

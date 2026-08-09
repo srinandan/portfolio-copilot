@@ -32,6 +32,8 @@ def write_ips_from_interview_result(
     existing_ips_ref: Optional[str] = None,
     registry_entry_id: Optional[str] = None,
     db_client: Optional[FirestoreClient] = None,
+    approval_required_above_usd: Optional[float] = None,
+    approval_required_above_percent: Optional[float] = None,
 ) -> Tuple[InvestmentPolicyStatement, LiabilitiesSnapshot]:
     """Persists synthesized goals onboarding interview results to Firestore.
 
@@ -39,6 +41,10 @@ def write_ips_from_interview_result(
     2. Writes the active InvestmentPolicyStatement.
     3. Overwrites the current LiabilitiesSnapshot.
     4. Records an authoritative audit log entry (IPS_CREATED or IPS_SUPERSEDED).
+
+    approval_required_above_usd / approval_required_above_percent are threaded
+    through as-is when set. They live on the IPS rather than
+    GoalsOnboardingResult because the LLM interview path doesn't collect them.
     """
     client = db_client or FirestoreClient()
     now = datetime.now(timezone.utc)
@@ -77,6 +83,8 @@ def write_ips_from_interview_result(
         target_allocation=result.target_allocation,
         constraints=result.constraints or Constraints(concentration_limit_percent=15.0),
         rebalancing_rules=result.rebalancing_rules,
+        approval_required_above_usd=approval_required_above_usd,
+        approval_required_above_percent=approval_required_above_percent,
         created_at=now,
     )
 
