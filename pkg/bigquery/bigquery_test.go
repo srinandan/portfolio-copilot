@@ -35,6 +35,19 @@ func TestPrepareSecureSQL(t *testing.T) {
 			},
 		},
 		{
+			name:         "Valid query with leading comments and trailing semicolon",
+			generatedSQL: "-- Calculate total spent\n/* Block comment */\nSELECT category, SUM(amount) FROM chase_transactions GROUP BY category;",
+			expectError:  false,
+			checkQuery: func(t *testing.T, secureSQL string, params map[string]interface{}) {
+				if !strings.HasPrefix(secureSQL, "WITH chase_transactions AS") {
+					t.Errorf("Expected CTE prefix, got: %s", secureSQL)
+				}
+				if !strings.HasSuffix(secureSQL, "LIMIT 100;") {
+					t.Errorf("Expected LIMIT 100; at the end, got: %s", secureSQL)
+				}
+			},
+		},
+		{
 			name:         "Query with existing LIMIT",
 			generatedSQL: "SELECT category, SUM(amount) FROM chase_transactions GROUP BY category LIMIT 10",
 			expectError:  false,
@@ -45,10 +58,52 @@ func TestPrepareSecureSQL(t *testing.T) {
 			},
 		},
 		{
-			name:          "Write query rejected",
+			name:          "Write query rejected - DELETE",
 			generatedSQL:  "DELETE FROM chase_transactions WHERE amount > 100",
 			expectError:   true,
-			expectedError: "read-only queries only: DELETE is not allowed",
+			expectedError: "only SELECT queries are allowed",
+		},
+		{
+			name:          "Write query rejected - MERGE",
+			generatedSQL:  "MERGE portfolio_copilot.chase_transactions T USING (SELECT '@attacker' AS user_id) S ON TRUE WHEN MATCHED THEN UPDATE SET T.user_id = S.user_id",
+			expectError:   true,
+			expectedError: "only SELECT queries are allowed",
+		},
+		{
+			name:          "Write query rejected - EXPORT DATA",
+			generatedSQL:  "EXPORT DATA OPTIONS(uri='gs://bucket/*.csv', format='CSV') AS SELECT * FROM chase_transactions",
+			expectError:   true,
+			expectedError: "only SELECT queries are allowed",
+		},
+		{
+			name:          "Write query rejected - LOAD DATA",
+			generatedSQL:  "LOAD DATA INTO chase_transactions FROM FILES(format='CSV', uris=['gs://bucket/data.csv'])",
+			expectError:   true,
+			expectedError: "only SELECT queries are allowed",
+		},
+		{
+			name:          "Write query rejected - EXECUTE IMMEDIATE",
+			generatedSQL:  "EXECUTE IMMEDIATE 'INSERT INTO chase_transactions VALUES (1, 2)'",
+			expectError:   true,
+			expectedError: "only SELECT queries are allowed",
+		},
+		{
+			name:          "Write query rejected - CALL procedure",
+			generatedSQL:  "CALL my_dataset.my_procedure()",
+			expectError:   true,
+			expectedError: "only SELECT queries are allowed",
+		},
+		{
+			name:          "Multi-statement query rejected",
+			generatedSQL:  "SELECT * FROM chase_transactions; DROP TABLE chase_transactions;",
+			expectError:   true,
+			expectedError: "multi-statement queries are not permitted",
+		},
+		{
+			name:          "Empty query rejected",
+			generatedSQL:  "   -- only comments\n/* nothing */  ",
+			expectError:   true,
+			expectedError: "query cannot be empty",
 		},
 		{
 			name:          "Missing table target",
@@ -63,6 +118,17 @@ func TestPrepareSecureSQL(t *testing.T) {
 			checkQuery: func(t *testing.T, secureSQL string, params map[string]interface{}) {
 				if !strings.Contains(secureSQL, "update_date") {
 					t.Errorf("Expected column update_date to be preserved, got: %s", secureSQL)
+				}
+			},
+		},
+		{
+			name:         "Query targeting full path portfolio_copilot.chase_transactions is rewritten to CTE",
+			generatedSQL: "SELECT * FROM portfolio_copilot.chase_transactions WHERE amount > 50",
+			expectError:  false,
+			checkQuery: func(t *testing.T, secureSQL string, params map[string]interface{}) {
+				// The main SELECT after CTE should reference chase_transactions (pointing to the CTE)
+				if !strings.Contains(secureSQL, "SELECT * FROM chase_transactions WHERE amount > 50") {
+					t.Errorf("Expected main query to reference CTE chase_transactions, got: %s", secureSQL)
 				}
 			},
 		},
