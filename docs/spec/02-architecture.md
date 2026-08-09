@@ -38,6 +38,80 @@ past interactions, semantic recall (e.g. "rejected trimming AAPL in
 March"). Not a substitute for a database — it doesn't hold bulk structured
 data.
 
+## System architecture diagram
+
+```mermaid
+flowchart TD
+    subgraph Client ["Client Layer"]
+        UI["Vue 3 + TypeScript SPA<br/><i>(Dashboard, Portfolio Drift, Spending, Onboarding Wizard, HITL Card)</i>"]
+    end
+
+    subgraph WebHost ["Web Host & API Gateway (Cloud Run)"]
+        Server["Go Backend Server<br/><code>frontend/server</code> (:8080)"]
+        SPA["Static Asset Host<br/><code>/dist</code>"]
+        APIProxy["REST & SSE Streaming Proxy<br/><code>/api/plan</code>, <code>/api/holdings</code>, <code>/api/spending_report</code>"]
+        Server --> SPA
+        Server --> APIProxy
+    end
+
+    subgraph AgentRuntimeLayer ["Agent Platform Agent Runtime (Cloud Custom Container)"]
+        Planner["Root Dynamic Planner<br/><code>orchestrator.planner:root_agent</code><br/><i>(ADK DynamicNode / Workflow)</i>"]
+        
+        subgraph OrchestratorLoop ["Dynamic Planning & Governance Loop"]
+            Discovery["1. Skill Discovery<br/><code>registry_client.py</code>"]
+            Preloader["2. State Preloader<br/><code>state/preloader.py</code>"]
+            Primitives["3. Deterministic Primitives<br/><code>primitives/*.py</code>"]
+            Dispatch["4. Skill Dispatch<br/><code>managed_agents/dispatcher.py</code>"]
+            Reviewer["5. Reviewer Governance Gate<br/><code>reviewer/rules.py</code> + MA"]
+            HITL["6. HITL Approval Gate<br/><code>gates/hitl.py</code> (RequestInput)"]
+            ExecGate["7. Execution Gate<br/><code>gates/execution.py</code>"]
+            Writers["8. Audit & State Writers<br/><code>state/writers.py</code>"]
+        end
+
+        Planner --> Discovery
+        Planner --> Preloader
+        Planner --> Primitives
+        Planner --> Dispatch
+        Planner --> Reviewer
+        Planner --> HITL
+        Planner --> ExecGate
+        Planner --> Writers
+    end
+
+    subgraph ManagedAgents ["Managed Agents Layer (Antigravity Sandbox)"]
+        WorkerMA["Worker Managed Agent<br/><i>(Interaction-scoped SKILL.md override)</i>"]
+        SearchTool["Google Search Tool<br/><i>(Research skill only)</i>"]
+        WorkerMA --> SearchTool
+    end
+
+    subgraph GCPInfra ["Google Cloud Services & External APIs"]
+        Registry[("Agent Registry<br/><i>(6 Runtime Skills)</i>")]
+        Firestore[("Cloud Firestore<br/><i>(IPS, Holdings, Liabilities, Audit Log)</i>")]
+        BigQuery[("BigQuery<br/><i>(Chase Transactions)</i>")]
+        SessionsStore[("Agent Platform Sessions<br/>& Memory Bank")]
+        SecretMgr[("Secret Manager<br/><i>(Alpaca Keys, MA ID)</i>")]
+        AlpacaAPI[("Alpaca Trading API<br/><i>(Paper Brokerage)</i>")]
+    end
+
+    %% Client / Server
+    UI <-->|"HTTP REST & Server-Sent Events (SSE)"| Server
+    APIProxy -->|"Direct Fan-out Reads"| Firestore
+    APIProxy -->|"Direct Aggregate Reads"| BigQuery
+    APIProxy <-->|"POST /v1/invoke & /v1/resume (SSE Stream)"| Planner
+
+    %% Orchestrator Cloud Interactions
+    Discovery <-->|"Discover Authorized Skills"| Registry
+    Preloader -->|"Fetch Snapshot"| Firestore
+    Preloader -->|"Fetch Transactions"| BigQuery
+    Dispatch <-->|"Interactions API"| WorkerMA
+    Reviewer <-->|"Verify Draft Actions"| WorkerMA
+    HITL <-->|"Checkpoint Turn State"| SessionsStore
+    ExecGate -->|"Submit Paper Orders (idempotent action_id)"| AlpacaAPI
+    Writers -->|"Write IPS, ProposedAction, Audit Log"| Firestore
+    Planner <-->|"Session State (ctx.state)"| SessionsStore
+    AgentRuntimeLayer -.->|"Retrieve Secrets"| SecretMgr
+```
+
 ## Deployment topology
 
 ```
