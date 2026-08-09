@@ -59,9 +59,7 @@
             data-testid="select-account-type"
           >
             <option value="taxable">Individual Taxable Brokerage</option>
-            <option value="ira">Traditional IRA</option>
-            <option value="roth_ira">Roth IRA</option>
-            <option value="401k">Solo 401(k)</option>
+            <option value="retirement">Retirement (IRA / Roth / 401k)</option>
           </select>
         </div>
 
@@ -219,7 +217,7 @@ function submitConstraints() {
       concentration_limit_percent: Number(concentrationLimit.value) || 15,
       excluded_tickers,
       excluded_sectors,
-      account_type: accountType.value as any,
+      account_type: accountType.value,
       tax_loss_harvesting_enabled: taxLossHarvesting.value
     },
     thresholds: {

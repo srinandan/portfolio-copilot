@@ -201,7 +201,10 @@ func defaultSpendingReport() *contracts.SpendingReport {
 
 func defaultDriftReport() *contracts.DriftReport {
 	return &contracts.DriftReport{
-		AsOf:                 time.Now().UTC().Format("2006-01-02"),
+		// Fixed date so snapshot / equality tests aren't time-dependent.
+		// This is dev-mode fallback data anyway; the real drift report comes
+		// from Firestore with its own timestamp.
+		AsOf:                 "2026-01-01",
 		HasActiveIPS:         true,
 		RebalanceRecommended: true,
 		UnclassifiedValueUSD: 0.0,

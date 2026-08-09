@@ -181,6 +181,7 @@ async def test_gate_executes_on_approved_verdict_absent_with_admin_bypass(sample
     with (
         patch("orchestrator.gates.execution.FirestoreClient") as mock_fs_cls,
         patch("orchestrator.gates.execution.emit_action_executed_audit") as mock_exec_audit,
+        patch("orchestrator.gates.execution.emit_reviewer_bypassed_audit") as mock_bypass_audit,
     ):
         mock_fs = mock_fs_cls.return_value
         res = await _run_gate(node_input)
@@ -195,6 +196,11 @@ async def test_gate_executes_on_approved_verdict_absent_with_admin_bypass(sample
             updated_fields={"broker_order_id": "ord-alpaca-999"},
         )
         mock_exec_audit.assert_called_once()
+        # Bypass must leave an auditable trace — not just a log line.
+        mock_bypass_audit.assert_called_once()
+        bypass_call = mock_bypass_audit.call_args
+        assert bypass_call.args[0].action_id == "act-exec-101"
+        assert "PORTFOLIO_COPILOT_ADMIN_BYPASS_REVIEWER" in bypass_call.kwargs["reason"]
 
 
 @pytest.mark.asyncio

@@ -27,7 +27,8 @@
         "approval_granted",
         "approval_rejected",
         "action_executed",
-        "action_failed"
+        "action_failed",
+        "reviewer_bypassed"
       ]
     },
     "timestamp": { "type": "string", "format": "date-time" },

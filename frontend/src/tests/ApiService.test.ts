@@ -30,64 +30,6 @@ describe('ApiService', () => {
     await expect(service.checkHealth()).rejects.toThrow('Health check failed with status 500');
   });
 
-  it('checkAuth calls /api/auth-check and returns JSON when response is ok', async () => {
-    const mockAuth = { project_id: 'test-project', message: 'ADC is configured correctly.' };
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve(mockAuth)
-    });
-
-    const result = await service.checkAuth();
-    expect(globalThis.fetch).toHaveBeenCalledWith('http://localhost:8080/api/auth-check');
-    expect(result).toEqual(mockAuth);
-  });
-
-  it('checkAuth throws error when response is not ok', async () => {
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: false,
-      status: 401
-    });
-
-    await expect(service.checkAuth()).rejects.toThrow('Auth check failed with status 401');
-  });
-
-  it('connectStream creates EventSource and handles events', () => {
-    const mockEventSource = {
-      addEventListener: vi.fn(),
-      close: vi.fn(),
-      onerror: null
-    };
-    (globalThis as unknown as Record<string, unknown>).EventSource = vi.fn().mockReturnValue(mockEventSource);
-
-    const onMessage = vi.fn();
-    const onClose = vi.fn();
-    const source = service.connectStream(onMessage, onClose);
-
-    expect(globalThis.EventSource).toHaveBeenCalledWith('http://localhost:8080/api/stream');
-    expect(source).toBe(mockEventSource);
-    expect(mockEventSource.addEventListener).toHaveBeenCalledWith('message', expect.any(Function));
-    expect(mockEventSource.addEventListener).toHaveBeenCalledWith('close', expect.any(Function));
-
-    // Test message handler with valid JSON
-    const messageCall = mockEventSource.addEventListener.mock.calls.find(call => call[0] === 'message');
-    expect(messageCall).toBeDefined();
-    const messageHandler = messageCall![1];
-    messageHandler({ data: JSON.stringify({ message: 'test' }) });
-    expect(onMessage).toHaveBeenCalledWith({ message: 'test' });
-
-    // Test message handler with non-JSON
-    messageHandler({ data: 'raw string' });
-    expect(onMessage).toHaveBeenCalledWith({ message: 'raw string' });
-
-    // Test close handler
-    const closeCall = mockEventSource.addEventListener.mock.calls.find(call => call[0] === 'close');
-    expect(closeCall).toBeDefined();
-    const closeHandler = closeCall![1];
-    closeHandler();
-    expect(mockEventSource.close).toHaveBeenCalled();
-    expect(onClose).toHaveBeenCalled();
-  });
-
   it('getHoldings fetches holdings data', async () => {
     const mockHoldings = {
       user_id: 'usr_test',

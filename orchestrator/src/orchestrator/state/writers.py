@@ -32,6 +32,8 @@ def write_ips_from_interview_result(
     existing_ips_ref: Optional[str] = None,
     registry_entry_id: Optional[str] = None,
     db_client: Optional[FirestoreClient] = None,
+    approval_required_above_usd: Optional[float] = None,
+    approval_required_above_percent: Optional[float] = None,
 ) -> Tuple[InvestmentPolicyStatement, LiabilitiesSnapshot]:
     """Persists synthesized goals onboarding interview results to Firestore.
 
@@ -39,6 +41,10 @@ def write_ips_from_interview_result(
     2. Writes the active InvestmentPolicyStatement.
     3. Overwrites the current LiabilitiesSnapshot.
     4. Records an authoritative audit log entry (IPS_CREATED or IPS_SUPERSEDED).
+
+    approval_required_above_usd / approval_required_above_percent are threaded
+    through as-is when set. They live on the IPS rather than
+    GoalsOnboardingResult because the LLM interview path doesn't collect them.
     """
     client = db_client or FirestoreClient()
     now = datetime.now(timezone.utc)
@@ -77,6 +83,8 @@ def write_ips_from_interview_result(
         target_allocation=result.target_allocation,
         constraints=result.constraints or Constraints(concentration_limit_percent=15.0),
         rebalancing_rules=result.rebalancing_rules,
+        approval_required_above_usd=approval_required_above_usd,
+        approval_required_above_percent=approval_required_above_percent,
         created_at=now,
     )
 
@@ -470,6 +478,40 @@ def emit_action_executed_audit(
     except Exception as e:
         logger.error(f"Failed to append ACTION_EXECUTED audit for {action.action_id}: {e}")
         raise RuntimeError(f"Audit log write failed for action execution: {e}") from e
+
+
+def emit_reviewer_bypassed_audit(
+    action: ProposedAction,
+    reason: str,
+    db_client: Optional[FirestoreClient] = None,
+) -> None:
+    """Emits REVIEWER_BYPASSED when the execution gate is allowed to run without a
+    reviewer verdict via PORTFOLIO_COPILOT_ADMIN_BYPASS_REVIEWER. Fail-closed.
+
+    The env-var escape hatch would otherwise leave no ledger trace beyond a log
+    warning; this audit entry makes the bypass first-class governance data.
+    """
+    client = db_client or FirestoreClient()
+    audit_entry = AuditLogEntry(
+        log_id=str(uuid.uuid4()),
+        event_type=EventType.REVIEWER_BYPASSED,
+        timestamp=datetime.now(timezone.utc),
+        actor=Actor(
+            type=ActorType.AGENT,
+            skill_name="orchestrator-execution-gate",
+            skill_version=get_orchestrator_version(),
+            registry_entry_id=None,
+            approval_scope=None,
+        ),
+        related_action_id=action.action_id,
+        related_ips_version=action.ips_version_referenced,
+        detail=f"Reviewer verdict bypassed: {reason}",
+    )
+    try:
+        client.append_audit_log(audit_entry)
+    except Exception as e:
+        logger.error(f"Failed to append REVIEWER_BYPASSED audit for {action.action_id}: {e}")
+        raise RuntimeError(f"Audit log write failed for reviewer bypass: {e}") from e
 
 
 def emit_action_failed_audit(

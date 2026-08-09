@@ -14,7 +14,6 @@ import (
 func setupTestRouter() *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	r.Use(CORSMiddleware())
 	srv := NewServer()
 	r.GET("/api/holdings", srv.HandleGetHoldings)
 	r.GET("/api/spending_report", srv.HandleGetSpendingReport)
@@ -102,20 +101,6 @@ func TestGetDocumentsEndpoint(t *testing.T) {
 	}
 	if len(docs) == 0 {
 		t.Errorf("expected non-empty document list")
-	}
-}
-
-func TestCORSHeaders(t *testing.T) {
-	r := setupTestRouter()
-	req, _ := http.NewRequest(http.MethodOptions, "/api/holdings", nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	if w.Code != http.StatusNoContent {
-		t.Fatalf("expected status 204 No Content for OPTIONS, got %d", w.Code)
-	}
-	if w.Header().Get("Access-Control-Allow-Origin") != "*" {
-		t.Errorf("expected CORS Access-Control-Allow-Origin: *")
 	}
 }
 

@@ -227,8 +227,13 @@ describe('Goals & Onboarding Interview (Issue #28 / S1)', () => {
   });
 
   describe('Turn 6: SubmissionStep.vue', () => {
-    it('renders synthesized IPS summary and invokes apiService.triggerPlan on submit', async () => {
-      const planSpy = vi.spyOn(apiService, 'triggerPlan').mockResolvedValue(new Response('{}', { status: 200 }));
+    it('renders synthesized IPS summary and invokes apiService.applyOnboarding on submit', async () => {
+      const applySpy = vi.spyOn(apiService, 'applyOnboarding').mockResolvedValue({
+        status: 'applied',
+        ips_id: 'ips-test-1',
+        version: 1,
+        liabilities_count: 1
+      });
 
       render(SubmissionStep, {
         props: {
@@ -260,9 +265,17 @@ describe('Goals & Onboarding Interview (Issue #28 / S1)', () => {
       const submitBtn = screen.getByTestId('submit-ips-btn');
       await fireEvent.click(submitBtn);
 
-      expect(planSpy).toHaveBeenCalledWith(
+      expect(applySpy).toHaveBeenCalledWith(
         expect.objectContaining({
-          user_id: 'test_user'
+          user_id: 'test_user',
+          trigger: 'initial',
+          approval_required_above_usd: 1000,
+          approval_required_above_percent: 5,
+          result: expect.objectContaining({
+            user_id: 'test_user',
+            risk_tolerance: 'aggressive',
+            time_horizon_years: 15
+          })
         })
       );
 
@@ -275,7 +288,12 @@ describe('Goals & Onboarding Interview (Issue #28 / S1)', () => {
 
   describe('OnboardingView.vue (Full 7-Step Turn-by-Turn Wizard)', () => {
     it('walks through all turns, computes deterministic risk, overrides bands, and submits plan', async () => {
-      vi.spyOn(apiService, 'triggerPlan').mockResolvedValue(new Response('{}', { status: 200 }));
+      vi.spyOn(apiService, 'applyOnboarding').mockResolvedValue({
+        status: 'applied',
+        ips_id: 'ips-test-1',
+        version: 1,
+        liabilities_count: 0
+      });
 
       render(OnboardingView);
 

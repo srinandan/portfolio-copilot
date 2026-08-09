@@ -48,13 +48,18 @@ describe('Frontend Views', () => {
     cleanup();
   });
 
-  it('DashboardView renders agent activity stream and financial canvas', async () => {
+  it('DashboardView renders agent activity stream, empty state, and financial canvas', async () => {
     render(DashboardView);
     expect(screen.getByText('Agent Activity Stream')).toBeDefined();
     expect(screen.getByText('Total Net Worth')).toBeDefined();
     expect(screen.getByText('Asset Allocation')).toBeDefined();
 
-    expect(screen.getByTestId('approval-card')).toBeDefined();
+    // Before any turn runs, the dashboard shows a real empty state — no fake
+    // demo message. The approval card only appears when a real HITL event
+    // arrives.
+    expect(screen.getByTestId('dashboard-empty-state')).toBeDefined();
+    expect(screen.queryByTestId('approval-card')).toBeNull();
+    expect(screen.getAllByTestId('example-prompt').length).toBeGreaterThan(0);
   });
 
   it('DashboardView triggers live plan, streams SSE events, and renders new HITL approval card', async () => {
@@ -108,9 +113,45 @@ describe('Frontend Views', () => {
     });
   });
 
+  // Helper: mock streamPlan to synchronously deliver a HITL approval request
+  // and then trigger a plan run so the ApprovalCard is on screen.
+  const seedApprovalCard = async (rationale = 'Rebalance rationale') => {
+    vi.spyOn(apiService, 'streamPlan').mockImplementation(async (_req, onEvent) => {
+      onEvent({
+        id: 'int_seed_1',
+        invocation_id: 'inv_seed_1',
+        session_id: 'sess_seed_1',
+        kind: 'hitl_approval_request',
+        action: {
+          action_id: 'act_seed_1',
+          session_id: 'sess_seed_1',
+          type: 'trade',
+          ticker: 'MSFT',
+          side: 'buy',
+          quantity: 20,
+          rationale,
+          status: 'drafted'
+        },
+        reviewer_verdict: {
+          verdict_id: 'verd_seed_1',
+          action_id: 'act_seed_1',
+          overall_pass: true,
+          requires_human_approval: true,
+          rule_results: []
+        }
+      });
+    });
+    render(DashboardView);
+    const prompts = screen.getAllByTestId('example-prompt');
+    await fireEvent.click(prompts[0]);
+    await waitFor(() => {
+      expect(screen.getByTestId('approval-card')).toBeDefined();
+    });
+  };
+
   it('DashboardView allows approving actions and resumes plan via apiService.streamPlanResume', async () => {
     const resumeSpy = vi.spyOn(apiService, 'streamPlanResume').mockResolvedValue();
-    render(DashboardView);
+    await seedApprovalCard();
 
     const approveBtn = screen.getByTestId('btn-approve');
     await fireEvent.click(approveBtn);
@@ -129,7 +170,7 @@ describe('Frontend Views', () => {
 
   it('DashboardView allows rejecting actions and resumes plan via apiService.streamPlanResume', async () => {
     const resumeSpy = vi.spyOn(apiService, 'streamPlanResume').mockResolvedValue();
-    render(DashboardView);
+    await seedApprovalCard();
 
     const rejectBtn = screen.getByTestId('btn-reject');
     await fireEvent.click(rejectBtn);
@@ -152,7 +193,7 @@ describe('Frontend Views', () => {
 
   it('DashboardView allows editing actions and saves changes via apiService.streamPlanResume', async () => {
     const resumeSpy = vi.spyOn(apiService, 'streamPlanResume').mockResolvedValue();
-    render(DashboardView);
+    await seedApprovalCard('Original rationale');
 
     const editBtn = screen.getByTestId('btn-edit');
     await fireEvent.click(editBtn);
@@ -170,7 +211,7 @@ describe('Frontend Views', () => {
           decision: 'edit',
           changes: {
             quantity: 30,
-            rationale: 'Trim AAPL position to rebalance US Equities within 55% IPS target allocation.'
+            rationale: 'Original rationale'
           },
           user_id: 'usr_default'
         }
@@ -191,19 +232,12 @@ describe('Frontend Views', () => {
     });
   });
 
-  it('DocumentsView renders recognized formats and processing log, and supports clearing log', async () => {
+  it('DocumentsView renders a coming-soon placeholder and links back to the dashboard', () => {
     render(DocumentsView);
-    expect(screen.getByText('Recognized Formats')).toBeDefined();
-    expect(screen.getByText('Processing Log')).toBeDefined();
-
-    await waitFor(() => {
-      expect(screen.getAllByTestId('doc-item').length).toBeGreaterThan(0);
-    });
-
-    const clearBtn = screen.getByText('CLEAR ALL');
-    await fireEvent.click(clearBtn);
-
-    expect(screen.getByText('No documents uploaded yet.')).toBeDefined();
+    expect(screen.getByTestId('documents-view')).toBeDefined();
+    expect(screen.getByText('Statement upload — coming soon')).toBeDefined();
+    const backLink = screen.getByTestId('documents-back-to-dashboard') as HTMLAnchorElement;
+    expect(backLink.getAttribute('href')).toBe('/');
   });
 
   it('SecurityView renders privacy intro, 2FA toggle, and export button', async () => {

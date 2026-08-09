@@ -36,6 +36,30 @@
 
       <!-- Messages Stream -->
       <div class="flex flex-col gap-sm">
+        <!-- Empty state: shown before the user runs anything -->
+        <div
+          v-if="messages.length === 0"
+          class="bg-surface-container-lowest rounded-xl p-lg border border-dashed border-surface-variant text-center flex flex-col items-center gap-sm"
+          data-testid="dashboard-empty-state"
+        >
+          <span class="material-symbols-outlined text-outline text-[28px]">chat</span>
+          <p class="font-body-base text-sm text-on-surface-variant">
+            Ask Portfolio Copilot something to get started. Nothing has run yet.
+          </p>
+          <div class="flex flex-wrap gap-xs justify-center mt-xs">
+            <button
+              v-for="prompt in examplePrompts"
+              :key="prompt"
+              type="button"
+              class="text-xs font-body-mono px-sm py-1 rounded-full bg-surface-container hover:bg-surface-container-high border border-surface-variant text-on-surface"
+              data-testid="example-prompt"
+              @click="triggerPlan(prompt)"
+            >
+              {{ prompt }}
+            </button>
+          </div>
+        </div>
+
         <div
           v-for="msg in messages"
           :key="msg.id"
@@ -94,45 +118,15 @@ const isStreaming = ref(false);
 const currentSessionId = ref('sess_default');
 const currentUserId = ref('usr_default');
 
-const messages = ref<ChatMessage[]>([
-  {
-    id: 'msg-init-1',
-    sender: 'agent',
-    text: 'Analyzed 3 positions against IPS target allocation. Detected equity drift (+3.2% US equities). Drafted rebalancing proposal for human approval.',
-    timestamp: '09:41 AM',
-    session_id: 'sess_default',
-    action: {
-      action_id: 'act_rebal_001',
-      session_id: 'sess_default',
-      type: 'TRADE',
-      ticker: 'AAPL',
-      side: 'SELL',
-      quantity: 15,
-      estimated_price_usd: 170.41,
-      estimated_value_usd: 2556.15,
-      rationale: 'Trim AAPL position to rebalance US Equities within 55% IPS target allocation.',
-      status: 'DRAFTED'
-    },
-    verdict: {
-      verdict_id: 'verd_001',
-      action_id: 'act_rebal_001',
-      overall_pass: true,
-      requires_human_approval: true,
-      rule_results: [
-        {
-          rule_id: 'rule_ips_target',
-          description: 'Trade moves asset allocation closer to IPS target',
-          passed: true
-        },
-        {
-          rule_id: 'rule_max_single_trade',
-          description: 'Single trade value under 5% portfolio threshold',
-          passed: true
-        }
-      ]
-    }
-  }
-]);
+// Start empty so we don't show a fake demo message. Real events populate this
+// on the first triggerPlan call, either from typed input or an example prompt.
+const messages = ref<ChatMessage[]>([]);
+
+const examplePrompts = [
+  'Analyze my portfolio drift',
+  'Check my spending anomalies',
+  'Suggest a rebalance'
+];
 
 onMounted(async () => {
   try {

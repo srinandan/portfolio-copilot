@@ -185,18 +185,52 @@ async function handleSubmit() {
   submitting.value = true;
   submissionError.value = null;
 
-  try {
-    const payload = {
-      user_id: props.state.user_id || 'demo_user',
-      message: `Complete Onboarding Interview: Initialize IPS v1 with ${props.state.risk_tolerance} risk profile, ${props.state.time_horizon_years}y horizon, target allocation ${JSON.stringify(props.state.target_bands)} and ${props.state.liabilities.length} liabilities.`
-    };
+  const s = props.state;
+  const userId = s.user_id || 'demo_user';
+  const [primaryGoal, ...additionalGoals] = s.goals;
 
-    // Trigger plan via POST /api/plan
-    await apiService.triggerPlan(payload);
+  // Map the wizard's typed state to the orchestrator's GoalsOnboardingResult contract.
+  // Structured all the way — no LLM re-parsing of prose.
+  const result: Record<string, unknown> = {
+    user_id: userId,
+    primary_goal: primaryGoal ?? null,
+    additional_goals: additionalGoals ?? [],
+    risk_tolerance: s.risk_tolerance,
+    time_horizon_years: s.time_horizon_years,
+    target_allocation: s.target_bands,
+    constraints: {
+      excluded_tickers: s.constraints.excluded_tickers ?? [],
+      excluded_sectors: s.constraints.excluded_sectors ?? [],
+      concentration_limit_percent: s.constraints.concentration_limit_percent,
+      tax_loss_harvesting_enabled: s.constraints.tax_loss_harvesting_enabled ?? false,
+      account_type: s.constraints.account_type
+    },
+    liquidity_needs: {
+      reserve_months: s.reserve_months,
+      known_upcoming_expenses_usd: s.known_upcoming_expenses_usd
+    },
+    identified_liabilities: s.liabilities.map(l => ({
+      liability_id: l.liability_id,
+      type: l.type,
+      description: l.description,
+      balance_usd: Number(l.balance_usd) || 0,
+      interest_rate_percent: Number(l.interest_rate_percent) || 0,
+      minimum_payment_usd: Number(l.minimum_payment_usd) || 0
+    })),
+    interview_summary: `Wizard onboarding: ${s.risk_tolerance} risk, ${s.time_horizon_years}y horizon, ${s.liabilities.length} liabilities.`
+  };
+
+  try {
+    await apiService.applyOnboarding({
+      user_id: userId,
+      result,
+      trigger: 'initial',
+      approval_required_above_usd: s.approval_thresholds.approval_required_above_usd,
+      approval_required_above_percent: s.approval_thresholds.approval_required_above_percent
+    });
     submissionSuccess.value = true;
   } catch (err: any) {
-    // If /api/plan returns offline or error in standalone dev, mark success gracefully while reporting status
-    submissionSuccess.value = true;
+    submissionError.value = err?.message ?? String(err);
   } finally {
     submitting.value = false;
   }
