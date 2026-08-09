@@ -27,7 +27,11 @@ from ..contracts.reviewer_verdict import ReviewerVerdict
 from ..data.firestore import FirestoreClient
 from ..executors.alpaca import AlpacaExecutionError, AlpacaExecutor, ExecutionResult
 from ..logger import get_logger
-from ..state.writers import emit_action_executed_audit, emit_action_failed_audit
+from ..state.writers import (
+    emit_action_executed_audit,
+    emit_action_failed_audit,
+    emit_reviewer_bypassed_audit,
+)
 
 logger = get_logger(__name__)
 
@@ -134,6 +138,10 @@ async def execution_gate(ctx: Context, node_input: Any):
         if admin_bypass:
             logger.warning(
                 f"Execution gate: reviewer verdict absent for {action.action_id}, but PORTFOLIO_COPILOT_ADMIN_BYPASS_REVIEWER=true; allowing execution."
+            )
+            emit_reviewer_bypassed_audit(
+                action,
+                reason="PORTFOLIO_COPILOT_ADMIN_BYPASS_REVIEWER=true; reviewer verdict absent",
             )
         else:
             if not _is_reviewer_authorized(ctx):

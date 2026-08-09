@@ -472,6 +472,40 @@ def emit_action_executed_audit(
         raise RuntimeError(f"Audit log write failed for action execution: {e}") from e
 
 
+def emit_reviewer_bypassed_audit(
+    action: ProposedAction,
+    reason: str,
+    db_client: Optional[FirestoreClient] = None,
+) -> None:
+    """Emits REVIEWER_BYPASSED when the execution gate is allowed to run without a
+    reviewer verdict via PORTFOLIO_COPILOT_ADMIN_BYPASS_REVIEWER. Fail-closed.
+
+    The env-var escape hatch would otherwise leave no ledger trace beyond a log
+    warning; this audit entry makes the bypass first-class governance data.
+    """
+    client = db_client or FirestoreClient()
+    audit_entry = AuditLogEntry(
+        log_id=str(uuid.uuid4()),
+        event_type=EventType.REVIEWER_BYPASSED,
+        timestamp=datetime.now(timezone.utc),
+        actor=Actor(
+            type=ActorType.AGENT,
+            skill_name="orchestrator-execution-gate",
+            skill_version=get_orchestrator_version(),
+            registry_entry_id=None,
+            approval_scope=None,
+        ),
+        related_action_id=action.action_id,
+        related_ips_version=action.ips_version_referenced,
+        detail=f"Reviewer verdict bypassed: {reason}",
+    )
+    try:
+        client.append_audit_log(audit_entry)
+    except Exception as e:
+        logger.error(f"Failed to append REVIEWER_BYPASSED audit for {action.action_id}: {e}")
+        raise RuntimeError(f"Audit log write failed for reviewer bypass: {e}") from e
+
+
 def emit_action_failed_audit(
     action: ProposedAction,
     error: str,

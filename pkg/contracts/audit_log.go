@@ -28,6 +28,7 @@ const (
 	AuditEventApprovalRejected      AuditEventType = "approval_rejected"
 	AuditEventActionExecuted        AuditEventType = "action_executed"
 	AuditEventActionFailed          AuditEventType = "action_failed"
+	AuditEventReviewerBypassed      AuditEventType = "reviewer_bypassed"
 )
 
 // ActorRef represents the agent or human actor responsible for the audit event.
@@ -43,7 +44,7 @@ type ActorRef struct {
 // AuditLogEntry represents one entry per governance-relevant event.
 type AuditLogEntry struct {
 	LogID             string         `json:"log_id" firestore:"log_id"`
-	EventType         AuditEventType `json:"event_type" firestore:"event_type"` // skill_invoked, skill_invocation_failed, skill_revoked, ips_created, ips_superseded, action_proposed, review_completed, approval_requested, approval_granted, approval_rejected, action_executed, action_failed
+	EventType         AuditEventType `json:"event_type" firestore:"event_type"` // skill_invoked, skill_invocation_failed, skill_revoked, ips_created, ips_superseded, action_proposed, review_completed, approval_requested, approval_granted, approval_rejected, action_executed, action_failed, reviewer_bypassed
 	Timestamp         time.Time      `json:"timestamp" firestore:"timestamp"`
 	Actor             ActorRef       `json:"actor" firestore:"actor"`
 	RelatedActionID   *string        `json:"related_action_id,omitempty" firestore:"related_action_id,omitempty"`
@@ -57,7 +58,7 @@ func (ale *AuditLogEntry) Validate() bool {
 		return false
 	}
 	switch ale.EventType {
-	case AuditEventSkillInvoked, AuditEventSkillInvocationFailed, AuditEventSkillRevoked, AuditEventIPSCreated, AuditEventIPSSuperseded, AuditEventActionProposed, AuditEventReviewCompleted, AuditEventApprovalRequested, AuditEventApprovalGranted, AuditEventApprovalRejected, AuditEventActionExecuted, AuditEventActionFailed:
+	case AuditEventSkillInvoked, AuditEventSkillInvocationFailed, AuditEventSkillRevoked, AuditEventIPSCreated, AuditEventIPSSuperseded, AuditEventActionProposed, AuditEventReviewCompleted, AuditEventApprovalRequested, AuditEventApprovalGranted, AuditEventApprovalRejected, AuditEventActionExecuted, AuditEventActionFailed, AuditEventReviewerBypassed:
 	default:
 		return false
 	}
