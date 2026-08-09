@@ -12,7 +12,7 @@ fi
 
 echo "Setting up Agent Engine in project $PROJECT_ID ($REGION)..."
 
-# Enable Vertex AI API
+# Enable Agent Platform / AI Platform API
 gcloud services enable aiplatform.googleapis.com --project="$PROJECT_ID"
 
 # 1. Grant Secret Manager access to Agent Platform Service Agent

@@ -24,7 +24,7 @@ class SessionManager:
         self.location = os.environ.get("GOOGLE_CLOUD_LOCATION", "us-central1")
         self.agent_engine_id = os.environ.get("AGENT_ENGINE_ID", None)
 
-        # Use Vertex AI services by default, fallback to InMemory for tests
+        # Use Agent Platform services by default, fallback to InMemory for tests
         if use_in_memory or not self.agent_engine_id:
             self.session_service: BaseSessionService = InMemorySessionService()
             self.memory_service: BaseMemoryService | None = InMemoryMemoryService()

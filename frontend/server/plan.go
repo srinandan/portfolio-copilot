@@ -100,7 +100,7 @@ func (c *OrchestratorClient) invokeDirect(ctx context.Context, path string, body
 	return resp.Body, resp.Header.Get("Content-Type"), resp.StatusCode, nil
 }
 
-// invokeAgentEngine sends the plan request to Vertex AI Agent Engine's :streamQuery
+// invokeAgentEngine sends the plan request to Agent Platform Agent Runtime's :streamQuery
 // endpoint and returns the raw streamed body (newline-delimited JSON), plus status.
 // Caller must adapt the JSON stream to SSE — see writeAgentEngineSSE.
 func (c *OrchestratorClient) invokeAgentEngine(ctx context.Context, body PlanRequest, resume bool) (io.ReadCloser, int, error) {

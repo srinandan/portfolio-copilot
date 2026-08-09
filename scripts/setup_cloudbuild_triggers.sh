@@ -126,7 +126,7 @@ fi
 
 echo "--- 5. Grant Cloud Build SA the roles it needs ---"
 # roles/run.admin so frontend can `gcloud run deploy`; roles/aiplatform.user
-# so orchestrator can create/update its Vertex AI Agent Engine (Agent Runtime);
+# so orchestrator can create/update its Agent Platform Agent Runtime (Agent Engine);
 # roles/iam.serviceAccountUser so the pipeline can act as per-service SAs on deploy;
 # roles/artifactregistry.writer so it can push images.
 for ROLE in roles/run.admin roles/aiplatform.user roles/iam.serviceAccountUser roles/artifactregistry.writer; do

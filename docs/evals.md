@@ -116,7 +116,7 @@ When creating or modifying a runtime skill in `/skills`:
 
 ## Live Skill Revocation Demo
 
-To ensure runtime governance and skill filtering work end-to-end against live Google Cloud Agent Registry and Vertex AI Sessions services, the repository includes an automated revocation demo (`scripts/demo_live_revocation.py`):
+To ensure runtime governance and skill filtering work end-to-end against live Google Cloud Agent Registry and Agent Platform Sessions services, the repository includes an automated revocation demo (`scripts/demo_live_revocation.py`):
 - **PR CI Mock Demo**: Configured in `.github/workflows/ci.yml`. Runs `scripts/demo_live_revocation.py --mock-registry` as part of every pull request build without requiring GCP credentials, verifying that the orchestration loop properly filters out revoked skills when excluded from `list_authorized_skills`.
 - **Manual Live Demo**: Run `scripts/demo_live_revocation.py` locally against a real GCP project (with `PROJECT_ID` set and `gcloud` authenticated) when you want to verify two-cycle skill revocation and `SKILL_REVOKED` audit log generation against the live Agent Registry.
 

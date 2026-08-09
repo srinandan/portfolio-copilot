@@ -25,7 +25,7 @@ steps:
       - '--all-tags'
       - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}'
 
-  # Deploy the container image to Vertex AI Agent Runtime (Agent Engine).
+  # Deploy the container image to Agent Platform Agent Runtime.
   # Uses the SDK's container_spec deployment path (ReasoningEngineSpec.container_spec).
   # Idempotent: updates the existing engine matching _AGENT_DISPLAY_NAME in place, or
   # creates one if none exists yet.

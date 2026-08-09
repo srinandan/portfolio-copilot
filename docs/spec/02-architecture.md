@@ -13,9 +13,9 @@ This document describes how the system is built, reflecting the completed Phase 
 | Deterministic math & primitives | In-process Python functions under `orchestrator/primitives/` | [0016](../adr/0016-deterministic-primitives-in-orchestrator.md) |
 | Analytical data | BigQuery (Chase transactions) | [0002](../adr/0002-bigquery-plus-firestore-split.md), [0015](../adr/0015-real-user-data-antigravity-sandbox.md) |
 | Transactional data | Firestore (IPS, holdings, liabilities, audit log) — separate Go and Python clients | [0002](../adr/0002-bigquery-plus-firestore-split.md), [0008](../adr/0008-python-for-orchestrator.md) |
-| Session state | Vertex AI Sessions | — |
-| Long-term memory | Vertex AI Memory Bank | — |
-| Deployment / runtime | Vertex AI Agent Runtime (Agent Engine) — Python custom-agent contract | [0008](../adr/0008-python-for-orchestrator.md) |
+| Session state | Agent Platform Sessions | — |
+| Long-term memory | Agent Platform Memory Bank | — |
+| Deployment / runtime | Agent Platform Agent Runtime — Python custom-agent contract | [0008](../adr/0008-python-for-orchestrator.md) |
 | Deployment identities | Dedicated Cloud Run SA (`portfolio-copilot-frontend-sa`) + Agent Identity (`orchestrator`) | [0011](../adr/0011-least-privilege-identities.md), [0017](../adr/0017-unified-gateway-and-frontend.md) |
 | Web application | Vue 3 + TypeScript SPA hosted by Go backend server (`frontend/server`), Cloud Run | [0003](../adr/0003-standalone-ui-not-agentspace.md), [0017](../adr/0017-unified-gateway-and-frontend.md) |
 | Trade execution (paper) | Alpaca API (orchestrator-owned execution outside sandbox) | [0005](../adr/0005-managed-agents-hybrid-evaluation.md), [0014](../adr/0014-managed-agents-subagent-execution-layer.md) |
@@ -31,12 +31,86 @@ portfolio holdings, current liabilities, and the approval/audit log.
 Needs millisecond reads, real transactional writes, and row-level
 concurrency control — none of which BigQuery is built for.
 
-**Vertex AI Sessions** — short-term conversation and workflow state (`ctx.state` and ADK session history). All values stored in `ctx.state` across workflow resumptions (such as `hitl_action`, `hitl_verdict`, and `last_authorized_skills`) MUST be strictly JSON-serializable dictionaries (`json.dumps(...)` compatible). Unlike `InMemorySessionService`, `VertexAiSessionService` enforces JSON serialization invariants and size constraints; storing raw Python objects, Pydantic model instances, or non-serializable datetimes in `ctx.state` will result in runtime serialization exceptions upon checkpointing or resuming.
+**Agent Platform Sessions** — short-term conversation and workflow state (`ctx.state` and ADK session history). All values stored in `ctx.state` across workflow resumptions (such as `hitl_action`, `hitl_verdict`, and `last_authorized_skills`) MUST be strictly JSON-serializable dictionaries (`json.dumps(...)` compatible). Unlike `InMemorySessionService`, Agent Platform Session service enforces JSON serialization invariants and size constraints; storing raw Python objects, Pydantic model instances, or non-serializable datetimes in `ctx.state` will result in runtime serialization exceptions upon checkpointing or resuming.
 
-**Vertex AI Memory Bank** — long-term *soft* memory: preferences, summarized
+**Agent Platform Memory Bank** — long-term *soft* memory: preferences, summarized
 past interactions, semantic recall (e.g. "rejected trimming AAPL in
 March"). Not a substitute for a database — it doesn't hold bulk structured
 data.
+
+## System architecture diagram
+
+```mermaid
+flowchart TD
+    subgraph Client ["Client Layer"]
+        UI["Vue 3 + TypeScript SPA<br/><i>(Dashboard, Portfolio Drift, Spending, Onboarding Wizard, HITL Card)</i>"]
+    end
+
+    subgraph WebHost ["Web Host & API Gateway (Cloud Run)"]
+        Server["Go Backend Server<br/><code>frontend/server</code> (:8080)"]
+        SPA["Static Asset Host<br/><code>/dist</code>"]
+        APIProxy["REST & SSE Streaming Proxy<br/><code>/api/plan</code>, <code>/api/holdings</code>, <code>/api/spending_report</code>"]
+        Server --> SPA
+        Server --> APIProxy
+    end
+
+    subgraph AgentRuntimeLayer ["Agent Platform Agent Runtime (Cloud Custom Container)"]
+        Planner["Root Dynamic Planner<br/><code>orchestrator.planner:root_agent</code><br/><i>(ADK DynamicNode / Workflow)</i>"]
+        
+        subgraph OrchestratorLoop ["Dynamic Planning & Governance Loop"]
+            Discovery["1. Skill Discovery<br/><code>registry_client.py</code>"]
+            Preloader["2. State Preloader<br/><code>state/preloader.py</code>"]
+            Primitives["3. Deterministic Primitives<br/><code>primitives/*.py</code>"]
+            Dispatch["4. Skill Dispatch<br/><code>managed_agents/dispatcher.py</code>"]
+            Reviewer["5. Reviewer Governance Gate<br/><code>reviewer/rules.py</code> + MA"]
+            HITL["6. HITL Approval Gate<br/><code>gates/hitl.py</code> (RequestInput)"]
+            ExecGate["7. Execution Gate<br/><code>gates/execution.py</code>"]
+            Writers["8. Audit & State Writers<br/><code>state/writers.py</code>"]
+        end
+
+        Planner --> Discovery
+        Planner --> Preloader
+        Planner --> Primitives
+        Planner --> Dispatch
+        Planner --> Reviewer
+        Planner --> HITL
+        Planner --> ExecGate
+        Planner --> Writers
+    end
+
+    subgraph ManagedAgents ["Managed Agents Layer (Antigravity Sandbox)"]
+        WorkerMA["Worker Managed Agent<br/><i>(Interaction-scoped SKILL.md override)</i>"]
+        SearchTool["Google Search Tool<br/><i>(Research skill only)</i>"]
+        WorkerMA --> SearchTool
+    end
+
+    subgraph GCPInfra ["Google Cloud Services & External APIs"]
+        Registry[("Agent Registry<br/><i>(6 Runtime Skills)</i>")]
+        Firestore[("Cloud Firestore<br/><i>(IPS, Holdings, Liabilities, Audit Log)</i>")]
+        BigQuery[("BigQuery<br/><i>(Chase Transactions)</i>")]
+        SessionsStore[("Agent Platform Sessions<br/>& Memory Bank")]
+        SecretMgr[("Secret Manager<br/><i>(Alpaca Keys, MA ID)</i>")]
+        AlpacaAPI[("Alpaca Trading API<br/><i>(Paper Brokerage)</i>")]
+    end
+
+    %% Client / Server
+    UI <-->|"HTTP REST & Server-Sent Events (SSE)"| Server
+    APIProxy -->|"Direct Fan-out Reads"| Firestore
+    APIProxy -->|"Direct Aggregate Reads"| BigQuery
+    APIProxy <-->|"POST /v1/invoke & /v1/resume (SSE Stream)"| Planner
+
+    %% Orchestrator Cloud Interactions
+    Discovery <-->|"Discover Authorized Skills"| Registry
+    Preloader -->|"Fetch Snapshot"| Firestore
+    Preloader -->|"Fetch Transactions"| BigQuery
+    Dispatch <-->|"Interactions API"| WorkerMA
+    Reviewer <-->|"Verify Draft Actions"| WorkerMA
+    HITL <-->|"Checkpoint Turn State"| SessionsStore
+    ExecGate -->|"Submit Paper Orders (idempotent action_id)"| AlpacaAPI
+    Writers -->|"Write IPS, ProposedAction, Audit Log"| Firestore
+    Planner <-->|"Session State (ctx.state)"| SessionsStore
+    AgentRuntimeLayer -.->|"Retrieve Secrets"| SecretMgr
+```
 
 ## Deployment topology
 

@@ -149,7 +149,7 @@ git push origin v0.1.0
 Both builds start in parallel; each pushes a versioned image to
 Artifact Registry (`<region>-docker.pkg.dev/<project>/portfolio-copilot/<service>:v0.1.0`)
 and deploys it — the frontend to Cloud Run, the orchestrator to
-Vertex AI Agent Runtime (Agent Engine) via
+Agent Platform Agent Runtime via
 [`ReasoningEngineSpec.container_spec`](https://cloud.google.com/vertex-ai/generative-ai/docs/agent-engine/deploy)
 per [ADR-0008](../docs/adr/0008-python-for-orchestrator.md).
 
