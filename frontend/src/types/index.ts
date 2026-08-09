@@ -166,7 +166,7 @@ export interface IPSConstraints {
   concentration_limit_percent: number;
   excluded_tickers: string[];
   excluded_sectors: string[];
-  account_type?: 'taxable' | 'ira' | 'roth_ira' | '401k';
+  account_type?: 'taxable' | 'retirement';
   tax_loss_harvesting_enabled?: boolean;
 }
 
