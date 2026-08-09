@@ -26,7 +26,7 @@ full picture before making non-trivial changes.
 docs/{spec,adr}/   Spec-driven design — read before changing architecture
 skills/            Runtime skills (Agent Registry-facing, see above)
 orchestrator/      Python — ADK root planner (DynamicNode), deployed to Agent Runtime
-pkg/               Go — contracts, BigQuery, Agent Registry client, Firestore store
+pkg/               Go — contracts, BigQuery, Firestore store
                     (library code for frontend/server; not consumed by orchestrator's Python)
 frontend/          Vue 3 TypeScript SPA + Go backend server (Cloud Run)
 scripts/           bash/gcloud/python and Makefiles for infra provisioning
