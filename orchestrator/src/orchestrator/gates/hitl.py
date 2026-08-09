@@ -128,8 +128,9 @@ def _extract_resume_response(ctx: Context, node_input: Any) -> Any:
     res = _extract_from_obj(node_input)
     if res is not None:
         return res
-    if ctx.session and hasattr(ctx.session, "events"):
-        for e in reversed(ctx.session.events):
+    if ctx.session and hasattr(ctx.session, "events") and ctx.session.events:
+        recent_events = list(ctx.session.events)[-50:]
+        for e in reversed(recent_events):
             if hasattr(e, "content") and e.content:
                 res = _extract_from_obj(e.content)
                 if res is not None:

@@ -71,7 +71,7 @@ class InvestmentPolicyStatement(BaseModel):
     version: int = Field(ge=1)
     status: IPSStatus
     superseded_by: str | None = None
-    effective_date: date  # Kept as str to match json schema (or date), let's use date and pydantic will handle it
+    effective_date: date
     risk_tolerance: RiskTolerance
     time_horizon_years: int = Field(ge=0)
 

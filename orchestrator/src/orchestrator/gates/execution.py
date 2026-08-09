@@ -103,7 +103,7 @@ async def execution_gate(ctx: Context, node_input: Any):
         }
 
     outcome = hitl.get("outcome")
-    if outcome != HITLOutcome.APPROVED.value and outcome != HITLOutcome.APPROVED:
+    if outcome != HITLOutcome.APPROVED:
         logger.info(f"Execution gate: HITL outcome '{outcome}' is not approved; skipping.")
         return {
             "status": "skipped",

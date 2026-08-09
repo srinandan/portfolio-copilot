@@ -19,12 +19,12 @@ import (
 // PlanRequest is the body the frontend POSTs to /api/plan and /api/plan/resume.
 // user_id + message start a turn; resume adds session_id + invocation_id + interrupt_id + payload.
 type PlanRequest struct {
-	UserID        string      `json:"user_id"`
-	Message       string      `json:"message,omitempty"`
-	SessionID     string      `json:"session_id,omitempty"`
-	InvocationID  string      `json:"invocation_id,omitempty"`
-	InterruptID   string      `json:"interrupt_id,omitempty"`
-	Payload       interface{} `json:"payload,omitempty"`
+	UserID       string          `json:"user_id"`
+	Message      string          `json:"message,omitempty"`
+	SessionID    string          `json:"session_id,omitempty"`
+	InvocationID string          `json:"invocation_id,omitempty"`
+	InterruptID  string          `json:"interrupt_id,omitempty"`
+	Payload      json.RawMessage `json:"payload,omitempty"`
 }
 
 // OrchestratorClient talks to the orchestrator. Two modes:
@@ -146,7 +146,6 @@ func (c *OrchestratorClient) invokeAgentEngine(ctx context.Context, body PlanReq
 // speaks SSE.
 func writeSSEPassthrough(c *gin.Context, body io.ReadCloser) {
 	defer body.Close()
-	reader := bufio.NewReader(body)
 	buf := make([]byte, 4096)
 	for {
 		select {
@@ -154,7 +153,7 @@ func writeSSEPassthrough(c *gin.Context, body io.ReadCloser) {
 			return
 		default:
 		}
-		n, err := reader.Read(buf)
+		n, err := body.Read(buf)
 		if n > 0 {
 			if _, werr := c.Writer.Write(buf[:n]); werr != nil {
 				return

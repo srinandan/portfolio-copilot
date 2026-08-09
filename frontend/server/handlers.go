@@ -29,6 +29,8 @@ func NewServer() *Server {
 	}
 	var storeClient *store.Client
 	if projectID != "" {
+		// store.NewClient reads PROJECT_ID from the environment; set it once at server initialization
+		// if not already present.
 		if os.Getenv("PROJECT_ID") == "" {
 			os.Setenv("PROJECT_ID", projectID)
 		}
