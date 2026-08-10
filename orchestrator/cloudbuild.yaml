@@ -29,7 +29,7 @@ steps:
   # Uses the SDK's container_spec deployment path (ReasoningEngineSpec.container_spec).
   # Idempotent: updates the existing engine matching _AGENT_DISPLAY_NAME in place, or
   # creates one if none exists yet.
-  - name: 'python:3.12-slim'
+  - name: 'gcr.io/google.com/cloudsdktool/google-cloud-cli:latest'
     entrypoint: bash
     args:
       - '-c'

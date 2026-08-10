@@ -61,19 +61,48 @@ if [ -n "$PROJECT_NUMBER" ]; then
     --condition=None \
     --quiet || echo "Note: Datastore IAM binding on principalSet skipped or already configured"
 
-  # BigQuery: spending analysis
+  # BigQuery: spending analysis and job execution
   gcloud projects add-iam-policy-binding "$PROJECT_ID" \
     --member="$PRINCIPAL_SET" \
     --role="roles/bigquery.dataViewer" \
     --condition=None \
-    --quiet || echo "Note: BigQuery IAM binding on principalSet skipped or already configured"
+    --quiet || echo "Note: BigQuery dataViewer IAM binding on principalSet skipped or already configured"
+  gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+    --member="$PRINCIPAL_SET" \
+    --role="roles/bigquery.user" \
+    --condition=None \
+    --quiet || echo "Note: BigQuery user IAM binding on principalSet skipped or already configured"
 
-  # Secret Manager: Alpaca API key
+  # Secret Manager: Alpaca API key & MANAGED_AGENT_ID
   gcloud projects add-iam-policy-binding "$PROJECT_ID" \
     --member="$PRINCIPAL_SET" \
     --role="roles/secretmanager.secretAccessor" \
     --condition=None \
     --quiet || echo "Note: Secret Manager IAM binding on principalSet skipped or already configured"
+
+  # Agent Registry: list authorized skills
+  gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+    --member="$PRINCIPAL_SET" \
+    --role="roles/agentregistry.viewer" \
+    --condition=None \
+    --quiet || echo "Note: Agent Registry IAM binding on principalSet skipped or already configured"
+
+  # Service Usage, Logging, and Monitoring
+  gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+    --member="$PRINCIPAL_SET" \
+    --role="roles/serviceusage.serviceUsageConsumer" \
+    --condition=None \
+    --quiet || echo "Note: Service Usage IAM binding on principalSet skipped or already configured"
+  gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+    --member="$PRINCIPAL_SET" \
+    --role="roles/logging.logWriter" \
+    --condition=None \
+    --quiet || echo "Note: Logging IAM binding on principalSet skipped or already configured"
+  gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+    --member="$PRINCIPAL_SET" \
+    --role="roles/monitoring.metricWriter" \
+    --condition=None \
+    --quiet || echo "Note: Monitoring IAM binding on principalSet skipped or already configured"
 fi
 
 # 3. Deploy Agent Engine instance with Agent Identity
