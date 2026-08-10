@@ -86,12 +86,10 @@ state = ServerState()
 
 @asynccontextmanager
 async def _lifespan(_app: FastAPI):
-    # Startup verification of SKILL.md metadata reachability, workload mTLS, and required secrets
+    # Startup verification of SKILL.md metadata reachability and required secrets
     from .managed_agents.secret_loader import verify_required_secrets
-    from .mtls_setup import setup_workload_mtls
     from .skills._skill_metadata import verify_all_skills_metadata
 
-    setup_workload_mtls()
     verify_all_skills_metadata()
     verify_required_secrets()
 

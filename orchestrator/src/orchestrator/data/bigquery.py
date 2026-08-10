@@ -4,24 +4,13 @@ from typing import Any, Dict, List, Optional
 
 from google.cloud import bigquery
 
-from ..mtls_setup import setup_workload_mtls
-
 
 class BigQueryClient:
     def __init__(self, project: Optional[str] = None):
-        setup_workload_mtls()
         self.project = (
             project or os.environ.get("PROJECT_ID") or os.environ.get("GOOGLE_CLOUD_PROJECT") or "test-project"
         )
-        try:
-            import google.auth
-            creds, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
-        except Exception:
-            creds = None
-        if creds:
-            self.client = bigquery.Client(project=self.project, credentials=creds)
-        else:
-            self.client = bigquery.Client(project=self.project)
+        self.client = bigquery.Client(project=self.project)
 
     def get_monthly_spending_totals(
         self, user_id: str, current_month_start: str, window_months: int = 3

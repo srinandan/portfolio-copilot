@@ -15,7 +15,6 @@ from ..contracts import (
     LiabilitiesSnapshot,
     ProposedAction,
 )
-from ..mtls_setup import setup_workload_mtls
 
 COLLECTION_HOLDINGS = "holdings"
 COLLECTION_LIABILITIES = "liabilities"
@@ -26,7 +25,6 @@ COLLECTION_PROPOSED_ACTIONS = "proposed_actions"
 
 class FirestoreClient:
     def __init__(self, project: str | None = None):
-        setup_workload_mtls()
         self.project = (
             project or os.environ.get("PROJECT_ID") or os.environ.get("GOOGLE_CLOUD_PROJECT") or "test-project"
         )
@@ -36,15 +34,7 @@ class FirestoreClient:
         if emulator_host:
             self.db = firestore.Client(project=self.project, credentials=AnonymousCredentials())
         else:
-            try:
-                import google.auth
-                creds, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
-            except Exception:
-                creds = None
-            if creds:
-                self.db = firestore.Client(project=self.project, database="(default)", credentials=creds)
-            else:
-                self.db = firestore.Client(project=self.project, database="(default)")
+            self.db = firestore.Client(project=self.project)
 
     def _dict_factory(self, obj: Any) -> dict[str, Any]:
         """Convert a Pydantic model to a dict, handling dates/enums properly for Firestore."""
