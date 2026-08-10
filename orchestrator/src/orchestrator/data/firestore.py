@@ -15,6 +15,7 @@ from ..contracts import (
     LiabilitiesSnapshot,
     ProposedAction,
 )
+from ..mtls_setup import setup_workload_mtls
 
 COLLECTION_HOLDINGS = "holdings"
 COLLECTION_LIABILITIES = "liabilities"
@@ -25,6 +26,7 @@ COLLECTION_PROPOSED_ACTIONS = "proposed_actions"
 
 class FirestoreClient:
     def __init__(self, project: str | None = None):
+        setup_workload_mtls()
         self.project = (
             project or os.environ.get("PROJECT_ID") or os.environ.get("GOOGLE_CLOUD_PROJECT") or "test-project"
         )
