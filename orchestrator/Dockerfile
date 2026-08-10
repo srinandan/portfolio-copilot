@@ -28,6 +28,9 @@ COPY skills/ ./skills/
 
 ENV SKILLS_DIR=/app/skills
 ENV GOOGLE_API_PREVENT_AGENT_TOKEN_SHARING_FOR_GCP_SERVICES=false
+ENV GOOGLE_GENAI_USE_ENTERPRISE=true
+ENV AGENT_REGISTRY_LOCATION=global
+ENV GOOGLE_CLOUD_LOCATION=us-central1
 
 # Install the project and dependencies using uv
 RUN uv pip install --system --no-cache .
