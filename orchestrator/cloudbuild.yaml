@@ -35,9 +35,8 @@ steps:
       - '-c'
       - |
         set -eu
-        python3 -m venv /tmp/deploy-venv
-        /tmp/deploy-venv/bin/pip install --no-cache-dir "google-cloud-aiplatform[agent_engines,adk]" click google-auth
-        /tmp/deploy-venv/bin/python scripts/deploy_agent_engine.py \
+        pip install --no-cache-dir --break-system-packages "google-cloud-aiplatform[agent_engines,adk]" click google-auth
+        python3 scripts/deploy_agent_engine.py \
           --project="${PROJECT_ID}" \
           --location="${_REGION}" \
           --display-name="${_AGENT_DISPLAY_NAME}" \
