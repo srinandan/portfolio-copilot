@@ -27,6 +27,7 @@ COPY orchestrator/src/ ./src/
 COPY skills/ ./skills/
 
 ENV SKILLS_DIR=/app/skills
+ENV GOOGLE_API_PREVENT_AGENT_TOKEN_SHARING_FOR_GCP_SERVICES=false
 
 # Install the project and dependencies using uv
 RUN uv pip install --system --no-cache .
