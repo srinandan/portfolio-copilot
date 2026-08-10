@@ -2,8 +2,6 @@ import os
 import re
 from typing import Any, Dict, List, Optional
 
-from google.api_core.client_options import ClientOptions
-from google.auth.transport import mtls
 from google.cloud import bigquery
 
 
@@ -12,10 +10,7 @@ class BigQueryClient:
         self.project = (
             project or os.environ.get("PROJECT_ID") or os.environ.get("GOOGLE_CLOUD_PROJECT") or "test-project"
         )
-        client_options = None
-        if mtls.has_default_client_cert_source():
-            client_options = ClientOptions(client_cert_source=mtls.default_client_cert_source())
-        self.client = bigquery.Client(project=self.project, client_options=client_options)
+        self.client = bigquery.Client(project=self.project)
 
     def get_monthly_spending_totals(
         self, user_id: str, current_month_start: str, window_months: int = 3

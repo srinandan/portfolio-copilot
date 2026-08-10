@@ -45,10 +45,7 @@ def test_pydantic_dict_factory():
 def test_firestore_client_initialization_no_emulator():
     with patch("google.cloud.firestore.Client") as mock_client:
         client = FirestoreClient(project="test-project")
-        assert client.project == "test-project"
-        mock_client.assert_called_once()
-        _, kwargs = mock_client.call_args
-        assert kwargs.get("project") == "test-project"
+        mock_client.assert_called_once_with(project="test-project")
 
 
 def test_set_liabilities():

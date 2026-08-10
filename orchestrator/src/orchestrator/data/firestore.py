@@ -2,9 +2,7 @@ import json
 import os
 from typing import Any
 
-from google.api_core.client_options import ClientOptions
 from google.auth.credentials import AnonymousCredentials
-from google.auth.transport import mtls
 from google.cloud import firestore
 from google.cloud.firestore_v1.transaction import Transaction
 
@@ -36,10 +34,7 @@ class FirestoreClient:
         if emulator_host:
             self.db = firestore.Client(project=self.project, credentials=AnonymousCredentials())
         else:
-            client_options = None
-            if mtls.has_default_client_cert_source():
-                client_options = ClientOptions(client_cert_source=mtls.default_client_cert_source())
-            self.db = firestore.Client(project=self.project, client_options=client_options)
+            self.db = firestore.Client(project=self.project)
 
     def _dict_factory(self, obj: Any) -> dict[str, Any]:
         """Convert a Pydantic model to a dict, handling dates/enums properly for Firestore."""
