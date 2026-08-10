@@ -45,8 +45,8 @@ class GoogleAuth(httpx.Auth):
             if not self.credentials.valid:
                 try:
                     self.credentials.refresh(self._auth_request)
-                except Exception as e:
-                    logger.warning(f"Credential refresh in auth_flow failed: {e}")
+                except Exception:
+                    logger.exception("Credential refresh in auth_flow failed")
             token = getattr(self.credentials, "token", None)
             if token and isinstance(token, str):
                 request.headers["Authorization"] = f"Bearer {token}"
@@ -128,8 +128,8 @@ class AgentRegistryClient:
             if not credentials.valid:
                 try:
                     credentials.refresh(GoogleAuthRequest())
-                except Exception as e:
-                    logger.warning(f"Initial credential refresh in _get_client failed: {e}")
+                except Exception:
+                    logger.exception("Initial credential refresh in _get_client failed")
             self._http_client = httpx.AsyncClient(
                 auth=GoogleAuth(credentials, quota_project_id=self.project_id),
                 verify=self._ssl_context if self._ssl_context is not None else True,
@@ -166,7 +166,15 @@ class AgentRegistryClient:
 
             response = await client.get(base_url, params=params)
             if response.status_code != 200:
-                raise RuntimeError(f"API returned status {response.status_code}: {response.text}")
+                logger.error(
+                    "Agent Registry list_authorized_skills failed: status=%s url=%s body=%s",
+                    response.status_code,
+                    base_url,
+                    response.text,
+                )
+                raise RuntimeError(
+                    f"Agent Registry {response.status_code} on GET {base_url}: {response.text}"
+                )
 
             data = response.json()
             skills_data = data.get("skills", [])
@@ -200,7 +208,15 @@ class AgentRegistryClient:
         skill_url = f"{self.base_url}/{skill_name}"
         response = await client.get(skill_url)
         if response.status_code != 200:
-            raise RuntimeError(f"API returned status {response.status_code}: {response.text}")
+            logger.error(
+                "Agent Registry get_skill failed: status=%s url=%s body=%s",
+                response.status_code,
+                skill_url,
+                response.text,
+            )
+            raise RuntimeError(
+                f"Agent Registry {response.status_code} on GET {skill_url}: {response.text}"
+            )
 
         skill_data = response.json()
         default_revision = skill_data.get("defaultRevision", "")
@@ -211,7 +227,15 @@ class AgentRegistryClient:
         rev_url = f"{self.base_url}/{default_revision}"
         rev_response = await client.get(rev_url, params={"alt": "media"})
         if rev_response.status_code != 200:
-            raise RuntimeError(f"API returned status {rev_response.status_code} fetching revision: {rev_response.text}")
+            logger.error(
+                "Agent Registry get_revision failed: status=%s url=%s body=%s",
+                rev_response.status_code,
+                rev_url,
+                rev_response.text,
+            )
+            raise RuntimeError(
+                f"Agent Registry {rev_response.status_code} on GET {rev_url}: {rev_response.text}"
+            )
 
         # 3. Extract SKILL.md from zip
         try:
@@ -264,6 +288,12 @@ class AgentRegistryClient:
 
         response = await client.patch(url, json=body, params=params)
         if response.status_code not in (200, 204):
+            logger.error(
+                "Agent Registry PATCH failed: status=%s url=%s body=%s",
+                response.status_code,
+                url,
+                response.text,
+            )
             raise RuntimeError(
                 f"Failed to PATCH skill {skill_name} to {target_state}: "
                 f"status={response.status_code} body={response.text}"

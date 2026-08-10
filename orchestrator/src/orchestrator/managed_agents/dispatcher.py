@@ -91,7 +91,7 @@ async def dispatch_managed_skill(
     try:
         instructions = await resolve_skill_instructions(short_name, client=registry_client)
     except Exception as e:
-        logger.error(f"Failed to resolve skill instructions for {short_name}: {e}")
+        logger.exception("Failed to resolve skill instructions for %s", short_name)
         raise RuntimeError(f"Skill instruction resolution failed for {short_name}: {e}") from e
 
     agent = build_worker_managed_agent(
@@ -110,7 +110,11 @@ async def dispatch_managed_skill(
         if isinstance(raw_result, dict):
             try:
                 return output_schema.model_validate(raw_result)
-            except ValidationError as ve:
-                logger.warning(f"Could not validate result as {output_schema.__name__}: {ve}")
+            except ValidationError:
+                logger.exception(
+                    "Could not validate result as %s (raw_result keys=%s)",
+                    output_schema.__name__,
+                    list(raw_result.keys()),
+                )
 
     return raw_result
