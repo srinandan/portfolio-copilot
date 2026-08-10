@@ -33,6 +33,7 @@ AGENT_IDENTITY_ROLES = [
     "roles/bigquery.user",  # BigQuery: run query jobs
     "roles/secretmanager.secretAccessor",  # Secret Manager: Alpaca API key & MANAGED_AGENT_ID
     "roles/agentregistry.viewer",  # Agent Registry: list authorized skills
+    "roles/aiplatform.user",  # Vertex AI: Managed Agents and Reasoning Engine invocation
     "roles/serviceusage.serviceUsageConsumer",  # Service usage consumer
     "roles/logging.logWriter",  # Cloud Logging
     "roles/monitoring.metricWriter",  # Cloud Monitoring

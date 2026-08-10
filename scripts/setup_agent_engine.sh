@@ -80,12 +80,17 @@ if [ -n "$PROJECT_NUMBER" ]; then
     --condition=None \
     --quiet || echo "Note: Secret Manager IAM binding on principalSet skipped or already configured"
 
-  # Agent Registry: list authorized skills
+  # Agent Registry & Vertex AI: list authorized skills and invoke Managed Agents
   gcloud projects add-iam-policy-binding "$PROJECT_ID" \
     --member="$PRINCIPAL_SET" \
     --role="roles/agentregistry.viewer" \
     --condition=None \
     --quiet || echo "Note: Agent Registry IAM binding on principalSet skipped or already configured"
+  gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+    --member="$PRINCIPAL_SET" \
+    --role="roles/aiplatform.user" \
+    --condition=None \
+    --quiet || echo "Note: AI Platform User IAM binding on principalSet skipped or already configured"
 
   # Service Usage, Logging, and Monitoring
   gcloud projects add-iam-policy-binding "$PROJECT_ID" \
