@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -113,6 +115,99 @@ func TestHandlePlan_DirectMode_UpstreamError_EmitsSSEError(t *testing.T) {
 	}
 	if !strings.Contains(w.Body.String(), "orchestrator exploded") {
 		t.Errorf("expected upstream body in error frame, got:\n%s", w.Body.String())
+	}
+}
+
+// captureSlog swaps slog's default logger for one writing JSON into a buffer, so
+// tests can assert what was logged and restores the prior default when the test
+// ends. The buffer captures all levels; assertions filter by content.
+func captureSlog(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	buf := &bytes.Buffer{}
+	prior := slog.Default()
+	slog.SetDefault(slog.New(slog.NewJSONHandler(buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	t.Cleanup(func() { slog.SetDefault(prior) })
+	return buf
+}
+
+func TestHandlePlan_DirectMode_UpstreamError_LogsAtError(t *testing.T) {
+	// The wire-level SSE error was already going out; the missing piece was
+	// server-side logging. This test guards that regression: any upstream
+	// failure MUST log at ERROR with structured context so operators can find
+	// it in Cloud Logging.
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		io.WriteString(w, "IAM binding missing on Agent Registry")
+	}))
+	defer upstream.Close()
+
+	logs := captureSlog(t)
+	oc := &OrchestratorClient{directURL: upstream.URL, httpClient: http.DefaultClient}
+	r := newTestRouter(oc)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/plan",
+		strings.NewReader(`{"user_id":"u1","message":"hi"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	out := logs.String()
+	if !strings.Contains(out, `"level":"ERROR"`) {
+		t.Errorf("expected ERROR-level log, got:\n%s", out)
+	}
+	if !strings.Contains(out, "orchestrator 401") {
+		t.Errorf("expected orchestrator 401 message in log, got:\n%s", out)
+	}
+	if !strings.Contains(out, `"status":401`) {
+		t.Errorf("expected structured status=401 in log, got:\n%s", out)
+	}
+	if !strings.Contains(out, `"user_id":"u1"`) {
+		t.Errorf("expected structured user_id in log, got:\n%s", out)
+	}
+	if !strings.Contains(out, "IAM binding missing on Agent Registry") {
+		t.Errorf("expected upstream body in log, got:\n%s", out)
+	}
+}
+
+func TestHandlePlan_AgentEngineMode_UpstreamError_LogsAtError(t *testing.T) {
+	// Same guarantee for the Agent Engine backend path — a 401 from the
+	// :streamQuery endpoint (missing aiplatform.user, wrong project, etc.)
+	// used to only reach the browser. Now it must also hit the gateway logs.
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		io.WriteString(w, `{"error":{"code":401,"message":"missing aiplatform.user"}}`)
+	}))
+	defer upstream.Close()
+
+	logs := captureSlog(t)
+	oc := &OrchestratorClient{
+		agentEngineID: "projects/123/locations/us-central1/reasoningEngines/eng-xyz",
+		tokenSource:   func(context.Context) (string, error) { return "test-token", nil },
+		httpClient: &http.Client{
+			Transport: rewriteHostTransport{target: upstream.URL, base: http.DefaultTransport},
+			Timeout:   5 * time.Second,
+		},
+	}
+	r := newTestRouter(oc)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/plan",
+		strings.NewReader(`{"user_id":"u1","message":"hi"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	out := logs.String()
+	if !strings.Contains(out, `"level":"ERROR"`) {
+		t.Errorf("expected ERROR log, got:\n%s", out)
+	}
+	if !strings.Contains(out, `"mode":"agent_engine"`) {
+		t.Errorf("expected mode=agent_engine in log, got:\n%s", out)
+	}
+	if !strings.Contains(out, `"engine_id":"projects/123/locations/us-central1/reasoningEngines/eng-xyz"`) {
+		t.Errorf("expected engine_id in log, got:\n%s", out)
+	}
+	if !strings.Contains(out, "missing aiplatform.user") {
+		t.Errorf("expected upstream body in log, got:\n%s", out)
 	}
 }
 

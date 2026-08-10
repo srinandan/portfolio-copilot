@@ -126,7 +126,7 @@ async def test_list_authorized_skills_api_error():
         http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
     )
 
-    with pytest.raises(RuntimeError, match="API returned status 500"):
+    with pytest.raises(RuntimeError, match=r"Agent Registry 500 on GET .*Internal Server Error"):
         await client.list_authorized_skills()
 
 
@@ -250,7 +250,7 @@ async def test_get_skill_content_skill_api_error():
         http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
     )
 
-    with pytest.raises(RuntimeError, match="API returned status 404"):
+    with pytest.raises(RuntimeError, match=r"Agent Registry 404 on GET .*Skill not found"):
         await client.get_skill_content("nonexistent")
 
 
@@ -294,7 +294,7 @@ async def test_get_skill_content_revision_api_error():
         http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
     )
 
-    with pytest.raises(RuntimeError, match="API returned status 500 fetching revision"):
+    with pytest.raises(RuntimeError, match=r"Agent Registry 500 on GET .*Failed to download zip"):
         await client.get_skill_content("my-skill")
 
 

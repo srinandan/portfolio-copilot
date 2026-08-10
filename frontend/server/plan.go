@@ -225,19 +225,23 @@ func (c *OrchestratorClient) runPlan(ctx *gin.Context, req PlanRequest, resume b
 		}
 		body, contentType, status, err := c.invokeDirect(ctx.Request.Context(), path, req)
 		if err != nil {
-			writeSSEError(ctx, fmt.Sprintf("orchestrator call failed: %v", err))
+			logAndWriteSSEError(ctx, fmt.Sprintf("orchestrator call failed: %v", err),
+				"mode", "direct", "path", path, "user_id", req.UserID, "error", err)
 			return
 		}
 		if status >= 400 {
 			payload, _ := io.ReadAll(body)
 			body.Close()
-			writeSSEError(ctx, fmt.Sprintf("orchestrator %d: %s", status, string(payload)))
+			logAndWriteSSEError(ctx, fmt.Sprintf("orchestrator %d: %s", status, string(payload)),
+				"mode", "direct", "path", path, "user_id", req.UserID, "status", status, "body", string(payload))
 			return
 		}
 		if !strings.HasPrefix(contentType, "text/event-stream") {
 			payload, _ := io.ReadAll(body)
 			body.Close()
-			writeSSEError(ctx, fmt.Sprintf("orchestrator returned unexpected content-type %q: %s", contentType, string(payload)))
+			logAndWriteSSEError(ctx,
+				fmt.Sprintf("orchestrator returned unexpected content-type %q: %s", contentType, string(payload)),
+				"mode", "direct", "path", path, "user_id", req.UserID, "content_type", contentType, "body", string(payload))
 			return
 		}
 		// The orchestrator already speaks SSE — pass through untouched.
@@ -248,16 +252,29 @@ func (c *OrchestratorClient) runPlan(ctx *gin.Context, req PlanRequest, resume b
 	// Agent Engine mode
 	body, status, err := c.invokeAgentEngine(ctx.Request.Context(), req, resume)
 	if err != nil {
-		writeSSEError(ctx, fmt.Sprintf("agent engine call failed: %v", err))
+		logAndWriteSSEError(ctx, fmt.Sprintf("agent engine call failed: %v", err),
+			"mode", "agent_engine", "engine_id", c.agentEngineID, "resume", resume, "user_id", req.UserID, "error", err)
 		return
 	}
 	defer body.Close()
 	if status >= 400 {
 		payload, _ := io.ReadAll(body)
-		writeSSEError(ctx, fmt.Sprintf("agent engine %d: %s", status, string(payload)))
+		logAndWriteSSEError(ctx, fmt.Sprintf("agent engine %d: %s", status, string(payload)),
+			"mode", "agent_engine", "engine_id", c.agentEngineID, "resume", resume, "user_id", req.UserID,
+			"status", status, "body", string(payload))
 		return
 	}
 	writeAgentEngineSSE(ctx, body)
+}
+
+// logAndWriteSSEError logs the failure at ERROR with structured context and
+// then writes the SSE `error` frame the frontend expects. Splitting the two
+// paths (log + wire) is what was missing — the wire frame was surfacing the
+// error to users but nothing was hitting Cloud Logging, so operators had no
+// way to see e.g. an Agent Registry 401 or a bad Agent Engine IAM binding.
+func logAndWriteSSEError(ctx *gin.Context, msg string, kv ...any) {
+	slog.ErrorContext(ctx.Request.Context(), msg, kv...)
+	writeSSEError(ctx, msg)
 }
 
 func writeSSEError(ctx *gin.Context, msg string) {

@@ -24,23 +24,23 @@ contract with the frontend.
 """
 
 import json
-import logging
 import os
 from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator, Optional
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from google.adk.runners import Runner
 from google.genai.types import Part, UserContent
 from pydantic import BaseModel
 
 from .contracts.goals_onboarding import GoalsOnboardingResult
+from .logger import get_logger
 from .planner import root_agent
 from .session_manager import SessionManager
 from .state import write_ips_from_interview_result
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 APP_NAME = os.environ.get("AGENT_ENGINE_ID") or os.environ.get("ORCHESTRATOR_APP_NAME", "portfolio_copilot")
 
@@ -110,6 +110,22 @@ async def _lifespan(_app: FastAPI):
 app = FastAPI(title="Portfolio Copilot Orchestrator", version="0.1.0", lifespan=_lifespan)
 
 
+@app.exception_handler(Exception)
+async def _log_unhandled(request: Request, exc: Exception) -> JSONResponse:
+    """Ensure every unhandled exception hits Cloud Logging with a traceback.
+
+    FastAPI's default handler returns a generic 500 without logging — that's
+    how we've been losing 401s and other upstream failures. Preserve
+    HTTPException semantics by re-raising the response for those.
+    """
+    if isinstance(exc, HTTPException):
+        return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+    logger.exception(
+        "Unhandled exception on %s %s", request.method, request.url.path
+    )
+    return JSONResponse(status_code=500, content={"detail": "internal_server_error"})
+
+
 @app.get("/livez")
 async def livez() -> dict[str, str]:
     return {"status": "ok"}
@@ -143,7 +159,11 @@ async def _sse(events: AsyncIterator[Any]) -> AsyncIterator[bytes]:
             payload = json.dumps(_event_to_wire(event), default=str)
             yield f"data: {payload}\n\n".encode("utf-8")
     except Exception as e:
-        err = json.dumps({"error": str(e)})
+        # The frontend gets the message via the SSE `error` event, but that
+        # frame is opaque server-side — log the full traceback so operators
+        # can trace failures (e.g. Agent Registry 401s) in Cloud Logging.
+        logger.exception("SSE event stream raised; sending error frame to client")
+        err = json.dumps({"error": str(e), "type": type(e).__name__})
         yield f"event: error\ndata: {err}\n\n".encode("utf-8")
 
 
@@ -153,7 +173,8 @@ async def _stream_json_lines(events: AsyncIterator[Any]) -> AsyncIterator[bytes]
             payload = json.dumps(_event_to_wire(event), default=str)
             yield f"{payload}\n".encode("utf-8")
     except Exception as e:
-        err = json.dumps({"error": str(e)})
+        logger.exception("NDJSON event stream raised; sending error line to client")
+        err = json.dumps({"error": str(e), "type": type(e).__name__})
         yield f"{err}\n".encode("utf-8")
 
 

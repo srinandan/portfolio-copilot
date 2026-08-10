@@ -139,6 +139,57 @@ def test_sse_serializes_error_events():
     assert "boom" in out
 
 
+def test_sse_logs_exception_with_traceback(caplog):
+    """The SSE error frame goes to the client, but the server MUST log the full
+    exception so operators can trace failures (e.g. Agent Registry 401s) in
+    Cloud Logging — otherwise the wire error is the only record and it lands
+    only in the browser."""
+    import asyncio
+    import logging
+
+    from src.orchestrator.server import _sse
+
+    async def failing():
+        raise RuntimeError("registry 401: unauthorized")
+        yield  # pragma: no cover
+
+    async def drain():
+        async for _ in _sse(failing()):
+            pass
+
+    with caplog.at_level(logging.ERROR, logger="orchestrator.server"):
+        asyncio.run(drain())
+
+    matching = [r for r in caplog.records if "SSE event stream raised" in r.getMessage()]
+    assert matching, f"expected SSE-raise log record, got {[r.getMessage() for r in caplog.records]}"
+    record = matching[0]
+    assert record.levelno == logging.ERROR
+    assert record.exc_info is not None, "logger.exception must attach exc_info for tracebacks"
+
+
+def test_stream_json_lines_logs_exception_with_traceback(caplog):
+    """Same guarantee as _sse but for the Agent Runtime streamQuery NDJSON path."""
+    import asyncio
+    import logging
+
+    from src.orchestrator.server import _stream_json_lines
+
+    async def failing():
+        raise RuntimeError("agent runtime blew up")
+        yield  # pragma: no cover
+
+    async def drain():
+        async for _ in _stream_json_lines(failing()):
+            pass
+
+    with caplog.at_level(logging.ERROR, logger="orchestrator.server"):
+        asyncio.run(drain())
+
+    matching = [r for r in caplog.records if "NDJSON event stream raised" in r.getMessage()]
+    assert matching
+    assert matching[0].exc_info is not None
+
+
 def test_stream_reasoning_engine_invoke(client_with_runner):
     client, fake_runner, fake_sm = client_with_runner
     with client.stream(

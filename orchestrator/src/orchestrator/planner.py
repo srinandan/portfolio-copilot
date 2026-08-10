@@ -126,8 +126,8 @@ async def _postprocess_goals_onboarding(
             await ctx.add_events_to_memory(
                 events=[UserContent(parts=[Part.from_text(text=summary_text)])]
             )
-        except Exception as mem_err:
-            logger.warning(f"add_events_to_memory failed: {mem_err}")
+        except Exception:
+            logger.exception("add_events_to_memory failed")
         payload = {
             "status": "completed",
             "ips_id": new_ips.ips_id,
@@ -224,8 +224,8 @@ async def _postprocess_reviewer(user_id, result, ctx, input_dict, registry_entry
     elif isinstance(result, dict):
         try:
             llm_verdict = ReviewerVerdict.model_validate(result)
-        except Exception as e:
-            logger.warning(f"Reviewer MA returned malformed verdict, treating as no-verdict: {e}")
+        except Exception:
+            logger.exception("Reviewer MA returned malformed verdict, treating as no-verdict")
 
     ad_result_dict = input_dict.get("_reviewer_action")
     action = ProposedAction.model_validate(ad_result_dict)
@@ -389,7 +389,7 @@ async def _execute_skill(
         )
         return {"status": "declined", "message": str(e)}
     except Exception as e:
-        logger.error(f"Skill {plan.short_name} preload failed: {e}")
+        logger.exception("Skill %s preload failed", plan.short_name)
         emit_skill_failed_audit(
             plan.short_name,
             error=f"preload_failed: {e}",
@@ -412,7 +412,7 @@ async def _execute_skill(
     try:
         result = await dispatch_managed_skill(plan.short_name, node_input=node_input, ctx=ctx)
     except Exception as e:
-        logger.error(f"Skill {plan.short_name} dispatch failed: {e}")
+        logger.exception("Skill %s dispatch failed", plan.short_name)
         emit_skill_failed_audit(
             plan.short_name,
             error=f"dispatch_failed: {e}",
@@ -426,7 +426,7 @@ async def _execute_skill(
             user_id, result, ctx, input_dict, registry_entry_id
         )
     except Exception as e:
-        logger.error(f"Skill {plan.short_name} postprocess failed: {e}")
+        logger.exception("Skill %s postprocess failed", plan.short_name)
         emit_skill_failed_audit(
             plan.short_name,
             error=f"postprocess_failed: {e}",
@@ -468,10 +468,10 @@ def _detect_and_audit_revocations(
                 detail=f"Skill {short_name} was authorized last cycle but is now DISABLED or absent",
             )
             logger.info(f"Detected revocation of skill {short_name} (prior revision {prior_revision})")
-        except Exception as e:
+        except Exception:
             # Audit fail-closed raises; log and continue so a single failure doesn't
             # block detection of other revocations in the same cycle.
-            logger.error(f"Failed to audit revocation of {short_name}: {e}")
+            logger.exception("Failed to audit revocation of %s", short_name)
 
     # Store current cycle for next comparison. Serialized as plain dicts so
     # ADK's ctx.state (which needs JSON-safe values) is happy.
@@ -556,7 +556,7 @@ async def root_planner(ctx: Context, node_input: Any):
         try:
             hitl_result = await ctx.run_node(hitl_approval_gate, node_input=gate_input)
         except Exception as e:
-            logger.error(f"HITL gate failed: {e}")
+            logger.exception("HITL gate failed")
             results.append(f"hitl_error: {e}")
         else:
             results.append(f"hitl_decision: {hitl_result}")
@@ -575,7 +575,7 @@ async def root_planner(ctx: Context, node_input: Any):
         try:
             exec_result = await ctx.run_node(execution_gate, node_input=exec_input)
         except Exception as e:
-            logger.error(f"Execution gate raised: {e}")
+            logger.exception("Execution gate raised")
             results.append(f"execution_error: {e}")
         else:
             results.append(f"execution_result: {exec_result}")
