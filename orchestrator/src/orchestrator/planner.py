@@ -358,10 +358,7 @@ async def get_skills_from_registry(ctx: Context, node_input: Any):
     return skills
 
 
-@node(name="dummy_skill_execution", rerun_on_resume=False)
-async def dummy_skill_execution(ctx: Context, node_input: Any):
-    logger.info(f"Executing skill: {node_input}")
-    return f"{node_input}_completed"
+
 
 
 
@@ -485,8 +482,16 @@ def _detect_and_audit_revocations(
 async def root_planner(ctx: Context, node_input: Any):
     """Registry-driven dynamic planner. Iterates authorized skills in canonical order,
     dispatching each to the worker Managed Agent via a per-skill SkillPlan."""
-    skills = await ctx.run_node(get_skills_from_registry, node_input=node_input)
-    logger.info(f"Available skills: {skills}")
+    all_skills = await ctx.run_node(get_skills_from_registry, node_input=node_input)
+    logger.info(f"Available skills from registry: {all_skills}")
+
+    # Filter strictly to the Portfolio Copilot skills (the 6 skills in skills/)
+    skills = [
+        s
+        for s in all_skills
+        if _normalize_skill_key(s.name if hasattr(s, "name") else str(s)) in SKILL_PLANS
+    ]
+    logger.info(f"Filtered Portfolio Copilot skills ({len(skills)}): {skills}")
 
     # Delta-detect revocations vs the previous planning cycle in this session.
     # Emits SKILL_REVOKED audit for anything that disappeared.
@@ -526,9 +531,6 @@ async def root_planner(ctx: Context, node_input: Any):
         short_name = _normalize_skill_key(skill_name)
         plan = SKILL_PLANS.get(short_name)
         if plan is None:
-            logger.info(f"Authorized skill {skill} has no SkillPlan; executing fallback.")
-            result = await ctx.run_node(dummy_skill_execution, node_input=skill_name)
-            results.append(result)
             continue
 
         payload = await _execute_skill(

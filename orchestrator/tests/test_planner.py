@@ -157,10 +157,8 @@ async def test_root_planner_trace():
             events.append(event)
 
         last_event = events[-1]
-        assert last_event.output == [
-            "projects/test-project/locations/test-location/skills/dummy_skill_1_completed",
-            "projects/test-project/locations/test-location/skills/dummy_skill_2_completed",
-        ]
+        # Unrelated skills from registry must be ignored by Portfolio Copilot planner
+        assert last_event.output == []
 
 
 @pytest.mark.asyncio
