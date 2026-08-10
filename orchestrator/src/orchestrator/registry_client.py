@@ -31,18 +31,21 @@ class GoogleAuth(httpx.Auth):
         self._auth_request = GoogleAuthRequest()
 
     def auth_flow(self, request: httpx.Request):
-        if not self.credentials.valid:
-            try:
-                self.credentials.refresh(self._auth_request)
-            except Exception as e:
-                logger.warning(f"Credential refresh in auth_flow failed: {e}")
-        token = getattr(self.credentials, "token", None)
-        if token and isinstance(token, str):
-            request.headers["Authorization"] = f"Bearer {token}"
-        elif hasattr(self.credentials, "apply"):
-            self.credentials.apply(request.headers)
-        elif hasattr(self.credentials, "before_request"):
-            self.credentials.before_request(self._auth_request, request.method, str(request.url), request.headers)
+        if hasattr(self.credentials, "before_request"):
+            self.credentials.before_request(
+                self._auth_request, request.method, str(request.url), request.headers
+            )
+        else:
+            if not self.credentials.valid:
+                try:
+                    self.credentials.refresh(self._auth_request)
+                except Exception as e:
+                    logger.warning(f"Credential refresh in auth_flow failed: {e}")
+            token = getattr(self.credentials, "token", None)
+            if token and isinstance(token, str):
+                request.headers["Authorization"] = f"Bearer {token}"
+            elif hasattr(self.credentials, "apply"):
+                self.credentials.apply(request.headers)
         yield request
 
 

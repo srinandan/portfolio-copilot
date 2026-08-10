@@ -345,26 +345,40 @@ async def test_get_skill_content_invalid_zip():
         await client.get_skill_content("my-skill")
 
 
-def test_google_auth():
+def test_google_auth_before_request():
     mock_creds = MagicMock()
-    mock_creds.valid = False
 
-    def refresh(req):
-        mock_creds.valid = True
-
-    def apply(headers):
+    def before_request(req, method, url, headers):
         headers["Authorization"] = "Bearer test-token"
 
-    mock_creds.refresh = MagicMock(side_effect=refresh)
-    mock_creds.apply = MagicMock(side_effect=apply)
+    mock_creds.before_request = MagicMock(side_effect=before_request)
 
     auth = GoogleAuth(mock_creds)
     req = httpx.Request("GET", "https://example.com")
     flow = auth.auth_flow(req)
     next(flow)
 
-    assert mock_creds.refresh.called
+    assert mock_creds.before_request.called
     assert req.headers["Authorization"] == "Bearer test-token"
+
+
+def test_google_auth_fallback():
+    class CustomCreds:
+        valid = False
+        token = None
+
+        def refresh(self, req):
+            self.valid = True
+            self.token = "custom-token"
+
+    creds = CustomCreds()
+    auth = GoogleAuth(creds)
+    req = httpx.Request("GET", "https://example.com")
+    flow = auth.auth_flow(req)
+    next(flow)
+
+    assert creds.valid is True
+    assert req.headers["Authorization"] == "Bearer custom-token"
 
 
 @pytest.mark.asyncio
