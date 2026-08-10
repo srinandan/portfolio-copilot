@@ -475,3 +475,45 @@ async def test_patch_target_state_rejects_invalid_state():
     client = AgentRegistryClient(project_id="test-project", location="test-location")
     with pytest.raises(ValueError, match="Invalid target_state"):
         await client._patch_target_state("research", "TARGET_STATE_BOGUS")
+
+
+def test_google_auth_attaches_quota_project_header():
+    mock_creds = MagicMock()
+    mock_creds.quota_project_id = None
+    mock_creds.before_request = MagicMock()
+
+    auth = GoogleAuth(mock_creds, quota_project_id="quota-proj")
+    req = httpx.Request("GET", "https://example.com")
+    flow = auth.auth_flow(req)
+    next(flow)
+
+    assert req.headers["x-goog-user-project"] == "quota-proj"
+
+
+def test_registry_client_mtls_auto_resolution():
+    with patch("orchestrator.registry_client.mtls.has_default_client_cert_source", return_value=True):
+        with patch(
+            "orchestrator.registry_client.mtls.default_client_cert_source",
+            return_value=lambda: (b"cert", b"key"),
+        ):
+            with patch("orchestrator.registry_client.ssl.create_default_context") as mock_ssl_ctx:
+                mock_ctx_inst = MagicMock()
+                mock_ssl_ctx.return_value = mock_ctx_inst
+
+                client = AgentRegistryClient(project_id="test-p", location="global")
+                assert "agentregistry.mtls.googleapis.com" in client.base_url
+                assert client._ssl_context == mock_ctx_inst
+
+
+def test_registry_client_mtls_disabled():
+    with patch.dict("os.environ", {"GOOGLE_API_USE_MTLS_ENDPOINT": "never"}):
+        client = AgentRegistryClient(project_id="test-p", location="global")
+        assert "agentregistry.googleapis.com" in client.base_url
+        assert client._ssl_context is None
+
+
+def test_registry_client_env_base_url_override():
+    with patch.dict("os.environ", {"AGENT_REGISTRY_BASE_URL": "https://custom-registry.internal"}):
+        client = AgentRegistryClient(project_id="test-p", location="global")
+        assert client.base_url == "https://custom-registry.internal"
+
