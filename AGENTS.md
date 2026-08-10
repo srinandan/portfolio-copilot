@@ -56,7 +56,9 @@ cd frontend && npm run build && npm run test -- --coverage
 
 1. Read `.agent/skills/concise-code/SKILL.md`,
    `.agent/skills/unit-testing/SKILL.md`, and
-   `.agent/skills/code-coverage/SKILL.md`.
+   `.agent/skills/code-coverage/SKILL.md`. If you're touching anything
+   Agent Runtime-related also read
+   `.agent/skills/agent-runtime/SKILL.md`.
 2. If the change affects what the system does, check it against
    `docs/spec/01-functional.md` first — update the spec, don't let code
    drift from it silently.
@@ -72,3 +74,21 @@ cd frontend && npm run build && npm run test -- --coverage
   `scripts/` — use Secret Manager / environment injection
 - Every skill in `/skills` must have a complete `SKILL.md` (no TODOs)
   before it's registered with the Agent Registry
+
+## Talking to Agent Runtime (fka Agent Engine)
+
+The only supported control-plane surface is the **Python `vertexai` SDK**
+(`vertexai.Client(...).agent_engines`). The following `gcloud` command
+groups **do not exist** — don't try them, and don't invent variants:
+
+- `gcloud ai reasoning-engines …`
+- `gcloud ai-platform …` (the entire group is dead)
+- `gcloud agent-registry …` / `gcloud alpha agent-registry …`
+- `gcloud alpha agents …`
+
+For list / describe / query / delete / logs use
+[`scripts/agent_engine_admin.py`](scripts/agent_engine_admin.py) — it
+wraps the SDK behind a click CLI. Deploy/update is
+[`scripts/deploy_agent_engine.py`](scripts/deploy_agent_engine.py). See
+[`.agent/skills/agent-runtime/SKILL.md`](.agent/skills/agent-runtime/SKILL.md)
+for the full playbook before troubleshooting.
