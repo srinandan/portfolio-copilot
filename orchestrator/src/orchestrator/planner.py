@@ -497,6 +497,11 @@ async def root_planner(ctx: Context, node_input: Any):
     # Emits SKILL_REVOKED audit for anything that disappeared.
     _detect_and_audit_revocations(ctx, skills)
 
+    if not skills:
+        msg = "No authorized Portfolio Copilot skills found in Agent Registry to complete the request."
+        logger.warning(msg)
+        return [f"error: {msg}"]
+
     # Parse node_input into a plain dict
     input_dict: Dict[str, Any] = {}
     if isinstance(node_input, dict):

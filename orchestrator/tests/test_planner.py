@@ -157,8 +157,10 @@ async def test_root_planner_trace():
             events.append(event)
 
         last_event = events[-1]
-        # Unrelated skills from registry must be ignored by Portfolio Copilot planner
-        assert last_event.output == []
+        # Unrelated skills from registry are ignored and an explicit error is returned
+        assert last_event.output == [
+            "error: No authorized Portfolio Copilot skills found in Agent Registry to complete the request."
+        ]
 
 
 @pytest.mark.asyncio
