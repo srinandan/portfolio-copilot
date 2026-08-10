@@ -1,12 +1,16 @@
 """Agent Registry REST client."""
 
 import io
+import os
+import ssl
+import tempfile
 import zipfile
 from dataclasses import dataclass
 from typing import Any
 
 import httpx
 from google.auth import default as google_auth_default
+from google.auth.transport import mtls
 from google.auth.transport.requests import Request as GoogleAuthRequest
 
 from .logger import get_logger
@@ -14,6 +18,7 @@ from .logger import get_logger
 logger = get_logger(__name__)
 
 DEFAULT_BASE_URL = "https://agentregistry.googleapis.com/v1alpha"
+DEFAULT_MTLS_BASE_URL = "https://agentregistry.mtls.googleapis.com/v1alpha"
 
 
 @dataclass
@@ -26,24 +31,59 @@ class Skill:
 class GoogleAuth(httpx.Auth):
     """httpx Auth flow using Google credentials."""
 
-    def __init__(self, credentials: Any):
+    def __init__(self, credentials: Any, quota_project_id: str | None = None):
         self.credentials = credentials
+        self.quota_project_id = quota_project_id
         self._auth_request = GoogleAuthRequest()
 
     def auth_flow(self, request: httpx.Request):
-        if not self.credentials.valid:
-            try:
-                self.credentials.refresh(self._auth_request)
-            except Exception as e:
-                logger.warning(f"Credential refresh in auth_flow failed: {e}")
-        token = getattr(self.credentials, "token", None)
-        if token and isinstance(token, str):
-            request.headers["Authorization"] = f"Bearer {token}"
-        elif hasattr(self.credentials, "apply"):
-            self.credentials.apply(request.headers)
-        elif hasattr(self.credentials, "before_request"):
-            self.credentials.before_request(self._auth_request, request.method, str(request.url), request.headers)
+        if hasattr(self.credentials, "before_request"):
+            self.credentials.before_request(
+                self._auth_request, request.method, str(request.url), request.headers
+            )
+        else:
+            if not self.credentials.valid:
+                try:
+                    self.credentials.refresh(self._auth_request)
+                except Exception as e:
+                    logger.warning(f"Credential refresh in auth_flow failed: {e}")
+            token = getattr(self.credentials, "token", None)
+            if token and isinstance(token, str):
+                request.headers["Authorization"] = f"Bearer {token}"
+            elif hasattr(self.credentials, "apply"):
+                self.credentials.apply(request.headers)
+
+        quota_project = getattr(self.credentials, "quota_project_id", None) or self.quota_project_id
+        if quota_project and "x-goog-user-project" not in request.headers:
+            request.headers["x-goog-user-project"] = quota_project
+
         yield request
+
+
+def _create_mtls_ssl_context() -> ssl.SSLContext | None:
+    """Creates an SSLContext with client certificates loaded from default mTLS source."""
+    if not mtls.has_default_client_cert_source():
+        return None
+    source = mtls.default_client_cert_source()
+    if not source:
+        return None
+    try:
+        cert_bytes, key_bytes = source()
+        if not cert_bytes or not key_bytes:
+            return None
+        ssl_context = ssl.create_default_context()
+        with tempfile.NamedTemporaryFile(delete=False) as c_file, tempfile.NamedTemporaryFile(delete=False) as k_file:
+            c_file.write(cert_bytes)
+            k_file.write(key_bytes)
+            c_file.flush()
+            k_file.flush()
+            ssl_context.load_cert_chain(certfile=c_file.name, keyfile=k_file.name)
+            os.unlink(c_file.name)
+            os.unlink(k_file.name)
+        return ssl_context
+    except Exception as e:
+        logger.debug(f"Failed to load mTLS client certificate: {e}")
+        return None
 
 
 class AgentRegistryClient:
@@ -53,14 +93,34 @@ class AgentRegistryClient:
         self,
         project_id: str,
         location: str,
-        base_url: str = DEFAULT_BASE_URL,
+        base_url: str | None = None,
         http_client: httpx.AsyncClient | None = None,
     ):
         self.project_id = project_id
         self.location = location
-        self.base_url = base_url.rstrip("/")
         self._http_client = http_client
         self._owns_client = http_client is None
+        self._ssl_context: ssl.SSLContext | None = None
+
+        env_base_url = os.environ.get("AGENT_REGISTRY_BASE_URL")
+        if base_url is not None:
+            self.base_url = base_url.rstrip("/")
+        elif env_base_url:
+            self.base_url = env_base_url.rstrip("/")
+        else:
+            # Automatic mTLS resolution
+            mtls_setting = os.getenv("GOOGLE_API_USE_MTLS_ENDPOINT", "auto").lower()
+            if mtls_setting != "never":
+                self._ssl_context = _create_mtls_ssl_context()
+                if self._ssl_context is not None or mtls_setting == "always":
+                    self.base_url = DEFAULT_MTLS_BASE_URL
+                else:
+                    self.base_url = DEFAULT_BASE_URL
+            else:
+                self.base_url = DEFAULT_BASE_URL
+
+        if ".mtls.googleapis.com" in self.base_url and self._ssl_context is None:
+            self._ssl_context = _create_mtls_ssl_context()
 
     async def _get_client(self) -> httpx.AsyncClient:
         if self._http_client is None:
@@ -71,7 +131,8 @@ class AgentRegistryClient:
                 except Exception as e:
                     logger.warning(f"Initial credential refresh in _get_client failed: {e}")
             self._http_client = httpx.AsyncClient(
-                auth=GoogleAuth(credentials),
+                auth=GoogleAuth(credentials, quota_project_id=self.project_id),
+                verify=self._ssl_context if self._ssl_context is not None else True,
                 timeout=httpx.Timeout(30.0, connect=10.0),
                 follow_redirects=True,
             )
