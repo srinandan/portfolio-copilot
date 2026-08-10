@@ -13,7 +13,15 @@ class BigQueryClient:
         self.project = (
             project or os.environ.get("PROJECT_ID") or os.environ.get("GOOGLE_CLOUD_PROJECT") or "test-project"
         )
-        self.client = bigquery.Client(project=self.project)
+        try:
+            import google.auth
+            creds, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
+        except Exception:
+            creds = None
+        if creds:
+            self.client = bigquery.Client(project=self.project, credentials=creds)
+        else:
+            self.client = bigquery.Client(project=self.project)
 
     def get_monthly_spending_totals(
         self, user_id: str, current_month_start: str, window_months: int = 3

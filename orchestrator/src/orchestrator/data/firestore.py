@@ -36,7 +36,15 @@ class FirestoreClient:
         if emulator_host:
             self.db = firestore.Client(project=self.project, credentials=AnonymousCredentials())
         else:
-            self.db = firestore.Client(project=self.project)
+            try:
+                import google.auth
+                creds, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
+            except Exception:
+                creds = None
+            if creds:
+                self.db = firestore.Client(project=self.project, database="(default)", credentials=creds)
+            else:
+                self.db = firestore.Client(project=self.project, database="(default)")
 
     def _dict_factory(self, obj: Any) -> dict[str, Any]:
         """Convert a Pydantic model to a dict, handling dates/enums properly for Firestore."""
