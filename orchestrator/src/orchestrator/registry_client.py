@@ -86,6 +86,19 @@ def _create_mtls_ssl_context() -> ssl.SSLContext | None:
         return None
 
 
+def strip_non_runtime_sections(content: str) -> str:
+    """Strips spec-only sections (Acceptance criteria, Registry metadata) from SKILL.md for runtime prompt efficiency."""
+    if "## Acceptance criteria" in content:
+        content = content.split("## Acceptance criteria")[0]
+    elif "## Acceptance Criteria" in content:
+        content = content.split("## Acceptance Criteria")[0]
+
+    if "## Registry metadata" in content:
+        content = content.split("## Registry metadata")[0]
+
+    return content.strip()
+
+
 class AgentRegistryClient:
     """REST client for Google Cloud Agent Registry API."""
 
@@ -243,7 +256,8 @@ class AgentRegistryClient:
                 for filename in zf.namelist():
                     if filename == "SKILL.md" or filename.endswith("/SKILL.md"):
                         with zf.open(filename) as f:
-                            return f.read().decode("utf-8")
+                            raw_text = f.read().decode("utf-8")
+                            return strip_non_runtime_sections(raw_text)
                 raise ValueError("SKILL.md not found in revision zip")
         except zipfile.BadZipFile as e:
             raise ValueError(f"failed to read zip archive: {e}") from e
