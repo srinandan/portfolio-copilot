@@ -87,6 +87,17 @@ reflect that uncertainty in its own `rationale`, not paper over it.
 - **No** Firestore, **no** BigQuery, **no** trade-execution tools of any
   kind. This is the strictest tool surface of any skill in this project.
 
+### Search budget
+
+- **At most 3 `google_search` calls per invocation.** If 3 searches do
+  not produce enough evidence, return the brief with `confidence: low`
+  and an explicit gap statement in `summary`. Do not keep querying.
+- Prefer one broad search followed by at most two follow-ups scoped to
+  named tickers, sectors, or dates from the first result. Do not run
+  synonym-variant queries of the same question.
+- One search per distinct sub-question. If two sub-questions can be
+  answered by the same search, run it once.
+
 ## Registry metadata
 
 - Registered as: `projects/{project}/locations/{location}/skills/private-research`

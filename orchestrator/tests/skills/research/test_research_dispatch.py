@@ -90,3 +90,14 @@ async def test_research_dispatch_ma_failure_raises(mock_dispatch, mock_emit_fail
     mock_emit_failed.assert_called_once()
     assert "dispatch_failed" in mock_emit_failed.call_args[1]["error"]
     mock_emit_invoked.assert_called_once()
+
+
+def test_research_managed_agent_has_timeout():
+    from orchestrator.managed_agents.worker import build_worker_managed_agent
+
+    agent = build_worker_managed_agent(
+        name="private-research",
+        description="Search instructions",
+    )
+    # timeout is 120.0 seconds (2 minutes)
+    assert agent.timeout == 120.0
