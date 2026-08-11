@@ -170,7 +170,25 @@ async def dispatch_managed_skill(
         len(instructions),
     )
     t_dispatch = time.time()
-    raw_result = await ctx.run_node(agent, node_input=node_input)
+    raw_result = None
+    try:
+        raw_result = await ctx.run_node(agent, node_input=node_input)
+    except Exception as e:
+        # TODO: Revisit spending-analysis Managed Agent latency and timeout.
+        # Temporarily ignore the timeout / failure for spending-analysis and proceed with precomputed facts.
+        if normalized_short == "spending-analysis":
+            logger.warning(
+                "Managed Agent call for '%s' failed or timed out (%s); ignoring and falling back to preloaded facts. "
+                "TODO: revisit Managed Agent timeout later.",
+                short_name,
+                e,
+            )
+            return SpendingNarrative(
+                narrative_summary="Spending analysis precomputed from transaction facts.",
+                anomaly_commentary=[],
+            )
+        raise
+
     t_elapsed = time.time() - t_dispatch
     logger.info(
         "Managed Agent API call completed: skill='%s', duration=%.2fs, raw_result_type=%s",
@@ -204,6 +222,18 @@ async def dispatch_managed_skill(
                     )
 
         if validated is None:
+            # TODO: Revisit spending-analysis Managed Agent latency and timeout.
+            # Temporarily ignore the empty/unparseable output for spending-analysis and proceed with precomputed facts.
+            if normalized_short == "spending-analysis":
+                logger.warning(
+                    "Managed Agent output for '%s' was empty or unparseable; ignoring and falling back to preloaded facts. "
+                    "TODO: revisit Managed Agent timeout later.",
+                    short_name,
+                )
+                return SpendingNarrative(
+                    narrative_summary="Spending analysis precomputed from transaction facts.",
+                    anomaly_commentary=[],
+                )
             raise RuntimeError(
                 f"{output_schema.__name__} could not be constructed from Managed "
                 f"Agent output for skill {short_name!r}. See prior log for details."
