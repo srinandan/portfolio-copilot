@@ -28,12 +28,26 @@ def preload_spending_facts(
     current_month_start = datetime.now(timezone.utc).replace(day=1).strftime("%Y-%m-%d")
     valid_window = int(window_months) if isinstance(window_months, (int, float)) and window_months > 0 else 3
 
+    logger.info(
+        "preload_spending_facts_start: user '%s' (window=%d months)",
+        user_id,
+        valid_window,
+        extra={"event": "preload_spending_facts_start", "user_id": user_id, "window_months": valid_window},
+    )
+
+    t_bq = time.monotonic()
     totals, spending_totals = bq.get_spending_snapshot(user_id, current_month_start, window_months=valid_window)
+    bq_elapsed_sec = round(time.monotonic() - t_bq, 3)
+
+    t_fs = time.monotonic()
+    holdings = fs.get_holdings(user_id)
+    fs_elapsed_sec = round(time.monotonic() - t_fs, 3)
+
+    t_calc = time.monotonic()
     total_income = float(totals.get("total_income", 0.0) or 0.0)
     total_outflow = float(totals.get("total_outflow", 0.0) or 0.0)
     savings_rate = calculate_savings_rate(total_income, total_outflow)
 
-    holdings = fs.get_holdings(user_id)
     cash_usd = float(holdings.cash_usd) if holdings and holdings.cash_usd else 0.0
 
     avg_monthly_expenses = (total_outflow / float(valid_window)) if total_outflow > 0 else 0.0
@@ -59,15 +73,34 @@ def preload_spending_facts(
                     description=f"Spending in '{cat}' surged from 3-month average ${avg:.2f} to ${curr:.2f}.",
                 )
             )
+    calc_elapsed_sec = round(time.monotonic() - t_calc, 3)
+    total_elapsed_sec = round(time.monotonic() - t0, 3)
 
-    elapsed_sec = round(time.monotonic() - t0, 2)
     logger.info(
-        f"Preloaded spending facts for {user_id}: income=${total_income}, outflow=${total_outflow}, "
-        f"savings_rate={savings_rate:.2%}, reserve_months={reserve_months:.1f}, anomalies={len(anomalies)}"
+        "preload_spending_facts_complete: user '%s' in %.3fs (bq=%.3fs, fs=%.3fs, calc=%.3fs): income=$%.2f, outflow=$%.2f, savings_rate=%.2f%%, reserve_months=%.1f, anomalies=%d",
+        user_id,
+        total_elapsed_sec,
+        bq_elapsed_sec,
+        fs_elapsed_sec,
+        calc_elapsed_sec,
+        total_income,
+        total_outflow,
+        savings_rate * 100.0,
+        reserve_months,
+        len(anomalies),
     )
     logger.info(
         "spending_preload_complete",
-        extra={"user_id": user_id, "elapsed_sec": elapsed_sec, "anomalies": len(anomalies)},
+        extra={
+            "event": "spending_preload_complete",
+            "user_id": user_id,
+            "total_elapsed_sec": total_elapsed_sec,
+            "bq_elapsed_sec": bq_elapsed_sec,
+            "fs_elapsed_sec": fs_elapsed_sec,
+            "calc_elapsed_sec": calc_elapsed_sec,
+            "anomalies": len(anomalies),
+            "categories": len(category_breakdown),
+        },
     )
 
     return {

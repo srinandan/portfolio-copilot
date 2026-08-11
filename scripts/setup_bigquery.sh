@@ -9,7 +9,7 @@ if [ -z "$PROJECT_ID" ]; then
 fi
 
 DATASET_NAME="portfolio_copilot"
-TABLE_NAME="chase_transactions"
+TABLE_NAMES=("checking_transactions" "savings_transactions" "chase_transactions")
 
 echo "Setting up BigQuery in project $PROJECT_ID..."
 
@@ -22,18 +22,20 @@ else
   bq update --project_id="$PROJECT_ID" --set_label=app:portfolio-copilot "${DATASET_NAME}" 2>/dev/null || true
 fi
 
-# Create table
-if ! bq show --project_id="$PROJECT_ID" "${DATASET_NAME}.${TABLE_NAME}" &>/dev/null; then
-  echo "Creating BigQuery table: ${DATASET_NAME}.${TABLE_NAME}"
-  bq mk \
-    --project_id="$PROJECT_ID" \
-    --table \
-    --label=app:portfolio-copilot \
-    "${DATASET_NAME}.${TABLE_NAME}" \
-    user_id:STRING,transaction_date:DATE,amount:FLOAT64,description:STRING,raw_category:STRING,normalized_category:STRING
-else
-  echo "Table ${TABLE_NAME} already exists. Ensuring labels..."
-  bq update --project_id="$PROJECT_ID" --set_label=app:portfolio-copilot "${DATASET_NAME}.${TABLE_NAME}" 2>/dev/null || true
-fi
+# Create tables
+for TABLE_NAME in "${TABLE_NAMES[@]}"; do
+  if ! bq show --project_id="$PROJECT_ID" "${DATASET_NAME}.${TABLE_NAME}" &>/dev/null; then
+    echo "Creating BigQuery table: ${DATASET_NAME}.${TABLE_NAME}"
+    bq mk \
+      --project_id="$PROJECT_ID" \
+      --table \
+      --label=app:portfolio-copilot \
+      "${DATASET_NAME}.${TABLE_NAME}" \
+      user_id:STRING,transaction_date:DATE,amount:FLOAT64,description:STRING,raw_category:STRING,normalized_category:STRING
+  else
+    echo "Table ${TABLE_NAME} already exists. Ensuring labels..."
+    bq update --project_id="$PROJECT_ID" --set_label=app:portfolio-copilot "${DATASET_NAME}.${TABLE_NAME}" 2>/dev/null || true
+  fi
+done
 
 echo "BigQuery setup complete."

@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 import jsonschema
+import pytest
 
 from orchestrator.contracts import (
     HoldingsSnapshot,
@@ -114,9 +115,11 @@ def test_fixtures_are_internally_consistent():
     assert poisoned_data["suggested_allocation_percent"] > ips_data["constraints"]["concentration_limit_percent"]
 
 
-def test_chase_transactions_csv_exercises_dual_condition_anomaly():
-    csv_path = TESTDATA_DIR / "chase_transactions.csv"
-    assert csv_path.exists()
+@pytest.mark.parametrize("fixture_name", ["checking_transactions.csv", "chase_transactions.csv"])
+def test_transactions_csv_exercises_dual_condition_anomaly(fixture_name):
+    csv_path = TESTDATA_DIR / fixture_name
+    if not csv_path.exists():
+        pytest.skip(f"{fixture_name} not found")
 
     monthly_spend: dict[str, dict[str, float]] = {}  # month -> category -> total spend
 

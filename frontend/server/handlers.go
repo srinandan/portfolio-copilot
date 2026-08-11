@@ -253,11 +253,13 @@ func defaultDocuments() []contracts.DocumentItem {
 	return []contracts.DocumentItem{
 		{
 			ID:            "doc-1",
-			Filename:      "Fidelity_Stmt_Oct2023.pdf",
+			Filename:      "Checking_Stmt_Oct2023.csv",
+			AccountType:   "checking",
+			TargetTable:   "checking_transactions",
 			SizeBytes:     1258291,
 			UploadedAt:    "2023-10-24T09:41:00Z",
 			Status:        "SUCCESS",
-			RecordsParsed: ptrInt(42),
+			RecordsParsed: ptrInt(36),
 		},
 	}
 }
