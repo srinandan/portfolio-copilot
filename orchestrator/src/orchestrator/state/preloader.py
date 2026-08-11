@@ -43,9 +43,9 @@ def preload_for_portfolio_analysis(
     drift_report = calculate_drift(holdings, ips)
     return {
         "user_id": user_id,
-        "ips": ips.model_dump(),
-        "holdings": holdings.model_dump(),
-        "drift_report": drift_report.model_dump(),
+        "ips": ips.model_dump(mode="json"),
+        "holdings": holdings.model_dump(mode="json"),
+        "drift_report": drift_report.model_dump(mode="json"),
     }
 
 
@@ -87,12 +87,14 @@ def preload_for_action_drafting(
 
     return {
         "user_id": user_id,
-        "ips": ips.model_dump(),
-        "holdings": holdings.model_dump(),
+        "ips": ips.model_dump(mode="json"),
+        "holdings": holdings.model_dump(mode="json"),
         "drift_report": drift_report,
-        "research_briefs": [b.model_dump() if hasattr(b, "model_dump") else b for b in (research_briefs or [])],
+        "research_briefs": [
+            b.model_dump(mode="json") if hasattr(b, "model_dump") else b for b in (research_briefs or [])
+        ],
         "requested_trade": requested_trade,
-        "precomputed_trade": precomputed_trade.model_dump()
+        "precomputed_trade": precomputed_trade.model_dump(mode="json")
         if hasattr(precomputed_trade, "model_dump") and precomputed_trade is not None
         else precomputed_trade,
     }
@@ -139,11 +141,11 @@ def preload_for_reviewer(
     if not holdings:
         raise PreloadDeclinedError(f"No holdings found for user {user_id}.")
 
-    action_dict = action.model_dump() if hasattr(action, "model_dump") else dict(action)
+    action_dict = action.model_dump(mode="json") if hasattr(action, "model_dump") else dict(action)
 
     return {
         "user_id": user_id,
         "action": action_dict,
-        "ips": ips.model_dump(),
-        "holdings": holdings.model_dump(),
+        "ips": ips.model_dump(mode="json"),
+        "holdings": holdings.model_dump(mode="json"),
     }

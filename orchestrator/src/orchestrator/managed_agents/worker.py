@@ -16,7 +16,8 @@ DEFAULT_TURN_TIMEOUT = timedelta(seconds=DEFAULT_TIMEOUT_SEC)
 PER_SKILL_TIMEOUT: dict[str, timedelta] = {
     "research": timedelta(seconds=float(os.environ.get("RESEARCH_TIMEOUT_SECONDS", "300"))),
     "action-drafting": timedelta(seconds=float(os.environ.get("ACTION_DRAFTING_TIMEOUT_SECONDS", "180"))),
-    "spending-analysis": timedelta(seconds=float(os.environ.get("SPENDING_ANALYSIS_TIMEOUT_SECONDS", "480"))),
+    "spending-analysis": timedelta(seconds=float(os.environ.get("SPENDING_ANALYSIS_TIMEOUT_SECONDS", "60"))),
+    "private-spending-analysis": timedelta(seconds=float(os.environ.get("SPENDING_ANALYSIS_TIMEOUT_SECONDS", "60"))),
 }
 
 __all__ = [

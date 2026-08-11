@@ -1,5 +1,5 @@
 import os
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from google.adk import Context
@@ -200,3 +200,64 @@ async def test_dispatch_managed_skill_research_cache_hit(mock_resolve):
     assert res2 == expected_brief
     assert mock_ctx.run_node.await_count == 1
     _RESEARCH_CACHE.clear()
+
+
+@pytest.mark.asyncio
+@patch("orchestrator.managed_agents.dispatcher.resolve_skill_instructions")
+async def test_dispatch_managed_skill_coerces_goals_onboarding_dict(mock_resolve):
+    from orchestrator.contracts.goals_onboarding import GoalsOnboardingResult
+    from orchestrator.contracts.ips import RiskTolerance
+
+    mock_resolve.return_value = "Goals onboarding instructions"
+
+    mock_ctx = AsyncMock(spec=Context)
+    mock_ctx.run_node.return_value = {
+        "user_id": "usr_123",
+        "risk_tolerance": "moderate",
+        "time_horizon_years": 15,
+        "interview_summary": "Balanced portfolio for retirement in 15 years.",
+    }
+
+    result = await dispatch_managed_skill(
+        skill_name="private-goals-onboarding",
+        node_input={"user_id": "usr_123"},
+        ctx=mock_ctx,
+    )
+    assert isinstance(result, GoalsOnboardingResult)
+    assert result.user_id == "usr_123"
+    assert result.risk_tolerance == RiskTolerance.MODERATE
+    assert result.time_horizon_years == 15
+    assert len(result.target_allocation) == 3
+
+
+@pytest.mark.asyncio
+@patch("orchestrator.managed_agents.dispatcher.resolve_skill_instructions")
+async def test_dispatch_managed_skill_extracts_from_session_events(mock_resolve):
+    from google.genai.types import Part
+
+    from orchestrator.contracts.goals_onboarding import GoalsOnboardingResult
+
+    mock_resolve.return_value = "Goals onboarding instructions"
+
+    mock_event = MagicMock()
+    mock_event.author = "goals_onboarding"
+    mock_event.output = None
+    mock_event.content.parts = [
+        Part.from_text(text='{"user_id": "usr_456", "risk_tolerance": "aggressive", "time_horizon_years": 20}')
+    ]
+
+    mock_session = MagicMock()
+    mock_session.events = [mock_event]
+
+    mock_ctx = AsyncMock(spec=Context)
+    mock_ctx.run_node.return_value = None
+    mock_ctx.session = mock_session
+
+    result = await dispatch_managed_skill(
+        skill_name="private-goals-onboarding",
+        node_input={"user_id": "usr_456"},
+        ctx=mock_ctx,
+    )
+    assert isinstance(result, GoalsOnboardingResult)
+    assert result.user_id == "usr_456"
+    assert result.time_horizon_years == 20

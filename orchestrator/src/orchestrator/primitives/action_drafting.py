@@ -17,7 +17,15 @@ KNOWN_SECTOR_MAP = {
     "NVDA": "Technology",
     "VOO": "Broad Market",
     "SPY": "Broad Market",
+    "VTI": "Broad Market",
+    "IVV": "Broad Market",
+    "QQQ": "Technology",
+    "VXUS": "International Equity",
+    "VEA": "International Equity",
+    "VWO": "Emerging Markets",
     "BND": "Fixed Income",
+    "AGG": "Fixed Income",
+    "TLT": "Fixed Income",
 }
 
 

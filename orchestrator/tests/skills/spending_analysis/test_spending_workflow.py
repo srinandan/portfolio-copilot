@@ -214,3 +214,61 @@ async def test_planner_dispatches_spending_analysis_managed_agent():
         assert mock_dispatch.call_args[1]["node_input"]["query_intent"] == "anomaly_check"
         assert mock_dispatch.call_args[1]["node_input"]["window_months"] == 6
         assert "preloaded" in mock_dispatch.call_args[1]["node_input"]
+
+
+@pytest.mark.asyncio
+async def test_spending_analysis_workflow_handles_timeout_gracefully():
+    agent = Workflow(
+        name="test_root",
+        edges=[("START", root_planner)],
+    )
+    session_service = InMemorySessionService()
+    memory_service = InMemoryMemoryService()
+    runner = Runner(
+        app_name="test_app",
+        agent=agent,
+        session_service=session_service,
+        memory_service=memory_service,
+        auto_create_session=True,
+    )
+
+    with (
+        patch("orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list,
+        patch("orchestrator.planner.preload_spending_facts") as mock_preload,
+        patch("orchestrator.planner.emit_skill_invoked_audit"),
+        patch("orchestrator.planner.dispatch_managed_skill", new_callable=AsyncMock) as mock_dispatch,
+    ):
+        mock_list.return_value = [
+            Skill(
+                name="projects/test-proj/locations/global/skills/private-spending-analysis",
+                target_state="TARGET_STATE_ACTIVE",
+                default_revision="rev1",
+            ),
+        ]
+        mock_preload.return_value = {
+            "user_id": "user_123",
+            "total_income_usd": 10000.0,
+            "total_outflow_usd": 6000.0,
+            "savings_rate": 0.4,
+            "reserve_months": 6.0,
+            "category_breakdown": [],
+            "anomalies": [],
+        }
+        # Simulate a TimeoutError from Managed Agent dispatch
+        mock_dispatch.side_effect = TimeoutError("Node 'private_spending_analysis' timed out after 180.0 seconds.")
+
+        response_stream = runner.run_async(
+            user_id="user_123",
+            session_id="session_spending_timeout_1",
+            new_message=UserContent(
+                parts=[
+                    Part.from_text(text='{"user_id": "user_123", "query_intent": "anomaly_check", "window_months": 3}')
+                ]
+            ),
+        )
+
+        events = [e async for e in response_stream]
+        assert len(events) > 0
+        # Verify execution completed without raising unhandled exception
+        mock_preload.assert_called_once_with(user_id="user_123", window_months=3)
+        mock_dispatch.assert_called_once()

@@ -23,6 +23,59 @@ COLLECTION_IPS = "ips"
 COLLECTION_PROPOSED_ACTIONS = "proposed_actions"
 
 
+def _default_dict_factory(obj: Any) -> dict[str, Any]:
+    return json.loads(obj.model_dump_json(exclude_none=True))
+
+
+@firestore.transactional
+def _update_ips_transactional(
+    transaction: Transaction,
+    db: firestore.Client,
+    new_ips: InvestmentPolicyStatement,
+    dict_factory: Any = None,
+) -> None:
+    factory = dict_factory or _default_dict_factory
+
+    if new_ips.status != IPSStatus.ACTIVE:
+        raise ValueError("new IPS must have status 'active'")
+
+    ips_collection = db.collection(COLLECTION_IPS)
+    new_doc_id = f"{new_ips.ips_id}_v{new_ips.version}"
+    new_doc_ref = ips_collection.document(new_doc_id)
+
+    # 1. Find the currently active IPS for this ips_id
+    query = (
+        ips_collection.where(filter=firestore.FieldFilter("ips_id", "==", new_ips.ips_id))
+        .where(filter=firestore.FieldFilter("status", "==", IPSStatus.ACTIVE.value))
+        .limit(1)
+    )
+
+    docs = list(query.stream(transaction=transaction))
+    if len(docs) > 1:
+        raise ValueError(f"invariant violated: found multiple active IPS documents for ips_id {new_ips.ips_id}")
+
+    if len(docs) == 1:
+        # There's an active IPS, supersede it
+        old_doc = docs[0]
+        old_data = old_doc.to_dict()
+
+        # Prepare the update
+        old_data["status"] = IPSStatus.SUPERSEDED.value
+        old_data["superseded_by"] = new_doc_id
+
+        # Validate the modified old document before saving
+        old_ips = InvestmentPolicyStatement.model_validate(old_data)
+
+        transaction.set(old_doc.reference, factory(old_ips))
+    else:
+        # Initial case: no active IPS exists.
+        if new_ips.version != 1:
+            raise ValueError(f"no active IPS found, but new version is not 1 (got {new_ips.version})")
+
+    # 2. Write the new active document
+    transaction.set(new_doc_ref, factory(new_ips))
+
+
 class FirestoreClient:
     def __init__(self, project: str | None = None):
         self.project = (
@@ -114,47 +167,6 @@ class FirestoreClient:
             return InvestmentPolicyStatement.model_validate(docs[0].to_dict())
         return None
 
-    @firestore.transactional
-    def _update_ips_transactional(self, transaction: Transaction, new_ips: InvestmentPolicyStatement) -> None:
-        if new_ips.status != IPSStatus.ACTIVE:
-            raise ValueError("new IPS must have status 'active'")
-
-        ips_collection = self.db.collection(COLLECTION_IPS)
-        new_doc_id = f"{new_ips.ips_id}_v{new_ips.version}"
-        new_doc_ref = ips_collection.document(new_doc_id)
-
-        # 1. Find the currently active IPS for this ips_id
-        query = (
-            ips_collection.where(filter=firestore.FieldFilter("ips_id", "==", new_ips.ips_id))
-            .where(filter=firestore.FieldFilter("status", "==", IPSStatus.ACTIVE.value))
-            .limit(1)
-        )
-
-        docs = list(query.stream(transaction=transaction))
-        if len(docs) > 1:
-            raise ValueError(f"invariant violated: found multiple active IPS documents for ips_id {new_ips.ips_id}")
-
-        if len(docs) == 1:
-            # There's an active IPS, supersede it
-            old_doc = docs[0]
-            old_data = old_doc.to_dict()
-
-            # Prepare the update
-            old_data["status"] = IPSStatus.SUPERSEDED.value
-            old_data["superseded_by"] = new_doc_id
-
-            # Validate the modified old document before saving
-            old_ips = InvestmentPolicyStatement.model_validate(old_data)
-
-            transaction.set(old_doc.reference, self._dict_factory(old_ips))
-        else:
-            # Initial case: no active IPS exists.
-            if new_ips.version != 1:
-                raise ValueError(f"no active IPS found, but new version is not 1 (got {new_ips.version})")
-
-        # 2. Write the new active document
-        transaction.set(new_doc_ref, self._dict_factory(new_ips))
-
     def update_ips(self, new_ips: InvestmentPolicyStatement) -> None:
         """
         Implements the IPS versioning invariant.
@@ -162,7 +174,7 @@ class FirestoreClient:
         When adding a new version, the previous active version is marked as superseded.
         """
         transaction = self.db.transaction()
-        self._update_ips_transactional(transaction, new_ips)
+        _update_ips_transactional(transaction, self.db, new_ips, self._dict_factory)
 
     def get_active_ips_by_user(self, user_id: str) -> InvestmentPolicyStatement | None:
         """Gets the currently active IPS for a given user_id."""

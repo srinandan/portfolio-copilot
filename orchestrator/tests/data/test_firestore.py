@@ -12,7 +12,7 @@ from src.orchestrator.contracts import (
     RiskTolerance,
     TargetAllocation,
 )
-from src.orchestrator.data.firestore import FirestoreClient
+from src.orchestrator.data.firestore import FirestoreClient, _update_ips_transactional
 
 
 def test_pydantic_dict_factory():
@@ -110,12 +110,12 @@ def test_update_ips_transactional_error_multiple_active():
 
         transaction = MagicMock()
 
-        original_func = client._update_ips_transactional.to_wrap
+        original_func = _update_ips_transactional.to_wrap
 
         bad_ips = ips.model_copy()
         bad_ips.status = IPSStatus.DRAFT
         with pytest.raises(ValueError, match="must have status 'active'"):
-            original_func(client, transaction, bad_ips)
+            original_func(transaction, client.db, bad_ips, client._dict_factory)
 
         client.db = MagicMock()
         mock_query = MagicMock()
@@ -123,7 +123,7 @@ def test_update_ips_transactional_error_multiple_active():
         client.db.collection.return_value.where.return_value.where.return_value.limit.return_value = mock_query
 
         with pytest.raises(ValueError, match="invariant violated"):
-            original_func(client, transaction, ips)
+            original_func(transaction, client.db, ips, client._dict_factory)
 
 
 def test_update_ips_transactional_error_version_not_1():
@@ -149,10 +149,10 @@ def test_update_ips_transactional_error_version_not_1():
         mock_query.stream.return_value = []
         client.db.collection.return_value.where.return_value.where.return_value.limit.return_value = mock_query
 
-        original_func = client._update_ips_transactional.to_wrap
+        original_func = _update_ips_transactional.to_wrap
 
         with pytest.raises(ValueError, match="new version is not 1"):
-            original_func(client, transaction, ips)
+            original_func(transaction, client.db, ips, client._dict_factory)
 
 
 def test_update_ips_transactional_success_update():
@@ -184,8 +184,8 @@ def test_update_ips_transactional_success_update():
         mock_query.stream.return_value = [mock_old_doc]
         client.db.collection.return_value.where.return_value.where.return_value.limit.return_value = mock_query
 
-        original_func = client._update_ips_transactional.to_wrap
-        original_func(client, transaction, ips)
+        original_func = _update_ips_transactional.to_wrap
+        original_func(transaction, client.db, ips, client._dict_factory)
 
         assert transaction.set.call_count == 2
 
