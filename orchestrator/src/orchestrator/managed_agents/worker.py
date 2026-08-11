@@ -1,3 +1,4 @@
+import os
 import re
 from datetime import timedelta
 from typing import Any, List, Optional, Type
@@ -10,10 +11,12 @@ from orchestrator.managed_agents.secret_loader import (
     resolve_managed_agent_id,
 )
 
-DEFAULT_TURN_TIMEOUT = timedelta(minutes=3)
+DEFAULT_TIMEOUT_SEC = float(os.environ.get("MANAGED_AGENT_TIMEOUT_SECONDS", "480"))
+DEFAULT_TURN_TIMEOUT = timedelta(seconds=DEFAULT_TIMEOUT_SEC)
 PER_SKILL_TIMEOUT: dict[str, timedelta] = {
-    "research": timedelta(minutes=2),  # search-loop guardrail
-    "action-drafting": timedelta(minutes=1),  # narrow schema
+    "research": timedelta(seconds=float(os.environ.get("RESEARCH_TIMEOUT_SECONDS", "300"))),
+    "action-drafting": timedelta(seconds=float(os.environ.get("ACTION_DRAFTING_TIMEOUT_SECONDS", "180"))),
+    "spending-analysis": timedelta(seconds=float(os.environ.get("SPENDING_ANALYSIS_TIMEOUT_SECONDS", "480"))),
 }
 
 __all__ = [

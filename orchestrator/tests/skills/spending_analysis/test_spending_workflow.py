@@ -8,7 +8,6 @@ from google.adk.workflow import Workflow
 from google.genai.types import Part, UserContent
 
 from orchestrator.contracts.holdings import HoldingsSnapshot
-from orchestrator.contracts.spending_analysis import CategorySpending, SpendingAnomaly, SpendingReport
 from orchestrator.planner import root_planner
 from orchestrator.registry_client import Skill
 from orchestrator.state.spending import preload_spending_facts
@@ -16,14 +15,13 @@ from orchestrator.state.spending import preload_spending_facts
 
 def test_preload_spending_facts_default_3_months():
     mock_bq = MagicMock()
-    mock_bq.get_trailing_income_and_outflow.return_value = {
-        "total_income": 10000.0,
-        "total_outflow": 6000.0,
-    }
-    mock_bq.get_monthly_spending_totals.return_value = [
-        {"normalized_category": "dining", "current_month_spend": 800.0, "trailing_3mo_avg": 400.0},
-        {"normalized_category": "groceries", "current_month_spend": 500.0, "trailing_3mo_avg": 500.0},
-    ]
+    mock_bq.get_spending_snapshot.return_value = (
+        {"total_income": 10000.0, "total_outflow": 6000.0},
+        [
+            {"normalized_category": "dining", "current_month_spend": 800.0, "trailing_3mo_avg": 400.0},
+            {"normalized_category": "groceries", "current_month_spend": 500.0, "trailing_3mo_avg": 500.0},
+        ],
+    )
 
     mock_fs = MagicMock()
     mock_fs.get_holdings.return_value = HoldingsSnapshot(
@@ -44,15 +42,15 @@ def test_preload_spending_facts_default_3_months():
     assert len(facts["anomalies"]) == 1
     assert facts["anomalies"][0]["category"] == "dining"
     assert len(facts["category_breakdown"]) == 2
+    mock_bq.get_spending_snapshot.assert_called_once()
 
 
 def test_preload_spending_facts_dynamic_6_months():
     mock_bq = MagicMock()
-    mock_bq.get_trailing_income_and_outflow.return_value = {
-        "total_income": 20000.0,
-        "total_outflow": 12000.0,
-    }
-    mock_bq.get_monthly_spending_totals.return_value = []
+    mock_bq.get_spending_snapshot.return_value = (
+        {"total_income": 20000.0, "total_outflow": 12000.0},
+        [],
+    )
 
     mock_fs = MagicMock()
     mock_fs.get_holdings.return_value = HoldingsSnapshot(
@@ -67,6 +65,87 @@ def test_preload_spending_facts_dynamic_6_months():
     assert facts["window_months"] == 6
     # monthly expenses = 12000 / 6 = 2000; reserve_months = 10000 / 2000 = 5.0
     assert facts["reserve_months"] == 5.0
+
+
+def test_preload_uses_single_bigquery_call():
+    mock_bq = MagicMock()
+    mock_bq.get_spending_snapshot.return_value = ({"total_income": 0.0, "total_outflow": 0.0}, [])
+    mock_fs = MagicMock()
+    mock_fs.get_holdings.return_value = None
+
+    preload_spending_facts("user_123", window_months=3, bq_client=mock_bq, firestore_client=mock_fs)
+
+    assert mock_bq.get_spending_snapshot.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_spending_postprocess_merges_narrative_onto_preloaded_facts():
+    from orchestrator.contracts.spending_analysis import SpendingNarrative
+    from orchestrator.planner import _postprocess_spending
+
+    preloaded = {
+        "user_id": "user_123",
+        "total_income_usd": 12000.0,
+        "total_outflow_usd": 7000.0,
+        "savings_rate": 0.4167,
+        "reserve_months": 4.5,
+        "category_breakdown": [{"category": "dining", "amount_usd": 500.0, "percentage": 7.14}],
+        "anomalies": [
+            {"category": "dining", "current_spend_usd": 500.0, "trailing_avg_usd": 200.0, "description": "surged"}
+        ],
+    }
+    llm_result = SpendingNarrative(
+        narrative_summary="Your spending is on track with 41.7% savings rate.",
+        anomaly_commentary=["One-time birthday dinner celebration."],
+    )
+
+    payload, context_delta = await _postprocess_spending(
+        user_id="user_123",
+        result=llm_result,
+        ctx=MagicMock(),
+        input_dict={"preloaded": preloaded},
+    )
+
+    report = context_delta["spending_analysis_result"]
+    assert report.total_income_usd == 12000.0
+    assert report.total_outflow_usd == 7000.0
+    assert report.savings_rate == 0.4167
+    assert report.reserve_months == 4.5
+    assert report.narrative_summary == "Your spending is on track with 41.7% savings rate."
+    assert report.anomalies[0].description == "One-time birthday dinner celebration."
+
+
+@pytest.mark.asyncio
+async def test_spending_postprocess_ignores_llm_numeric_hallucination():
+    from orchestrator.planner import _postprocess_spending
+
+    preloaded = {
+        "user_id": "user_123",
+        "total_income_usd": 5000.0,
+        "total_outflow_usd": 3000.0,
+        "savings_rate": 0.4,
+        "reserve_months": 3.0,
+        "category_breakdown": [],
+        "anomalies": [],
+    }
+    # Dict output attempting to override numeric fields
+    llm_dict = {
+        "total_income_usd": 99999.0,
+        "savings_rate": 0.99,
+        "narrative_summary": "Attempted override of numbers.",
+    }
+
+    payload, context_delta = await _postprocess_spending(
+        user_id="user_123",
+        result=llm_dict,
+        ctx=MagicMock(),
+        input_dict={"preloaded": preloaded},
+    )
+
+    report = context_delta["spending_analysis_result"]
+    assert report.total_income_usd == 5000.0
+    assert report.savings_rate == 0.4
+    assert report.narrative_summary == "Attempted override of numbers."
 
 
 @pytest.mark.asyncio
@@ -85,22 +164,11 @@ async def test_planner_dispatches_spending_analysis_managed_agent():
         auto_create_session=True,
     )
 
-    expected_report = SpendingReport(
-        user_id="user_123",
-        total_income_usd=10000.0,
-        total_outflow_usd=6000.0,
-        savings_rate=0.4,
-        reserve_months=6.0,
-        category_breakdown=[CategorySpending(category="dining", amount_usd=800.0, percentage=13.33)],
-        anomalies=[
-            SpendingAnomaly(
-                category="dining",
-                current_spend_usd=800.0,
-                trailing_avg_usd=400.0,
-                description="Dining doubled this month.",
-            )
-        ],
+    from orchestrator.contracts.spending_analysis import SpendingNarrative
+
+    expected_narrative = SpendingNarrative(
         narrative_summary="Dining showed significant surge; overall savings rate remains solid at 40%.",
+        anomaly_commentary=[],
     )
 
     with (
@@ -125,7 +193,7 @@ async def test_planner_dispatches_spending_analysis_managed_agent():
             "category_breakdown": [],
             "anomalies": [],
         }
-        mock_dispatch.return_value = expected_report
+        mock_dispatch.return_value = expected_narrative
 
         response_stream = runner.run_async(
             user_id="user_123",

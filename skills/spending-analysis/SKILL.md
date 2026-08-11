@@ -68,16 +68,28 @@ dispatching to the Managed Agent:
 
 ## Output
 
-Produces a typed [`SpendingReport`](../../schemas/spending-report.schema.json)
-containing:
-- `user_id`: string
-- `total_income_usd`: float
-- `total_outflow_usd`: float
-- `savings_rate`: float
-- `reserve_months`: float
-- `category_breakdown`: list of CategorySpending
-- `anomalies`: list of SpendingAnomaly
-- `narrative_summary`: natural language synthesis and recommendations
+Return **only** the natural-language synthesis fields:
+
+- `narrative_summary` — 2–5 sentences. Directly answer the user's
+  `query_intent` using the preloaded numeric facts. If anomalies were
+  flagged by the preloader, name them and give a plausible cause. If
+  reserve_months is under 3 or savings_rate is under 0 (spending more
+  than earning), call it out. Do not invent numbers; every figure you
+  cite must appear in `input.preloaded`. If `input.preloaded` contains
+  zero income/outflow and empty categories, state clearly that no transaction
+  history is available.
+- `anomaly_commentary` — optional list, at most one entry per anomaly
+  in `input.preloaded.anomalies`, in the same order. Each string
+  replaces the preloader's canned "surged from average" description
+  with a more specific explanation (e.g. "one-time medical bill",
+  "annual insurance premium"). Leave empty if you have no better
+  explanation — the preloader's description is a valid default.
+
+Do NOT restate `total_income_usd`, `total_outflow_usd`, `savings_rate`,
+`reserve_months`, `category_breakdown`, or the numeric fields of any
+anomaly. Those come from `input.preloaded` and are authoritative. The
+orchestrator merges your two fields onto the preloaded facts and
+persists the resulting SpendingReport.
 
 ## Tools / permissions required
 

@@ -20,6 +20,7 @@ from .contracts.proposed_action import (
     ProposedAction,
     SkillVersionRef,
 )
+from .contracts.spending_analysis import SpendingReport
 from .data.firestore import FirestoreClient
 from .gates import execution_gate, hitl_approval_gate
 from .logger import get_logger
@@ -103,8 +104,38 @@ def _build_spending_input(user_id, input_dict, context):
 
 
 async def _postprocess_spending(user_id, result, ctx, input_dict, registry_entry_id=None):
-    payload = result.model_dump() if hasattr(result, "model_dump") else result
-    return payload, {"spending_analysis_result": result}
+    preloaded = input_dict.get("preloaded", {}) or {}
+    narrative = ""
+    if isinstance(result, dict):
+        narrative = result.get("narrative_summary") or result.get("summary") or ""
+    elif hasattr(result, "narrative_summary"):
+        narrative = getattr(result, "narrative_summary") or ""
+    elif isinstance(result, str):
+        narrative = result
+
+    commentary = []
+    if isinstance(result, dict):
+        commentary = result.get("anomaly_commentary", []) or []
+    elif hasattr(result, "anomaly_commentary"):
+        commentary = getattr(result, "anomaly_commentary", []) or []
+
+    anomalies_out = list(preloaded.get("anomalies", []))
+    for i, comment in enumerate(commentary):
+        if i < len(anomalies_out) and isinstance(anomalies_out[i], dict) and comment:
+            anomalies_out[i] = {**anomalies_out[i], "description": comment}
+
+    report = SpendingReport(
+        user_id=preloaded.get("user_id", user_id),
+        total_income_usd=float(preloaded.get("total_income_usd", 0.0)),
+        total_outflow_usd=float(preloaded.get("total_outflow_usd", 0.0)),
+        savings_rate=float(preloaded.get("savings_rate", 0.0)),
+        reserve_months=float(preloaded.get("reserve_months", 0.0)),
+        category_breakdown=preloaded.get("category_breakdown", []),
+        anomalies=anomalies_out,
+        narrative_summary=narrative or "Spending analysis completed based on transaction facts.",
+    )
+    payload = report.model_dump()
+    return payload, {"spending_analysis_result": report}
 
 
 def _build_goals_onboarding_input(user_id, input_dict, context):
@@ -205,6 +236,7 @@ async def _postprocess_action_drafting(user_id, result, ctx, input_dict, registr
     session_id_str = sess_id if isinstance(sess_id, str) else "sess_default"
 
     merged = {
+        **pre,
         "action_id": pre.get("action_id") or str(uuid.uuid4()),
         "session_id": pre.get("session_id") or session_id_str,
         "type": pre.get("type") or ActionType.TRADE,
@@ -221,7 +253,6 @@ async def _postprocess_action_drafting(user_id, result, ctx, input_dict, registr
             skill_version="0.1.0",
             registry_entry_id=registry_entry_id,
         ),
-        **pre,
         "rationale": rationale,
         "supporting_research_refs": refs,
     }
@@ -428,8 +459,11 @@ async def _execute_skill(
         logger.info(f"Skipping skill {plan.short_name} (no input built)")
         return None
 
-    if isinstance(node_input, dict) and "precomputed_trade" in node_input:
-        input_dict.setdefault("precomputed_trade", node_input.get("precomputed_trade"))
+    if isinstance(node_input, dict):
+        if "precomputed_trade" in node_input:
+            input_dict.setdefault("precomputed_trade", node_input.get("precomputed_trade"))
+        if "preloaded" in node_input:
+            input_dict.setdefault("preloaded", node_input.get("preloaded"))
 
     # 2. Emit SKILL_INVOKED
     emit_skill_invoked_audit(
@@ -441,7 +475,12 @@ async def _execute_skill(
     # 3. Dispatch to Managed Agent
     t0 = time.monotonic()
     try:
-        result = await dispatch_managed_skill(plan.short_name, node_input=node_input, ctx=ctx)
+        result = await dispatch_managed_skill(
+            plan.short_name,
+            node_input=node_input,
+            ctx=ctx,
+            registry_entry_id=registry_entry_id,
+        )
     except Exception as e:
         logger.exception("Skill %s dispatch failed", plan.short_name)
         emit_skill_failed_audit(
@@ -615,9 +654,10 @@ async def root_planner(ctx: Context, node_input: Any):
 
     if parallel_tasks:
         parallel_results = await asyncio.gather(*parallel_tasks, return_exceptions=True)
+        errors = [r for r in parallel_results if isinstance(r, Exception)]
+        if errors:
+            raise ExceptionGroup("parallel skill dispatch failed", errors)
         for plan, r in zip(parallel_plans, parallel_results):
-            if isinstance(r, Exception):
-                raise r
             if r is not None:
                 results.append(f"{plan.short_name.replace('private-', '')}_result: {r}")
 

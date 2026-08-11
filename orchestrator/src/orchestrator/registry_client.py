@@ -84,17 +84,30 @@ def _create_mtls_ssl_context() -> ssl.SSLContext | None:
         return None
 
 
+_STRIP_SECTIONS_STARTING_WITH = (
+    "## Acceptance criteria",
+    "## Acceptance Criteria",
+    "## Registry metadata",
+    "## Registry Metadata",
+    "## When this skill runs",
+    "## When This Skill Runs",
+    "## Drafting logic",  # action-drafting; obsolete after PR #259
+    "## Pre-check, before drafting",  # action-drafting; deterministic path
+    "## Deterministic calculations",  # spending-analysis; orchestrator-precomputed
+)
+
+
 def strip_non_runtime_sections(content: str) -> str:
-    """Strips spec-only sections (Acceptance criteria, Registry metadata) from SKILL.md for runtime prompt efficiency."""
-    if "## Acceptance criteria" in content:
-        content = content.split("## Acceptance criteria")[0]
-    elif "## Acceptance Criteria" in content:
-        content = content.split("## Acceptance Criteria")[0]
-
-    if "## Registry metadata" in content:
-        content = content.split("## Registry metadata")[0]
-
-    return content.strip()
+    """Strips non-runtime sections from SKILL.md for runtime prompt efficiency."""
+    lines = content.splitlines()
+    out = []
+    skipping = False
+    for line in lines:
+        if line.startswith("## "):
+            skipping = any(line.startswith(m) for m in _STRIP_SECTIONS_STARTING_WITH)
+        if not skipping:
+            out.append(line)
+    return "\n".join(out).strip()
 
 
 class AgentRegistryClient:

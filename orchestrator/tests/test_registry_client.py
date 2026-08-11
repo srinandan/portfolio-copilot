@@ -556,3 +556,30 @@ Research brief summary.
     assert "## Registry metadata" not in stripped
     assert "## Acceptance criteria" not in stripped
     assert "Must not leak sensitive data" not in stripped
+
+
+def test_strip_removes_middle_sections_but_keeps_later_ones():
+    from orchestrator.registry_client import strip_non_runtime_sections
+
+    content = """# Action Drafting
+
+## Purpose
+Drafts trades.
+
+## Drafting logic
+Compute math and allocations here.
+
+## Output
+Author rationale only.
+
+## Acceptance criteria
+1. Valid trade.
+"""
+    stripped = strip_non_runtime_sections(content)
+    assert "## Purpose" in stripped
+    assert "## Output" in stripped
+    assert "Author rationale only." in stripped
+    assert "## Drafting logic" not in stripped
+    assert "Compute math and allocations here." not in stripped
+    assert "## Acceptance criteria" not in stripped
+    assert "Valid trade." not in stripped

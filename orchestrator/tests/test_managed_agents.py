@@ -8,9 +8,10 @@ from google.adk.tools import google_search
 from orchestrator.contracts import (
     Goal,
     GoalsOnboardingResult,
+    ProposedActionRationale,
     ResearchBrief,
     RiskTolerance,
-    SpendingReport,
+    SpendingNarrative,
     TargetAllocation,
 )
 from orchestrator.managed_agents import (
@@ -60,7 +61,7 @@ def test_output_schema_by_skill():
     from orchestrator.managed_agents.dispatcher import normalize_private_skill_name
 
     assert OUTPUT_SCHEMA_BY_SKILL["private-goals-onboarding"] == GoalsOnboardingResult
-    assert OUTPUT_SCHEMA_BY_SKILL["private-spending-analysis"] == SpendingReport
+    assert OUTPUT_SCHEMA_BY_SKILL["private-spending-analysis"] == SpendingNarrative
     assert OUTPUT_SCHEMA_BY_SKILL["private-research"] == ResearchBrief
     assert OUTPUT_SCHEMA_BY_SKILL.get(normalize_private_skill_name("goals-onboarding")) == GoalsOnboardingResult
     assert OUTPUT_SCHEMA_BY_SKILL.get(normalize_private_skill_name("private-goals-onboarding")) == GoalsOnboardingResult
@@ -102,14 +103,8 @@ async def test_dispatch_managed_skill_dict_coercion(mock_resolve):
 
     mock_ctx = AsyncMock(spec=Context)
     raw_dict = {
-        "user_id": "user1",
-        "total_income_usd": 10000.0,
-        "total_outflow_usd": 6000.0,
-        "savings_rate": 0.4,
-        "reserve_months": 6.0,
-        "category_breakdown": [],
-        "anomalies": [],
         "narrative_summary": "Spending is within normal range.",
+        "anomaly_commentary": [],
     }
     mock_ctx.run_node.return_value = raw_dict
 
@@ -119,15 +114,52 @@ async def test_dispatch_managed_skill_dict_coercion(mock_resolve):
         ctx=mock_ctx,
     )
 
-    assert isinstance(result, SpendingReport)
-    assert result.savings_rate == 0.4
-    assert result.reserve_months == 6.0
+    assert isinstance(result, SpendingNarrative)
+    assert result.narrative_summary == "Spending is within normal range."
+
+
+def test_dispatch_managed_skill_spending_uses_narrow_schema():
+    assert OUTPUT_SCHEMA_BY_SKILL["private-spending-analysis"] is SpendingNarrative
 
 
 def test_dispatch_managed_skill_action_drafting_uses_narrow_schema():
-    from orchestrator.contracts.proposed_action import ProposedActionRationale
-
     assert OUTPUT_SCHEMA_BY_SKILL["private-action-drafting"] is ProposedActionRationale
+
+
+@pytest.mark.asyncio
+@patch("orchestrator.managed_agents.dispatcher.resolve_skill_instructions")
+async def test_dispatch_managed_skill_raises_on_unvalidatable_output(mock_resolve):
+    mock_resolve.return_value = "Instructions from registry"
+
+    mock_ctx = AsyncMock(spec=Context)
+    mock_ctx.run_node.return_value = {"unrecognized_field": 123}
+
+    with pytest.raises(RuntimeError, match="could not be constructed from Managed Agent output"):
+        await dispatch_managed_skill(
+            skill_name="private-action-drafting",
+            node_input={"user_id": "user1"},
+            ctx=mock_ctx,
+        )
+
+
+@pytest.mark.asyncio
+@patch("orchestrator.managed_agents.dispatcher.resolve_skill_instructions")
+async def test_dispatch_managed_skill_returns_pydantic_instance_directly(mock_resolve):
+    mock_resolve.return_value = "Instructions from registry"
+
+    mock_ctx = AsyncMock(spec=Context)
+    instance = ProposedActionRationale(
+        rationale="Direct Pydantic instance",
+        supporting_research_refs=["ref1"],
+    )
+    mock_ctx.run_node.return_value = instance
+
+    result = await dispatch_managed_skill(
+        skill_name="private-action-drafting",
+        node_input={"user_id": "user1"},
+        ctx=mock_ctx,
+    )
+    assert result is instance
 
 
 @pytest.mark.asyncio

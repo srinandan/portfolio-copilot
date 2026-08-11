@@ -115,7 +115,7 @@ const holdings = ref<HoldingsSnapshot>({
 
 const inputPrompt = ref('');
 const isStreaming = ref(false);
-const currentSessionId = ref('sess_default');
+const currentSessionId = ref<string | undefined>(undefined);
 const currentUserId = ref('usr_default');
 
 // Start empty so we don't show a fake demo message. Real events populate this
@@ -267,7 +267,7 @@ async function onApproveAction(msg: ChatMessage) {
     await apiService.streamPlanResume(
       {
         user_id: currentUserId.value,
-        session_id: msg.session_id || currentSessionId.value,
+        session_id: msg.session_id || currentSessionId.value || '',
         invocation_id: msg.invocation_id || '',
         interrupt_id: msg.interrupt_id || '',
         payload: {
@@ -297,7 +297,7 @@ async function onRejectAction(msg: ChatMessage) {
     await apiService.streamPlanResume(
       {
         user_id: currentUserId.value,
-        session_id: msg.session_id || currentSessionId.value,
+        session_id: msg.session_id || currentSessionId.value || '',
         invocation_id: msg.invocation_id || '',
         interrupt_id: msg.interrupt_id || '',
         payload: {
@@ -325,7 +325,7 @@ async function onUpdateAction(msg: ChatMessage, updated: ProposedAction) {
     await apiService.streamPlanResume(
       {
         user_id: currentUserId.value,
-        session_id: msg.session_id || currentSessionId.value,
+        session_id: msg.session_id || currentSessionId.value || '',
         invocation_id: msg.invocation_id || '',
         interrupt_id: msg.interrupt_id || '',
         payload: {

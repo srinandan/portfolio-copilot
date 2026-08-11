@@ -99,5 +99,5 @@ def test_research_managed_agent_has_timeout():
         name="private-research",
         description="Search instructions",
     )
-    # timeout is 120.0 seconds (2 minutes)
-    assert agent.timeout == 120.0
+    # timeout is 300.0 seconds (5 minutes)
+    assert agent.timeout == 300.0

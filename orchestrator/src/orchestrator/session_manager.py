@@ -43,7 +43,7 @@ class SessionManager:
 
     async def get_or_create_session(self, app_name: str, user_id: str, session_id: str | None = None):
         target_app = self.agent_engine_id or app_name
-        if session_id:
+        if session_id and session_id not in ("sess_default", "default", "none", "null", ""):
             try:
                 session = await self.session_service.get_session(
                     app_name=target_app, user_id=user_id, session_id=session_id

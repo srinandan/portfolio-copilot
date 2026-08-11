@@ -12,6 +12,76 @@ class BigQueryClient:
         )
         self.client = bigquery.Client(project=self.project)
 
+    def get_spending_snapshot(
+        self, user_id: str, current_month_start: str, window_months: int = 3
+    ) -> tuple[Dict[str, float], List[Dict[str, Any]]]:
+        """Combines income/outflow totals and per-category spending into a single BigQuery job."""
+        query = f"""
+        WITH scoped AS (
+          SELECT
+            user_id,
+            transaction_date,
+            normalized_category,
+            amount,
+            DATE_TRUNC(transaction_date, MONTH) AS month
+          FROM `{self.project}.portfolio_copilot.chase_transactions`
+          WHERE user_id = @user_id
+            AND transaction_date >= DATE_SUB(CAST(@current_month_start AS DATE), INTERVAL @window_months MONTH)
+            AND transaction_date < DATE_ADD(CAST(@current_month_start AS DATE), INTERVAL 1 MONTH)
+        ),
+        income_outflow AS (
+          SELECT
+            SUM(IF(amount > 0 AND transaction_date < CAST(@current_month_start AS DATE), amount, 0)) AS total_income,
+            SUM(IF(amount < 0 AND transaction_date < CAST(@current_month_start AS DATE), -amount, 0)) AS total_outflow
+          FROM scoped
+        ),
+        per_category AS (
+          SELECT
+            normalized_category,
+            SUM(IF(month = CAST(@current_month_start AS DATE), -amount, 0)) AS current_month_spend,
+            AVG(IF(month < CAST(@current_month_start AS DATE), -amount, NULL)) AS trailing_3mo_avg
+          FROM scoped
+          WHERE amount < 0
+          GROUP BY normalized_category
+        )
+        SELECT
+          (SELECT total_income FROM income_outflow) AS total_income,
+          (SELECT total_outflow FROM income_outflow) AS total_outflow,
+          ARRAY(
+            SELECT AS STRUCT
+              normalized_category,
+              current_month_spend,
+              trailing_3mo_avg
+            FROM per_category
+          ) AS category_totals
+        """
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("user_id", "STRING", user_id),
+                bigquery.ScalarQueryParameter("current_month_start", "STRING", current_month_start),
+                bigquery.ScalarQueryParameter("window_months", "INT64", window_months),
+            ]
+        )
+        query_job = self.client.query(query, job_config=job_config)
+        results = list(query_job.result())
+        if not results:
+            return {"total_income": 0.0, "total_outflow": 0.0}, []
+
+        row = results[0]
+        totals = {
+            "total_income": float(row.total_income or 0.0),
+            "total_outflow": float(row.total_outflow or 0.0),
+        }
+        category_rows = [
+            {
+                "normalized_category": c["normalized_category"],
+                "current_month_spend": float(c["current_month_spend"] or 0.0),
+                "trailing_3mo_avg": float(c["trailing_3mo_avg"]) if c["trailing_3mo_avg"] is not None else 0.0,
+            }
+            for c in (row.category_totals or [])
+        ]
+        return totals, category_rows
+
     def get_monthly_spending_totals(
         self, user_id: str, current_month_start: str, window_months: int = 3
     ) -> List[Dict[str, Any]]:

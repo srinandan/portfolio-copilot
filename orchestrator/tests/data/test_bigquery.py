@@ -75,3 +75,22 @@ def test_get_monthly_spending_totals_uses_parameterized_window(mock_client_cls, 
     assert "INTERVAL @window_months MONTH" in sql
     window_param = [p for p in job_config.query_parameters if p.name == "window_months"][0]
     assert window_param.value == window
+
+
+@pytest.mark.parametrize("window", [3, 6])
+@patch("google.cloud.bigquery.Client")
+def test_get_spending_snapshot_uses_parameterized_window(mock_client_cls, window):
+    client = BigQueryClient("test-project")
+    client.client = MagicMock()
+    mock_job = MagicMock()
+    mock_job.result.return_value = []
+    client.client.query.return_value = mock_job
+
+    client.get_spending_snapshot("user123", "2026-08-01", window_months=window)
+
+    args, kwargs = client.client.query.call_args
+    sql = args[0]
+    job_config = kwargs["job_config"]
+    assert "INTERVAL @window_months MONTH" in sql
+    window_param = [p for p in job_config.query_parameters if p.name == "window_months"][0]
+    assert window_param.value == window
