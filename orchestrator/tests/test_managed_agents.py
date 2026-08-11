@@ -24,7 +24,7 @@ from orchestrator.managed_agents import (
 
 def test_get_worker_agent_id():
     with patch.dict(os.environ, {"MANAGED_AGENT_ID": "projects/test/agents/worker-1"}):
-        assert get_worker_agent_id() == "projects/test/agents/worker-1"
+        assert get_worker_agent_id() == "worker-1"
 
     with (
         patch.dict(os.environ, {}, clear=True),

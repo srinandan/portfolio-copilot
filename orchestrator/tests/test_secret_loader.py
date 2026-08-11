@@ -20,9 +20,9 @@ def setup_function():
 
 def test_resolve_from_env_var():
     with patch.dict(os.environ, {"MANAGED_AGENT_ID": "projects/test/agents/env-agent"}):
-        assert resolve_managed_agent_id() == "projects/test/agents/env-agent"
+        assert resolve_managed_agent_id() == "env-agent"
         # Second call returns same value
-        assert resolve_managed_agent_id() == "projects/test/agents/env-agent"
+        assert resolve_managed_agent_id() == "env-agent"
 
 
 def test_resolve_from_secret_manager():
@@ -38,15 +38,15 @@ def test_resolve_from_secret_manager():
 
         with patch("google.cloud.secretmanager.SecretManagerServiceClient", return_value=mock_client_instance):
             res = resolve_managed_agent_id()
-            assert res == "projects/test-project/agents/sm-agent"
+            assert res == "sm-agent"
             # Cached call does not call access_secret_version again
             res2 = resolve_managed_agent_id()
-            assert res2 == "projects/test-project/agents/sm-agent"
+            assert res2 == "sm-agent"
             assert mock_client_instance.access_secret_version.call_count == 1
 
             # Force refresh calls again
             res3 = resolve_managed_agent_id(force_refresh=True)
-            assert res3 == "projects/test-project/agents/sm-agent"
+            assert res3 == "sm-agent"
             assert mock_client_instance.access_secret_version.call_count == 2
 
 

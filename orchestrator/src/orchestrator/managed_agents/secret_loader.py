@@ -64,7 +64,7 @@ def resolve_managed_agent_id(force_refresh: bool = False) -> str:
     # 1. Check environment variable first (allows overrides in dev/test/Cloud Run)
     env_val = os.environ.get("MANAGED_AGENT_ID")
     if env_val:
-        return env_val
+        return env_val.split("/")[-1] if "/" in env_val else env_val
 
     if _CACHED_AGENT_ID is not None and not force_refresh:
         return _CACHED_AGENT_ID
@@ -72,7 +72,7 @@ def resolve_managed_agent_id(force_refresh: bool = False) -> str:
     # 2. Check Secret Manager
     sm_val = _fetch_from_secret_manager("MANAGED_AGENT_ID")
     if sm_val:
-        _CACHED_AGENT_ID = sm_val
+        _CACHED_AGENT_ID = sm_val.split("/")[-1] if "/" in sm_val else sm_val
         return _CACHED_AGENT_ID
 
     # 3. Fall back to placeholder default with clear warning
