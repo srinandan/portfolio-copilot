@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://example.com/schemas/chase-transaction",
-  "title": "ChaseTransaction",
-  "description": "Represents a single Chase bank transaction exported to BigQuery for spending analysis.",
+  "$id": "https://example.com/schemas/account-transaction",
+  "title": "AccountTransaction",
+  "description": "Represents a single account transaction (e.g. checking_transactions, savings_transactions) exported to BigQuery for spending and cash flow analysis.",
   "type": "object",
   "properties": {
     "user_id": {
@@ -23,11 +23,15 @@
       "type": "string"
     },
     "raw_category": {
-      "description": "The category provided by Chase before normalization.",
+      "description": "The category provided by the financial institution before normalization.",
       "type": "string"
     },
     "normalized_category": {
       "description": "The category after normalization into our standard taxonomy.",
+      "type": "string"
+    },
+    "account_type": {
+      "description": "The type of account (e.g. checking, savings).",
       "type": "string"
     }
   },
