@@ -100,7 +100,7 @@ describe('Frontend Views', () => {
 
     expect(streamPlanSpy).toHaveBeenCalledWith(
       expect.objectContaining({
-        user_id: 'usr_default',
+        user_id: 'demo_user',
         message: 'Rebalance my portfolio now'
       }),
       expect.any(Function),
@@ -158,8 +158,8 @@ describe('Frontend Views', () => {
 
     expect(resumeSpy).toHaveBeenCalledWith(
       expect.objectContaining({
-        user_id: 'usr_default',
-        payload: { decision: 'approve', user_id: 'usr_default' }
+        user_id: 'demo_user',
+        payload: { decision: 'approve', user_id: 'demo_user' }
       }),
       expect.any(Function),
       expect.any(Function)
@@ -177,11 +177,11 @@ describe('Frontend Views', () => {
 
     expect(resumeSpy).toHaveBeenCalledWith(
       expect.objectContaining({
-        user_id: 'usr_default',
+        user_id: 'demo_user',
         payload: {
           decision: 'reject',
           reason: 'User rejected proposed trade',
-          user_id: 'usr_default'
+          user_id: 'demo_user'
         }
       }),
       expect.any(Function),
@@ -206,14 +206,14 @@ describe('Frontend Views', () => {
 
     expect(resumeSpy).toHaveBeenCalledWith(
       expect.objectContaining({
-        user_id: 'usr_default',
+        user_id: 'demo_user',
         payload: {
           decision: 'edit',
           changes: {
             quantity: 30,
             rationale: 'Original rationale'
           },
-          user_id: 'usr_default'
+          user_id: 'demo_user'
         }
       }),
       expect.any(Function),

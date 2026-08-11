@@ -116,7 +116,7 @@ const holdings = ref<HoldingsSnapshot>({
 const inputPrompt = ref('');
 const isStreaming = ref(false);
 const currentSessionId = ref<string | undefined>(undefined);
-const currentUserId = ref('usr_default');
+const currentUserId = ref('demo_user');
 
 // Start empty so we don't show a fake demo message. Real events populate this
 // on the first triggerPlan call, either from typed input or an example prompt.

@@ -188,7 +188,7 @@ async def stream_reasoning_engine(request: Request) -> StreamingResponse:
     if not isinstance(input_data, dict):
         input_data = {}
 
-    user_id = input_data.get("user_id", "usr_default")
+    user_id = input_data.get("user_id", "demo_user")
     session_id = input_data.get("session_id")
     message = input_data.get("message", "")
 
@@ -233,7 +233,7 @@ async def reasoning_engine(request: Request) -> dict[str, Any]:
     if not isinstance(input_data, dict):
         input_data = {}
 
-    user_id = input_data.get("user_id", "usr_default")
+    user_id = input_data.get("user_id", "demo_user")
     session_id = input_data.get("session_id")
     message = input_data.get("message", "")
 
