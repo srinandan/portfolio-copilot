@@ -27,10 +27,11 @@ class AlpacaExecutionError(RuntimeError):
 @dataclass
 class ExecutionResult:
     """What the executor hands back to the gate after a successful submit."""
+
     broker_order_id: str
     submitted_at: datetime
     client_order_id: str  # = ProposedAction.action_id
-    raw_status: str       # Alpaca's own status string ("new", "accepted", etc.)
+    raw_status: str  # Alpaca's own status string ("new", "accepted", etc.)
 
 
 def _load_alpaca_credentials() -> tuple[str, str]:
@@ -76,9 +77,7 @@ def _build_order_request(action: ProposedAction):
     }
     if action.order_type == OrderType.LIMIT:
         if action.limit_price_usd is None:
-            raise AlpacaExecutionError(
-                f"ProposedAction {action.action_id} is a limit order but has no limit_price_usd"
-            )
+            raise AlpacaExecutionError(f"ProposedAction {action.action_id} is a limit order but has no limit_price_usd")
         return LimitOrderRequest(**common, limit_price=action.limit_price_usd)
     return MarketOrderRequest(**common)
 
@@ -88,9 +87,9 @@ class AlpacaExecutor:
 
     def __init__(self, client: Optional[TradingClient] = None):
         """Args:
-            client: Optional pre-built TradingClient (for tests). If None, one
-                is constructed from ALPACA_API_KEY_ID / ALPACA_API_SECRET env vars
-                on first use.
+        client: Optional pre-built TradingClient (for tests). If None, one
+            is constructed from ALPACA_API_KEY_ID / ALPACA_API_SECRET env vars
+            on first use.
         """
         self._client = client
         self._client_built = client is not None

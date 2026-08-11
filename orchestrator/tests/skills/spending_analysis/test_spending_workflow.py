@@ -104,9 +104,7 @@ async def test_planner_dispatches_spending_analysis_managed_agent():
     )
 
     with (
-        patch(
-            "orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock
-        ) as mock_list,
+        patch("orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list,
         patch("orchestrator.planner.preload_spending_facts") as mock_preload,
         patch("orchestrator.planner.emit_skill_invoked_audit"),
         patch("orchestrator.planner.dispatch_managed_skill", new_callable=AsyncMock) as mock_dispatch,
@@ -132,7 +130,11 @@ async def test_planner_dispatches_spending_analysis_managed_agent():
         response_stream = runner.run_async(
             user_id="user_123",
             session_id="session_spending_1",
-            new_message=UserContent(parts=[Part.from_text(text='{"user_id": "user_123", "query_intent": "anomaly_check", "window_months": 6}')]),
+            new_message=UserContent(
+                parts=[
+                    Part.from_text(text='{"user_id": "user_123", "query_intent": "anomaly_check", "window_months": 6}')
+                ]
+            ),
         )
 
         events = [e async for e in response_stream]

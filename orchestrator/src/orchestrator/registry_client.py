@@ -38,9 +38,7 @@ class GoogleAuth(httpx.Auth):
 
     def auth_flow(self, request: httpx.Request):
         if hasattr(self.credentials, "before_request"):
-            self.credentials.before_request(
-                self._auth_request, request.method, str(request.url), request.headers
-            )
+            self.credentials.before_request(self._auth_request, request.method, str(request.url), request.headers)
         else:
             if not self.credentials.valid:
                 try:
@@ -84,6 +82,19 @@ def _create_mtls_ssl_context() -> ssl.SSLContext | None:
     except Exception as e:
         logger.debug(f"Failed to load mTLS client certificate: {e}")
         return None
+
+
+def strip_non_runtime_sections(content: str) -> str:
+    """Strips spec-only sections (Acceptance criteria, Registry metadata) from SKILL.md for runtime prompt efficiency."""
+    if "## Acceptance criteria" in content:
+        content = content.split("## Acceptance criteria")[0]
+    elif "## Acceptance Criteria" in content:
+        content = content.split("## Acceptance Criteria")[0]
+
+    if "## Registry metadata" in content:
+        content = content.split("## Registry metadata")[0]
+
+    return content.strip()
 
 
 class AgentRegistryClient:
@@ -172,9 +183,7 @@ class AgentRegistryClient:
                     base_url,
                     response.text,
                 )
-                raise RuntimeError(
-                    f"Agent Registry {response.status_code} on GET {base_url}: {response.text}"
-                )
+                raise RuntimeError(f"Agent Registry {response.status_code} on GET {base_url}: {response.text}")
 
             data = response.json()
             skills_data = data.get("skills", [])
@@ -214,9 +223,7 @@ class AgentRegistryClient:
                 skill_url,
                 response.text,
             )
-            raise RuntimeError(
-                f"Agent Registry {response.status_code} on GET {skill_url}: {response.text}"
-            )
+            raise RuntimeError(f"Agent Registry {response.status_code} on GET {skill_url}: {response.text}")
 
         skill_data = response.json()
         default_revision = skill_data.get("defaultRevision", "")
@@ -233,9 +240,7 @@ class AgentRegistryClient:
                 rev_url,
                 rev_response.text,
             )
-            raise RuntimeError(
-                f"Agent Registry {rev_response.status_code} on GET {rev_url}: {rev_response.text}"
-            )
+            raise RuntimeError(f"Agent Registry {rev_response.status_code} on GET {rev_url}: {rev_response.text}")
 
         # 3. Extract SKILL.md from zip
         try:
@@ -243,7 +248,8 @@ class AgentRegistryClient:
                 for filename in zf.namelist():
                     if filename == "SKILL.md" or filename.endswith("/SKILL.md"):
                         with zf.open(filename) as f:
-                            return f.read().decode("utf-8")
+                            raw_text = f.read().decode("utf-8")
+                            return strip_non_runtime_sections(raw_text)
                 raise ValueError("SKILL.md not found in revision zip")
         except zipfile.BadZipFile as e:
             raise ValueError(f"failed to read zip archive: {e}") from e

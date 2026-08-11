@@ -28,7 +28,7 @@ def _clean_skill_name(name: str) -> str:
     """Strip any path prefix or 'private-' prefix to get the canonical skill directory name."""
     short = name.split("/")[-1] if "/" in name else name
     if short.startswith("private-"):
-        return short[len("private-"):]
+        return short[len("private-") :]
     return short
 
 
@@ -110,11 +110,7 @@ def read_skill_version(skill_dir_name: str) -> str:
     if path is None:
         return "0.1.0"
     frontmatter = _parse_frontmatter(path)
-    metadata = (
-        frontmatter.get("metadata", {})
-        if isinstance(frontmatter.get("metadata"), dict)
-        else {}
-    )
+    metadata = frontmatter.get("metadata", {}) if isinstance(frontmatter.get("metadata"), dict) else {}
     version = metadata.get("version")
     if not version:
         raise RuntimeError(f"No metadata.version found in frontmatter of {path}")

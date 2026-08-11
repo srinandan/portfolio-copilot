@@ -109,9 +109,7 @@ def test_execution_gate_uses_orchestrator_build_sha(sample_proposed_action, monk
         (emit_action_failed_audit, {"error": "bad order"}),
     ],
 )
-def test_emit_action_fails_closed_on_audit_write_error(
-    sample_proposed_action, emitter, kwargs
-):
+def test_emit_action_fails_closed_on_audit_write_error(sample_proposed_action, emitter, kwargs):
     mock_client = MagicMock()
     mock_client.append_audit_log.side_effect = Exception("Firestore down")
 

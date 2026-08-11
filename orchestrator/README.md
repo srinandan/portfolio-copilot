@@ -125,6 +125,7 @@ from google.adk.sessions.in_memory_session_service import InMemorySessionService
 from google.genai.types import UserContent
 from src.orchestrator.planner import root_agent
 
+
 async def main():
     session_service = InMemorySessionService()
     runner = Runner(
@@ -146,6 +147,7 @@ async def main():
     async for event in response_stream:
         if event.output:
             print(f"Workflow output: {event.output}")
+
 
 if __name__ == "__main__":
     asyncio.run(main())

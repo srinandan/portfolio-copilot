@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -164,7 +165,9 @@ func writeSSEPassthrough(c *gin.Context, body io.ReadCloser) {
 			return
 		}
 		if err != nil {
-			slog.WarnContext(c.Request.Context(), "orchestrator stream read error", "error", err)
+			if !errors.Is(err, context.Canceled) && c.Request.Context().Err() == nil {
+				slog.WarnContext(c.Request.Context(), "orchestrator stream read error", "error", err)
+			}
 			return
 		}
 	}
@@ -192,7 +195,9 @@ func writeAgentEngineSSE(c *gin.Context, body io.ReadCloser) {
 		c.Writer.Flush()
 	}
 	if err := scanner.Err(); err != nil {
-		slog.WarnContext(c.Request.Context(), "agent-engine stream scan error", "error", err)
+		if !errors.Is(err, context.Canceled) && c.Request.Context().Err() == nil {
+			slog.WarnContext(c.Request.Context(), "agent-engine stream scan error", "error", err)
+		}
 	}
 }
 

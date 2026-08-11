@@ -35,12 +35,8 @@ def happy_ips() -> InvestmentPolicyStatement:
         risk_tolerance=RiskTolerance.MODERATE,
         time_horizon_years=10,
         target_allocation=[
-            TargetAllocation(
-                asset_class="Equity", target_percent=60, min_percent=50, max_percent=70
-            ),
-            TargetAllocation(
-                asset_class="Bonds", target_percent=40, min_percent=30, max_percent=50
-            ),
+            TargetAllocation(asset_class="Equity", target_percent=60, min_percent=50, max_percent=70),
+            TargetAllocation(asset_class="Bonds", target_percent=40, min_percent=30, max_percent=50),
         ],
         constraints=Constraints(
             concentration_limit_percent=15,
@@ -92,9 +88,7 @@ def happy_action() -> ProposedAction:
         rationale="Small buy within concentration limit and target bands.",
         supporting_research_refs=[],
         ips_version_referenced=RelatedIPSVersion(ips_id="ips_happy", version=1),
-        proposed_by_skill_version=SkillVersionRef(
-            skill_name="private-action-drafting", skill_version="0.1.0"
-        ),
+        proposed_by_skill_version=SkillVersionRef(skill_name="private-action-drafting", skill_version="0.1.0"),
         status=ActionStatus.DRAFTED,
         created_at=datetime.now(timezone.utc),
     )

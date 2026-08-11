@@ -48,6 +48,7 @@ steps:
           --region=${_REGION}
           --service-account=portfolio-copilot-frontend-sa@${PROJECT_ID}.iam.gserviceaccount.com
           --labels=app=portfolio-copilot,component=frontend,commit=${_COMMIT_SHA}
+          --timeout=600
           --no-allow-unauthenticated
         )
 

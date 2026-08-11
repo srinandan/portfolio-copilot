@@ -133,8 +133,25 @@ def store_secret(project: str, secret_id: str, secret_value: str) -> None:
 def find_existing_managed_agent(project: str, location: str, display_name: str) -> Optional[str]:
     """Lists agents in the project/location and returns server-assigned resource ID if matching display_name exists."""
     candidate_commands = [
-        ["gcloud", "agent-registry", "agents", "list", f"--project={project}", f"--location={location}", "--format=json"],
-        ["gcloud", "alpha", "agent-registry", "agents", "list", f"--project={project}", f"--location={location}", "--format=json"],
+        [
+            "gcloud",
+            "agent-registry",
+            "agents",
+            "list",
+            f"--project={project}",
+            f"--location={location}",
+            "--format=json",
+        ],
+        [
+            "gcloud",
+            "alpha",
+            "agent-registry",
+            "agents",
+            "list",
+            f"--project={project}",
+            f"--location={location}",
+            "--format=json",
+        ],
         ["gcloud", "alpha", "agents", "list", f"--project={project}", f"--location={location}", "--format=json"],
     ]
 
@@ -166,6 +183,7 @@ def provision_managed_agent(
     # 1. Try google.genai SDK
     try:
         from google.genai import Client
+
         client = Client(enterprise=True, location=location)
         try:
             agent = client.agents.get(id=display_name)
@@ -195,14 +213,40 @@ def provision_managed_agent(
 
     candidate_commands = [
         [
-            "gcloud", "agent-registry", "services", "create", display_name,
-            f"--project={project}", f"--location={location}", f"--display-name={display_name}",
-            "--description=Worker Agent for Portfolio Copilot", "--agent-spec-type=no-spec",
-            f"--interfaces=[{{\"protocolBinding\": \"http-json\", \"url\": \"https://{location}-aiplatform.googleapis.com\"}}]",
+            "gcloud",
+            "agent-registry",
+            "services",
+            "create",
+            display_name,
+            f"--project={project}",
+            f"--location={location}",
+            f"--display-name={display_name}",
+            "--description=Worker Agent for Portfolio Copilot",
+            "--agent-spec-type=no-spec",
+            f'--interfaces=[{{"protocolBinding": "http-json", "url": "https://{location}-aiplatform.googleapis.com"}}]',
             "--format=json",
         ],
-        ["gcloud", "alpha", "agent-registry", "agents", "create", f"--project={project}", f"--location={location}", f"--display-name={display_name}", "--format=json"],
-        ["gcloud", "alpha", "agents", "create", f"--project={project}", f"--location={location}", f"--display-name={display_name}", "--format=json"],
+        [
+            "gcloud",
+            "alpha",
+            "agent-registry",
+            "agents",
+            "create",
+            f"--project={project}",
+            f"--location={location}",
+            f"--display-name={display_name}",
+            "--format=json",
+        ],
+        [
+            "gcloud",
+            "alpha",
+            "agents",
+            "create",
+            f"--project={project}",
+            f"--location={location}",
+            f"--display-name={display_name}",
+            "--format=json",
+        ],
     ]
 
     last_error = None
@@ -257,9 +301,7 @@ def deploy_managed_agent(
     if not project:
         _, project = google.auth.default()
 
-    print(
-        f"Provisioning worker Managed Agent '{display_name}' in project {project} ({location})..."
-    )
+    print(f"Provisioning worker Managed Agent '{display_name}' in project {project} ({location})...")
 
     try:
         # 1. Provision or resolve server-assigned agent ID (fails loud by default)

@@ -94,7 +94,10 @@ async def test_pa_dispatch_no_ips_declines_gracefully(mock_emit_failed, mock_emi
 
     payload = await _execute_skill(plan, "private-portfolio-analysis", "user_123", {}, context, ctx)
 
-    assert payload == {"status": "declined", "message": "No active IPS found for user user_123; complete goals onboarding first."}
+    assert payload == {
+        "status": "declined",
+        "message": "No active IPS found for user user_123; complete goals onboarding first.",
+    }
     mock_emit_failed.assert_called_once()
     assert "declined" in mock_emit_failed.call_args[1]["error"]
     mock_emit_invoked.assert_not_called()
@@ -105,7 +108,9 @@ async def test_pa_dispatch_no_ips_declines_gracefully(mock_emit_failed, mock_emi
 @patch("orchestrator.planner.emit_skill_invoked_audit")
 @patch("orchestrator.planner.emit_skill_failed_audit")
 @patch("orchestrator.planner.dispatch_managed_skill", new_callable=AsyncMock)
-async def test_pa_dispatch_ma_failure_raises(mock_dispatch, mock_emit_failed, mock_emit_invoked, mock_fs_cls, sample_ips, sample_holdings):
+async def test_pa_dispatch_ma_failure_raises(
+    mock_dispatch, mock_emit_failed, mock_emit_invoked, mock_fs_cls, sample_ips, sample_holdings
+):
     mock_fs = mock_fs_cls.return_value
     mock_fs.get_active_ips_by_user.return_value = sample_ips
     mock_fs.get_holdings.return_value = sample_holdings

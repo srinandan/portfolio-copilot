@@ -1,6 +1,8 @@
 """Generic Managed Agent dispatcher for registry-driven dynamic execution."""
 
+import json
 import os
+import re
 from typing import Any, Dict, Optional, Type
 
 from google.adk import Context
@@ -10,7 +12,7 @@ from pydantic import BaseModel, ValidationError
 
 from ..contracts.drift_report import DriftReport
 from ..contracts.goals_onboarding import GoalsOnboardingResult
-from ..contracts.proposed_action import ProposedAction
+from ..contracts.proposed_action import ProposedActionRationale
 from ..contracts.research_brief import ResearchBrief
 from ..contracts.reviewer_verdict import ReviewerVerdict
 from ..contracts.spending_analysis import SpendingReport
@@ -25,10 +27,23 @@ OUTPUT_SCHEMA_BY_SKILL: Dict[str, Type[BaseModel]] = {
     "private-goals-onboarding": GoalsOnboardingResult,
     "private-portfolio-analysis": DriftReport,
     "private-research": ResearchBrief,
-    "private-action-drafting": ProposedAction,
+    "private-action-drafting": ProposedActionRationale,
     "private-spending-analysis": SpendingReport,
     "private-reviewer": ReviewerVerdict,
 }
+
+_RESEARCH_CACHE: Dict[str, ResearchBrief] = {}
+_RESEARCH_CACHE_MAX = 128
+
+
+def _research_cache_key(node_input: Any) -> Optional[str]:
+    """Generates normalized cache key for research queries."""
+    if not isinstance(node_input, dict):
+        return None
+    q = node_input.get("research_question") or node_input.get("query")
+    if not isinstance(q, str) or not q.strip():
+        return None
+    return q.strip().lower()
 
 
 def get_skill_tools(skill_name: str) -> list:
@@ -71,6 +86,37 @@ async def resolve_skill_instructions(skill_name: str, client: Optional[AgentRegi
         return await reg_client.get_skill_content(norm_name)
 
 
+def _extract_json_from_text(text: str) -> Optional[dict]:
+    """Helper to extract JSON dict from raw LLM text or markdown code blocks."""
+    try:
+        data = json.loads(text)
+        if isinstance(data, dict):
+            return data
+    except Exception:
+        pass
+
+    match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
+    if match:
+        try:
+            data = json.loads(match.group(1))
+            if isinstance(data, dict):
+                return data
+        except Exception:
+            pass
+
+    start = text.find("{")
+    end = text.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        try:
+            data = json.loads(text[start : end + 1])
+            if isinstance(data, dict):
+                return data
+        except Exception:
+            pass
+
+    return None
+
+
 async def dispatch_managed_skill(
     skill_name: str,
     node_input: Any,
@@ -85,8 +131,15 @@ async def dispatch_managed_skill(
     4. Validates and returns the typed Pydantic output.
     """
     short_name = skill_name.split("/")[-1] if "/" in skill_name else skill_name
+    normalized_short = normalize_skill_name(short_name)
     output_schema = OUTPUT_SCHEMA_BY_SKILL.get(normalize_private_skill_name(short_name))
     tools = get_skill_tools(short_name)
+
+    if normalized_short == "research":
+        cache_key = _research_cache_key(node_input)
+        if cache_key and cache_key in _RESEARCH_CACHE:
+            logger.info(f"Research cache hit for '{cache_key}'")
+            return _RESEARCH_CACHE[cache_key]
 
     try:
         instructions = await resolve_skill_instructions(short_name, client=registry_client)
@@ -101,20 +154,83 @@ async def dispatch_managed_skill(
         tools=tools,
     )
 
-    logger.info(f"Dispatching skill '{short_name}' to worker Managed Agent (schema={output_schema.__name__ if output_schema else None})")
+    logger.info(
+        f"Dispatching skill '{short_name}' to worker Managed Agent (schema={output_schema.__name__ if output_schema else None})"
+    )
     raw_result = await ctx.run_node(agent, node_input=node_input)
 
+    result_to_return = raw_result
     if output_schema:
         if isinstance(raw_result, output_schema):
-            return raw_result
-        if isinstance(raw_result, dict):
+            result_to_return = raw_result
+        elif isinstance(raw_result, dict):
             try:
-                return output_schema.model_validate(raw_result)
+                result_to_return = output_schema.model_validate(raw_result)
             except ValidationError:
                 logger.exception(
                     "Could not validate result as %s (raw_result keys=%s)",
                     output_schema.__name__,
                     list(raw_result.keys()),
                 )
+        elif isinstance(raw_result, str):
+            parsed = _extract_json_from_text(raw_result)
+            if parsed:
+                try:
+                    result_to_return = output_schema.model_validate(parsed)
+                except ValidationError:
+                    pass
 
-    return raw_result
+        # Fallback for structured schemas using preloaded facts + model narrative
+        if result_to_return is raw_result or result_to_return is None:
+            if output_schema is SpendingReport:
+                preloaded = node_input.get("preloaded", {}) if isinstance(node_input, dict) else {}
+                narrative = ""
+                if ctx.session and ctx.session.events:
+                    safe_author = agent.name
+                    for ev in reversed(ctx.session.events):
+                        if ev.author == safe_author and ev.content and ev.content.parts:
+                            for part in reversed(ev.content.parts):
+                                text = getattr(part, "text", "")
+                                if text:
+                                    narrative = text
+                                    break
+                        if narrative:
+                            break
+                result_to_return = SpendingReport(
+                    user_id=node_input.get("user_id", "default_user")
+                    if isinstance(node_input, dict)
+                    else "default_user",
+                    total_income_usd=float(preloaded.get("total_income_usd", 0.0)),
+                    total_outflow_usd=float(preloaded.get("total_outflow_usd", 0.0)),
+                    savings_rate=float(preloaded.get("savings_rate", 0.0)),
+                    reserve_months=float(preloaded.get("reserve_months", 0.0)),
+                    category_breakdown=[],
+                    anomalies=[],
+                    narrative_summary=narrative or "Spending analysis completed based on transaction facts.",
+                )
+            elif output_schema is ProposedActionRationale:
+                narrative = ""
+                if ctx.session and ctx.session.events:
+                    safe_author = agent.name
+                    for ev in reversed(ctx.session.events):
+                        if ev.author == safe_author and ev.content and ev.content.parts:
+                            for part in reversed(ev.content.parts):
+                                text = getattr(part, "text", "")
+                                if text:
+                                    narrative = text
+                                    break
+                        if narrative:
+                            break
+                result_to_return = ProposedActionRationale(
+                    rationale=narrative or "Trade drafted based on portfolio drift and IPS target allocation.",
+                    supporting_research_refs=[],
+                )
+
+    if normalized_short == "research":
+        cache_key = _research_cache_key(node_input)
+        if cache_key and isinstance(result_to_return, ResearchBrief):
+            if len(_RESEARCH_CACHE) >= _RESEARCH_CACHE_MAX:
+                _RESEARCH_CACHE.pop(next(iter(_RESEARCH_CACHE)))
+            _RESEARCH_CACHE[cache_key] = result_to_return
+
+    return result_to_return

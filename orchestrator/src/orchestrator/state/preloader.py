@@ -35,9 +35,7 @@ def preload_for_portfolio_analysis(
     fs = firestore_client or FirestoreClient()
     ips = fs.get_active_ips_by_user(user_id)
     if not ips:
-        raise PreloadDeclinedError(
-            f"No active IPS found for user {user_id}; complete goals onboarding first."
-        )
+        raise PreloadDeclinedError(f"No active IPS found for user {user_id}; complete goals onboarding first.")
     holdings = fs.get_holdings(user_id)
     if not holdings:
         raise PreloadDeclinedError(f"No holdings found for user {user_id}.")
@@ -92,11 +90,11 @@ def preload_for_action_drafting(
         "ips": ips.model_dump(),
         "holdings": holdings.model_dump(),
         "drift_report": drift_report,
-        "research_briefs": [
-            b.model_dump() if hasattr(b, "model_dump") else b for b in (research_briefs or [])
-        ],
+        "research_briefs": [b.model_dump() if hasattr(b, "model_dump") else b for b in (research_briefs or [])],
         "requested_trade": requested_trade,
-        "precomputed_trade": precomputed_trade.model_dump() if hasattr(precomputed_trade, "model_dump") and precomputed_trade is not None else precomputed_trade,
+        "precomputed_trade": precomputed_trade.model_dump()
+        if hasattr(precomputed_trade, "model_dump") and precomputed_trade is not None
+        else precomputed_trade,
     }
 
 

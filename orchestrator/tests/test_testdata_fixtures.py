@@ -59,8 +59,7 @@ def test_liabilities_fixture_validates_and_parses():
 
     # Verify at least one high-interest liability (>15% APR)
     high_interest_liabs = [
-        liab for liab in liabilities.liabilities
-        if liab.interest_rate_percent and liab.interest_rate_percent > 15.0
+        liab for liab in liabilities.liabilities if liab.interest_rate_percent and liab.interest_rate_percent > 15.0
     ]
     assert len(high_interest_liabs) >= 1
     assert high_interest_liabs[0].type == "credit_card"

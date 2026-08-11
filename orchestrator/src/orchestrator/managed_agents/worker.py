@@ -1,6 +1,5 @@
-"""Worker Managed Agent factory and execution helpers."""
-
 import re
+from datetime import timedelta
 from typing import Any, List, Optional, Type
 
 from google.adk.agents import ManagedAgent
@@ -11,8 +10,16 @@ from orchestrator.managed_agents.secret_loader import (
     resolve_managed_agent_id,
 )
 
+DEFAULT_TURN_TIMEOUT = timedelta(minutes=3)
+PER_SKILL_TIMEOUT: dict[str, timedelta] = {
+    "research": timedelta(minutes=2),  # search-loop guardrail
+    "action-drafting": timedelta(minutes=1),  # narrow schema
+}
+
 __all__ = [
     "DEFAULT_MANAGED_AGENT_ID",
+    "DEFAULT_TURN_TIMEOUT",
+    "PER_SKILL_TIMEOUT",
     "build_worker_managed_agent",
     "get_worker_agent_id",
     "sanitize_node_name",
@@ -53,6 +60,9 @@ def build_worker_managed_agent(
     """
     resolved_id = agent_id or get_worker_agent_id()
     safe_name = sanitize_node_name(name)
+    short = name.replace("private-", "")
+    timeout = PER_SKILL_TIMEOUT.get(short, DEFAULT_TURN_TIMEOUT)
+    timeout_sec = timeout.total_seconds() if isinstance(timeout, timedelta) else float(timeout)
 
     return ManagedAgent(
         name=safe_name,
@@ -62,4 +72,5 @@ def build_worker_managed_agent(
         tools=tools or [],
         output_schema=output_schema,
         rerun_on_resume=True,
+        timeout=timeout_sec,
     )

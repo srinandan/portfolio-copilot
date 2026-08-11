@@ -80,12 +80,20 @@ exclusion or accept the drift").
 
 ## Output
 
-One [`ProposedAction`](../../schemas/proposed-action.schema.json),
-`status: "drafted"`. `ips_version_referenced` is always the IPS version
-active *at drafting time* — if the IPS changes between drafting and
-review, the Reviewer's stale-version rule catches it, this skill doesn't
-need to. `rationale` cites both the drift figures and any Research Brief
-consulted; `supporting_research_refs` lists their `research_run_id`s.
+Return **only** the two judgment fields:
+
+- `rationale` — a single paragraph, 2–4 sentences. Cite the drift
+  figures from the input's `drift_report` and, if any, the input's
+  `research_briefs` by `research_run_id`. If confidence in the research
+  is low, say so plainly.
+- `supporting_research_refs` — a list of `research_run_id` strings you
+  actually cited. Empty list if none apply.
+
+Do NOT restate `ticker`, `side`, `quantity`, `estimated_price_usd`,
+`ips_version_referenced`, or any other numeric/identifier field. Those
+come from `input.precomputed_trade` and are authoritative. The
+orchestrator merges your two fields onto the precomputed trade and
+persists the result.
 
 ## Failure mode: no research available
 

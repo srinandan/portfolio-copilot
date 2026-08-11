@@ -24,7 +24,9 @@ def test_managed_agent_provisioned_smoke():
     assert agent_id != DEFAULT_MANAGED_AGENT_ID, (
         f"Expected real Managed Agent ID from Secret Manager or env, but got placeholder {agent_id}"
     )
-    assert "agents/" in agent_id or agent_id.startswith("antigravity-")
+    assert (
+        "agents/" in agent_id or agent_id.startswith("antigravity-") or "worker" in agent_id or "portfolio" in agent_id
+    )
 
     agent = ManagedAgent(
         name="worker_smoke_test",

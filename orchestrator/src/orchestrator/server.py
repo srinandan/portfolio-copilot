@@ -120,9 +120,7 @@ async def _log_unhandled(request: Request, exc: Exception) -> JSONResponse:
     """
     if isinstance(exc, HTTPException):
         return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
-    logger.exception(
-        "Unhandled exception on %s %s", request.method, request.url.path
-    )
+    logger.exception("Unhandled exception on %s %s", request.method, request.url.path)
     return JSONResponse(status_code=500, content={"detail": "internal_server_error"})
 
 

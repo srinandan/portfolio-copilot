@@ -517,3 +517,42 @@ def test_registry_client_env_base_url_override():
         client = AgentRegistryClient(project_id="test-p", location="global")
         assert client.base_url == "https://custom-registry.internal"
 
+
+@pytest.mark.asyncio
+async def test_get_skill_content_strips_non_runtime_sections():
+    raw_skill_md = """# Research Skill
+
+## Purpose
+Gathers market context.
+
+## Output
+Research brief summary.
+
+## Registry metadata
+- Version: 0.1.0
+
+## Acceptance criteria
+1. Must not leak sensitive data.
+2. Must cite run id.
+"""
+    zip_bytes = create_zip({"SKILL.md": raw_skill_md})
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/skills/private-research"):
+            return httpx.Response(200, json={"defaultRevision": "revisions/rev1"})
+        if request.url.path.endswith("/revisions/rev1"):
+            return httpx.Response(200, content=zip_bytes)
+        return httpx.Response(404)
+
+    client = AgentRegistryClient(
+        project_id="test-p",
+        location="global",
+        http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+    )
+
+    stripped = await client.get_skill_content("research")
+    assert "## Purpose" in stripped
+    assert "## Output" in stripped
+    assert "## Registry metadata" not in stripped
+    assert "## Acceptance criteria" not in stripped
+    assert "Must not leak sensitive data" not in stripped

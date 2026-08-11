@@ -60,15 +60,17 @@ def calculate_drift(holdings: HoldingsSnapshot, ips: InvestmentPolicyStatement) 
                 else:
                     drift_amount = max(0.0, 0.0 - alloc.max_percent)
 
-            entries.append(DriftReportEntry(
-                asset_class=alloc.asset_class,
-                current_percent=0.0,
-                target_percent=alloc.target_percent,
-                min_percent=alloc.min_percent,
-                max_percent=alloc.max_percent,
-                in_band=in_band,
-                drift_amount_percent=drift_amount,
-            ))
+            entries.append(
+                DriftReportEntry(
+                    asset_class=alloc.asset_class,
+                    current_percent=0.0,
+                    target_percent=alloc.target_percent,
+                    min_percent=alloc.min_percent,
+                    max_percent=alloc.max_percent,
+                    in_band=in_band,
+                    drift_amount_percent=drift_amount,
+                )
+            )
         return DriftReport(entries=entries, unclassified_value_usd=0.0, rebalance_recommended=False)
 
     # Accumulate market value by asset class
@@ -113,15 +115,17 @@ def calculate_drift(holdings: HoldingsSnapshot, ips: InvestmentPolicyStatement) 
         if drift_threshold is not None and drift_amount >= drift_threshold:
             rebalance_recommended = True
 
-        entries.append(DriftReportEntry(
-            asset_class=alloc.asset_class,
-            current_percent=current_percent,
-            target_percent=alloc.target_percent,
-            min_percent=alloc.min_percent,
-            max_percent=alloc.max_percent,
-            in_band=in_band,
-            drift_amount_percent=drift_amount,
-        ))
+        entries.append(
+            DriftReportEntry(
+                asset_class=alloc.asset_class,
+                current_percent=current_percent,
+                target_percent=alloc.target_percent,
+                min_percent=alloc.min_percent,
+                max_percent=alloc.max_percent,
+                in_band=in_band,
+                drift_amount_percent=drift_amount,
+            )
+        )
 
     # Any positions in value_by_class not matching an IPS band are unclassified
     for ac, val in value_by_class.items():

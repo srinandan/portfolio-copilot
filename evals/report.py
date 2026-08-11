@@ -73,12 +73,14 @@ def evaluate_skills(skills_dir: Path, use_llm_judge: bool = False) -> list[dict[
                         if inv.final_response and inv.final_response.parts:
                             expected = inv.final_response.parts[0].text or ""
 
-                    report["cases"].append({
-                        "id": c.eval_id,
-                        "description": getattr(c, "description", ""),
-                        "prompt": prompt,
-                        "expected": expected,
-                    })
+                    report["cases"].append(
+                        {
+                            "id": c.eval_id,
+                            "description": getattr(c, "description", ""),
+                            "prompt": prompt,
+                            "expected": expected,
+                        }
+                    )
 
                 if report["case_count"] == 0:
                     report["status"] = "FAIL"
@@ -136,7 +138,9 @@ def generate_markdown_report(reports: list[dict[str, Any]], use_llm_judge: bool 
     elif use_llm_judge:
         md.append("> [!NOTE]\n> 🚀 Evaluated with full LLM-judge inference.\n")
 
-    md.append(f"**Total Skills:** {total_skills} | **Passed:** {passed_skills}/{total_skills} | **Skipped:** {skipped_skills} | **Failed:** {failed_skills} | **Total Cases:** {total_cases}\n")
+    md.append(
+        f"**Total Skills:** {total_skills} | **Passed:** {passed_skills}/{total_skills} | **Skipped:** {skipped_skills} | **Failed:** {failed_skills} | **Total Cases:** {total_cases}\n"
+    )
 
     # Summary table
     md.append("## Summary\n")
@@ -154,7 +158,9 @@ def generate_markdown_report(reports: list[dict[str, Any]], use_llm_judge: bool 
         score_str = f"{r['score']:.0%}" if r["score"] is not None else "N/A"
         doc_size = f"{r['skill_md_chars']:,} chars" if r["has_skill_md"] else "N/A"
         eval_file = r["evalset_file"] or "None"
-        md.append(f"| `{r['name']}` | {status_badge} | {mode_badge} | {score_str} | {r['case_count']} | {doc_size} | `{eval_file}` |")
+        md.append(
+            f"| `{r['name']}` | {status_badge} | {mode_badge} | {score_str} | {r['case_count']} | {doc_size} | `{eval_file}` |"
+        )
 
     # Details per skill
     md.append("\n## Detailed Skill Evaluation Suites\n")

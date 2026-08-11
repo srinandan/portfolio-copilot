@@ -37,6 +37,22 @@ class ActionStatus(str, Enum):
     FAILED = "failed"
 
 
+class ProposedActionRationale(BaseModel):
+    """LLM-authored slice of a ProposedAction.
+
+    The orchestrator pre-computes every numeric/enum/id field via
+    `primitives.action_drafting.calculate_draft_action`. The Managed Agent
+    only needs to author judgment fields; the orchestrator merges them
+    onto the precomputed trade before persistence. Keeping the schema
+    narrow cuts forced structured-output tokens and closes the door on
+    the LLM hallucinating a different ticker/quantity than the deterministic
+    math produced.
+    """
+
+    rationale: str = Field(min_length=1)
+    supporting_research_refs: list[str] = Field(default_factory=list)
+
+
 class ProposedAction(BaseModel):
     action_id: str
     session_id: str

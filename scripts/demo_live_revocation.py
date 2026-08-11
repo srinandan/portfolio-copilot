@@ -80,10 +80,7 @@ def _list_skill_names_from_events(events) -> List[str]:
                         except Exception:
                             pass
                 if isinstance(val, str) and "Available skills:" in val:
-                    return [
-                        s.strip()
-                        for s in val.split("Available skills:", 1)[1].strip().strip("[]").split(",")
-                    ]
+                    return [s.strip() for s in val.split("Available skills:", 1)[1].strip().strip("[]").split(",")]
     return []
 
 
@@ -267,8 +264,7 @@ async def main() -> int:
 
     # Ensure the skill we're about to revoke was authorized on cycle 1
     if not any(skill in s for s in cycle1_skills):
-        print(f"WARNING: skill '{skill}' was not authorized on cycle 1. "
-              f"Revocation demo will show no delta.")
+        print(f"WARNING: skill '{skill}' was not authorized on cycle 1. Revocation demo will show no delta.")
 
     # Revoke via the same client the orchestrator uses
     async with AgentRegistryClient(project_id=project_id, location=location) as client:

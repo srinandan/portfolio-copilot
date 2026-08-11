@@ -64,7 +64,7 @@ def resolve_managed_agent_id(force_refresh: bool = False) -> str:
     # 1. Check environment variable first (allows overrides in dev/test/Cloud Run)
     env_val = os.environ.get("MANAGED_AGENT_ID")
     if env_val:
-        return env_val
+        return env_val.split("/")[-1] if "/" in env_val else env_val
 
     if _CACHED_AGENT_ID is not None and not force_refresh:
         return _CACHED_AGENT_ID
@@ -72,13 +72,12 @@ def resolve_managed_agent_id(force_refresh: bool = False) -> str:
     # 2. Check Secret Manager
     sm_val = _fetch_from_secret_manager("MANAGED_AGENT_ID")
     if sm_val:
-        _CACHED_AGENT_ID = sm_val
+        _CACHED_AGENT_ID = sm_val.split("/")[-1] if "/" in sm_val else sm_val
         return _CACHED_AGENT_ID
 
     # 3. Fall back to placeholder default with clear warning
     logger.warning(
-        f"MANAGED_AGENT_ID not set in environment or Secret Manager; "
-        f"falling back to default {DEFAULT_MANAGED_AGENT_ID}"
+        f"MANAGED_AGENT_ID not set in environment or Secret Manager; falling back to default {DEFAULT_MANAGED_AGENT_ID}"
     )
     _CACHED_AGENT_ID = DEFAULT_MANAGED_AGENT_ID
     return _CACHED_AGENT_ID
@@ -107,7 +106,12 @@ def resolve_alpaca_credentials(force_refresh: bool = False, require: bool = Fals
         _CACHED_ALPACA_SECRET = secret
         return key_id, secret
 
-    if _CACHED_ALPACA_KEY_ID and _CACHED_ALPACA_SECRET and not force_refresh and "PYTEST_CURRENT_TEST" not in os.environ:
+    if (
+        _CACHED_ALPACA_KEY_ID
+        and _CACHED_ALPACA_SECRET
+        and not force_refresh
+        and "PYTEST_CURRENT_TEST" not in os.environ
+    ):
         return _CACHED_ALPACA_KEY_ID, _CACHED_ALPACA_SECRET
 
     if not key_id:

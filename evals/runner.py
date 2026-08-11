@@ -15,6 +15,7 @@ from evals.doc_only_agent import build_doc_only_agent
 @dataclass
 class EvalCaseResult:
     """Result for an individual evaluation case."""
+
     case_id: str
     status: str  # "PASS", "FAIL", "SKIPPED_NO_KEY"
     score: float | None
@@ -25,6 +26,7 @@ class EvalCaseResult:
 @dataclass
 class EvalRunResult:
     """Aggregated result of an evaluation run for a skill."""
+
     eval_set_id: str
     status: str  # "PASS", "FAIL", "SKIPPED_NO_KEY"
     mode: str  # "heuristic" or "llm_judge"
@@ -75,13 +77,15 @@ def evaluate_heuristically(eval_set: EvalSet, doc_instruction: str) -> EvalRunRe
     for case in eval_set.eval_cases:
         case_id = case.eval_id
         if not case.conversation or len(case.conversation) == 0:
-            case_results.append(EvalCaseResult(
-                case_id=case_id,
-                status="FAIL",
-                score=0.0,
-                mode="heuristic",
-                reason="Empty conversation in eval case",
-            ))
+            case_results.append(
+                EvalCaseResult(
+                    case_id=case_id,
+                    status="FAIL",
+                    score=0.0,
+                    mode="heuristic",
+                    reason="Empty conversation in eval case",
+                )
+            )
             continue
 
         inv = case.conversation[0]
@@ -89,32 +93,38 @@ def evaluate_heuristically(eval_set: EvalSet, doc_instruction: str) -> EvalRunRe
         expected = inv.final_response.parts[0].text if (inv.final_response and inv.final_response.parts) else ""
 
         if not prompt or len(prompt.strip().split()) < 3:
-            case_results.append(EvalCaseResult(
-                case_id=case_id,
-                status="FAIL",
-                score=0.0,
-                mode="heuristic",
-                reason="Prompt is empty or too short (< 3 words)",
-            ))
+            case_results.append(
+                EvalCaseResult(
+                    case_id=case_id,
+                    status="FAIL",
+                    score=0.0,
+                    mode="heuristic",
+                    reason="Prompt is empty or too short (< 3 words)",
+                )
+            )
             continue
 
         if not expected or len(expected.strip().split()) < 3:
-            case_results.append(EvalCaseResult(
-                case_id=case_id,
-                status="FAIL",
-                score=0.0,
-                mode="heuristic",
-                reason="Expected response is empty or too short (< 3 words)",
-            ))
+            case_results.append(
+                EvalCaseResult(
+                    case_id=case_id,
+                    status="FAIL",
+                    score=0.0,
+                    mode="heuristic",
+                    reason="Expected response is empty or too short (< 3 words)",
+                )
+            )
             continue
 
-        case_results.append(EvalCaseResult(
-            case_id=case_id,
-            status="PASS",
-            score=1.0,
-            mode="heuristic",
-            reason="Heuristic scenario checks passed",
-        ))
+        case_results.append(
+            EvalCaseResult(
+                case_id=case_id,
+                status="PASS",
+                score=1.0,
+                mode="heuristic",
+                reason="Heuristic scenario checks passed",
+            )
+        )
         passed_count += 1
 
     total = len(eval_set.eval_cases)
@@ -158,7 +168,9 @@ def run_doc_only_eval(
 
     if use_llm_judge:
         if not key:
-            print(f"⚠️ LLM judge requested for '{eval_set.eval_set_id}' but GEMINI_API_KEY is not set. Marking as SKIPPED_NO_KEY.")
+            print(
+                f"⚠️ LLM judge requested for '{eval_set.eval_set_id}' but GEMINI_API_KEY is not set. Marking as SKIPPED_NO_KEY."
+            )
             return EvalRunResult(
                 eval_set_id=eval_set.eval_set_id,
                 status="SKIPPED_NO_KEY",

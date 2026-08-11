@@ -199,10 +199,16 @@ def seed_firestore(project_id: str, location: str, dry_run: bool) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Seed canonical test fixtures into GCP BigQuery and Firestore.")
-    parser.add_argument("--project", default=None, help="GCP project ID (default: gcloud config project or PROJECT_ID env)")
+    parser.add_argument(
+        "--project", default=None, help="GCP project ID (default: gcloud config project or PROJECT_ID env)"
+    )
     parser.add_argument("--location", default="us-central1", help="GCP region/location (default: us-central1)")
-    parser.add_argument("--dataset", default="portfolio_copilot", help="BigQuery dataset name (default: portfolio_copilot)")
-    parser.add_argument("--table", default="chase_transactions", help="BigQuery table name (default: chase_transactions)")
+    parser.add_argument(
+        "--dataset", default="portfolio_copilot", help="BigQuery dataset name (default: portfolio_copilot)"
+    )
+    parser.add_argument(
+        "--table", default="chase_transactions", help="BigQuery table name (default: chase_transactions)"
+    )
     parser.add_argument("--dry-run", action="store_true", help="Validate fixtures without uploading to GCP")
 
     args = parser.parse_args()

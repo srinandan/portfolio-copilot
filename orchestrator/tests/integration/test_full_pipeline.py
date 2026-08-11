@@ -132,9 +132,7 @@ def mock_pipeline_environment():
                 verdict_id="verdict_e2e_1",
                 action_id="act_e2e_1",
                 ips_version_checked_against=RelatedIPSVersion(ips_id="ips_e2e_1", version=1),
-                rule_results=[
-                    RuleResult(rule_id="r1", description="rule 1", passed=True)
-                ],
+                rule_results=[RuleResult(rule_id="r1", description="rule 1", passed=True)],
                 overall_pass=True,
                 requires_human_approval=True,
                 reviewer_skill_version=SkillVersionRef(
@@ -155,12 +153,25 @@ def mock_pipeline_environment():
             side_effect=fake_dispatch,
         ),
         patch("orchestrator.planner.FirestoreClient", return_value=fake_fs),
+        patch("src.orchestrator.planner.FirestoreClient", return_value=fake_fs, create=True),
         patch("orchestrator.state.preloader.FirestoreClient", return_value=fake_fs),
+        patch("src.orchestrator.state.preloader.FirestoreClient", return_value=fake_fs, create=True),
         patch("orchestrator.state.writers.FirestoreClient", return_value=fake_fs),
+        patch("src.orchestrator.state.writers.FirestoreClient", return_value=fake_fs, create=True),
         patch("orchestrator.gates.hitl.FirestoreClient", return_value=fake_fs),
+        patch("src.orchestrator.gates.hitl.FirestoreClient", return_value=fake_fs, create=True),
         patch("orchestrator.gates.execution.FirestoreClient", return_value=fake_fs),
+        patch("src.orchestrator.gates.execution.FirestoreClient", return_value=fake_fs, create=True),
+        patch("orchestrator.data.firestore.FirestoreClient", return_value=fake_fs),
+        patch("src.orchestrator.data.firestore.FirestoreClient", return_value=fake_fs, create=True),
         patch("orchestrator.planner.write_ips_from_interview_result", return_value=(fake_fs.ips, MagicMock())),
+        patch(
+            "src.orchestrator.planner.write_ips_from_interview_result",
+            return_value=(fake_fs.ips, MagicMock()),
+            create=True,
+        ),
         patch("orchestrator.gates.execution.AlpacaExecutor") as mock_alpaca_cls,
+        patch("src.orchestrator.gates.execution.AlpacaExecutor", mock_alpaca_cls, create=True),
     ):
         mock_list_skills.return_value = [
             Skill(

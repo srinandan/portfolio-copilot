@@ -54,9 +54,7 @@ def sample_reviewer_verdict():
         ],
         overall_pass=True,
         requires_human_approval=True,
-        reviewer_skill_version=SkillVersionRef(
-            skill_name="private-reviewer", skill_version="0.1.0"
-        ),
+        reviewer_skill_version=SkillVersionRef(skill_name="private-reviewer", skill_version="0.1.0"),
         reviewed_at=datetime.now(timezone.utc),
     )
 
@@ -204,9 +202,7 @@ async def test_gate_executes_on_approved_verdict_absent_with_admin_bypass(sample
 
 
 @pytest.mark.asyncio
-async def test_gate_executes_on_approved_with_passing_verdict(
-    sample_proposed_action, sample_reviewer_verdict
-):
+async def test_gate_executes_on_approved_with_passing_verdict(sample_proposed_action, sample_reviewer_verdict):
     mock_executor = MagicMock()
     mock_executor.submit_order.return_value = ExecutionResult(
         broker_order_id="ord-alpaca-888",
@@ -240,9 +236,7 @@ async def test_gate_executes_on_approved_with_passing_verdict(
 
 
 @pytest.mark.asyncio
-async def test_gate_refuses_on_approved_with_failing_verdict(
-    sample_proposed_action, sample_reviewer_verdict
-):
+async def test_gate_refuses_on_approved_with_failing_verdict(sample_proposed_action, sample_reviewer_verdict):
     mock_executor = MagicMock()
     failing_verdict = sample_reviewer_verdict.model_copy(update={"overall_pass": False})
     node_input = {
@@ -263,9 +257,7 @@ async def test_gate_refuses_on_approved_with_failing_verdict(
         assert res["reason"] == "reviewer_verdict_failed"
 
         mock_executor.submit_order.assert_not_called()
-        mock_fs.update_proposed_action_status.assert_called_once_with(
-            "act-exec-101", ActionStatus.FAILED
-        )
+        mock_fs.update_proposed_action_status.assert_called_once_with("act-exec-101", ActionStatus.FAILED)
         mock_fail_audit.assert_called_once()
         assert mock_fail_audit.call_args[1]["error"] == "reviewer_verdict_failed"
 
@@ -291,9 +283,7 @@ async def test_gate_handles_alpaca_execution_error(sample_proposed_action, sampl
         assert res["status"] == "failed"
         assert res["reason"] == "insufficient funds"
 
-        mock_fs.update_proposed_action_status.assert_called_once_with(
-            "act-exec-101", ActionStatus.FAILED
-        )
+        mock_fs.update_proposed_action_status.assert_called_once_with("act-exec-101", ActionStatus.FAILED)
         mock_fail_audit.assert_called_once()
         assert mock_fail_audit.call_args[1]["error"] == "insufficient funds"
 
@@ -301,9 +291,7 @@ async def test_gate_handles_alpaca_execution_error(sample_proposed_action, sampl
 @pytest.mark.asyncio
 async def test_gate_handles_alpaca_credentials_missing(sample_proposed_action, sample_reviewer_verdict):
     mock_executor = MagicMock()
-    mock_executor.submit_order.side_effect = AlpacaExecutionError(
-        "Alpaca credentials not configured"
-    )
+    mock_executor.submit_order.side_effect = AlpacaExecutionError("Alpaca credentials not configured")
     node_input = {
         "hitl_decision": {
             "outcome": "approved",
@@ -320,9 +308,7 @@ async def test_gate_handles_alpaca_credentials_missing(sample_proposed_action, s
         res = await _run_gate(node_input)
         assert res["status"] == "failed"
         assert "credentials not configured" in res["reason"]
-        mock_fs.update_proposed_action_status.assert_called_once_with(
-            "act-exec-101", ActionStatus.FAILED
-        )
+        mock_fs.update_proposed_action_status.assert_called_once_with("act-exec-101", ActionStatus.FAILED)
         mock_fail_audit.assert_called_once()
 
 
@@ -354,9 +340,7 @@ async def test_gate_passes_approving_user_id_to_audit(sample_proposed_action, sa
 
 
 @pytest.mark.asyncio
-async def test_gate_verdict_as_pydantic_model(
-    sample_proposed_action, sample_reviewer_verdict
-):
+async def test_gate_verdict_as_pydantic_model(sample_proposed_action, sample_reviewer_verdict):
     mock_executor = MagicMock()
     mock_executor.submit_order.return_value = ExecutionResult(
         broker_order_id="ord-alpaca-model-1",

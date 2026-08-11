@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 class DriftReportEntry(BaseModel):
     """Represents asset class allocation status and drift metrics against target bands."""
+
     asset_class: str = Field(description="Name of the asset class (e.g. Equity, Fixed Income, Cash).")
     current_percent: float = Field(description="Current percentage of total portfolio value.")
     target_percent: float = Field(description="Target percentage defined in the IPS.")
@@ -18,6 +19,9 @@ class DriftReportEntry(BaseModel):
 
 class DriftReport(BaseModel):
     """Comprehensive drift analysis report across all target asset classes."""
+
     entries: List[DriftReportEntry] = Field(description="Per-asset-class allocation and drift entries.")
     unclassified_value_usd: float = Field(description="Total USD value of holdings not mapped to any IPS target band.")
-    rebalance_recommended: bool = Field(description="True if rebalancing threshold is exceeded for an out-of-band class.")
+    rebalance_recommended: bool = Field(
+        description="True if rebalancing threshold is exceeded for an out-of-band class."
+    )

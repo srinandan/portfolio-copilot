@@ -1,7 +1,7 @@
-"""Root planner — dynamic dispatch of registry-authorized skills to the worker Managed Agent."""
-
+import asyncio
 import json
 import os
+import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -13,7 +13,13 @@ from google.auth import default as google_auth_default
 from google.genai.types import Part, UserContent
 
 from .contracts.goals_onboarding import GoalsOnboardingResult
-from .contracts.proposed_action import ProposedAction
+from .contracts.ips import RelatedIPSVersion
+from .contracts.proposed_action import (
+    ActionStatus,
+    ActionType,
+    ProposedAction,
+    SkillVersionRef,
+)
 from .data.firestore import FirestoreClient
 from .gates import execution_gate, hitl_approval_gate
 from .logger import get_logger
@@ -56,6 +62,7 @@ PIPELINE_SKILL_ORDER = [
 @dataclass
 class SkillPlan:
     """Configuration for how the planner drives one skill turn."""
+
     short_name: str
     # Given (user_id, input_dict, context), returns the node_input dict to pass to the MA,
     # or None to skip this skill entirely (e.g. research with no research_question).
@@ -83,6 +90,7 @@ def _skill_sort_key(skill: Any) -> int:
 
 # ---------- per-skill input builders and post-processors ----------
 
+
 def _build_spending_input(user_id, input_dict, context):
     window_months = input_dict.get("window_months", 3)
     preloaded = preload_spending_facts(user_id=user_id, window_months=window_months)
@@ -94,9 +102,7 @@ def _build_spending_input(user_id, input_dict, context):
     }
 
 
-async def _postprocess_spending(
-    user_id, result, ctx, input_dict, registry_entry_id=None
-):
+async def _postprocess_spending(user_id, result, ctx, input_dict, registry_entry_id=None):
     payload = result.model_dump() if hasattr(result, "model_dump") else result
     return payload, {"spending_analysis_result": result}
 
@@ -106,9 +112,7 @@ def _build_goals_onboarding_input(user_id, input_dict, context):
     return {"user_id": user_id, "trigger": trigger}
 
 
-async def _postprocess_goals_onboarding(
-    user_id, result, ctx, input_dict, registry_entry_id=None
-):
+async def _postprocess_goals_onboarding(user_id, result, ctx, input_dict, registry_entry_id=None):
     if isinstance(result, GoalsOnboardingResult):
         trigger = input_dict.get("trigger", "initial")
         new_ips, _ = write_ips_from_interview_result(
@@ -123,9 +127,7 @@ async def _postprocess_goals_onboarding(
             f"Primary horizon: {new_ips.time_horizon_years} years."
         )
         try:
-            await ctx.add_events_to_memory(
-                events=[UserContent(parts=[Part.from_text(text=summary_text)])]
-            )
+            await ctx.add_events_to_memory(events=[UserContent(parts=[Part.from_text(text=summary_text)])])
         except Exception:
             logger.exception("add_events_to_memory failed")
         payload = {
@@ -142,9 +144,7 @@ def _build_portfolio_analysis_input(user_id, input_dict, context):
     return preload_for_portfolio_analysis(user_id=user_id)
 
 
-async def _postprocess_portfolio_analysis(
-    user_id, result, ctx, input_dict, registry_entry_id=None
-):
+async def _postprocess_portfolio_analysis(user_id, result, ctx, input_dict, registry_entry_id=None):
     payload = result.model_dump() if hasattr(result, "model_dump") else result
     context_update = {"portfolio_analysis_result": payload}
     # Thread the drift_report forward so action-drafting can consume it (I1 chaining)
@@ -159,14 +159,10 @@ def _build_research_input(user_id, input_dict, context):
     research_question = input_dict.get("research_question")
     if not research_question or not str(research_question).strip():
         return None  # skip research if no explicit question (I4)
-    return preload_for_research(
-        user_id=user_id, research_question=str(research_question)
-    )
+    return preload_for_research(user_id=user_id, research_question=str(research_question))
 
 
-async def _postprocess_research(
-    user_id, result, ctx, input_dict, registry_entry_id=None
-):
+async def _postprocess_research(user_id, result, ctx, input_dict, registry_entry_id=None):
     payload = result.model_dump() if hasattr(result, "model_dump") else result
     return payload, {"research_briefs": [payload]}
 
@@ -175,22 +171,64 @@ def _build_action_drafting_input(user_id, input_dict, context):
     return preload_for_action_drafting(
         user_id=user_id,
         drift_report=input_dict.get("drift_report") or context.get("drift_report"),
-        research_briefs=input_dict.get("research_briefs")
-        or context.get("research_briefs"),
+        research_briefs=input_dict.get("research_briefs") or context.get("research_briefs"),
         requested_trade=input_dict.get("requested_trade"),
     )
 
 
-async def _postprocess_action_drafting(
-    user_id, result, ctx, input_dict, registry_entry_id=None
-):
+async def _postprocess_action_drafting(user_id, result, ctx, input_dict, registry_entry_id=None):
     if isinstance(result, ProposedAction):
-        write_proposed_action(
-            user_id=user_id, action=result, registry_entry_id=registry_entry_id
-        )
+        write_proposed_action(user_id=user_id, action=result, registry_entry_id=registry_entry_id)
         payload = result.model_dump()
-    else:
-        payload = result
+        return payload, {"action_drafting_result": payload}
+
+    pre = input_dict.get("precomputed_trade")
+    if pre is None:
+        # Preloader declined to produce a candidate (no drift + no
+        # requested trade). Nothing to persist; return the LLM's
+        # rationale as-is so the planner can surface it.
+        payload = result.model_dump() if hasattr(result, "model_dump") else result
+        return payload, {"action_drafting_result": payload}
+
+    # `result` is a ProposedActionRationale. Build the full ProposedAction
+    # from the deterministic precomputed trade + the LLM-authored fields.
+    rationale = getattr(result, "rationale", None) or (result.get("rationale") if isinstance(result, dict) else "")
+    refs = getattr(result, "supporting_research_refs", None) or (
+        result.get("supporting_research_refs", []) if isinstance(result, dict) else []
+    )
+    ips_dict = input_dict.get("ips", {}) if isinstance(input_dict.get("ips"), dict) else {}
+    ips_id = ips_dict.get("ips_id") or getattr(input_dict.get("ips"), "ips_id", "ips_unknown")
+    ips_ver = ips_dict.get("version") or getattr(input_dict.get("ips"), "version", 1)
+
+    sess = getattr(ctx, "session", None)
+    sess_id = getattr(sess, "id", None)
+    session_id_str = sess_id if isinstance(sess_id, str) else "sess_default"
+
+    merged = {
+        "action_id": pre.get("action_id") or str(uuid.uuid4()),
+        "session_id": pre.get("session_id") or session_id_str,
+        "type": pre.get("type") or ActionType.TRADE,
+        "status": pre.get("status") or ActionStatus.DRAFTED,
+        "created_at": pre.get("created_at") or datetime.now(timezone.utc),
+        "ips_version_referenced": pre.get("ips_version_referenced")
+        or RelatedIPSVersion(
+            ips_id=str(ips_id),
+            version=int(ips_ver),
+        ),
+        "proposed_by_skill_version": pre.get("proposed_by_skill_version")
+        or SkillVersionRef(
+            skill_name="private-action-drafting",
+            skill_version="0.1.0",
+            registry_entry_id=registry_entry_id,
+        ),
+        **pre,
+        "rationale": rationale,
+        "supporting_research_refs": refs,
+    }
+    action = ProposedAction.model_validate(merged)
+
+    write_proposed_action(user_id=user_id, action=action, registry_entry_id=registry_entry_id)
+    payload = action.model_dump()
     return payload, {"action_drafting_result": payload}
 
 
@@ -274,9 +312,7 @@ async def _postprocess_reviewer(user_id, result, ctx, input_dict, registry_entry
         auth_verdict = ReviewerVerdict(
             verdict_id=str(uuid.uuid4()),
             action_id=action.action_id,
-            ips_version_checked_against=RelatedIPSVersion(
-                ips_id=ips_obj.ips_id, version=ips_obj.version
-            ),
+            ips_version_checked_against=RelatedIPSVersion(ips_id=ips_obj.ips_id, version=ips_obj.version),
             rule_results=rule_results,
             overall_pass=overall_pass,
             requires_human_approval=requires_approval,
@@ -358,13 +394,6 @@ async def get_skills_from_registry(ctx: Context, node_input: Any):
     return skills
 
 
-@node(name="dummy_skill_execution", rerun_on_resume=False)
-async def dummy_skill_execution(ctx: Context, node_input: Any):
-    logger.info(f"Executing skill: {node_input}")
-    return f"{node_input}_completed"
-
-
-
 async def _execute_skill(
     plan: SkillPlan,
     skill_name: str,
@@ -384,9 +413,7 @@ async def _execute_skill(
         node_input = plan.build_input(user_id, input_dict, context)
     except PreloadDeclinedError as e:
         logger.info(f"Skill {plan.short_name} declined: {e}")
-        emit_skill_failed_audit(
-            plan.short_name, error=f"declined: {e}", registry_entry_id=registry_entry_id
-        )
+        emit_skill_failed_audit(plan.short_name, error=f"declined: {e}", registry_entry_id=registry_entry_id)
         return {"status": "declined", "message": str(e)}
     except Exception as e:
         logger.exception("Skill %s preload failed", plan.short_name)
@@ -401,6 +428,9 @@ async def _execute_skill(
         logger.info(f"Skipping skill {plan.short_name} (no input built)")
         return None
 
+    if isinstance(node_input, dict) and "precomputed_trade" in node_input:
+        input_dict.setdefault("precomputed_trade", node_input.get("precomputed_trade"))
+
     # 2. Emit SKILL_INVOKED
     emit_skill_invoked_audit(
         plan.short_name,
@@ -409,6 +439,7 @@ async def _execute_skill(
     )
 
     # 3. Dispatch to Managed Agent
+    t0 = time.monotonic()
     try:
         result = await dispatch_managed_skill(plan.short_name, node_input=node_input, ctx=ctx)
     except Exception as e:
@@ -419,12 +450,15 @@ async def _execute_skill(
             registry_entry_id=registry_entry_id,
         )
         raise
+    finally:
+        logger.info(
+            "skill_dispatch_complete",
+            extra={"skill": plan.short_name, "elapsed_sec": round(time.monotonic() - t0, 2)},
+        )
 
     # 4. Postprocess (writes + rationale + context)
     try:
-        payload, ctx_update = await plan.postprocess(
-            user_id, result, ctx, input_dict, registry_entry_id
-        )
+        payload, ctx_update = await plan.postprocess(user_id, result, ctx, input_dict, registry_entry_id)
     except Exception as e:
         logger.exception("Skill %s postprocess failed", plan.short_name)
         emit_skill_failed_audit(
@@ -449,8 +483,7 @@ def _detect_and_audit_revocations(
     {"name": str, "default_revision": str} dicts (JSON-serializable across resumes).
     """
     current_by_name = {
-        (s.name if hasattr(s, "name") else str(s)): getattr(s, "default_revision", None)
-        for s in current_skills
+        (s.name if hasattr(s, "name") else str(s)): getattr(s, "default_revision", None) for s in current_skills
     }
     prior_raw = ctx.state.get("last_authorized_skills") or []
     prior_by_name = {p["name"]: p for p in prior_raw if isinstance(p, dict) and "name" in p}
@@ -476,8 +509,7 @@ def _detect_and_audit_revocations(
     # Store current cycle for next comparison. Serialized as plain dicts so
     # ADK's ctx.state (which needs JSON-safe values) is happy.
     ctx.state["last_authorized_skills"] = [
-        {"name": name, "default_revision": rev}
-        for name, rev in current_by_name.items()
+        {"name": name, "default_revision": rev} for name, rev in current_by_name.items()
     ]
 
 
@@ -485,12 +517,21 @@ def _detect_and_audit_revocations(
 async def root_planner(ctx: Context, node_input: Any):
     """Registry-driven dynamic planner. Iterates authorized skills in canonical order,
     dispatching each to the worker Managed Agent via a per-skill SkillPlan."""
-    skills = await ctx.run_node(get_skills_from_registry, node_input=node_input)
-    logger.info(f"Available skills: {skills}")
+    all_skills = await ctx.run_node(get_skills_from_registry, node_input=node_input)
+    logger.info(f"Available skills from registry: {all_skills}")
+
+    # Filter strictly to the Portfolio Copilot skills (the 6 skills in skills/)
+    skills = [s for s in all_skills if _normalize_skill_key(s.name if hasattr(s, "name") else str(s)) in SKILL_PLANS]
+    logger.info(f"Filtered Portfolio Copilot skills ({len(skills)}): {skills}")
 
     # Delta-detect revocations vs the previous planning cycle in this session.
     # Emits SKILL_REVOKED audit for anything that disappeared.
     _detect_and_audit_revocations(ctx, skills)
+
+    if not skills:
+        msg = "No authorized Portfolio Copilot skills found in Agent Registry to complete the request."
+        logger.warning(msg)
+        return [f"error: {msg}"]
 
     # Parse node_input into a plain dict
     input_dict: Dict[str, Any] = {}
@@ -519,18 +560,21 @@ async def root_planner(ctx: Context, node_input: Any):
     results: list[Any] = []
     context: Dict[str, Any] = {}
 
+    independent_first = ("private-spending-analysis", "private-goals-onboarding")
+    parallel_group = ("private-portfolio-analysis", "private-research")
+    dependent_after = ("private-action-drafting", "private-reviewer")
+
     ordered_skills = sorted(skills, key=_skill_sort_key)
+
+    # 1. Independent first group (sequential)
     for skill in ordered_skills:
         skill_name = skill.name if hasattr(skill, "name") else str(skill)
-        registry_entry_id = getattr(skill, "default_revision", None)
         short_name = _normalize_skill_key(skill_name)
+        if short_name not in independent_first:
+            continue
         plan = SKILL_PLANS.get(short_name)
         if plan is None:
-            logger.info(f"Authorized skill {skill} has no SkillPlan; executing fallback.")
-            result = await ctx.run_node(dummy_skill_execution, node_input=skill_name)
-            results.append(result)
             continue
-
         payload = await _execute_skill(
             plan,
             skill_name,
@@ -538,11 +582,65 @@ async def root_planner(ctx: Context, node_input: Any):
             input_dict,
             context,
             ctx,
-            registry_entry_id=registry_entry_id,
+            registry_entry_id=getattr(skill, "default_revision", None),
         )
-        if payload is None:
+        if payload is not None:
+            results.append(f"{plan.short_name.replace('private-', '')}_result: {payload}")
+
+    # 2. Parallel group: portfolio-analysis and research concurrent dispatch
+    # Note: Concurrent writes into `context` are safe because portfolio-analysis writes
+    # `portfolio_analysis_result` and research writes `research_briefs` (disjoint keys).
+    parallel_tasks = []
+    parallel_plans = []
+    for skill in ordered_skills:
+        skill_name = skill.name if hasattr(skill, "name") else str(skill)
+        short_name = _normalize_skill_key(skill_name)
+        if short_name not in parallel_group:
             continue
-        results.append(f"{plan.short_name.replace('private-', '')}_result: {payload}")
+        plan = SKILL_PLANS.get(short_name)
+        if plan is None:
+            continue
+        parallel_plans.append(plan)
+        parallel_tasks.append(
+            _execute_skill(
+                plan,
+                skill_name,
+                user_id,
+                input_dict,
+                context,
+                ctx,
+                registry_entry_id=getattr(skill, "default_revision", None),
+            )
+        )
+
+    if parallel_tasks:
+        parallel_results = await asyncio.gather(*parallel_tasks, return_exceptions=True)
+        for plan, r in zip(parallel_plans, parallel_results):
+            if isinstance(r, Exception):
+                raise r
+            if r is not None:
+                results.append(f"{plan.short_name.replace('private-', '')}_result: {r}")
+
+    # 3. Dependent after group (sequential)
+    for skill in ordered_skills:
+        skill_name = skill.name if hasattr(skill, "name") else str(skill)
+        short_name = _normalize_skill_key(skill_name)
+        if short_name not in dependent_after:
+            continue
+        plan = SKILL_PLANS.get(short_name)
+        if plan is None:
+            continue
+        payload = await _execute_skill(
+            plan,
+            skill_name,
+            user_id,
+            input_dict,
+            context,
+            ctx,
+            registry_entry_id=getattr(skill, "default_revision", None),
+        )
+        if payload is not None:
+            results.append(f"{plan.short_name.replace('private-', '')}_result: {payload}")
 
     # HITL approval gate: if action-drafting produced a ProposedAction, gate it before returning
     ad_result = context.get("action_drafting_result")
