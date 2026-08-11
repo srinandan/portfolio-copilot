@@ -1232,8 +1232,8 @@ async def test_reviewer_build_input_mirrors_preloaded_state_into_input_dict(
     node_input = plan.build_input("user_pre", input_dict, context)
     assert node_input is not None
     # build_input must mirror the preloader's IPS + holdings into input_dict.
-    assert input_dict["_preloaded_ips"] == fake_ips.model_dump()
-    assert input_dict["_preloaded_holdings"] == fake_holdings.model_dump()
+    assert input_dict["_preloaded_ips"] == fake_ips.model_dump(mode="json")
+    assert input_dict["_preloaded_holdings"] == fake_holdings.model_dump(mode="json")
 
     # Now postprocess reads them from input_dict — no second Firestore round-trip.
     planner_fs = mock_planner_fs_cls.return_value

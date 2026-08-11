@@ -275,8 +275,14 @@ async def dispatch_managed_skill(
     )
     t_dispatch = time.time()
     raw_result = None
+    safe_input = node_input
+    if isinstance(node_input, (dict, list)):
+        try:
+            safe_input = json.loads(json.dumps(node_input, default=str))
+        except Exception:
+            pass
     try:
-        raw_result = await ctx.run_node(agent, node_input=node_input)
+        raw_result = await ctx.run_node(agent, node_input=safe_input)
     except Exception as e:
         # TODO: Revisit spending-analysis Managed Agent latency and timeout.
         # Temporarily ignore the timeout / failure for spending-analysis and proceed with precomputed facts.

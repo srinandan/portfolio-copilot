@@ -110,6 +110,6 @@ def preload_spending_facts(
         "total_outflow_usd": total_outflow,
         "savings_rate": savings_rate,
         "reserve_months": reserve_months,
-        "category_breakdown": [c.model_dump() for c in category_breakdown],
-        "anomalies": [a.model_dump() for a in anomalies],
+        "category_breakdown": [c.model_dump(mode="json") for c in category_breakdown],
+        "anomalies": [a.model_dump(mode="json") for a in anomalies],
     }
