@@ -118,6 +118,51 @@ async def test_dispatch_managed_skill_dict_coercion(mock_resolve):
     assert result.narrative_summary == "Spending is within normal range."
 
 
+@pytest.mark.asyncio
+@patch("orchestrator.managed_agents.dispatcher.resolve_skill_instructions")
+async def test_dispatch_sends_instructions_schema_and_frame_to_worker(mock_resolve):
+    """issue #266: the backend only receives node_input, so the skill instructions,
+    an anti-exploration frame, and the output schema must be delivered inline as the
+    user message — otherwise the worker base agent explores its sandbox and greets."""
+    mock_resolve.return_value = "SPENDING_SKILL_MARKER: analyze the user's spending."
+
+    mock_ctx = AsyncMock(spec=Context)
+    mock_ctx.run_node.return_value = {"narrative_summary": "ok", "anomaly_commentary": []}
+
+    await dispatch_managed_skill(
+        skill_name="private-spending-analysis",
+        node_input={"user_id": "user_xyz", "window_months": 3},
+        ctx=mock_ctx,
+    )
+
+    mock_ctx.run_node.assert_awaited_once()
+    sent = mock_ctx.run_node.await_args.kwargs["node_input"]
+    # The worker must receive a single text prompt, not the bare JSON dict.
+    assert isinstance(sent, str)
+    # Anti-exploration frame (the core of the fix).
+    assert "Do NOT run shell commands" in sent
+    assert "workspace" in sent.lower()
+    # The actual skill instructions must reach the model.
+    assert "SPENDING_SKILL_MARKER" in sent
+    # The output schema must be present so the model returns structured output.
+    assert "OUTPUT SCHEMA" in sent
+    assert "narrative_summary" in sent
+    # The input data must still be delivered.
+    assert "user_xyz" in sent
+
+
+def test_build_worker_prompt_omits_schema_when_none():
+    from orchestrator.managed_agents.dispatcher import _build_worker_prompt
+
+    prompt = _build_worker_prompt("do the thing", None, {"a": 1})
+    assert "SKILL INSTRUCTIONS:" in prompt
+    assert "do the thing" in prompt
+    # No schema section header when output_schema is None (the preamble still
+    # references the phrase "OUTPUT SCHEMA", so match the section header only).
+    assert "OUTPUT SCHEMA (respond with JSON" not in prompt
+    assert '"a": 1' in prompt
+
+
 def test_dispatch_managed_skill_spending_uses_narrow_schema():
     assert OUTPUT_SCHEMA_BY_SKILL["private-spending-analysis"] is SpendingNarrative
 

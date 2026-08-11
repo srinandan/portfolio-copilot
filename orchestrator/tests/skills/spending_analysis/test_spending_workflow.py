@@ -217,34 +217,27 @@ async def test_planner_dispatches_spending_analysis_managed_agent():
 
 
 @pytest.mark.asyncio
-async def test_spending_analysis_workflow_handles_timeout_gracefully():
-    agent = Workflow(
-        name="test_root",
-        edges=[("START", root_planner)],
-    )
-    session_service = InMemorySessionService()
-    memory_service = InMemoryMemoryService()
-    runner = Runner(
-        app_name="test_app",
-        agent=agent,
-        session_service=session_service,
-        memory_service=memory_service,
-        auto_create_session=True,
-    )
+async def test_spending_analysis_dispatch_failure_surfaces_error():
+    """A spending-analysis dispatch failure must no longer be silently swallowed.
+
+    The old fail-silently fallback (added when the worker routinely timed out at
+    60-80s) masked real failures. Now that the #266/#267 fix removed the timeout
+    root cause, spending-analysis fails like every other skill: it emits a
+    SKILL_INVOCATION_FAILED audit and propagates the error instead of returning a
+    fabricated "precomputed" narrative.
+    """
+    from orchestrator.planner import SKILL_PLANS, _execute_skill
+
+    plan = SKILL_PLANS["private-spending-analysis"]
+    ctx = MagicMock()
+    input_dict = {"user_id": "user_123", "query_intent": "anomaly_check", "window_months": 3}
 
     with (
-        patch("orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list,
         patch("orchestrator.planner.preload_spending_facts") as mock_preload,
         patch("orchestrator.planner.emit_skill_invoked_audit"),
+        patch("orchestrator.planner.emit_skill_failed_audit") as mock_failed,
         patch("orchestrator.planner.dispatch_managed_skill", new_callable=AsyncMock) as mock_dispatch,
     ):
-        mock_list.return_value = [
-            Skill(
-                name="projects/test-proj/locations/global/skills/private-spending-analysis",
-                target_state="TARGET_STATE_ACTIVE",
-                default_revision="rev1",
-            ),
-        ]
         mock_preload.return_value = {
             "user_id": "user_123",
             "total_income_usd": 10000.0,
@@ -254,21 +247,20 @@ async def test_spending_analysis_workflow_handles_timeout_gracefully():
             "category_breakdown": [],
             "anomalies": [],
         }
-        # Simulate a TimeoutError from Managed Agent dispatch
-        mock_dispatch.side_effect = TimeoutError("Node 'private_spending_analysis' timed out after 180.0 seconds.")
+        mock_dispatch.side_effect = TimeoutError("Node 'private_spending_analysis' timed out after 60.0 seconds.")
 
-        response_stream = runner.run_async(
-            user_id="user_123",
-            session_id="session_spending_timeout_1",
-            new_message=UserContent(
-                parts=[
-                    Part.from_text(text='{"user_id": "user_123", "query_intent": "anomaly_check", "window_months": 3}')
-                ]
-            ),
-        )
+        with pytest.raises(TimeoutError):
+            await _execute_skill(
+                plan,
+                "projects/test-proj/locations/global/skills/private-spending-analysis",
+                "user_123",
+                input_dict,
+                {},
+                ctx,
+                registry_entry_id="rev1",
+            )
 
-        events = [e async for e in response_stream]
-        assert len(events) > 0
-        # Verify execution completed without raising unhandled exception
-        mock_preload.assert_called_once_with(user_id="user_123", window_months=3)
-        mock_dispatch.assert_called_once()
+        mock_dispatch.assert_awaited_once()
+        # The failure is recorded (surfaced), not hidden.
+        mock_failed.assert_called_once()
+        assert "dispatch_failed" in mock_failed.call_args[1]["error"]

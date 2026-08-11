@@ -332,6 +332,61 @@ def _coerce_to_schema(
     return None
 
 
+# Prepended to every worker turn. ManagedAgent transmits ONLY node_input as the
+# user message — the SKILL.md instructions passed as the agent's `description`
+# are never sent to the backend (see google.adk ManagedAgent._run_async_impl,
+# which builds the request with system_instruction=None). Without an explicit
+# task frame the antigravity worker base agent falls back to autonomous
+# workspace/shell exploration and emits a coding-assistant greeting instead of
+# the skill payload (issue #266). Delivering the instructions, a hard
+# anti-exploration frame, and the output schema inline is the strongest lever
+# available without re-provisioning the base agent.
+_WORKER_SYSTEM_PREAMBLE = (
+    "You are a headless financial-analysis agent running inside an automated pipeline. "
+    "You are NOT a coding assistant and NOT a workspace assistant.\n"
+    "STRICT OPERATING RULES:\n"
+    "- Do NOT run shell commands and do NOT inspect, list, or explore any filesystem, "
+    "workspace, home directory, or environment variables. There are no files to discover; "
+    "everything you need is in INPUT DATA below.\n"
+    "- Do NOT greet the user, introduce yourself, or narrate your steps.\n"
+    "- Complete the task in SKILL INSTRUCTIONS using only INPUT DATA.\n"
+    "- Respond with a SINGLE JSON object that conforms to OUTPUT SCHEMA. Output only that "
+    "JSON object — no prose, no explanation, and no markdown code fences."
+)
+
+
+def _build_worker_prompt(
+    instructions: str,
+    output_schema: Optional[Type[BaseModel]],
+    payload: Any,
+) -> str:
+    """Composes the single user message sent to the worker Managed Agent.
+
+    The skill instructions, a strict anti-exploration frame, the expected output
+    schema, and the data payload must all be delivered here because the backend
+    only ever receives node_input (issue #266).
+    """
+    sections = [
+        _WORKER_SYSTEM_PREAMBLE,
+        "SKILL INSTRUCTIONS:\n" + (instructions or "").strip(),
+    ]
+    if output_schema is not None:
+        try:
+            schema_json = json.dumps(output_schema.model_json_schema(), indent=2)
+            sections.append("OUTPUT SCHEMA (respond with JSON matching this schema exactly):\n" + schema_json)
+        except Exception:
+            pass
+    if isinstance(payload, str):
+        data_text = payload
+    else:
+        try:
+            data_text = json.dumps(payload, default=str, ensure_ascii=False)
+        except Exception:
+            data_text = str(payload)
+    sections.append("INPUT DATA:\n" + data_text)
+    return "\n\n".join(sections)
+
+
 async def dispatch_managed_skill(
     skill_name: str,
     node_input: Any,
@@ -391,23 +446,12 @@ async def dispatch_managed_skill(
             safe_input = json.loads(json.dumps(node_input, default=str))
         except Exception:
             pass
-    try:
-        raw_result = await ctx.run_node(agent, node_input=safe_input)
-    except Exception as e:
-        # TODO: Revisit spending-analysis Managed Agent latency and timeout.
-        # Temporarily ignore the timeout / failure for spending-analysis and proceed with precomputed facts.
-        if normalized_short == "spending-analysis":
-            logger.warning(
-                "Managed Agent call for '%s' failed or timed out (%s); ignoring and falling back to preloaded facts. "
-                "TODO: revisit Managed Agent timeout later.",
-                short_name,
-                e,
-            )
-            return SpendingNarrative(
-                narrative_summary="Spending analysis precomputed from transaction facts.",
-                anomaly_commentary=[],
-            )
-        raise
+    # The backend only receives node_input as the user message; the agent's
+    # `description` (SKILL.md) is not transmitted. Deliver the instructions,
+    # anti-exploration frame, and output schema inline so the worker performs
+    # the skill instead of exploring its sandbox (issue #266).
+    worker_prompt = _build_worker_prompt(instructions, output_schema, safe_input)
+    raw_result = await ctx.run_node(agent, node_input=worker_prompt)
 
     t_elapsed = time.time() - t_dispatch
     logger.info(
@@ -439,18 +483,6 @@ async def dispatch_managed_skill(
         validated = _coerce_to_schema(raw_result, output_schema, short_name, node_input=node_input)
 
         if validated is None:
-            # TODO: Revisit spending-analysis Managed Agent latency and timeout.
-            # Temporarily ignore the empty/unparseable output for spending-analysis and proceed with precomputed facts.
-            if normalized_short == "spending-analysis":
-                logger.warning(
-                    "Managed Agent output for '%s' was empty or unparseable; ignoring and falling back to preloaded facts. "
-                    "TODO: revisit Managed Agent timeout later.",
-                    short_name,
-                )
-                return SpendingNarrative(
-                    narrative_summary="Spending analysis precomputed from transaction facts.",
-                    anomaly_commentary=[],
-                )
             raise RuntimeError(
                 f"{output_schema.__name__} could not be constructed from Managed "
                 f"Agent output for skill {short_name!r}. See prior log for details."
