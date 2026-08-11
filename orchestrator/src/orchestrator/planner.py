@@ -166,7 +166,13 @@ async def _postprocess_goals_onboarding(user_id, result, ctx, input_dict, regist
             f"Primary horizon: {new_ips.time_horizon_years} years."
         )
         try:
-            await ctx.add_events_to_memory(events=[UserContent(parts=[Part.from_text(text=summary_text)])])
+            from google.adk.events import Event
+
+            memory_event = Event(
+                author="portfolio_copilot_planner",
+                content=UserContent(parts=[Part.from_text(text=summary_text)]),
+            )
+            await ctx.add_events_to_memory(events=[memory_event])
         except Exception:
             logger.exception("add_events_to_memory failed")
         payload = {
