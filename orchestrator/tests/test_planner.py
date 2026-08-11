@@ -1517,3 +1517,48 @@ async def test_root_planner_runs_research_and_portfolio_analysis_in_parallel():
 
         assert starts[res_name] < ends[pa_name]
         assert starts[pa_name] < ends[res_name]
+
+
+@pytest.mark.asyncio
+@patch("src.orchestrator.planner.write_ips_from_interview_result")
+async def test_postprocess_goals_onboarding_adds_adk_event_to_memory(mock_write):
+    from google.adk.events import Event
+
+    from src.orchestrator.planner import _postprocess_goals_onboarding
+
+    mock_ips = MagicMock(
+        ips_id="ips-123",
+        version=1,
+        risk_tolerance=RiskTolerance.MODERATE,
+        time_horizon_years=10,
+    )
+    mock_write.return_value = (mock_ips, MagicMock())
+
+    result = GoalsOnboardingResult(
+        user_id="user_test_memory",
+        primary_goal=Goal(name="Retirement", target_amount_usd=1000000.0, target_date="2045-01-01"),
+        risk_tolerance=RiskTolerance.MODERATE,
+        time_horizon_years=10,
+        target_allocation=[],
+        interview_summary="User seeks moderate growth over 10 years.",
+    )
+
+    mock_ctx = AsyncMock(spec=Context)
+
+    payload, update = await _postprocess_goals_onboarding(
+        user_id="user_test_memory",
+        result=result,
+        ctx=mock_ctx,
+        input_dict={"trigger": "initial"},
+    )
+
+    assert payload["status"] == "completed"
+    assert payload["ips_id"] == "ips-123"
+    mock_ctx.add_events_to_memory.assert_awaited_once()
+    called_events = mock_ctx.add_events_to_memory.await_args.kwargs.get("events")
+    assert len(called_events) == 1
+    event = called_events[0]
+    assert isinstance(event, Event)
+    assert hasattr(event, "content")
+    assert isinstance(event.content, UserContent)
+    assert "User user_test_memory completed goals onboarding" in event.content.parts[0].text
