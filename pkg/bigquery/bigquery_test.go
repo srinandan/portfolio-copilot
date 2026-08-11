@@ -16,7 +16,30 @@ func TestPrepareSecureSQL(t *testing.T) {
 		checkQuery    func(t *testing.T, secureSQL string, params map[string]interface{})
 	}{
 		{
-			name:         "Basic valid query",
+			name:         "Basic valid query with checking_transactions",
+			generatedSQL: "SELECT * FROM checking_transactions",
+			expectError:  false,
+			checkQuery: func(t *testing.T, secureSQL string, params map[string]interface{}) {
+				if !strings.Contains(secureSQL, "portfolio_copilot.checking_transactions") {
+					t.Errorf("Expected scoped table name in query, got: %s", secureSQL)
+				}
+				if !strings.Contains(secureSQL, "WITH checking_transactions AS") {
+					t.Errorf("Expected CTE prefix for checking_transactions, got: %s", secureSQL)
+				}
+				if !strings.Contains(secureSQL, "user_id = @user_id") {
+					t.Errorf("Expected user_id parameter in query, got: %s", secureSQL)
+				}
+				if !strings.HasSuffix(secureSQL, "LIMIT 100") {
+					t.Errorf("Expected LIMIT 100 at the end, got: %s", secureSQL)
+				}
+				if params["user_id"] != userID {
+					t.Errorf("Expected user_id parameter to be %s, got: %v", userID, params["user_id"])
+				}
+			},
+		},
+
+		{
+			name:         "Basic valid query with legacy chase_transactions",
 			generatedSQL: "SELECT * FROM chase_transactions",
 			expectError:  false,
 			checkQuery: func(t *testing.T, secureSQL string, params map[string]interface{}) {
@@ -109,7 +132,7 @@ func TestPrepareSecureSQL(t *testing.T) {
 			name:          "Missing table target",
 			generatedSQL:  "SELECT * FROM some_other_table",
 			expectError:   true,
-			expectedError: "query must target chase_transactions table",
+			expectedError: "query must target a transactions table",
 		},
 		{
 			name:         "Valid query with UPDATE in column name",

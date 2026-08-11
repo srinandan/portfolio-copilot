@@ -20,5 +20,6 @@ fi
 
 echo "Syncing schemas from ${SRC_DIR} to ${DEST_DIR}..."
 mkdir -p "${DEST_DIR}"
+rm -f "${DEST_DIR}"/*.json
 cp -f "${SRC_DIR}"/*.json "${DEST_DIR}/"
 echo "Schemas synced successfully."

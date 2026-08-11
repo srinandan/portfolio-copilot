@@ -29,6 +29,23 @@ describe('UploadDropzone.vue', () => {
     expect(screen.getByText('statement.csv')).toBeDefined();
     expect(screen.getByText('CHANGE FILE')).toBeDefined();
     expect(emitted()['file-selected']).toHaveLength(1);
-    expect(emitted()['file-selected'][0]).toEqual([file]);
+    expect(emitted()['file-selected'][0]).toEqual([file, 'checking', 'checking_transactions']);
+  });
+
+  it('updates target table when account type changes to brokerage', async () => {
+    const { emitted } = render(UploadDropzone);
+    const select = screen.getByTestId('account-type-select') as HTMLSelectElement;
+    await fireEvent.update(select, 'brokerage');
+
+    const input = screen.getByTestId('file-input') as HTMLInputElement;
+    const file = new File(['ticker,shares\nAAPL,10'], 'brokerage_stmt.csv', {
+      type: 'text/csv'
+    });
+    Object.defineProperty(input, 'files', {
+      value: [file]
+    });
+
+    await fireEvent.change(input);
+    expect(emitted()['file-selected'][0]).toEqual([file, 'brokerage', 'holdings']);
   });
 });

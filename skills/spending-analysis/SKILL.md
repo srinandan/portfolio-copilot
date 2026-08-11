@@ -1,11 +1,10 @@
 ---
 name: spending-analysis
 description: >-
-  Analyzes Chase transaction data via BigQuery — categorizes spend,
-  flags anomalies, answers trend questions via natural-language-to-SQL.
-  Use when the user asks about spending patterns, budget categories, or
-  wants a trend explained (e.g. "why did dining spend jump in June"), or
-  when Goals & Onboarding needs a savings rate or reserve estimate.
+  Synthesizes spending insights, savings rate, and reserve estimates from
+  preloaded account transaction facts (e.g. checking_transactions). Use when
+  the user asks about spending patterns, budget categories, or when Goals &
+  Onboarding needs a savings rate or reserve estimate.
 metadata:
   version: "0.2.0"
   status: draft
@@ -15,12 +14,12 @@ metadata:
 
 ## Purpose
 
-Analyzes Chase transaction data: categorizes spend into a fixed taxonomy,
-flags anomalies against trailing history, and synthesizes natural language
-budgeting insights, savings rate metrics, and reserve months estimates.
+Analyzes bank transaction data (from `checking_transactions`): categorizes spend
+into a fixed taxonomy, flags anomalies against trailing history, and synthesizes
+natural language budgeting insights, savings rate metrics, and reserve months estimates.
 
-Produces a typed [`SpendingReport`](../../schemas/spending-report.schema.json)
-for the orchestrator and downstream skills.
+Produces typed narrative fields for the orchestrator to merge into the
+final SpendingReport.
 
 ## When this skill runs
 
@@ -41,7 +40,7 @@ for the orchestrator and downstream skills.
 
 ## Category taxonomy
 
-Chase's own exported category strings are normalized into a fixed internal
+Transaction category strings from statements are normalized into a fixed internal
 taxonomy:
 
 `housing`, `utilities`, `groceries`, `dining`, `transportation`,
@@ -95,7 +94,7 @@ persists the resulting SpendingReport.
 
 - Managed Agent sandbox: conversational reasoning over preloaded context
 - Orchestrator (outside sandbox):
-  - BigQuery: read `chase_transactions` (aggregate/`SELECT` only, user-scoped)
+  - BigQuery: read `checking_transactions` (aggregate/`SELECT` only, user-scoped)
   - Firestore: read `holdings` (cash balance only, for reserve estimate)
 - **No** direct database execution tools inside the Managed Agent sandbox.
 

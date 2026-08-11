@@ -22,6 +22,8 @@ export interface HoldingsSnapshot {
 export interface DocumentItem {
   id: string;
   filename: string;
+  account_type?: 'checking' | 'savings' | 'brokerage' | 'credit_card' | 'other' | string;
+  target_table?: string;
   size_bytes: number;
   uploaded_at: string;
   status: 'SUCCESS' | 'PROCESSING' | 'FAILED';

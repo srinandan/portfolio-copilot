@@ -33,7 +33,8 @@ def validate_fixtures() -> None:
         "holdings.json": "holdings.schema.json",
         "liabilities.json": "liabilities.schema.json",
         "ips.json": "ips.schema.json",
-        "chase_transactions.json": "chase-transaction.schema.json",
+        "checking_transactions.json": "account-transaction.schema.json",
+        "chase_transactions.json": "account-transaction.schema.json",
     }
 
     for fixture_name, schema_name in schema_map.items():
@@ -86,7 +87,12 @@ def get_default_project() -> str:
 
 
 def seed_bigquery(project_id: str, location: str, dataset_name: str, table_name: str, dry_run: bool) -> None:
-    csv_file = TESTDATA_DIR / "chase_transactions.csv"
+    csv_file = TESTDATA_DIR / f"{table_name}.csv"
+    if not csv_file.exists():
+        # Fallback to checking_transactions.csv or chase_transactions.csv
+        csv_file = TESTDATA_DIR / "checking_transactions.csv"
+        if not csv_file.exists():
+            csv_file = TESTDATA_DIR / "chase_transactions.csv"
     table_id = f"{project_id}.{dataset_name}.{table_name}"
     print(f"\n[BigQuery] Seeding {csv_file.name} -> {table_id} (location: {location})...")
 
@@ -207,7 +213,7 @@ def main() -> None:
         "--dataset", default="portfolio_copilot", help="BigQuery dataset name (default: portfolio_copilot)"
     )
     parser.add_argument(
-        "--table", default="chase_transactions", help="BigQuery table name (default: chase_transactions)"
+        "--table", default="checking_transactions", help="BigQuery table name (default: checking_transactions)"
     )
     parser.add_argument("--dry-run", action="store_true", help="Validate fixtures without uploading to GCP")
 

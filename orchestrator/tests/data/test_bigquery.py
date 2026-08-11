@@ -15,18 +15,20 @@ def test_validate_and_execute_nl_sql_valid_query(mock_client):
     mock_job.result.return_value = [{"col": 1}]
     client.client.query.return_value = mock_job
 
-    # Should not raise an exception
-    result = client.validate_and_execute_nl_sql("user123", "SELECT * FROM chase_transactions WHERE user_id = @user_id")
+    # Should not raise an exception for checking_transactions or chase_transactions
+    result = client.validate_and_execute_nl_sql(
+        "user123", "SELECT * FROM checking_transactions WHERE user_id = @user_id"
+    )
     assert result == [{"col": 1}]
 
 
 @pytest.mark.parametrize(
     "query, error_msg",
     [
-        ("UPDATE chase_transactions SET amount = 0 WHERE user_id = @user_id", "Write-intent SQL refused"),
-        ("DELETE FROM chase_transactions WHERE user_id = @user_id", "Write-intent SQL refused"),
-        ("SELECT * FROM some_other_table WHERE user_id = @user_id", "must target the chase_transactions table"),
-        ("SELECT * FROM chase_transactions WHERE amount > 0", "must include @user_id parameter"),
+        ("UPDATE checking_transactions SET amount = 0 WHERE user_id = @user_id", "Write-intent SQL refused"),
+        ("DELETE FROM checking_transactions WHERE user_id = @user_id", "Write-intent SQL refused"),
+        ("SELECT * FROM some_other_table WHERE user_id = @user_id", "must target a transactions table"),
+        ("SELECT * FROM checking_transactions WHERE amount > 0", "must include @user_id parameter"),
     ],
 )
 @patch("google.cloud.bigquery.Client")

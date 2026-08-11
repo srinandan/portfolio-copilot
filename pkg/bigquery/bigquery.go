@@ -11,16 +11,14 @@ import (
 const MaxBytesBilled = 10 * 1024 * 1024
 
 var (
-	blockCommentRegex = regexp.MustCompile(`/\*[\s\S]*?\*/`)
-	lineCommentRegex  = regexp.MustCompile(`(--|#)[^\n]*`)
-	selectStartRegex  = regexp.MustCompile(`(?i)^SELECT\b`)
-	chaseTableRegex   = regexp.MustCompile(`(?i)\bchase_transactions\b`)
-	// qualifiedChaseRefBacktick matches `foo.bar.chase_transactions` (backtick-quoted, any prefix).
-	qualifiedChaseRefBacktick = regexp.MustCompile("`[^`]*\\bchase_transactions`")
-	// qualifiedChaseRefBare matches word.word[.word]*.chase_transactions (unquoted, any prefix depth).
-	qualifiedChaseRefBare = regexp.MustCompile(`(?i)\b(?:[A-Za-z_][\w-]*\.)+chase_transactions\b`)
-	limitRegex            = regexp.MustCompile(`(?i)\blimit\s+\d+\s*;?\s*$`)
-	restrictedRegex       = regexp.MustCompile(`(?i)\b(INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|TRUNCATE|MERGE|EXPORT|LOAD|CALL|EXECUTE)\b`)
+	blockCommentRegex               = regexp.MustCompile(`/\*[\s\S]*?\*/`)
+	lineCommentRegex                = regexp.MustCompile(`(--|#)[^\n]*`)
+	selectStartRegex                = regexp.MustCompile(`(?i)^SELECT\b`)
+	transactionTableRegex           = regexp.MustCompile(`(?i)\b([a-zA-Z0-9_]+_transactions)\b`)
+	qualifiedTransactionRefBacktick = regexp.MustCompile("`[^`]*\\b([a-zA-Z0-9_]+_transactions)`")
+	qualifiedTransactionRefBare     = regexp.MustCompile(`(?i)\b(?:[A-Za-z_][\w-]*\.)+([a-zA-Z0-9_]+_transactions)\b`)
+	limitRegex                      = regexp.MustCompile(`(?i)\blimit\s+\d+\s*;?\s*$`)
+	restrictedRegex                 = regexp.MustCompile(`(?i)\b(INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|TRUNCATE|MERGE|EXPORT|LOAD|CALL|EXECUTE)\b`)
 )
 
 func stripCommentsAndSpace(sql string) string {
@@ -56,17 +54,19 @@ func PrepareSecureSQL(generatedSQL, userID string) (string, map[string]interface
 		return "", nil, fmt.Errorf("read-only queries only: %s is not allowed", strings.ToUpper(match))
 	}
 
-	// 4. Target checking: Must target chase_transactions
-	if !chaseTableRegex.MatchString(sqlWithoutTrailingSemicolon) {
-		return "", nil, fmt.Errorf("query must target chase_transactions table")
+	// 4. Target checking: Must target a transactions table (e.g. checking_transactions)
+	tableMatch := transactionTableRegex.FindStringSubmatch(sqlWithoutTrailingSemicolon)
+	if len(tableMatch) < 2 {
+		return "", nil, fmt.Errorf("query must target a transactions table (e.g. checking_transactions)")
 	}
+	targetTable := strings.ToLower(tableMatch[1])
 
 	// 5. CTE-based row-level user scoping.
-	// Strip ANY qualifier prefix from chase_transactions so the CTE below shadows
+	// Strip ANY qualifier prefix from the transactions table so the CTE below shadows
 	// every reference. BigQuery CTEs only shadow unqualified names — a query using
-	// `project.dataset.chase_transactions` would otherwise skip user_id scoping.
-	cleanUserSQL := qualifiedChaseRefBacktick.ReplaceAllString(sqlWithoutTrailingSemicolon, "chase_transactions")
-	cleanUserSQL = qualifiedChaseRefBare.ReplaceAllString(cleanUserSQL, "chase_transactions")
+	// `project.dataset.checking_transactions` would otherwise skip user_id scoping.
+	cleanUserSQL := qualifiedTransactionRefBacktick.ReplaceAllString(sqlWithoutTrailingSemicolon, "$1")
+	cleanUserSQL = qualifiedTransactionRefBare.ReplaceAllString(cleanUserSQL, "$1")
 
 	// 6. Ensure LIMIT safeguard
 	if !limitRegex.MatchString(cleanUserSQL) {
@@ -79,7 +79,7 @@ func PrepareSecureSQL(generatedSQL, userID string) (string, map[string]interface
 		cleanUserSQL = cleanUserSQL + ";"
 	}
 
-	secureSQL := fmt.Sprintf("WITH chase_transactions AS (\n  SELECT * FROM portfolio_copilot.chase_transactions WHERE user_id = @user_id\n)\n%s", cleanUserSQL)
+	secureSQL := fmt.Sprintf("WITH %s AS (\n  SELECT * FROM portfolio_copilot.%s WHERE user_id = @user_id\n)\n%s", targetTable, targetTable, cleanUserSQL)
 
 	params := map[string]interface{}{
 		"user_id": userID,

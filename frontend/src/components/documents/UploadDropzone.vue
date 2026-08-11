@@ -5,6 +5,18 @@
       <span class="material-symbols-outlined text-outline">verified_user</span>
     </div>
     <div class="p-lg">
+      <div class="mb-md flex items-center gap-sm">
+        <label for="account-type-select" class="font-body-base text-sm text-on-surface font-medium">Account Type:</label>
+        <select
+          id="account-type-select"
+          v-model="accountType"
+          class="bg-surface-container-low text-on-surface border border-outline-variant rounded-md px-sm py-xs text-sm font-body-base focus:outline-none focus:border-primary"
+          data-testid="account-type-select"
+        >
+          <option value="checking">Bank Account (checking_transactions)</option>
+          <option value="brokerage">Brokerage Holdings</option>
+        </select>
+      </div>
       <div
         :class="[
           'border-2 border-dashed rounded-lg p-xl flex flex-col items-center justify-center text-center transition-colors duration-200 cursor-pointer',
@@ -31,7 +43,7 @@
           {{ selectedFile ? selectedFile.name : 'Drop Statements Here' }}
         </h3>
         <p class="font-body-base text-body-base text-on-surface-variant mb-md max-w-[240px]">
-          {{ selectedFile ? `${(selectedFile.size / 1024 / 1024).toFixed(2)} MB • Ready to process` : 'CSV or PDF format. End-of-month statements preferred.' }}
+          {{ selectedFile ? `${(selectedFile.size / 1024 / 1024).toFixed(2)} MB • Target: ${targetTable}` : 'CSV or PDF format. End-of-month statements preferred.' }}
         </p>
         <button
           type="button"
@@ -51,15 +63,25 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 
 const emit = defineEmits<{
-  (e: 'file-selected', file: File): void;
+  (e: 'file-selected', file: File, accountType?: string, targetTable?: string): void;
 }>();
 
 const isDragging = ref(false);
 const selectedFile = ref<File | null>(null);
 const fileInputRef = ref<HTMLInputElement | null>(null);
+const accountType = ref<'checking' | 'brokerage'>('checking');
+
+const targetTable = computed(() => {
+  switch (accountType.value) {
+    case 'checking':
+      return 'checking_transactions';
+    default:
+      return 'holdings';
+  }
+});
 
 function triggerFileInput() {
   fileInputRef.value?.click();
@@ -67,7 +89,7 @@ function triggerFileInput() {
 
 function handleFile(file: File) {
   selectedFile.value = file;
-  emit('file-selected', file);
+  emit('file-selected', file, accountType.value, targetTable.value);
 }
 
 function onFileSelect(event: Event) {

@@ -53,6 +53,8 @@ type DriftReport struct {
 type DocumentItem struct {
 	ID            string  `json:"id" firestore:"id"`
 	Filename      string  `json:"filename" firestore:"filename"`
+	AccountType   string  `json:"account_type,omitempty" firestore:"account_type,omitempty"`
+	TargetTable   string  `json:"target_table,omitempty" firestore:"target_table,omitempty"`
 	SizeBytes     int64   `json:"size_bytes" firestore:"size_bytes"`
 	UploadedAt    string  `json:"uploaded_at" firestore:"uploaded_at"`
 	Status        string  `json:"status" firestore:"status"`
