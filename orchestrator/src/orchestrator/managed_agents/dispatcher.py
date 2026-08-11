@@ -162,6 +162,16 @@ def _coerce_to_schema(
                 }
             elif output_schema == SpendingNarrative:
                 return SpendingNarrative(narrative_summary=raw, anomaly_commentary=[])
+            elif output_schema == ProposedActionRationale:
+                return ProposedActionRationale(rationale=raw, supporting_research_refs=[])
+            elif output_schema == DriftReport and isinstance(node_input, dict) and "drift_report" in node_input:
+                report_dict = dict(node_input["drift_report"])
+                if raw and isinstance(raw, str):
+                    report_dict["summary"] = raw
+                try:
+                    return DriftReport.model_validate(report_dict)
+                except Exception:
+                    pass
 
     if isinstance(data, dict):
         try:
@@ -219,6 +229,24 @@ def _coerce_to_schema(
                         data.get("interview_summary") or data.get("summary") or "Onboarding completed."
                     ),
                 )
+            elif output_schema == ProposedActionRationale:
+                if "rationale" in data or "summary" in data:
+                    return ProposedActionRationale(
+                        rationale=str(data.get("rationale") or data.get("summary")),
+                        supporting_research_refs=data.get("supporting_research_refs", []),
+                    )
+            elif output_schema == DriftReport and isinstance(node_input, dict) and "drift_report" in node_input:
+                try:
+                    return DriftReport.model_validate(node_input["drift_report"])
+                except Exception:
+                    pass
+
+    if output_schema == DriftReport and isinstance(node_input, dict) and "drift_report" in node_input:
+        try:
+            return DriftReport.model_validate(node_input["drift_report"])
+        except Exception:
+            pass
+
     return None
 
 
