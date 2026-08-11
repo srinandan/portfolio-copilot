@@ -1,5 +1,4 @@
-"""Spending analysis state preloading and deterministic BigQuery computation."""
-
+import time
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
@@ -23,12 +22,13 @@ def preload_spending_facts(
     firestore_client: Optional[FirestoreClient] = None,
 ) -> Dict[str, Any]:
     """Deterministically queries BigQuery and Firestore to precompute spending facts for the Managed Agent."""
+    t0 = time.monotonic()
     bq = bq_client or BigQueryClient()
     fs = firestore_client or FirestoreClient()
     current_month_start = datetime.now(timezone.utc).replace(day=1).strftime("%Y-%m-%d")
     valid_window = int(window_months) if isinstance(window_months, (int, float)) and window_months > 0 else 3
 
-    totals = bq.get_trailing_income_and_outflow(user_id, current_month_start, window_months=valid_window)
+    totals, spending_totals = bq.get_spending_snapshot(user_id, current_month_start, window_months=valid_window)
     total_income = float(totals.get("total_income", 0.0) or 0.0)
     total_outflow = float(totals.get("total_outflow", 0.0) or 0.0)
     savings_rate = calculate_savings_rate(total_income, total_outflow)
@@ -39,7 +39,6 @@ def preload_spending_facts(
     avg_monthly_expenses = (total_outflow / float(valid_window)) if total_outflow > 0 else 0.0
     reserve_months = calculate_reserve_months(cash_usd, avg_monthly_expenses)
 
-    spending_totals = bq.get_monthly_spending_totals(user_id, current_month_start, window_months=valid_window)
     anomalies = []
     category_breakdown = []
 
@@ -61,9 +60,14 @@ def preload_spending_facts(
                 )
             )
 
+    elapsed_sec = round(time.monotonic() - t0, 2)
     logger.info(
         f"Preloaded spending facts for {user_id}: income=${total_income}, outflow=${total_outflow}, "
         f"savings_rate={savings_rate:.2%}, reserve_months={reserve_months:.1f}, anomalies={len(anomalies)}"
+    )
+    logger.info(
+        "spending_preload_complete",
+        extra={"user_id": user_id, "elapsed_sec": elapsed_sec, "anomalies": len(anomalies)},
     )
 
     return {

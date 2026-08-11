@@ -219,11 +219,10 @@ def test_preload_reviewer_missing_action_raises():
 
 def test_preload_spending_facts_window_months_differentiation(sample_holdings):
     mock_bq = MagicMock()
-    mock_bq.get_trailing_income_and_outflow.return_value = {
-        "total_income": 18000.0,
-        "total_outflow": 12000.0,
-    }
-    mock_bq.get_monthly_spending_totals.return_value = []
+    mock_bq.get_spending_snapshot.return_value = (
+        {"total_income": 18000.0, "total_outflow": 12000.0},
+        [],
+    )
 
     mock_fs = MagicMock()
     mock_fs.get_holdings.return_value = sample_holdings

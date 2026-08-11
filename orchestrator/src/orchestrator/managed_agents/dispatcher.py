@@ -16,7 +16,7 @@ from ..contracts.goals_onboarding import GoalsOnboardingResult
 from ..contracts.proposed_action import ProposedActionRationale
 from ..contracts.research_brief import ResearchBrief
 from ..contracts.reviewer_verdict import ReviewerVerdict
-from ..contracts.spending_analysis import SpendingReport
+from ..contracts.spending_analysis import SpendingNarrative
 from ..logger import get_logger
 from ..registry_client import AgentRegistryClient
 from .worker import build_worker_managed_agent
@@ -29,7 +29,7 @@ OUTPUT_SCHEMA_BY_SKILL: Dict[str, Type[BaseModel]] = {
     "private-portfolio-analysis": DriftReport,
     "private-research": ResearchBrief,
     "private-action-drafting": ProposedActionRationale,
-    "private-spending-analysis": SpendingReport,
+    "private-spending-analysis": SpendingNarrative,
     "private-reviewer": ReviewerVerdict,
 }
 
@@ -179,13 +179,13 @@ async def dispatch_managed_skill(
         type(raw_result).__name__,
     )
 
-    result_to_return = raw_result
+    validated: Optional[BaseModel] = None
     if output_schema:
         if isinstance(raw_result, output_schema):
-            result_to_return = raw_result
+            validated = raw_result
         elif isinstance(raw_result, dict):
             try:
-                result_to_return = output_schema.model_validate(raw_result)
+                validated = output_schema.model_validate(raw_result)
             except ValidationError:
                 logger.exception(
                     "Could not validate result as %s (raw_result keys=%s)",
@@ -196,55 +196,21 @@ async def dispatch_managed_skill(
             parsed = _extract_json_from_text(raw_result)
             if parsed:
                 try:
-                    result_to_return = output_schema.model_validate(parsed)
+                    validated = output_schema.model_validate(parsed)
                 except ValidationError:
-                    pass
+                    logger.exception(
+                        "Could not validate JSON-extracted string as %s",
+                        output_schema.__name__,
+                    )
 
-        # Fallback for structured schemas using preloaded facts + model narrative
-        if result_to_return is raw_result or result_to_return is None:
-            if output_schema is SpendingReport:
-                preloaded = node_input.get("preloaded", {}) if isinstance(node_input, dict) else {}
-                narrative = ""
-                if ctx.session and ctx.session.events:
-                    safe_author = agent.name
-                    for ev in reversed(ctx.session.events):
-                        if ev.author == safe_author and ev.content and ev.content.parts:
-                            for part in reversed(ev.content.parts):
-                                text = getattr(part, "text", "")
-                                if text:
-                                    narrative = text
-                                    break
-                        if narrative:
-                            break
-                result_to_return = SpendingReport(
-                    user_id=node_input.get("user_id", "default_user")
-                    if isinstance(node_input, dict)
-                    else "default_user",
-                    total_income_usd=float(preloaded.get("total_income_usd", 0.0)),
-                    total_outflow_usd=float(preloaded.get("total_outflow_usd", 0.0)),
-                    savings_rate=float(preloaded.get("savings_rate", 0.0)),
-                    reserve_months=float(preloaded.get("reserve_months", 0.0)),
-                    category_breakdown=[],
-                    anomalies=[],
-                    narrative_summary=narrative or "Spending analysis completed based on transaction facts.",
-                )
-            elif output_schema is ProposedActionRationale:
-                narrative = ""
-                if ctx.session and ctx.session.events:
-                    safe_author = agent.name
-                    for ev in reversed(ctx.session.events):
-                        if ev.author == safe_author and ev.content and ev.content.parts:
-                            for part in reversed(ev.content.parts):
-                                text = getattr(part, "text", "")
-                                if text:
-                                    narrative = text
-                                    break
-                        if narrative:
-                            break
-                result_to_return = ProposedActionRationale(
-                    rationale=narrative or "Trade drafted based on portfolio drift and IPS target allocation.",
-                    supporting_research_refs=[],
-                )
+        if validated is None:
+            raise RuntimeError(
+                f"{output_schema.__name__} could not be constructed from Managed "
+                f"Agent output for skill {short_name!r}. See prior log for details."
+            )
+        result_to_return = validated
+    else:
+        result_to_return = raw_result
 
     if normalized_short == "research":
         cache_key = _research_cache_key(node_input)

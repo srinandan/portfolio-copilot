@@ -35,3 +35,20 @@ class SpendingReport(BaseModel):
     )
     anomalies: List[SpendingAnomaly] = Field(default_factory=list, description="Detected spending anomalies.")
     narrative_summary: str = Field(description="Natural language narrative analysis and recommendations.")
+
+
+class SpendingNarrative(BaseModel):
+    """LLM-authored slice of a SpendingReport.
+
+    The orchestrator's preloader computes every numeric field
+    (totals, savings rate, reserve months, per-category totals,
+    detected anomalies). The Managed Agent only synthesizes the
+    natural-language narrative that ties those facts to the user's
+    question. The orchestrator merges the narrative back onto the
+    preloaded facts to produce the persisted SpendingReport.
+    """
+
+    narrative_summary: str = Field(min_length=1, description="Natural language spending synthesis and insights.")
+    anomaly_commentary: List[str] = Field(
+        default_factory=list, description="Optional per-anomaly commentary aligning with preloaded anomalies."
+    )

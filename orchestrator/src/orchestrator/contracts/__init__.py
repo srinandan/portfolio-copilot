@@ -26,7 +26,7 @@ from .proposed_action import (
 )
 from .research_brief import ConfidenceLevel, ResearchBrief
 from .reviewer_verdict import ReviewerVerdict, RuleResult
-from .spending_analysis import CategorySpending, SpendingAnomaly, SpendingReport
+from .spending_analysis import CategorySpending, SpendingAnomaly, SpendingNarrative, SpendingReport
 
 __all__ = [
     "AccountType",
@@ -65,6 +65,7 @@ __all__ = [
     "Side",
     "SkillVersionRef",
     "SpendingAnomaly",
+    "SpendingNarrative",
     "SpendingReport",
     "TargetAllocation",
 ]

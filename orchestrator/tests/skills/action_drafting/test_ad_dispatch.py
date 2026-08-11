@@ -254,3 +254,51 @@ async def test_ad_dispatch_no_ips_declines(mock_emit_failed, mock_emit_invoked, 
     mock_emit_failed.assert_called_once()
     assert "declined" in mock_emit_failed.call_args[1]["error"]
     mock_emit_invoked.assert_not_called()
+
+
+@pytest.mark.asyncio
+@patch("orchestrator.data.firestore.FirestoreClient")
+@patch("orchestrator.state.preloader.FirestoreClient")
+@patch("orchestrator.state.writers.FirestoreClient")
+@patch("orchestrator.planner.emit_skill_invoked_audit")
+@patch("orchestrator.planner.write_proposed_action")
+@patch("orchestrator.planner.dispatch_managed_skill", new_callable=AsyncMock)
+@patch("orchestrator.planner.preload_for_action_drafting")
+async def test_ad_dispatch_uses_uuid_fallback_when_pre_action_id_none(
+    mock_preload,
+    mock_dispatch,
+    mock_write,
+    mock_emit_invoked,
+    mock_fs_writers,
+    mock_fs_pre,
+    mock_fs_data,
+    sample_ips,
+):
+    trade_dict = {
+        "action_id": None,
+        "ticker": "VTI",
+        "side": Side.BUY,
+        "quantity": 10.0,
+        "order_type": OrderType.MARKET,
+        "estimated_price_usd": 100.0,
+        "estimated_value_usd": 1000.0,
+    }
+    mock_preload.return_value = {
+        "ips": sample_ips.model_dump(),
+        "precomputed_trade": trade_dict,
+    }
+    mock_dispatch.return_value = ProposedActionRationale(
+        rationale="Valid test rationale",
+        supporting_research_refs=[],
+    )
+
+    context = {}
+    ctx = MagicMock()
+    plan = SKILL_PLANS["private-action-drafting"]
+
+    await _execute_skill(plan, "private-action-drafting", "user_123", {}, context, ctx)
+
+    mock_write.assert_called_once()
+    saved_action: ProposedAction = mock_write.call_args[1]["action"]
+    assert saved_action.action_id is not None
+    assert len(saved_action.action_id) > 10  # Valid UUID string
