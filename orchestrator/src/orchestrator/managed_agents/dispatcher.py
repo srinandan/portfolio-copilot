@@ -318,6 +318,17 @@ def _coerce_to_schema(
             except Exception:
                 pass
 
+    if output_schema == ProposedActionRationale and isinstance(node_input, dict) and "precomputed_trade" in node_input:
+        fallback_msg = (
+            str(data)
+            if isinstance(data, str) and data.strip()
+            else "Action drafted based on portfolio drift and policy constraints."
+        )
+        return ProposedActionRationale(
+            rationale=fallback_msg,
+            supporting_research_refs=[],
+        )
+
     return None
 
 
