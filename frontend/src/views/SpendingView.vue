@@ -35,7 +35,7 @@ import CategoryBreakdownTable from '../components/spending/CategoryBreakdownTabl
 import AnomalyAlertCard from '../components/spending/AnomalyAlertCard.vue';
 
 const report = ref<SpendingReport>({
-  user_id: 'usr_default',
+  user_id: 'demo_user',
   total_income_usd: 18500.0,
   total_outflow_usd: 13227.5,
   savings_rate: 0.285,

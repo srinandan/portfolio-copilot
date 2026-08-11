@@ -620,7 +620,7 @@ async def root_planner(ctx: Context, node_input: Any):
         input_dict.get("user_id")
         or (getattr(ctx, "session", None) and getattr(ctx.session, "user_id", None))
         or getattr(ctx, "user_id", None)
-        or "default_user"
+        or "demo_user"
     )
 
     results: list[Any] = []

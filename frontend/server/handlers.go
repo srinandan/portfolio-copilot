@@ -50,7 +50,7 @@ func NewServer() *Server {
 }
 
 func (s *Server) HandleGetHoldings(c *gin.Context) {
-	userID := c.DefaultQuery("user_id", "usr_default")
+	userID := c.DefaultQuery("user_id", "demo_user")
 	if s.Store == nil {
 		c.JSON(http.StatusOK, defaultHoldings())
 		return
@@ -68,7 +68,7 @@ func (s *Server) HandleGetHoldings(c *gin.Context) {
 }
 
 func (s *Server) HandleGetSpendingReport(c *gin.Context) {
-	userID := c.DefaultQuery("user_id", "usr_default")
+	userID := c.DefaultQuery("user_id", "demo_user")
 	if s.Store == nil {
 		c.JSON(http.StatusOK, defaultSpendingReport())
 		return
@@ -86,7 +86,7 @@ func (s *Server) HandleGetSpendingReport(c *gin.Context) {
 }
 
 func (s *Server) HandleGetDriftReport(c *gin.Context) {
-	userID := c.DefaultQuery("user_id", "usr_default")
+	userID := c.DefaultQuery("user_id", "demo_user")
 	if s.Store == nil {
 		c.JSON(http.StatusOK, defaultDriftReport())
 		return
@@ -104,7 +104,7 @@ func (s *Server) HandleGetDriftReport(c *gin.Context) {
 }
 
 func (s *Server) HandleGetDocuments(c *gin.Context) {
-	userID := c.DefaultQuery("user_id", "usr_default")
+	userID := c.DefaultQuery("user_id", "demo_user")
 	if s.Store == nil {
 		c.JSON(http.StatusOK, defaultDocuments())
 		return
@@ -173,7 +173,7 @@ func defaultHoldings() *contracts.HoldingsSnapshot {
 
 func defaultSpendingReport() *contracts.SpendingReport {
 	return &contracts.SpendingReport{
-		UserID:          "usr_default",
+		UserID:          "demo_user",
 		TotalIncomeUSD:  18500.0,
 		TotalOutflowUSD: 13227.5,
 		SavingsRate:     0.285,

@@ -136,7 +136,7 @@ def _coerce_to_schema(
             data = parsed
         else:
             if output_schema == GoalsOnboardingResult:
-                u_id = "default_user"
+                u_id = "demo_user"
                 if isinstance(node_input, dict):
                     u_id = node_input.get("user_id", u_id)
                 data = {
@@ -179,8 +179,7 @@ def _coerce_to_schema(
         except ValidationError:
             if output_schema == GoalsOnboardingResult:
                 u_id = str(
-                    data.get("user_id")
-                    or (node_input.get("user_id") if isinstance(node_input, dict) else "default_user")
+                    data.get("user_id") or (node_input.get("user_id") if isinstance(node_input, dict) else "demo_user")
                 )
                 rt_raw = str(data.get("risk_tolerance", "moderate")).lower()
                 rt = RiskTolerance.MODERATE
