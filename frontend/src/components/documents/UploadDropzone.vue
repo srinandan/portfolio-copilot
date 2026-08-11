@@ -13,9 +13,7 @@
           class="bg-surface-container-low text-on-surface border border-outline-variant rounded-md px-sm py-xs text-sm font-body-base focus:outline-none focus:border-primary"
           data-testid="account-type-select"
         >
-          <option value="checking">Checking (checking_transactions)</option>
-          <option value="savings">Savings (savings_transactions)</option>
-          <option value="credit_card">Credit Card (credit_transactions)</option>
+          <option value="checking">Bank Account (checking_transactions)</option>
           <option value="brokerage">Brokerage Holdings</option>
         </select>
       </div>
@@ -74,16 +72,12 @@ const emit = defineEmits<{
 const isDragging = ref(false);
 const selectedFile = ref<File | null>(null);
 const fileInputRef = ref<HTMLInputElement | null>(null);
-const accountType = ref<'checking' | 'savings' | 'credit_card' | 'brokerage'>('checking');
+const accountType = ref<'checking' | 'brokerage'>('checking');
 
 const targetTable = computed(() => {
   switch (accountType.value) {
     case 'checking':
       return 'checking_transactions';
-    case 'savings':
-      return 'savings_transactions';
-    case 'credit_card':
-      return 'credit_transactions';
     default:
       return 'holdings';
   }

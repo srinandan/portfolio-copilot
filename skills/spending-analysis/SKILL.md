@@ -14,10 +14,9 @@ metadata:
 
 ## Purpose
 
-Analyzes bank and account transaction data (e.g. `checking_transactions`,
-`savings_transactions`): categorizes spend into a fixed taxonomy, flags
-anomalies against trailing history, and synthesizes natural language
-budgeting insights, savings rate metrics, and reserve months estimates.
+Analyzes bank transaction data (from `checking_transactions`): categorizes spend
+into a fixed taxonomy, flags anomalies against trailing history, and synthesizes
+natural language budgeting insights, savings rate metrics, and reserve months estimates.
 
 Produces typed narrative fields for the orchestrator to merge into the
 final SpendingReport.
@@ -95,7 +94,7 @@ persists the resulting SpendingReport.
 
 - Managed Agent sandbox: conversational reasoning over preloaded context
 - Orchestrator (outside sandbox):
-  - BigQuery: read `checking_transactions` / `savings_transactions` (aggregate/`SELECT` only, user-scoped)
+  - BigQuery: read `checking_transactions` (aggregate/`SELECT` only, user-scoped)
   - Firestore: read `holdings` (cash balance only, for reserve estimate)
 - **No** direct database execution tools inside the Managed Agent sandbox.
 

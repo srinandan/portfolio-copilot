@@ -54,7 +54,7 @@ func PrepareSecureSQL(generatedSQL, userID string) (string, map[string]interface
 		return "", nil, fmt.Errorf("read-only queries only: %s is not allowed", strings.ToUpper(match))
 	}
 
-	// 4. Target checking: Must target a transactions table (e.g. checking_transactions, savings_transactions)
+	// 4. Target checking: Must target a transactions table (e.g. checking_transactions)
 	tableMatch := transactionTableRegex.FindStringSubmatch(sqlWithoutTrailingSemicolon)
 	if len(tableMatch) < 2 {
 		return "", nil, fmt.Errorf("query must target a transactions table (e.g. checking_transactions)")

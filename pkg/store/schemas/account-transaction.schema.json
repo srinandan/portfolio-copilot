@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.com/schemas/account-transaction",
   "title": "AccountTransaction",
-  "description": "Represents a single account transaction (e.g. checking_transactions, savings_transactions) exported to BigQuery for spending and cash flow analysis.",
+  "description": "Represents a single account transaction (e.g. checking_transactions) exported to BigQuery for spending and cash flow analysis.",
   "type": "object",
   "properties": {
     "user_id": {

@@ -9,7 +9,7 @@ if [ -z "$PROJECT_ID" ]; then
 fi
 
 DATASET_NAME="portfolio_copilot"
-TABLE_NAMES=("checking_transactions" "savings_transactions" "chase_transactions")
+TABLE_NAMES=("checking_transactions" "chase_transactions")
 
 echo "Setting up BigQuery in project $PROJECT_ID..."
 

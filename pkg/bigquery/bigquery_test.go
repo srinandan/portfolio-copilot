@@ -37,19 +37,7 @@ func TestPrepareSecureSQL(t *testing.T) {
 				}
 			},
 		},
-		{
-			name:         "Basic valid query with savings_transactions",
-			generatedSQL: "SELECT * FROM savings_transactions",
-			expectError:  false,
-			checkQuery: func(t *testing.T, secureSQL string, params map[string]interface{}) {
-				if !strings.Contains(secureSQL, "portfolio_copilot.savings_transactions") {
-					t.Errorf("Expected scoped table name in query, got: %s", secureSQL)
-				}
-				if !strings.Contains(secureSQL, "WITH savings_transactions AS") {
-					t.Errorf("Expected CTE prefix for savings_transactions, got: %s", secureSQL)
-				}
-			},
-		},
+
 		{
 			name:         "Basic valid query with legacy chase_transactions",
 			generatedSQL: "SELECT * FROM chase_transactions",
