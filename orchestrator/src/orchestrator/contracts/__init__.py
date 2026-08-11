@@ -20,6 +20,7 @@ from .proposed_action import (
     ActionType,
     OrderType,
     ProposedAction,
+    ProposedActionRationale,
     Side,
     SkillVersionRef,
 )
@@ -54,6 +55,7 @@ __all__ = [
     "OrderType",
     "Position",
     "ProposedAction",
+    "ProposedActionRationale",
     "RebalancingRules",
     "RelatedIPSVersion",
     "ResearchBrief",
