@@ -18,6 +18,7 @@ from orchestrator.contracts.proposed_action import (
     ActionType,
     OrderType,
     ProposedAction,
+    ProposedActionRationale,
     Side,
     SkillVersionRef,
 )
@@ -78,28 +79,85 @@ def sample_proposed_action():
 
 
 @pytest.mark.asyncio
+@patch("orchestrator.data.firestore.FirestoreClient")
 @patch("orchestrator.state.preloader.FirestoreClient")
+@patch("orchestrator.state.writers.FirestoreClient")
 @patch("orchestrator.planner.emit_skill_invoked_audit")
 @patch("orchestrator.planner.write_proposed_action")
 @patch("orchestrator.planner.dispatch_managed_skill", new_callable=AsyncMock)
-async def test_ad_dispatch_writes_proposed_action(mock_dispatch, mock_write, mock_emit_invoked, mock_fs_cls, sample_ips, sample_holdings, sample_proposed_action):
-    mock_fs = mock_fs_cls.return_value
-    mock_fs.get_active_ips_by_user.return_value = sample_ips
-    mock_fs.get_holdings.return_value = sample_holdings
-    mock_dispatch.return_value = sample_proposed_action
+async def test_ad_dispatch_writes_proposed_action(mock_dispatch, mock_write, mock_emit_invoked, mock_fs_writers, mock_fs_pre, mock_fs_data, sample_ips, sample_holdings):
+    for m in (mock_fs_writers, mock_fs_pre, mock_fs_data):
+        m.return_value.get_active_ips_by_user.return_value = sample_ips
+        m.return_value.get_holdings.return_value = sample_holdings
+    llm_rationale = ProposedActionRationale(
+        rationale="Trimming overweighted equity to match target 60%.",
+        supporting_research_refs=["run_brief_1"],
+    )
+    mock_dispatch.return_value = llm_rationale
 
     context = {}
     ctx = MagicMock()
     plan = SKILL_PLANS["private-action-drafting"]
 
-    payload = await _execute_skill(plan, "private-action-drafting", "user_123", {}, context, ctx)
-
-    mock_write.assert_called_once_with(
-        user_id="user_123", action=sample_proposed_action, registry_entry_id=None
+    payload = await _execute_skill(
+        plan,
+        "private-action-drafting",
+        "user_123",
+        {"requested_trade": {"ticker": "VTI", "side": "sell", "quantity": 50.0}},
+        context,
+        ctx,
     )
-    assert payload == sample_proposed_action.model_dump()
-    assert context["action_drafting_result"] == sample_proposed_action.model_dump()
+
+    mock_write.assert_called_once()
+    saved_action: ProposedAction = mock_write.call_args[1]["action"]
+    assert saved_action.ticker == "VTI"
+    assert saved_action.side == Side.SELL
+    assert saved_action.quantity == 50.0
+    assert saved_action.rationale == "Trimming overweighted equity to match target 60%."
+    assert saved_action.supporting_research_refs == ["run_brief_1"]
+    assert payload["ticker"] == "VTI"
+    assert context["action_drafting_result"]["rationale"] == "Trimming overweighted equity to match target 60%."
     mock_emit_invoked.assert_called_once()
+
+
+@pytest.mark.asyncio
+@patch("orchestrator.data.firestore.FirestoreClient")
+@patch("orchestrator.state.preloader.FirestoreClient")
+@patch("orchestrator.state.writers.FirestoreClient")
+@patch("orchestrator.planner.emit_skill_invoked_audit")
+@patch("orchestrator.planner.write_proposed_action")
+@patch("orchestrator.planner.dispatch_managed_skill", new_callable=AsyncMock)
+async def test_ad_dispatch_rejects_llm_field_override(mock_dispatch, mock_write, mock_emit_invoked, mock_fs_writers, mock_fs_pre, mock_fs_data, sample_ips, sample_holdings):
+    """Guards against hallucination: numeric fields always come from deterministic precomputed trade."""
+    for m in (mock_fs_writers, mock_fs_pre, mock_fs_data):
+        m.return_value.get_active_ips_by_user.return_value = sample_ips
+        m.return_value.get_holdings.return_value = sample_holdings
+
+    # Even if LLM dict attempted to override ticker/quantity
+    llm_rationale = ProposedActionRationale(
+        rationale="Valid judgment rationale.",
+        supporting_research_refs=[],
+    )
+    mock_dispatch.return_value = llm_rationale
+
+    context = {}
+    ctx = MagicMock()
+    plan = SKILL_PLANS["private-action-drafting"]
+
+    payload = await _execute_skill(
+        plan,
+        "private-action-drafting",
+        "user_123",
+        {"requested_trade": {"ticker": "VTI", "side": "buy", "quantity": 10.0}},
+        context,
+        ctx,
+    )
+
+    mock_write.assert_called_once()
+    saved_action: ProposedAction = mock_write.call_args[1]["action"]
+    assert saved_action.ticker == "VTI"
+    assert saved_action.quantity == 10.0
+    assert saved_action.side == Side.BUY
 
 
 @pytest.mark.asyncio

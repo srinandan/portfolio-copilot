@@ -881,6 +881,8 @@ async def test_root_planner_threads_registry_entry_id_to_action_proposed_audit()
         patch("src.orchestrator.planner.dispatch_managed_skill", new_callable=AsyncMock) as mock_dispatch,
         patch("src.orchestrator.planner.write_proposed_action") as mock_write,
         patch("src.orchestrator.state.preloader.FirestoreClient") as mock_fs_cls,
+        patch("src.orchestrator.gates.hitl.FirestoreClient"),
+        patch("src.orchestrator.state.writers.FirestoreClient"),
     ):
         mock_list.return_value = [
             Skill(name="skills/private-action-drafting", target_state="TARGET_STATE_ACTIVE", default_revision="rev-action-99"),
@@ -1312,6 +1314,87 @@ async def test_root_planner_end_to_end_second_cycle_omits_revoked_skill(
     mock_emit.assert_called_once()
     assert mock_emit.call_args[1]["revoked_skill_short_name"] in ("goals-onboarding", "private-goals-onboarding")
     assert mock_emit.call_args[1]["prior_registry_entry_id"] == "rev-goal-1"
+
+
+@pytest.mark.asyncio
+async def test_root_planner_runs_research_and_portfolio_analysis_in_parallel():
+    import asyncio
+    import time
+    from orchestrator.contracts.drift_report import DriftReport
+    from orchestrator.contracts.research_brief import ConfidenceLevel, ResearchBrief
+
+    skill_pa = Skill(
+        name="projects/test/locations/global/skills/private-portfolio-analysis",
+        target_state="TARGET_STATE_ACTIVE",
+        default_revision="rev-pa-1",
+    )
+    skill_res = Skill(
+        name="projects/test/locations/global/skills/private-research",
+        target_state="TARGET_STATE_ACTIVE",
+        default_revision="rev-res-1",
+    )
+
+    starts = {}
+    ends = {}
+
+    async def fake_dispatch(skill_name: str, **kwargs):
+        starts[skill_name] = time.monotonic()
+        await asyncio.sleep(0.05)
+        ends[skill_name] = time.monotonic()
+        if "portfolio-analysis" in skill_name:
+            return DriftReport(entries=[], unclassified_value_usd=0.0, rebalance_recommended=False)
+        if "research" in skill_name:
+            return ResearchBrief(
+                research_run_id="run_p",
+                query="market outlook",
+                summary="Stable.",
+                sources=[],
+                confidence=ConfidenceLevel.HIGH,
+                as_of=1700000000,
+            )
+        return {}
+
+    with (
+        patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list,
+        patch("src.orchestrator.planner.dispatch_managed_skill", side_effect=fake_dispatch),
+        patch("src.orchestrator.planner.emit_skill_invoked_audit"),
+        patch("src.orchestrator.planner.preload_for_portfolio_analysis", return_value={"user_id": "u1"}),
+        patch("src.orchestrator.planner.preload_for_research", return_value={"user_id": "u1", "research_question": "market outlook"}),
+        patch("src.orchestrator.state.preloader.preload_for_portfolio_analysis", return_value={"user_id": "u1"}),
+        patch("src.orchestrator.state.preloader.preload_for_research", return_value={"user_id": "u1", "research_question": "market outlook"}),
+        patch("src.orchestrator.data.firestore.FirestoreClient"),
+        patch("src.orchestrator.state.writers.FirestoreClient"),
+        patch("orchestrator.state.writers.FirestoreClient", create=True),
+    ):
+        mock_list.return_value = [skill_pa, skill_res]
+
+        root_agent = Workflow(
+            name="test_parallel",
+            edges=[("START", root_planner)],
+        )
+        runner = Runner(
+            app_name="test_parallel",
+            agent=root_agent,
+            session_service=InMemorySessionService(),
+            memory_service=InMemoryMemoryService(),
+            auto_create_session=True,
+        )
+
+        stream = runner.run_async(
+            user_id="user_1",
+            session_id="sess_1",
+            new_message=UserContent(parts=[Part.from_text(text='{"user_id": "user_1", "research_question": "market outlook"}')]),
+        )
+        _ = [e async for e in stream]
+
+        # Both skills ran and their execution windows overlapped in time
+        assert "portfolio-analysis" in starts or "private-portfolio-analysis" in starts
+        assert "research" in starts or "private-research" in starts
+        pa_name = "private-portfolio-analysis" if "private-portfolio-analysis" in starts else "portfolio-analysis"
+        res_name = "private-research" if "private-research" in starts else "research"
+
+        assert starts[res_name] < ends[pa_name]
+        assert starts[pa_name] < ends[res_name]
 
 
 

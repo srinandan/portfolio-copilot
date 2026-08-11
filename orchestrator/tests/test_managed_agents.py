@@ -122,3 +122,48 @@ async def test_dispatch_managed_skill_dict_coercion(mock_resolve):
     assert isinstance(result, SpendingReport)
     assert result.savings_rate == 0.4
     assert result.reserve_months == 6.0
+
+
+def test_dispatch_managed_skill_action_drafting_uses_narrow_schema():
+    from orchestrator.contracts.proposed_action import ProposedActionRationale
+    assert OUTPUT_SCHEMA_BY_SKILL["private-action-drafting"] is ProposedActionRationale
+
+
+@pytest.mark.asyncio
+@patch("orchestrator.managed_agents.dispatcher.resolve_skill_instructions")
+async def test_dispatch_managed_skill_research_cache_hit(mock_resolve):
+    from orchestrator.contracts.research_brief import ConfidenceLevel, ResearchBrief
+    from orchestrator.managed_agents.dispatcher import _RESEARCH_CACHE
+
+    _RESEARCH_CACHE.clear()
+    mock_resolve.return_value = "Research instructions"
+
+    mock_ctx = AsyncMock(spec=Context)
+    expected_brief = ResearchBrief(
+        research_run_id="run_123",
+        query="market conditions for AAPL",
+        summary="Bullish outlook.",
+        sources=["https://example.com"],
+        confidence=ConfidenceLevel.HIGH,
+        as_of=1700000000,
+    )
+    mock_ctx.run_node.return_value = expected_brief
+
+    # First dispatch -> calls ctx.run_node
+    res1 = await dispatch_managed_skill(
+        skill_name="private-research",
+        node_input={"research_question": "market conditions for AAPL"},
+        ctx=mock_ctx,
+    )
+    assert res1 == expected_brief
+    assert mock_ctx.run_node.await_count == 1
+
+    # Second dispatch with same question -> cache hit, does not call ctx.run_node again
+    res2 = await dispatch_managed_skill(
+        skill_name="private-research",
+        node_input={"research_question": "market conditions for AAPL"},
+        ctx=mock_ctx,
+    )
+    assert res2 == expected_brief
+    assert mock_ctx.run_node.await_count == 1
+    _RESEARCH_CACHE.clear()
