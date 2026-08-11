@@ -1243,6 +1243,73 @@ async def test_reviewer_build_input_mirrors_preloaded_state_into_input_dict(
     planner_fs.get_holdings.assert_not_called()
 
 
+@pytest.mark.asyncio
+@patch("src.orchestrator.planner.write_proposed_action")
+@patch("src.orchestrator.state.preloader.FirestoreClient")
+async def test_action_drafting_stamps_active_ips_version_from_rationale(mock_preload_fs_cls, mock_write):
+    """Regression: when action-drafting's Managed Agent returns a ProposedActionRationale
+    (the real production schema), the orchestrator builds the ProposedAction from the
+    precomputed trade and must stamp ips_version_referenced with the *active* IPS
+    (not the "ips_unknown" sentinel). A wrong id makes the reviewer's
+    ips_version_current rule fail and wrongly rejects a compliant trade."""
+    from datetime import date, datetime, timezone
+
+    from src.orchestrator.contracts.holdings import HoldingsSnapshot, Position
+    from src.orchestrator.contracts.ips import (
+        Constraints,
+        InvestmentPolicyStatement,
+        IPSStatus,
+        RiskTolerance,
+        TargetAllocation,
+    )
+    from src.orchestrator.contracts.proposed_action import ProposedAction, ProposedActionRationale
+    from src.orchestrator.planner import SKILL_PLANS
+
+    fake_ips = InvestmentPolicyStatement(
+        ips_id="ips_active_42",
+        user_id="user_ad",
+        version=3,
+        status=IPSStatus.ACTIVE,
+        effective_date=date(2026, 1, 1),
+        risk_tolerance=RiskTolerance.MODERATE,
+        time_horizon_years=10,
+        target_allocation=[TargetAllocation(asset_class="Equity", target_percent=60, min_percent=50, max_percent=70)],
+        constraints=Constraints(concentration_limit_percent=90, excluded_tickers=[], excluded_sectors=[]),
+        created_at=datetime.now(timezone.utc),
+    )
+    fake_holdings = HoldingsSnapshot(
+        user_id="user_ad",
+        as_of=datetime.now(timezone.utc),
+        positions=[Position(ticker="AAPL", quantity=100, asset_class="Equity", market_value_usd=80000.0)],
+        cash_usd=20000.0,
+        total_value_usd=100000.0,
+    )
+    preload_fs = mock_preload_fs_cls.return_value
+    preload_fs.get_active_ips_by_user.return_value = fake_ips
+    preload_fs.get_holdings.return_value = fake_holdings
+
+    plan = SKILL_PLANS["private-action-drafting"]
+    # A direct user-requested sell produces a deterministic precomputed_trade.
+    input_dict: dict = {"requested_trade": {"ticker": "AAPL", "side": "sell", "quantity": 5}}
+
+    node_input = plan.build_input("user_ad", input_dict, {})
+    assert node_input is not None
+    assert node_input.get("precomputed_trade") is not None
+    # build_input must mirror the preloaded active IPS into input_dict.
+    assert input_dict.get("ips", {}).get("ips_id") == "ips_active_42"
+    # _execute_skill mirrors the precomputed trade into input_dict before postprocess.
+    input_dict.setdefault("precomputed_trade", node_input.get("precomputed_trade"))
+    # The Managed Agent returns only the narrow rationale slice in production.
+    rationale = ProposedActionRationale(rationale="Trim per user request.", supporting_research_refs=[])
+
+    payload, _ = await plan.postprocess("user_ad", rationale, MagicMock(), input_dict, registry_entry_id="rev-9")
+
+    action = ProposedAction.model_validate(payload)
+    assert action.ips_version_referenced.ips_id == "ips_active_42"
+    assert action.ips_version_referenced.version == 3
+    mock_write.assert_called_once()
+
+
 @patch("src.orchestrator.planner.emit_skill_revoked_audit")
 def test_detect_revocations_emits_for_missing_skills(mock_emit):
     from src.orchestrator.planner import _detect_and_audit_revocations

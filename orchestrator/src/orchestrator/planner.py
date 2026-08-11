@@ -207,12 +207,20 @@ async def _postprocess_research(user_id, result, ctx, input_dict, registry_entry
 
 
 def _build_action_drafting_input(user_id, input_dict, context):
-    return preload_for_action_drafting(
+    node_input = preload_for_action_drafting(
         user_id=user_id,
         drift_report=input_dict.get("drift_report") or context.get("drift_report"),
         research_briefs=input_dict.get("research_briefs") or context.get("research_briefs"),
         requested_trade=input_dict.get("requested_trade"),
     )
+    # Mirror the preloader's active IPS into input_dict so _postprocess_action_drafting
+    # can stamp the ProposedAction's ips_version_referenced with the *real* active
+    # IPS id/version. Without this, postprocess falls back to "ips_unknown", which
+    # makes the reviewer's ips_version_current rule fail and wrongly flags an
+    # otherwise-compliant trade as non-compliant. Mirrors the reviewer's build_input.
+    if isinstance(node_input, dict) and node_input.get("ips") is not None:
+        input_dict["ips"] = node_input.get("ips")
+    return node_input
 
 
 async def _postprocess_action_drafting(user_id, result, ctx, input_dict, registry_entry_id=None):
