@@ -240,12 +240,83 @@ def _coerce_to_schema(
                     return DriftReport.model_validate(node_input["drift_report"])
                 except Exception:
                     pass
+            elif output_schema == ReviewerVerdict and isinstance(node_input, dict) and "action" in node_input:
+                import uuid
+                from datetime import datetime, timezone
+
+                from ..contracts.holdings import HoldingsSnapshot
+                from ..contracts.ips import InvestmentPolicyStatement, RelatedIPSVersion
+                from ..contracts.proposed_action import ProposedAction, SkillVersionRef
+                from ..reviewer import ReviewInput, check_all_rules, compute_requires_human_approval
+                from ..skills._skill_metadata import read_skill_version
+
+                if "ips" in node_input and "holdings" in node_input:
+                    try:
+                        act_obj = ProposedAction.model_validate(node_input["action"])
+                        ips_obj = InvestmentPolicyStatement.model_validate(node_input["ips"])
+                        hld_obj = HoldingsSnapshot.model_validate(node_input["holdings"])
+                        rev_input = ReviewInput(action=act_obj, ips=ips_obj, holdings=hld_obj)
+                        rules = check_all_rules(rev_input)
+                        pass_val = all(r.passed for r in rules)
+                        req_appr = compute_requires_human_approval(rev_input, pass_val)
+                        return ReviewerVerdict(
+                            verdict_id=str(uuid.uuid4()),
+                            action_id=act_obj.action_id,
+                            ips_version_checked_against=RelatedIPSVersion(
+                                ips_id=ips_obj.ips_id, version=ips_obj.version
+                            ),
+                            rule_results=rules,
+                            overall_pass=pass_val,
+                            requires_human_approval=req_appr,
+                            reviewer_skill_version=SkillVersionRef(
+                                skill_name="private-reviewer",
+                                skill_version=read_skill_version("reviewer"),
+                            ),
+                            reviewed_at=datetime.now(timezone.utc),
+                        )
+                    except Exception:
+                        pass
 
     if output_schema == DriftReport and isinstance(node_input, dict) and "drift_report" in node_input:
         try:
             return DriftReport.model_validate(node_input["drift_report"])
         except Exception:
             pass
+
+    if output_schema == ReviewerVerdict and isinstance(node_input, dict) and "action" in node_input:
+        import uuid
+        from datetime import datetime, timezone
+
+        from ..contracts.holdings import HoldingsSnapshot
+        from ..contracts.ips import InvestmentPolicyStatement, RelatedIPSVersion
+        from ..contracts.proposed_action import ProposedAction, SkillVersionRef
+        from ..reviewer import ReviewInput, check_all_rules, compute_requires_human_approval
+        from ..skills._skill_metadata import read_skill_version
+
+        if "ips" in node_input and "holdings" in node_input:
+            try:
+                act_obj = ProposedAction.model_validate(node_input["action"])
+                ips_obj = InvestmentPolicyStatement.model_validate(node_input["ips"])
+                hld_obj = HoldingsSnapshot.model_validate(node_input["holdings"])
+                rev_input = ReviewInput(action=act_obj, ips=ips_obj, holdings=hld_obj)
+                rules = check_all_rules(rev_input)
+                pass_val = all(r.passed for r in rules)
+                req_appr = compute_requires_human_approval(rev_input, pass_val)
+                return ReviewerVerdict(
+                    verdict_id=str(uuid.uuid4()),
+                    action_id=act_obj.action_id,
+                    ips_version_checked_against=RelatedIPSVersion(ips_id=ips_obj.ips_id, version=ips_obj.version),
+                    rule_results=rules,
+                    overall_pass=pass_val,
+                    requires_human_approval=req_appr,
+                    reviewer_skill_version=SkillVersionRef(
+                        skill_name="private-reviewer",
+                        skill_version=read_skill_version("reviewer"),
+                    ),
+                    reviewed_at=datetime.now(timezone.utc),
+                )
+            except Exception:
+                pass
 
     return None
 
