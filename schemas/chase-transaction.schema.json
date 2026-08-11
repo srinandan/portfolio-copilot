@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.com/schemas/chase-transaction",
   "title": "ChaseTransaction",
-  "description": "Represents a single Chase bank transaction exported to BigQuery for spending analysis.",
+  "description": "Represents a single Chase transaction exported to BigQuery for spending analysis. Source-agnostic by design: Chase exports checking-account and credit-card activity in the same shape (date, amount, description, category), so a single schema carries both feeds. Credit-card *balances* (APR, minimum payment, outstanding balance) are self-reported and live in LiabilitiesSnapshot instead — a transaction feed shows payments happening, not the debt behind them. If Spending Analysis ever needs to slice card vs. debit, or attribute spend to a specific card (e.g. rewards optimization), the lighter move is an optional `account_type` / `source_account` field here rather than a parallel schema. Deferred until a use case demands it.",
   "type": "object",
   "properties": {
     "user_id": {
