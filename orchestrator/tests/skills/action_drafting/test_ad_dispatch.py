@@ -85,7 +85,16 @@ def sample_proposed_action():
 @patch("orchestrator.planner.emit_skill_invoked_audit")
 @patch("orchestrator.planner.write_proposed_action")
 @patch("orchestrator.planner.dispatch_managed_skill", new_callable=AsyncMock)
-async def test_ad_dispatch_writes_proposed_action(mock_dispatch, mock_write, mock_emit_invoked, mock_fs_writers, mock_fs_pre, mock_fs_data, sample_ips, sample_holdings):
+async def test_ad_dispatch_writes_proposed_action(
+    mock_dispatch,
+    mock_write,
+    mock_emit_invoked,
+    mock_fs_writers,
+    mock_fs_pre,
+    mock_fs_data,
+    sample_ips,
+    sample_holdings,
+):
     for m in (mock_fs_writers, mock_fs_pre, mock_fs_data):
         m.return_value.get_active_ips_by_user.return_value = sample_ips
         m.return_value.get_holdings.return_value = sample_holdings
@@ -127,7 +136,16 @@ async def test_ad_dispatch_writes_proposed_action(mock_dispatch, mock_write, moc
 @patch("orchestrator.planner.emit_skill_invoked_audit")
 @patch("orchestrator.planner.write_proposed_action")
 @patch("orchestrator.planner.dispatch_managed_skill", new_callable=AsyncMock)
-async def test_ad_dispatch_rejects_llm_field_override(mock_dispatch, mock_write, mock_emit_invoked, mock_fs_writers, mock_fs_pre, mock_fs_data, sample_ips, sample_holdings):
+async def test_ad_dispatch_rejects_llm_field_override(
+    mock_dispatch,
+    mock_write,
+    mock_emit_invoked,
+    mock_fs_writers,
+    mock_fs_pre,
+    mock_fs_data,
+    sample_ips,
+    sample_holdings,
+):
     """Guards against hallucination: numeric fields always come from deterministic precomputed trade."""
     for m in (mock_fs_writers, mock_fs_pre, mock_fs_data):
         m.return_value.get_active_ips_by_user.return_value = sample_ips
@@ -165,7 +183,9 @@ async def test_ad_dispatch_rejects_llm_field_override(mock_dispatch, mock_write,
 @patch("orchestrator.planner.emit_skill_invoked_audit")
 @patch("orchestrator.state.preloader.calculate_draft_action")
 @patch("orchestrator.planner.dispatch_managed_skill", new_callable=AsyncMock)
-async def test_ad_dispatch_consumes_drift_report_from_context(mock_dispatch, mock_calc, mock_emit_invoked, mock_fs_cls, sample_ips, sample_holdings):
+async def test_ad_dispatch_consumes_drift_report_from_context(
+    mock_dispatch, mock_calc, mock_emit_invoked, mock_fs_cls, sample_ips, sample_holdings
+):
     mock_fs = mock_fs_cls.return_value
     mock_fs.get_active_ips_by_user.return_value = sample_ips
     mock_fs.get_holdings.return_value = sample_holdings
@@ -189,7 +209,9 @@ async def test_ad_dispatch_consumes_drift_report_from_context(mock_dispatch, moc
 @patch("orchestrator.state.preloader.FirestoreClient")
 @patch("orchestrator.planner.write_proposed_action")
 @patch("orchestrator.planner.emit_skill_failed_audit")
-async def test_ad_dispatch_constraint_violation_emits_failed_audit(mock_emit_failed, mock_write, mock_fs_cls, sample_ips, sample_holdings):
+async def test_ad_dispatch_constraint_violation_emits_failed_audit(
+    mock_emit_failed, mock_write, mock_fs_cls, sample_ips, sample_holdings
+):
     sample_ips.constraints.excluded_tickers = ["TSLA"]
     mock_fs = mock_fs_cls.return_value
     mock_fs.get_active_ips_by_user.return_value = sample_ips

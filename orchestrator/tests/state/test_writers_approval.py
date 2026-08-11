@@ -153,9 +153,7 @@ def test_agent_actor_invariants_built_in_vs_registry_skills(sample_proposed_acti
         (emit_approval_rejected_audit, {"reason": "bad"}),
     ],
 )
-def test_emit_approval_fails_closed_on_audit_write_error(
-    sample_proposed_action, emitter, kwargs
-):
+def test_emit_approval_fails_closed_on_audit_write_error(sample_proposed_action, emitter, kwargs):
     mock_client = MagicMock()
     mock_client.append_audit_log.side_effect = Exception("Firestore down")
 

@@ -1,5 +1,5 @@
-from datetime import timedelta
 import re
+from datetime import timedelta
 from typing import Any, List, Optional, Type
 
 from google.adk.agents import ManagedAgent
@@ -12,7 +12,7 @@ from orchestrator.managed_agents.secret_loader import (
 
 DEFAULT_TURN_TIMEOUT = timedelta(minutes=3)
 PER_SKILL_TIMEOUT: dict[str, timedelta] = {
-    "research": timedelta(minutes=2),         # search-loop guardrail
+    "research": timedelta(minutes=2),  # search-loop guardrail
     "action-drafting": timedelta(minutes=1),  # narrow schema
 }
 

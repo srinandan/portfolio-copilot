@@ -18,11 +18,7 @@ logger = get_logger(__name__)
 
 def get_orchestrator_version() -> str:
     """Returns the orchestrator build SHA or package version for built-in gate traceability."""
-    return (
-        os.environ.get("ORCHESTRATOR_BUILD_SHA")
-        or os.environ.get("ORCHESTRATOR_VERSION")
-        or "0.1.0"
-    )
+    return os.environ.get("ORCHESTRATOR_BUILD_SHA") or os.environ.get("ORCHESTRATOR_VERSION") or "0.1.0"
 
 
 def write_ips_from_interview_result(
@@ -198,9 +194,7 @@ def emit_review_completed_audit(
             llm_fails = {r.rule_id for r in llm_verdict.rule_results if not r.passed}
             det_fails = {r.rule_id for r in authoritative_verdict.rule_results if not r.passed}
             if llm_fails != det_fails:
-                divergence = (
-                    f"LLM failing rules {sorted(llm_fails)} != deterministic failing rules {sorted(det_fails)}"
-                )
+                divergence = f"LLM failing rules {sorted(llm_fails)} != deterministic failing rules {sorted(det_fails)}"
 
     pass_summary = (
         "all rules passed"
@@ -371,7 +365,7 @@ def emit_approval_requested_audit(
         related_action_id=action.action_id,
         related_ips_version=action.ips_version_referenced,
         detail=f"Approval requested for {action.side.value} {action.quantity} {action.ticker}"
-               + (f" (reviewer_verdict={reviewer_verdict_id})" if reviewer_verdict_id else " (no reviewer verdict available)"),
+        + (f" (reviewer_verdict={reviewer_verdict_id})" if reviewer_verdict_id else " (no reviewer verdict available)"),
     )
     try:
         client.append_audit_log(audit_entry)
@@ -399,7 +393,7 @@ def emit_approval_granted_audit(
         related_action_id=action.action_id,
         related_ips_version=action.ips_version_referenced,
         detail=f"Human approved {action.side.value} {action.quantity} {action.ticker}"
-               + (f" after {edit_rounds} edit round(s)" if edit_rounds else ""),
+        + (f" after {edit_rounds} edit round(s)" if edit_rounds else ""),
     )
     try:
         client.append_audit_log(audit_entry)
@@ -545,4 +539,3 @@ def emit_action_failed_audit(
     except Exception as e:
         logger.error(f"Failed to append ACTION_FAILED audit for {action.action_id}: {e}")
         raise RuntimeError(f"Audit log write failed for action failure: {e}") from e
-

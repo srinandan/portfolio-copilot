@@ -88,9 +88,7 @@ def test_submit_order_success_limit(sample_proposed_action):
 
 
 def test_submit_order_limit_without_price_raises(sample_proposed_action):
-    action = sample_proposed_action.model_copy(
-        update={"order_type": OrderType.LIMIT, "limit_price_usd": None}
-    )
+    action = sample_proposed_action.model_copy(update={"order_type": OrderType.LIMIT, "limit_price_usd": None})
     executor = AlpacaExecutor(client=MagicMock())
 
     with pytest.raises(AlpacaExecutionError, match="limit_price_usd"):

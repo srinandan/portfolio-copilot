@@ -184,9 +184,7 @@ async def test_gate_approve_returns_approved_decision(
     result = final_event.output
     assert result["outcome"] == HITLOutcome.APPROVED.value
     assert result["approving_user_id"] == "u1"
-    mock_firestore_client.update_proposed_action_status.assert_called_once_with(
-        "act-test-123", ActionStatus.APPROVED
-    )
+    mock_firestore_client.update_proposed_action_status.assert_called_once_with("act-test-123", ActionStatus.APPROVED)
 
 
 @pytest.mark.asyncio
@@ -211,7 +209,10 @@ async def test_gate_reject_returns_rejected_decision(
 
     response_part = Part.from_function_response(
         name="adk_request_input",
-        response={"interruptId": interrupt_id, "payload": {"decision": "reject", "reason": "too risky", "user_id": "u1"}},
+        response={
+            "interruptId": interrupt_id,
+            "payload": {"decision": "reject", "reason": "too risky", "user_id": "u1"},
+        },
     )
     response_part.function_response.id = interrupt_id
 
@@ -226,15 +227,11 @@ async def test_gate_reject_returns_rejected_decision(
     result = final_event.output
     assert result["outcome"] == HITLOutcome.REJECTED.value
     assert result["reason"] == "too risky"
-    mock_firestore_client.update_proposed_action_status.assert_called_once_with(
-        "act-test-123", ActionStatus.REJECTED
-    )
+    mock_firestore_client.update_proposed_action_status.assert_called_once_with("act-test-123", ActionStatus.REJECTED)
 
 
 @pytest.mark.asyncio
-async def test_gate_edit_then_approve_completes_after_one_round(
-    sample_proposed_action, mock_firestore_client
-):
+async def test_gate_edit_then_approve_completes_after_one_round(sample_proposed_action, mock_firestore_client):
     workflow = _create_gate_workflow()
     runner = Runner(
         agent=workflow,
@@ -254,7 +251,10 @@ async def test_gate_edit_then_approve_completes_after_one_round(
     # First resume: edit quantity to 10
     response_part1 = Part.from_function_response(
         name="adk_request_input",
-        response={"interruptId": interrupt_id1, "payload": {"decision": "edit", "changes": {"quantity": 10}, "user_id": "u1"}},
+        response={
+            "interruptId": interrupt_id1,
+            "payload": {"decision": "edit", "changes": {"quantity": 10}, "user_id": "u1"},
+        },
     )
     response_part1.function_response.id = interrupt_id1
 
@@ -294,9 +294,7 @@ async def test_gate_edit_then_approve_completes_after_one_round(
 
 
 @pytest.mark.asyncio
-async def test_gate_edit_invalid_field_rejects(
-    sample_proposed_action, mock_firestore_client
-):
+async def test_gate_edit_invalid_field_rejects(sample_proposed_action, mock_firestore_client):
     workflow = _create_gate_workflow()
     runner = Runner(
         agent=workflow,
@@ -315,7 +313,10 @@ async def test_gate_edit_invalid_field_rejects(
 
     response_part = Part.from_function_response(
         name="adk_request_input",
-        response={"interruptId": interrupt_id1, "payload": {"decision": "edit", "changes": {"action_id": "hacked"}, "user_id": "u1"}},
+        response={
+            "interruptId": interrupt_id1,
+            "payload": {"decision": "edit", "changes": {"action_id": "hacked"}, "user_id": "u1"},
+        },
     )
     response_part.function_response.id = interrupt_id1
 
@@ -331,15 +332,11 @@ async def test_gate_edit_invalid_field_rejects(
     assert result["outcome"] == HITLOutcome.REJECTED.value
     assert "invalid_edit" in result["reason"]
     assert "action_id" in result["reason"]
-    mock_firestore_client.update_proposed_action_status.assert_called_once_with(
-        "act-test-123", ActionStatus.REJECTED
-    )
+    mock_firestore_client.update_proposed_action_status.assert_called_once_with("act-test-123", ActionStatus.REJECTED)
 
 
 @pytest.mark.asyncio
-async def test_gate_hits_edit_limit_auto_rejects(
-    sample_proposed_action, mock_firestore_client
-):
+async def test_gate_hits_edit_limit_auto_rejects(sample_proposed_action, mock_firestore_client):
     workflow = _create_gate_workflow()
     runner = Runner(
         agent=workflow,
@@ -361,7 +358,10 @@ async def test_gate_hits_edit_limit_auto_rejects(
     for q in [10, 20, 30]:
         response_part = Part.from_function_response(
             name="adk_request_input",
-            response={"interruptId": interrupt_id, "payload": {"decision": "edit", "changes": {"quantity": q}, "user_id": "u1"}},
+            response={
+                "interruptId": interrupt_id,
+                "payload": {"decision": "edit", "changes": {"quantity": q}, "user_id": "u1"},
+            },
         )
         response_part.function_response.id = interrupt_id
 
@@ -399,9 +399,7 @@ async def test_gate_missing_action_raises(mock_firestore_client):
 
 
 @pytest.mark.asyncio
-async def test_gate_malformed_response_raises(
-    sample_proposed_action, mock_firestore_client
-):
+async def test_gate_malformed_response_raises(sample_proposed_action, mock_firestore_client):
     workflow = _create_gate_workflow()
     runner = Runner(
         agent=workflow,
@@ -434,9 +432,7 @@ async def test_gate_malformed_response_raises(
 
 
 @pytest.mark.asyncio
-async def test_gate_unknown_decision_raises(
-    sample_proposed_action, mock_firestore_client
-):
+async def test_gate_unknown_decision_raises(sample_proposed_action, mock_firestore_client):
     workflow = _create_gate_workflow()
     runner = Runner(
         agent=workflow,
@@ -469,9 +465,7 @@ async def test_gate_unknown_decision_raises(
 
 
 @pytest.mark.asyncio
-async def test_gate_works_without_reviewer_verdict(
-    sample_proposed_action, mock_firestore_client
-):
+async def test_gate_works_without_reviewer_verdict(sample_proposed_action, mock_firestore_client):
     workflow = _create_gate_workflow()
     runner = Runner(
         agent=workflow,

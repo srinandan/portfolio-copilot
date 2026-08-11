@@ -35,8 +35,10 @@ def client_with_runner():
     fake_session.id = "sess_abc"
     fake_sm.get_or_create_session = AsyncMock(return_value=fake_session)
 
-    with patch("src.orchestrator.server.SessionManager", return_value=fake_sm), \
-         patch("src.orchestrator.server.Runner", return_value=fake_runner):
+    with (
+        patch("src.orchestrator.server.SessionManager", return_value=fake_sm),
+        patch("src.orchestrator.server.Runner", return_value=fake_runner),
+    ):
         with TestClient(server.app) as client:
             # Startup handler has run and installed the mocked SessionManager + Runner
             # via the patch above. Force ready in case another test left it False.
@@ -56,10 +58,12 @@ def test_livez_always_ok():
 def test_lifespan_runs_startup_verifications():
     from src.orchestrator import server
 
-    with patch("src.orchestrator.skills._skill_metadata.verify_all_skills_metadata") as mock_verify_skills, \
-         patch("src.orchestrator.managed_agents.secret_loader.verify_required_secrets") as mock_verify_secrets, \
-         patch("src.orchestrator.server.SessionManager"), \
-         patch("src.orchestrator.server.Runner"):
+    with (
+        patch("src.orchestrator.skills._skill_metadata.verify_all_skills_metadata") as mock_verify_skills,
+        patch("src.orchestrator.managed_agents.secret_loader.verify_required_secrets") as mock_verify_secrets,
+        patch("src.orchestrator.server.SessionManager"),
+        patch("src.orchestrator.server.Runner"),
+    ):
         with TestClient(server.app):
             mock_verify_skills.assert_called_once()
             mock_verify_secrets.assert_called_once()
@@ -260,18 +264,14 @@ def test_onboarding_apply_persists_via_writer(client_with_runner):
         risk_tolerance=RiskTolerance.MODERATE,
         time_horizon_years=10,
         target_allocation=[],
-        constraints=__import__(
-            "src.orchestrator.contracts.ips", fromlist=["Constraints"]
-        ).Constraints(concentration_limit_percent=10.0),
-        created_at=__import__("datetime").datetime.now(
-            __import__("datetime").timezone.utc
+        constraints=__import__("src.orchestrator.contracts.ips", fromlist=["Constraints"]).Constraints(
+            concentration_limit_percent=10.0
         ),
+        created_at=__import__("datetime").datetime.now(__import__("datetime").timezone.utc),
     )
     fake_liab = LiabilitiesSnapshot(
         user_id="u_wiz",
-        as_of=__import__("datetime").datetime.now(
-            __import__("datetime").timezone.utc
-        ),
+        as_of=__import__("datetime").datetime.now(__import__("datetime").timezone.utc),
         liabilities=[],
     )
 
@@ -335,4 +335,3 @@ def test_onboarding_apply_returns_500_on_writer_failure(client_with_runner):
         )
         assert r.status_code == 500
         assert "apply_failed" in r.json()["detail"]
-

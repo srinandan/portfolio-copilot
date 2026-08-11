@@ -38,9 +38,7 @@ class GoogleAuth(httpx.Auth):
 
     def auth_flow(self, request: httpx.Request):
         if hasattr(self.credentials, "before_request"):
-            self.credentials.before_request(
-                self._auth_request, request.method, str(request.url), request.headers
-            )
+            self.credentials.before_request(self._auth_request, request.method, str(request.url), request.headers)
         else:
             if not self.credentials.valid:
                 try:
@@ -185,9 +183,7 @@ class AgentRegistryClient:
                     base_url,
                     response.text,
                 )
-                raise RuntimeError(
-                    f"Agent Registry {response.status_code} on GET {base_url}: {response.text}"
-                )
+                raise RuntimeError(f"Agent Registry {response.status_code} on GET {base_url}: {response.text}")
 
             data = response.json()
             skills_data = data.get("skills", [])
@@ -227,9 +223,7 @@ class AgentRegistryClient:
                 skill_url,
                 response.text,
             )
-            raise RuntimeError(
-                f"Agent Registry {response.status_code} on GET {skill_url}: {response.text}"
-            )
+            raise RuntimeError(f"Agent Registry {response.status_code} on GET {skill_url}: {response.text}")
 
         skill_data = response.json()
         default_revision = skill_data.get("defaultRevision", "")
@@ -246,9 +240,7 @@ class AgentRegistryClient:
                 rev_url,
                 rev_response.text,
             )
-            raise RuntimeError(
-                f"Agent Registry {rev_response.status_code} on GET {rev_url}: {rev_response.text}"
-            )
+            raise RuntimeError(f"Agent Registry {rev_response.status_code} on GET {rev_url}: {rev_response.text}")
 
         # 3. Extract SKILL.md from zip
         try:

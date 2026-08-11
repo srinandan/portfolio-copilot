@@ -126,6 +126,7 @@ async def test_dispatch_managed_skill_dict_coercion(mock_resolve):
 
 def test_dispatch_managed_skill_action_drafting_uses_narrow_schema():
     from orchestrator.contracts.proposed_action import ProposedActionRationale
+
     assert OUTPUT_SCHEMA_BY_SKILL["private-action-drafting"] is ProposedActionRationale
 
 

@@ -87,9 +87,7 @@ def _apply_edit(action: ProposedAction, changes: Dict[str, Any]) -> ProposedActi
     }
     invalid = set(changes.keys()) - EDITABLE_FIELDS
     if invalid:
-        raise ValueError(
-            f"Cannot edit fields {sorted(invalid)}; only {sorted(EDITABLE_FIELDS)} are user-editable."
-        )
+        raise ValueError(f"Cannot edit fields {sorted(invalid)}; only {sorted(EDITABLE_FIELDS)} are user-editable.")
 
     updated = action.model_copy(update=changes)
     return updated
@@ -110,9 +108,7 @@ def _extract_from_obj(obj: Any) -> Any:
         return obj
     if hasattr(obj, "parts") and obj.parts:
         for p in obj.parts:
-            if getattr(p, "function_response", None) and getattr(
-                p.function_response, "response", None
-            ):
+            if getattr(p, "function_response", None) and getattr(p.function_response, "response", None):
                 res = _extract_from_obj(p.function_response.response)
                 if res is not None:
                     return res
@@ -158,9 +154,7 @@ async def hitl_approval_gate(ctx: Context, node_input: Any):
         # We are resuming from a RequestInput
         response = _extract_resume_response(ctx, node_input)
         if not isinstance(response, dict) or "decision" not in response:
-            raise ValueError(
-                f"HITL response must be a dict with 'decision' key; got {response}"
-            )
+            raise ValueError(f"HITL response must be a dict with 'decision' key; got {response}")
 
         raw_saved = ctx.state.get("hitl_action")
         if not raw_saved:
@@ -172,9 +166,7 @@ async def hitl_approval_gate(ctx: Context, node_input: Any):
         user_id = response.get("user_id")
 
         if decision == "approve":
-            db_client.update_proposed_action_status(
-                current_action.action_id, ActionStatus.APPROVED
-            )
+            db_client.update_proposed_action_status(current_action.action_id, ActionStatus.APPROVED)
             emit_approval_granted_audit(
                 current_action,
                 approving_user_id=user_id or "unknown",
@@ -193,9 +185,7 @@ async def hitl_approval_gate(ctx: Context, node_input: Any):
 
         if decision == "reject":
             reason = response.get("reason", "no reason provided")
-            db_client.update_proposed_action_status(
-                current_action.action_id, ActionStatus.REJECTED
-            )
+            db_client.update_proposed_action_status(current_action.action_id, ActionStatus.REJECTED)
             emit_approval_rejected_audit(
                 current_action,
                 reason=reason,
@@ -225,9 +215,7 @@ async def hitl_approval_gate(ctx: Context, node_input: Any):
                     rejecting_user_id=user_id,
                     db_client=db_client,
                 )
-                db_client.update_proposed_action_status(
-                    current_action.action_id, ActionStatus.REJECTED
-                )
+                db_client.update_proposed_action_status(current_action.action_id, ActionStatus.REJECTED)
                 ctx.state["hitl_action"] = None
                 yield HITLDecision(
                     outcome=HITLOutcome.REJECTED,
@@ -245,9 +233,7 @@ async def hitl_approval_gate(ctx: Context, node_input: Any):
             ctx.state["hitl_edit_rounds"] = edit_rounds
 
             if edit_rounds >= MAX_EDIT_ROUNDS:
-                db_client.update_proposed_action_status(
-                    current_action.action_id, ActionStatus.REJECTED
-                )
+                db_client.update_proposed_action_status(current_action.action_id, ActionStatus.REJECTED)
                 emit_approval_rejected_audit(
                     current_action,
                     reason="edit_limit_exceeded",
@@ -267,9 +253,7 @@ async def hitl_approval_gate(ctx: Context, node_input: Any):
 
             # Emit APPROVAL_REQUESTED again for the edited action and yield RequestInput
             raw_verdict = ctx.state.get("hitl_verdict")
-            verdict = (
-                ReviewerVerdict.model_validate(raw_verdict) if raw_verdict else None
-            )
+            verdict = ReviewerVerdict.model_validate(raw_verdict) if raw_verdict else None
             emit_approval_requested_audit(
                 current_action,
                 reviewer_verdict_id=verdict.verdict_id if verdict else None,
@@ -297,19 +281,13 @@ async def hitl_approval_gate(ctx: Context, node_input: Any):
     raw_action = raw_input.get("action")
     if raw_action is None:
         raise ValueError("hitl_approval_gate requires 'action' in node_input")
-    action = (
-        raw_action
-        if isinstance(raw_action, ProposedAction)
-        else ProposedAction.model_validate(raw_action)
-    )
+    action = raw_action if isinstance(raw_action, ProposedAction) else ProposedAction.model_validate(raw_action)
 
     raw_verdict = raw_input.get("reviewer_verdict")
     verdict: Optional[ReviewerVerdict] = None
     if raw_verdict is not None:
         verdict = (
-            raw_verdict
-            if isinstance(raw_verdict, ReviewerVerdict)
-            else ReviewerVerdict.model_validate(raw_verdict)
+            raw_verdict if isinstance(raw_verdict, ReviewerVerdict) else ReviewerVerdict.model_validate(raw_verdict)
         )
 
     # Save initial state across resumes

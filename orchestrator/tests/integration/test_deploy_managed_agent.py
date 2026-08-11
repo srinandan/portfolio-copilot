@@ -13,10 +13,12 @@ from scripts.deploy_managed_agent import (
 
 def test_find_existing_managed_agent_found():
     mock_proc = MagicMock()
-    mock_proc.stdout = json.dumps([
-        {"displayName": "other-agent", "name": "projects/p/locations/l/agents/agent-1"},
-        {"displayName": "portfolio-copilot-worker", "name": "projects/p/locations/l/agents/worker-12345"},
-    ])
+    mock_proc.stdout = json.dumps(
+        [
+            {"displayName": "other-agent", "name": "projects/p/locations/l/agents/agent-1"},
+            {"displayName": "portfolio-copilot-worker", "name": "projects/p/locations/l/agents/worker-12345"},
+        ]
+    )
 
     with patch("subprocess.run", return_value=mock_proc) as mock_run:
         result = find_existing_managed_agent("p", "l", "portfolio-copilot-worker")
@@ -26,9 +28,11 @@ def test_find_existing_managed_agent_found():
 
 def test_find_existing_managed_agent_not_found():
     mock_proc = MagicMock()
-    mock_proc.stdout = json.dumps([
-        {"displayName": "other-agent", "name": "projects/p/locations/l/agents/agent-1"},
-    ])
+    mock_proc.stdout = json.dumps(
+        [
+            {"displayName": "other-agent", "name": "projects/p/locations/l/agents/agent-1"},
+        ]
+    )
 
     with patch("subprocess.run", return_value=mock_proc):
         result = find_existing_managed_agent("p", "l", "portfolio-copilot-worker")
@@ -42,10 +46,12 @@ def test_provision_managed_agent_creates_and_returns_server_id():
 
     # 2. Create succeeds with server-assigned ID
     mock_create_proc = MagicMock()
-    mock_create_proc.stdout = json.dumps({
-        "name": "projects/test-proj/locations/us-central1/agents/generated-id-789",
-        "displayName": "portfolio-copilot-worker",
-    })
+    mock_create_proc.stdout = json.dumps(
+        {
+            "name": "projects/test-proj/locations/us-central1/agents/generated-id-789",
+            "displayName": "portfolio-copilot-worker",
+        }
+    )
 
     def subprocess_side_effect(cmd, **kwargs):
         if "list" in cmd:

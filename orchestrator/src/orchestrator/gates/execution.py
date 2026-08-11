@@ -111,7 +111,9 @@ async def execution_gate(ctx: Context, node_input: Any):
         logger.info(f"Execution gate: HITL outcome '{outcome}' is not approved; skipping.")
         return {
             "status": "skipped",
-            "action_id": hitl.get("action", {}).get("action_id") if isinstance(hitl.get("action"), dict) else getattr(hitl.get("action"), "action_id", None),
+            "action_id": hitl.get("action", {}).get("action_id")
+            if isinstance(hitl.get("action"), dict)
+            else getattr(hitl.get("action"), "action_id", None),
             "broker_order_id": None,
             "reason": f"hitl_{outcome}",
         }
@@ -125,11 +127,7 @@ async def execution_gate(ctx: Context, node_input: Any):
             "broker_order_id": None,
             "reason": "hitl_decision_missing_action",
         }
-    action = (
-        raw_action
-        if isinstance(raw_action, ProposedAction)
-        else ProposedAction.model_validate(raw_action)
-    )
+    action = raw_action if isinstance(raw_action, ProposedAction) else ProposedAction.model_validate(raw_action)
 
     verdict = _extract_verdict(node_input)
     admin_bypass = os.environ.get("PORTFOLIO_COPILOT_ADMIN_BYPASS_REVIEWER", "").lower() == "true"
@@ -167,9 +165,7 @@ async def execution_gate(ctx: Context, node_input: Any):
             }
 
     if verdict is not None and not verdict.overall_pass:
-        logger.warning(
-            f"Execution gate: reviewer verdict failed for {action.action_id}; refusing execution."
-        )
+        logger.warning(f"Execution gate: reviewer verdict failed for {action.action_id}; refusing execution.")
         db_client = FirestoreClient()
         db_client.update_proposed_action_status(action.action_id, ActionStatus.FAILED)
         emit_action_failed_audit(

@@ -154,7 +154,9 @@ async def dispatch_managed_skill(
         tools=tools,
     )
 
-    logger.info(f"Dispatching skill '{short_name}' to worker Managed Agent (schema={output_schema.__name__ if output_schema else None})")
+    logger.info(
+        f"Dispatching skill '{short_name}' to worker Managed Agent (schema={output_schema.__name__ if output_schema else None})"
+    )
     raw_result = await ctx.run_node(agent, node_input=node_input)
 
     result_to_return = raw_result
@@ -195,7 +197,9 @@ async def dispatch_managed_skill(
                         if narrative:
                             break
                 result_to_return = SpendingReport(
-                    user_id=node_input.get("user_id", "default_user") if isinstance(node_input, dict) else "default_user",
+                    user_id=node_input.get("user_id", "default_user")
+                    if isinstance(node_input, dict)
+                    else "default_user",
                     total_income_usd=float(preloaded.get("total_income_usd", 0.0)),
                     total_outflow_usd=float(preloaded.get("total_outflow_usd", 0.0)),
                     savings_rate=float(preloaded.get("savings_rate", 0.0)),

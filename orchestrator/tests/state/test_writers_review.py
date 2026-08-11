@@ -34,9 +34,7 @@ def sample_proposed_action() -> ProposedAction:
         rationale="Trade rationale",
         supporting_research_refs=[],
         ips_version_referenced=RelatedIPSVersion(ips_id="ips_1", version=1),
-        proposed_by_skill_version=SkillVersionRef(
-            skill_name="private-action-drafting", skill_version="0.1.0"
-        ),
+        proposed_by_skill_version=SkillVersionRef(skill_name="private-action-drafting", skill_version="0.1.0"),
         status=ActionStatus.DRAFTED,
         created_at=datetime.now(timezone.utc),
     )
@@ -48,14 +46,10 @@ def sample_passing_verdict() -> ReviewerVerdict:
         verdict_id="v_pass",
         action_id="act_rev_1",
         ips_version_checked_against=RelatedIPSVersion(ips_id="ips_1", version=1),
-        rule_results=[
-            RuleResult(rule_id="excluded_ticker", description="test", passed=True)
-        ],
+        rule_results=[RuleResult(rule_id="excluded_ticker", description="test", passed=True)],
         overall_pass=True,
         requires_human_approval=False,
-        reviewer_skill_version=SkillVersionRef(
-            skill_name="private-reviewer", skill_version="0.1.0"
-        ),
+        reviewer_skill_version=SkillVersionRef(skill_name="private-reviewer", skill_version="0.1.0"),
         reviewed_at=datetime.now(timezone.utc),
     )
 
@@ -76,16 +70,12 @@ def sample_failing_verdict() -> ReviewerVerdict:
         ],
         overall_pass=False,
         requires_human_approval=True,
-        reviewer_skill_version=SkillVersionRef(
-            skill_name="private-reviewer", skill_version="0.1.0"
-        ),
+        reviewer_skill_version=SkillVersionRef(skill_name="private-reviewer", skill_version="0.1.0"),
         reviewed_at=datetime.now(timezone.utc),
     )
 
 
-def test_emit_review_completed_audit_writes_entry_all_pass(
-    sample_proposed_action, sample_passing_verdict
-):
+def test_emit_review_completed_audit_writes_entry_all_pass(sample_proposed_action, sample_passing_verdict):
     mock_client = MagicMock()
     emit_review_completed_audit(
         sample_proposed_action,
@@ -107,9 +97,7 @@ def test_emit_review_completed_audit_writes_entry_all_pass(
     assert "divergence" not in audit_entry.detail
 
 
-def test_emit_review_completed_audit_captures_failing_rules(
-    sample_proposed_action, sample_failing_verdict
-):
+def test_emit_review_completed_audit_captures_failing_rules(sample_proposed_action, sample_failing_verdict):
     mock_client = MagicMock()
     emit_review_completed_audit(
         sample_proposed_action,
@@ -138,12 +126,12 @@ def test_emit_review_completed_audit_captures_divergence(
     mock_client.append_audit_log.assert_called_once()
     audit_entry = mock_client.append_audit_log.call_args[0][0]
     assert "LLM/deterministic divergence" in audit_entry.detail
-    assert "LLM verdict overall_pass=True disagreed with deterministic re-check overall_pass=False" in audit_entry.detail
+    assert (
+        "LLM verdict overall_pass=True disagreed with deterministic re-check overall_pass=False" in audit_entry.detail
+    )
 
 
-def test_emit_review_completed_audit_no_llm_verdict(
-    sample_proposed_action, sample_passing_verdict
-):
+def test_emit_review_completed_audit_no_llm_verdict(sample_proposed_action, sample_passing_verdict):
     mock_client = MagicMock()
     emit_review_completed_audit(
         sample_proposed_action,
@@ -157,9 +145,7 @@ def test_emit_review_completed_audit_no_llm_verdict(
     assert "divergence" not in audit_entry.detail
 
 
-def test_emit_review_completed_audit_fails_closed(
-    sample_proposed_action, sample_passing_verdict
-):
+def test_emit_review_completed_audit_fails_closed(sample_proposed_action, sample_passing_verdict):
     mock_client = MagicMock()
     mock_client.append_audit_log.side_effect = Exception("Firestore down")
 

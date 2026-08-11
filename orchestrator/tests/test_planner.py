@@ -337,21 +337,31 @@ async def test_root_planner_end_to_end_pa_then_ad():
     )
 
     with (
-        patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list,
+        patch(
+            "src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock
+        ) as mock_list,
         patch("src.orchestrator.planner.emit_skill_invoked_audit"),
         patch("src.orchestrator.planner.dispatch_managed_skill", new_callable=AsyncMock) as mock_dispatch,
         patch("src.orchestrator.state.preloader.FirestoreClient") as mock_fs_cls,
     ):
         mock_list.return_value = [
-            Skill(name="projects/p/locations/l/skills/private-portfolio-analysis", target_state="TARGET_STATE_ACTIVE", default_revision="v1"),
-            Skill(name="projects/p/locations/l/skills/private-action-drafting", target_state="TARGET_STATE_ACTIVE", default_revision="v1"),
+            Skill(
+                name="projects/p/locations/l/skills/private-portfolio-analysis",
+                target_state="TARGET_STATE_ACTIVE",
+                default_revision="v1",
+            ),
+            Skill(
+                name="projects/p/locations/l/skills/private-action-drafting",
+                target_state="TARGET_STATE_ACTIVE",
+                default_revision="v1",
+            ),
         ]
 
         mock_fs = mock_fs_cls.return_value
         fake_ips = MagicMock(ips_id="ips_1", version=1)
         fake_ips.model_dump.return_value = {"ips_id": "ips_1", "version": 1}
         fake_holdings = MagicMock(total_value_usd=100000.0, positions=[], cash_usd=100000.0)
-        fake_holdings.model_dump.return_value = {"total_value_usd": 100000.0, "positions":[], "cash_usd": 100000.0}
+        fake_holdings.model_dump.return_value = {"total_value_usd": 100000.0, "positions": [], "cash_usd": 100000.0}
 
         mock_fs.get_active_ips_by_user.return_value = fake_ips
         mock_fs.get_holdings.return_value = fake_holdings
@@ -380,7 +390,11 @@ async def test_root_planner_end_to_end_pa_then_ad():
         # Ensure AD call received PA's drift_report in node_input
         ad_call = [c for c in mock_dispatch.call_args_list if c[0][0] == "private-action-drafting"][0]
         assert "drift_report" in ad_call[1]["node_input"]
-        assert ad_call[1]["node_input"]["drift_report"] == {"entries": [], "unclassified_value_usd": 0.0, "rebalance_recommended": False}
+        assert ad_call[1]["node_input"]["drift_report"] == {
+            "entries": [],
+            "unclassified_value_usd": 0.0,
+            "rebalance_recommended": False,
+        }
 
 
 @pytest.mark.asyncio
@@ -401,7 +415,9 @@ async def test_root_planner_skips_research_without_question():
     )
 
     with (
-        patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list,
+        patch(
+            "src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock
+        ) as mock_list,
         patch("src.orchestrator.planner.dispatch_managed_skill", new_callable=AsyncMock) as mock_dispatch,
     ):
         mock_list.return_value = [
@@ -443,7 +459,9 @@ async def test_root_planner_pipeline_order_stable():
     )
 
     with (
-        patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list,
+        patch(
+            "src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock
+        ) as mock_list,
         patch("src.orchestrator.planner.emit_skill_invoked_audit"),
         patch("src.orchestrator.planner.dispatch_managed_skill", new_callable=AsyncMock) as mock_dispatch,
         patch("src.orchestrator.state.preloader.FirestoreClient") as mock_fs_cls,
@@ -459,7 +477,7 @@ async def test_root_planner_pipeline_order_stable():
         fake_ips = MagicMock(ips_id="ips_1", version=1)
         fake_ips.model_dump.return_value = {"ips_id": "ips_1", "version": 1}
         fake_holdings = MagicMock(total_value_usd=100000.0, positions=[], cash_usd=100000.0)
-        fake_holdings.model_dump.return_value = {"total_value_usd": 100000.0, "positions":[], "cash_usd": 100000.0}
+        fake_holdings.model_dump.return_value = {"total_value_usd": 100000.0, "positions": [], "cash_usd": 100000.0}
 
         mock_fs.get_active_ips_by_user.return_value = fake_ips
         mock_fs.get_holdings.return_value = fake_holdings
@@ -468,7 +486,9 @@ async def test_root_planner_pipeline_order_stable():
         response_stream = runner.run_async(
             user_id="user_chain",
             session_id="session_chain_1",
-            new_message=UserContent(parts=[Part.from_text(text='{"user_id": "user_chain", "research_question": "tech stocks"}')]),
+            new_message=UserContent(
+                parts=[Part.from_text(text='{"user_id": "user_chain", "research_question": "tech stocks"}')]
+            ),
         )
 
         events = [e async for e in response_stream]
@@ -499,7 +519,9 @@ async def test_root_planner_dispatches_hitl_gate_after_action_drafting():
     )
 
     with (
-        patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list,
+        patch(
+            "src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock
+        ) as mock_list,
         patch("src.orchestrator.planner.emit_skill_invoked_audit"),
         patch("src.orchestrator.planner.dispatch_managed_skill", new_callable=AsyncMock) as mock_dispatch,
         patch("src.orchestrator.planner.write_proposed_action"),
@@ -529,6 +551,7 @@ async def test_root_planner_dispatches_hitl_gate_after_action_drafting():
             Side,
             SkillVersionRef,
         )
+
         action = ProposedAction(
             action_id="act_1",
             session_id="sess_1",
@@ -567,7 +590,9 @@ async def test_root_planner_dispatches_hitl_gate_after_action_drafting():
         events = [e async for e in response_stream]
         last_event = events[-1]
 
-        hitl_calls = [c for c in mock_run_node.call_args_list if c[0] and getattr(c[0][0], "name", "") == "hitl_approval_gate"]
+        hitl_calls = [
+            c for c in mock_run_node.call_args_list if c[0] and getattr(c[0][0], "name", "") == "hitl_approval_gate"
+        ]
         assert len(hitl_calls) == 1, f"Expected 1 hitl_approval_gate call, found {len(hitl_calls)}"
         assert hitl_calls[0].kwargs["node_input"] == {"action": action.model_dump(), "reviewer_verdict": None}
         assert any("hitl_decision:" in str(item) for item in last_event.output)
@@ -589,7 +614,9 @@ async def test_root_planner_skips_hitl_when_no_proposed_action():
     )
 
     with (
-        patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list,
+        patch(
+            "src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock
+        ) as mock_list,
         patch("src.orchestrator.planner.emit_skill_invoked_audit"),
         patch("src.orchestrator.planner.dispatch_managed_skill", new_callable=AsyncMock) as mock_dispatch,
         patch("src.orchestrator.planner.preload_spending_facts") as mock_preload,
@@ -616,7 +643,9 @@ async def test_root_planner_skips_hitl_when_no_proposed_action():
         )
 
         events = [e async for e in response_stream]
-        hitl_calls = [c for c in mock_run_node.call_args_list if c[0] and getattr(c[0][0], "name", "") == "hitl_approval_gate"]
+        hitl_calls = [
+            c for c in mock_run_node.call_args_list if c[0] and getattr(c[0][0], "name", "") == "hitl_approval_gate"
+        ]
         assert len(hitl_calls) == 0, f"Expected 0 hitl_approval_gate calls, found: {hitl_calls}"
 
 
@@ -636,7 +665,9 @@ async def test_root_planner_dispatches_execution_gate_when_hitl_approved():
     )
 
     with (
-        patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list,
+        patch(
+            "src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock
+        ) as mock_list,
         patch("src.orchestrator.planner.emit_skill_invoked_audit"),
         patch("src.orchestrator.planner.dispatch_managed_skill", new_callable=AsyncMock) as mock_dispatch,
         patch("src.orchestrator.planner.write_proposed_action"),
@@ -666,6 +697,7 @@ async def test_root_planner_dispatches_execution_gate_when_hitl_approved():
             Side,
             SkillVersionRef,
         )
+
         action = ProposedAction(
             action_id="act_exec_1",
             session_id="sess_exec_1",
@@ -709,7 +741,9 @@ async def test_root_planner_dispatches_execution_gate_when_hitl_approved():
         events = [e async for e in response_stream]
         last_event = events[-1]
 
-        exec_calls = [c for c in mock_run_node.call_args_list if c[0] and getattr(c[0][0], "name", "") == "execution_gate"]
+        exec_calls = [
+            c for c in mock_run_node.call_args_list if c[0] and getattr(c[0][0], "name", "") == "execution_gate"
+        ]
         assert len(exec_calls) == 1, f"Expected 1 execution_gate call, found {len(exec_calls)}"
         assert exec_calls[0].kwargs["node_input"] == {"hitl_decision": hitl_decision, "reviewer_verdict": None}
         assert any("execution_result:" in str(item) for item in last_event.output)
@@ -731,7 +765,9 @@ async def test_root_planner_skips_execution_when_hitl_rejected():
     )
 
     with (
-        patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list,
+        patch(
+            "src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock
+        ) as mock_list,
         patch("src.orchestrator.planner.emit_skill_invoked_audit"),
         patch("src.orchestrator.planner.dispatch_managed_skill", new_callable=AsyncMock) as mock_dispatch,
         patch("src.orchestrator.planner.write_proposed_action"),
@@ -761,6 +797,7 @@ async def test_root_planner_skips_execution_when_hitl_rejected():
             Side,
             SkillVersionRef,
         )
+
         action = ProposedAction(
             action_id="act_exec_2",
             session_id="sess_exec_2",
@@ -804,7 +841,9 @@ async def test_root_planner_skips_execution_when_hitl_rejected():
         events = [e async for e in response_stream]
         last_event = events[-1]
 
-        exec_calls = [c for c in mock_run_node.call_args_list if c[0] and getattr(c[0][0], "name", "") == "execution_gate"]
+        exec_calls = [
+            c for c in mock_run_node.call_args_list if c[0] and getattr(c[0][0], "name", "") == "execution_gate"
+        ]
         assert len(exec_calls) == 1
         assert any("execution_result: {'status': 'skipped'" in str(item) for item in last_event.output)
 
@@ -814,9 +853,13 @@ async def test_get_skills_from_registry_returns_full_skill_objects():
     from src.orchestrator.planner import get_skills_from_registry
 
     mock_ctx = MagicMock()
-    with patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list:
+    with patch(
+        "src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock
+    ) as mock_list:
         mock_list.return_value = [
-            Skill(name="skills/private-goals-onboarding", target_state="TARGET_STATE_ACTIVE", default_revision="rev-goals"),
+            Skill(
+                name="skills/private-goals-onboarding", target_state="TARGET_STATE_ACTIVE", default_revision="rev-goals"
+            ),
         ]
         res = await get_skills_from_registry._func(mock_ctx, {})
         assert len(res) == 1
@@ -840,13 +883,17 @@ async def test_root_planner_threads_registry_entry_id_to_skill_invoked_audit():
     )
 
     with (
-        patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list,
+        patch(
+            "src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock
+        ) as mock_list,
         patch("src.orchestrator.planner.emit_skill_invoked_audit") as mock_invoked,
         patch("src.orchestrator.planner.dispatch_managed_skill", new_callable=AsyncMock) as mock_dispatch,
         patch("src.orchestrator.planner.preload_spending_facts") as mock_preload,
     ):
         mock_list.return_value = [
-            Skill(name="skills/private-spending-analysis", target_state="TARGET_STATE_ACTIVE", default_revision="rev-xyz"),
+            Skill(
+                name="skills/private-spending-analysis", target_state="TARGET_STATE_ACTIVE", default_revision="rev-xyz"
+            ),
         ]
         mock_preload.return_value = {}
         mock_dispatch.return_value = {"summary": "spending ok"}
@@ -876,7 +923,9 @@ async def test_root_planner_threads_registry_entry_id_to_action_proposed_audit()
     )
 
     with (
-        patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list,
+        patch(
+            "src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock
+        ) as mock_list,
         patch("src.orchestrator.planner.emit_skill_invoked_audit"),
         patch("src.orchestrator.planner.dispatch_managed_skill", new_callable=AsyncMock) as mock_dispatch,
         patch("src.orchestrator.planner.write_proposed_action") as mock_write,
@@ -885,7 +934,11 @@ async def test_root_planner_threads_registry_entry_id_to_action_proposed_audit()
         patch("src.orchestrator.state.writers.FirestoreClient"),
     ):
         mock_list.return_value = [
-            Skill(name="skills/private-action-drafting", target_state="TARGET_STATE_ACTIVE", default_revision="rev-action-99"),
+            Skill(
+                name="skills/private-action-drafting",
+                target_state="TARGET_STATE_ACTIVE",
+                default_revision="rev-action-99",
+            ),
         ]
         mock_fs = mock_fs_cls.return_value
         fake_ips = MagicMock(ips_id="ips_1", version=1)
@@ -906,6 +959,7 @@ async def test_root_planner_threads_registry_entry_id_to_action_proposed_audit()
             Side,
             SkillVersionRef,
         )
+
         action = ProposedAction(
             action_id="act_trace_1",
             session_id="sess_trace_1",
@@ -1042,9 +1096,7 @@ async def test_reviewer_postprocess_populates_context(mock_emit, mock_fs_cls):
         effective_date="2026-01-01",
         risk_tolerance=RiskTolerance.MODERATE,
         time_horizon_years=10,
-        target_allocation=[
-            TargetAllocation(asset_class="Equity", target_percent=60, min_percent=50, max_percent=70)
-        ],
+        target_allocation=[TargetAllocation(asset_class="Equity", target_percent=60, min_percent=50, max_percent=70)],
         constraints=Constraints(concentration_limit_percent=15, excluded_tickers=[], excluded_sectors=[]),
         approval_required_above_usd=25000.0,
         approval_required_above_percent=20.0,
@@ -1135,9 +1187,7 @@ async def test_reviewer_build_input_mirrors_preloaded_state_into_input_dict(
         effective_date=date(2026, 1, 1),
         risk_tolerance=RiskTolerance.MODERATE,
         time_horizon_years=10,
-        target_allocation=[
-            TargetAllocation(asset_class="Equity", target_percent=60, min_percent=50, max_percent=70)
-        ],
+        target_allocation=[TargetAllocation(asset_class="Equity", target_percent=60, min_percent=50, max_percent=70)],
         constraints=Constraints(concentration_limit_percent=15, excluded_tickers=[], excluded_sectors=[]),
         approval_required_above_usd=25000.0,
         approval_required_above_percent=20.0,
@@ -1212,9 +1262,7 @@ def test_detect_revocations_emits_for_missing_skills(mock_emit):
     mock_emit.assert_called_once()
     assert mock_emit.call_args[1]["revoked_skill_short_name"] in ("B", "private-B")
     assert mock_emit.call_args[1]["prior_registry_entry_id"] == "rev-B1"
-    assert ctx.state["last_authorized_skills"] == [
-        {"name": "skills/private-A", "default_revision": "rev-A1"}
-    ]
+    assert ctx.state["last_authorized_skills"] == [{"name": "skills/private-A", "default_revision": "rev-A1"}]
 
 
 @patch("src.orchestrator.planner.emit_skill_revoked_audit")
@@ -1229,9 +1277,7 @@ def test_detect_revocations_first_cycle_no_prior_state(mock_emit):
 
     _detect_and_audit_revocations(ctx, current_skills)
     mock_emit.assert_not_called()
-    assert ctx.state["last_authorized_skills"] == [
-        {"name": "skills/private-A", "default_revision": "rev-A1"}
-    ]
+    assert ctx.state["last_authorized_skills"] == [{"name": "skills/private-A", "default_revision": "rev-A1"}]
 
 
 @patch("src.orchestrator.planner.emit_skill_revoked_audit")
@@ -1280,9 +1326,7 @@ async def test_root_planner_end_to_end_second_cycle_omits_revoked_skill(
     )
 
     # Cycle 1 returns [A, B], cycle 2 returns [A] (B was revoked)
-    mock_reg_cls.return_value.list_authorized_skills = AsyncMock(
-        side_effect=[[skill_a, skill_b], [skill_a]]
-    )
+    mock_reg_cls.return_value.list_authorized_skills = AsyncMock(side_effect=[[skill_a, skill_b], [skill_a]])
     mock_preload.return_value = {}
     mock_dispatch.return_value = {"summary": "ok"}
 
@@ -1320,6 +1364,7 @@ async def test_root_planner_end_to_end_second_cycle_omits_revoked_skill(
 async def test_root_planner_runs_research_and_portfolio_analysis_in_parallel():
     import asyncio
     import time
+
     from orchestrator.contracts.drift_report import DriftReport
     from orchestrator.contracts.research_brief import ConfidenceLevel, ResearchBrief
 
@@ -1355,13 +1400,21 @@ async def test_root_planner_runs_research_and_portfolio_analysis_in_parallel():
         return {}
 
     with (
-        patch("src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock) as mock_list,
+        patch(
+            "src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock
+        ) as mock_list,
         patch("src.orchestrator.planner.dispatch_managed_skill", side_effect=fake_dispatch),
         patch("src.orchestrator.planner.emit_skill_invoked_audit"),
         patch("src.orchestrator.planner.preload_for_portfolio_analysis", return_value={"user_id": "u1"}),
-        patch("src.orchestrator.planner.preload_for_research", return_value={"user_id": "u1", "research_question": "market outlook"}),
+        patch(
+            "src.orchestrator.planner.preload_for_research",
+            return_value={"user_id": "u1", "research_question": "market outlook"},
+        ),
         patch("src.orchestrator.state.preloader.preload_for_portfolio_analysis", return_value={"user_id": "u1"}),
-        patch("src.orchestrator.state.preloader.preload_for_research", return_value={"user_id": "u1", "research_question": "market outlook"}),
+        patch(
+            "src.orchestrator.state.preloader.preload_for_research",
+            return_value={"user_id": "u1", "research_question": "market outlook"},
+        ),
         patch("src.orchestrator.data.firestore.FirestoreClient"),
         patch("src.orchestrator.state.writers.FirestoreClient"),
         patch("orchestrator.state.writers.FirestoreClient", create=True),
@@ -1383,7 +1436,9 @@ async def test_root_planner_runs_research_and_portfolio_analysis_in_parallel():
         stream = runner.run_async(
             user_id="user_1",
             session_id="sess_1",
-            new_message=UserContent(parts=[Part.from_text(text='{"user_id": "user_1", "research_question": "market outlook"}')]),
+            new_message=UserContent(
+                parts=[Part.from_text(text='{"user_id": "user_1", "research_question": "market outlook"}')]
+            ),
         )
         _ = [e async for e in stream]
 
@@ -1395,6 +1450,3 @@ async def test_root_planner_runs_research_and_portfolio_analysis_in_parallel():
 
         assert starts[res_name] < ends[pa_name]
         assert starts[pa_name] < ends[res_name]
-
-
-

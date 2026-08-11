@@ -77,8 +77,7 @@ def resolve_managed_agent_id(force_refresh: bool = False) -> str:
 
     # 3. Fall back to placeholder default with clear warning
     logger.warning(
-        f"MANAGED_AGENT_ID not set in environment or Secret Manager; "
-        f"falling back to default {DEFAULT_MANAGED_AGENT_ID}"
+        f"MANAGED_AGENT_ID not set in environment or Secret Manager; falling back to default {DEFAULT_MANAGED_AGENT_ID}"
     )
     _CACHED_AGENT_ID = DEFAULT_MANAGED_AGENT_ID
     return _CACHED_AGENT_ID
@@ -107,7 +106,12 @@ def resolve_alpaca_credentials(force_refresh: bool = False, require: bool = Fals
         _CACHED_ALPACA_SECRET = secret
         return key_id, secret
 
-    if _CACHED_ALPACA_KEY_ID and _CACHED_ALPACA_SECRET and not force_refresh and "PYTEST_CURRENT_TEST" not in os.environ:
+    if (
+        _CACHED_ALPACA_KEY_ID
+        and _CACHED_ALPACA_SECRET
+        and not force_refresh
+        and "PYTEST_CURRENT_TEST" not in os.environ
+    ):
         return _CACHED_ALPACA_KEY_ID, _CACHED_ALPACA_SECRET
 
     if not key_id:

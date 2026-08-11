@@ -20,7 +20,11 @@ class HITLDecision(BaseModel):
 
     outcome: HITLOutcome = Field(description="Final human decision after any edit rounds.")
     action: ProposedAction = Field(description="Final ProposedAction after any edit-round modifications applied.")
-    reason: Optional[str] = Field(default=None, description="Free-text reason (required on REJECTED, optional elsewhere).")
+    reason: Optional[str] = Field(
+        default=None, description="Free-text reason (required on REJECTED, optional elsewhere)."
+    )
     edit_rounds: int = Field(default=0, description="Number of edit rounds the user cycled through.")
     approved_at: datetime = Field(description="Timestamp the outcome was recorded.")
-    approving_user_id: Optional[str] = Field(default=None, description="User id from the RequestInput response — required on APPROVED.")
+    approving_user_id: Optional[str] = Field(
+        default=None, description="User id from the RequestInput response — required on APPROVED."
+    )

@@ -84,9 +84,7 @@ def rule_excluded_sector(inp: ReviewInput) -> RuleResult:
 def rule_concentration_limit(inp: ReviewInput) -> RuleResult:
     total = inp.holdings.total_value_usd
     if total is None:
-        total = sum(p.market_value_usd for p in inp.holdings.positions) + (
-            inp.holdings.cash_usd or 0.0
-        )
+        total = sum(p.market_value_usd for p in inp.holdings.positions) + (inp.holdings.cash_usd or 0.0)
     if total <= 0:
         return RuleResult(
             rule_id="concentration_limit",
@@ -95,11 +93,7 @@ def rule_concentration_limit(inp: ReviewInput) -> RuleResult:
             detail="Portfolio total value is 0; cannot evaluate concentration.",
         )
     current_value = next(
-        (
-            p.market_value_usd
-            for p in inp.holdings.positions
-            if p.ticker == inp.action.ticker
-        ),
+        (p.market_value_usd for p in inp.holdings.positions if p.ticker == inp.action.ticker),
         0.0,
     )
     trade_value = inp.action.estimated_value_usd or 0.0
@@ -126,11 +120,7 @@ def rule_concentration_limit(inp: ReviewInput) -> RuleResult:
 def rule_allocation_band_direction(inp: ReviewInput) -> RuleResult:
     """A sell in an under-allocated class fails; a buy in an over-allocated class fails."""
     asset_class = next(
-        (
-            p.asset_class
-            for p in inp.holdings.positions
-            if p.ticker == inp.action.ticker
-        ),
+        (p.asset_class for p in inp.holdings.positions if p.ticker == inp.action.ticker),
         None,
     )
     if asset_class is None:
@@ -141,9 +131,7 @@ def rule_allocation_band_direction(inp: ReviewInput) -> RuleResult:
             detail=f"{inp.action.ticker} is a new position; direction rule not applicable.",
         )
     drift_report = calculate_drift(inp.holdings, inp.ips)
-    entry = next(
-        (e for e in drift_report.entries if e.asset_class == asset_class), None
-    )
+    entry = next((e for e in drift_report.entries if e.asset_class == asset_class), None)
     if entry is None:
         return RuleResult(
             rule_id="allocation_band_direction",
@@ -224,12 +212,8 @@ def compute_requires_human_approval(inp: ReviewInput, overall_pass: bool) -> boo
     thresh_pct = inp.ips.approval_required_above_percent
     if thresh_pct is not None:
         total = inp.holdings.total_value_usd or (
-            sum(p.market_value_usd for p in inp.holdings.positions)
-            + (inp.holdings.cash_usd or 0.0)
+            sum(p.market_value_usd for p in inp.holdings.positions) + (inp.holdings.cash_usd or 0.0)
         )
-        if (
-            total > 0
-            and ((inp.action.estimated_value_usd or 0.0) / total * 100.0) > thresh_pct
-        ):
+        if total > 0 and ((inp.action.estimated_value_usd or 0.0) / total * 100.0) > thresh_pct:
             return True
     return False

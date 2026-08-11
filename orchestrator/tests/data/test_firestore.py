@@ -244,7 +244,7 @@ def test_set_holdings(mock_client):
     assert called_args["cash_usd"] == 500.0
 
 
-@patch('google.cloud.firestore.Client')
+@patch("google.cloud.firestore.Client")
 def test_get_active_ips_by_user_single(mock_client):
     """Verifies get_active_ips_by_user returns active IPS when exactly one active document exists."""
     client = FirestoreClient("test-project")
@@ -260,7 +260,9 @@ def test_get_active_ips_by_user_single(mock_client):
         "effective_date": "2026-01-01",
         "risk_tolerance": "moderate",
         "time_horizon_years": 10,
-        "target_allocation": [{"asset_class": "equity", "target_percent": 60.0, "min_percent": 50.0, "max_percent": 70.0}],
+        "target_allocation": [
+            {"asset_class": "equity", "target_percent": 60.0, "min_percent": 50.0, "max_percent": 70.0}
+        ],
         "constraints": {"concentration_limit_percent": 15},
         "created_at": "2026-01-01T00:00:00Z",
     }
@@ -274,7 +276,7 @@ def test_get_active_ips_by_user_single(mock_client):
     assert ips.user_id == "user1"
 
 
-@patch('google.cloud.firestore.Client')
+@patch("google.cloud.firestore.Client")
 def test_get_active_ips_by_user_none(mock_client):
     """Verifies get_active_ips_by_user returns None when no active IPS exists."""
     client = FirestoreClient("test-project")
@@ -288,7 +290,7 @@ def test_get_active_ips_by_user_none(mock_client):
     assert ips is None
 
 
-@patch('google.cloud.firestore.Client')
+@patch("google.cloud.firestore.Client")
 def test_get_active_ips_by_user_multiple_invariant_violation(mock_client):
     """Verifies D2: get_active_ips_by_user raises ValueError if multiple active documents exist."""
     client = FirestoreClient("test-project")
@@ -348,4 +350,3 @@ def test_proposed_action_roundtrip_with_broker_order_id():
         loaded_action = client.get_proposed_action("act_123")
         assert loaded_action is not None
         assert loaded_action.broker_order_id == "broker_ord_999"
-

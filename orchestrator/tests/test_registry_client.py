@@ -556,4 +556,3 @@ Research brief summary.
     assert "## Registry metadata" not in stripped
     assert "## Acceptance criteria" not in stripped
     assert "Must not leak sensitive data" not in stripped
-

@@ -1,6 +1,5 @@
 """Unit tests for Reviewer/Critic deterministic rules."""
 
-
 from orchestrator.contracts.holdings import Position
 from orchestrator.contracts.ips import RelatedIPSVersion
 from orchestrator.contracts.proposed_action import Side
@@ -82,9 +81,7 @@ def test_concentration_limit_passes_below(happy_review_input):
 
 def test_concentration_limit_fails_above(happy_review_input):
     # $50,000 buy of AAPL brings total AAPL to $60,000 / $100,000 = 60%, limit is 15%
-    action = happy_review_input.action.model_copy(
-        update={"estimated_value_usd": 50000.0}
-    )
+    action = happy_review_input.action.model_copy(update={"estimated_value_usd": 50000.0})
     inp = ReviewInput(action=action, ips=happy_review_input.ips, holdings=happy_review_input.holdings)
     res = rule_concentration_limit(inp)
     assert res.passed is False
@@ -93,9 +90,7 @@ def test_concentration_limit_fails_above(happy_review_input):
 
 
 def test_concentration_limit_zero_total_fails_gracefully(happy_review_input):
-    holdings = happy_review_input.holdings.model_copy(
-        update={"total_value_usd": 0.0, "cash_usd": 0.0, "positions": []}
-    )
+    holdings = happy_review_input.holdings.model_copy(update={"total_value_usd": 0.0, "cash_usd": 0.0, "positions": []})
     inp = ReviewInput(action=happy_review_input.action, ips=happy_review_input.ips, holdings=holdings)
     res = rule_concentration_limit(inp)
     assert res.passed is False
@@ -196,18 +191,14 @@ def test_compute_requires_human_approval_true_on_rule_fail(happy_review_input):
 
 def test_compute_requires_human_approval_true_on_usd_threshold(happy_review_input):
     # Action estimated value = $30,000 > threshold of $25,000
-    action = happy_review_input.action.model_copy(
-        update={"estimated_value_usd": 30000.0}
-    )
+    action = happy_review_input.action.model_copy(update={"estimated_value_usd": 30000.0})
     inp = ReviewInput(action=action, ips=happy_review_input.ips, holdings=happy_review_input.holdings)
     assert compute_requires_human_approval(inp, overall_pass=True) is True
 
 
 def test_compute_requires_human_approval_true_on_pct_threshold(happy_review_input):
     # Action estimated value = $21,000 / $100,000 = 21% > threshold of 20%
-    action = happy_review_input.action.model_copy(
-        update={"estimated_value_usd": 21000.0}
-    )
+    action = happy_review_input.action.model_copy(update={"estimated_value_usd": 21000.0})
     inp = ReviewInput(action=action, ips=happy_review_input.ips, holdings=happy_review_input.holdings)
     assert compute_requires_human_approval(inp, overall_pass=True) is True
 
