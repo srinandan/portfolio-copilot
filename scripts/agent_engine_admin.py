@@ -74,14 +74,12 @@ def _resolve_engine(client: vertexai.Client, engine: str):
     matches = [c for c in _engines_iter(client, display_name=engine)]
     if not matches:
         raise click.ClickException(
-            f"No Agent Engine matches display_name={engine!r}. "
-            "Run `agent_engine_admin.py list` to see what's deployed."
+            f"No Agent Engine matches display_name={engine!r}. Run `agent_engine_admin.py list` to see what's deployed."
         )
     if len(matches) > 1:
         names = ", ".join(m.api_resource.name for m in matches)
         raise click.ClickException(
-            f"display_name={engine!r} matches multiple engines ({names}). "
-            "Pass the full resource name via --engine."
+            f"display_name={engine!r} matches multiple engines ({names}). Pass the full resource name via --engine."
         )
     return matches[0]
 

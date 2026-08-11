@@ -74,17 +74,15 @@ def _apply_identity_iam(project: str, remote_app) -> None:
     if not effective_identity:
         resource_name = getattr(getattr(remote_app, "api_resource", None), "name", None)
         if resource_name:
-            effective_identity = f"principal://agents.global.org-975672035171.system.id.goog/resources/aiplatform/{resource_name}"
-        else:
-            logger.warning(
-                "Agent Engine did not expose an effective_identity or resource name; skipping IAM grants."
+            effective_identity = (
+                f"principal://agents.global.org-975672035171.system.id.goog/resources/aiplatform/{resource_name}"
             )
+        else:
+            logger.warning("Agent Engine did not expose an effective_identity or resource name; skipping IAM grants.")
             return
 
     principal = (
-        effective_identity
-        if effective_identity.startswith("principal://")
-        else f"principal://{effective_identity}"
+        effective_identity if effective_identity.startswith("principal://") else f"principal://{effective_identity}"
     )
     logger.info(f"Configuring IAM bindings for Agent Identity ({principal})...")
     for role in AGENT_IDENTITY_ROLES:
@@ -94,9 +92,7 @@ def _apply_identity_iam(project: str, remote_app) -> None:
 def _find_existing_engine(client: vertexai.Client, display_name: str):
     """Return the first Agent Engine with a matching display_name, or None."""
     try:
-        for engine in client.agent_engines.list(
-            config={"filter": f'display_name="{display_name}"'}
-        ):
+        for engine in client.agent_engines.list(config={"filter": f'display_name="{display_name}"'}):
             return engine
     except Exception as e:
         logger.warning(f"agent_engines.list failed: {e}")
@@ -143,9 +139,7 @@ def _get_client(project: str, location: str):
         "When omitted, falls back to the legacy PlaceholderAgent deploy path."
     ),
 )
-def deploy_agent_engine(
-    project: str | None, location: str, display_name: str, container_uri: str | None
-):
+def deploy_agent_engine(project: str | None, location: str, display_name: str, container_uri: str | None):
     if not project:
         _, project = google.auth.default()
 
@@ -156,10 +150,7 @@ def deploy_agent_engine(
     existing = _find_existing_engine(client, display_name)
 
     if container_uri:
-        print(
-            f"Deploying Agent Engine '{display_name}' from container "
-            f"{container_uri} to {project} in {location}..."
-        )
+        print(f"Deploying Agent Engine '{display_name}' from container {container_uri} to {project} in {location}...")
         try:
             env_vars = {
                 "AGENT_ENGINE_ID": "",
@@ -178,12 +169,8 @@ def deploy_agent_engine(
                     "container_spec": {"image_uri": container_uri},
                     "env_vars": env_vars,
                 }
-                remote_app = client.agent_engines.update(
-                    name=existing.api_resource.name, config=config
-                )
-                print(
-                    f"Updated existing Agent Engine: {remote_app.api_resource.name} (AGENT_ENGINE_ID={engine_id})"
-                )
+                remote_app = client.agent_engines.update(name=existing.api_resource.name, config=config)
+                print(f"Updated existing Agent Engine: {remote_app.api_resource.name} (AGENT_ENGINE_ID={engine_id})")
             else:
                 initial_config = {
                     "display_name": display_name,
@@ -202,9 +189,7 @@ def deploy_agent_engine(
                     "container_spec": {"image_uri": container_uri},
                     "env_vars": env_vars,
                 }
-                remote_app = client.agent_engines.update(
-                    name=remote_app.api_resource.name, config=update_config
-                )
+                remote_app = client.agent_engines.update(name=remote_app.api_resource.name, config=update_config)
                 print(
                     f"Successfully deployed Agent Engine: {remote_app.api_resource.name} (AGENT_ENGINE_ID={engine_id})"
                 )
@@ -236,9 +221,7 @@ def deploy_agent_engine(
                 "staging_bucket": staging_bucket,
             },
         )
-        print(
-            f"Successfully deployed placeholder Agent Engine: {remote_app.resource_name}"
-        )
+        print(f"Successfully deployed placeholder Agent Engine: {remote_app.resource_name}")
         _apply_identity_iam(project, remote_app)
     except Exception as e:
         print(f"Failed to deploy Agent Engine: {e}")

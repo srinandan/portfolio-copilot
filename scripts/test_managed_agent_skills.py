@@ -14,26 +14,16 @@ import time
 from typing import Any, Dict, List, Optional
 
 import google.auth
-from google.auth import impersonated_credentials
-from google.auth.transport.requests import Request
 from google import genai
-from google.genai import types
+from google.auth import impersonated_credentials
 
 # Add orchestrator src to Python path
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(ROOT_DIR, "orchestrator", "src"))
 
-from orchestrator.contracts.drift_report import DriftReport
-from orchestrator.contracts.goals_onboarding import GoalsOnboardingResult
-from orchestrator.contracts.proposed_action import ProposedAction
-from orchestrator.contracts.research_brief import ResearchBrief
-from orchestrator.contracts.reviewer_verdict import ReviewerVerdict
-from orchestrator.contracts.spending_analysis import SpendingReport
 from orchestrator.managed_agents.dispatcher import (
     OUTPUT_SCHEMA_BY_SKILL,
     _extract_json_from_text,
-    get_skill_tools,
-    resolve_skill_instructions,
 )
 from orchestrator.registry_client import AgentRegistryClient
 
@@ -128,9 +118,7 @@ def get_impersonated_client(
     impersonate_sa: Optional[str] = None,
 ) -> genai.Client:
     """Creates a Google GenAI client using impersonated service account credentials."""
-    source_credentials, _ = google.auth.default(
-        scopes=["https://www.googleapis.com/auth/cloud-platform"]
-    )
+    source_credentials, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
     if impersonate_sa:
         print(f"[*] Impersonating service account: {impersonate_sa}")
         creds = impersonated_credentials.Credentials(
@@ -158,9 +146,9 @@ async def test_single_skill(
     project_id: str,
 ) -> Dict[str, Any]:
     """Tests a single skill turn against the Managed Agent and records timing."""
-    print(f"\n=======================================================")
+    print("\n=======================================================")
     print(f"Testing Skill: private-{skill_short_name}")
-    print(f"=======================================================")
+    print("=======================================================")
 
     # 1. Fetch Skill Instructions from Registry
     start_instr_time = time.time()
@@ -284,7 +272,9 @@ async def main():
     print("\n" + "=" * 80)
     print("MANAGED AGENT BENCHMARK & TIMING SUMMARY")
     print("=" * 80)
-    header = f"{'Skill Name':<30} | {'Status':<10} | {'TTFT (s)':<10} | {'Turn (s)':<10} | {'Events':<8} | {'Schema OK'}"
+    header = (
+        f"{'Skill Name':<30} | {'Status':<10} | {'TTFT (s)':<10} | {'Turn (s)':<10} | {'Events':<8} | {'Schema OK'}"
+    )
     print(header)
     print("-" * len(header))
     for r in results:

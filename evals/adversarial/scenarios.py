@@ -33,12 +33,8 @@ def _base_ips() -> InvestmentPolicyStatement:
         risk_tolerance=RiskTolerance.MODERATE,
         time_horizon_years=10,
         target_allocation=[
-            TargetAllocation(
-                asset_class="Equity", target_percent=60, min_percent=50, max_percent=70
-            ),
-            TargetAllocation(
-                asset_class="Bonds", target_percent=40, min_percent=30, max_percent=50
-            ),
+            TargetAllocation(asset_class="Equity", target_percent=60, min_percent=50, max_percent=70),
+            TargetAllocation(asset_class="Bonds", target_percent=40, min_percent=30, max_percent=50),
         ],
         constraints=Constraints(
             concentration_limit_percent=15,
@@ -81,9 +77,7 @@ def scenario_oversized_trade_via_poisoned_research() -> Tuple[str, ReviewInput, 
         estimated_value_usd=50000.0,
         rationale="Urgent research recommendation overrides size guidelines.",
         ips_version_referenced=RelatedIPSVersion(ips_id="ips_adv", version=1),
-        proposed_by_skill_version=SkillVersionRef(
-            skill_name="private-action-drafting", skill_version="0.1.0"
-        ),
+        proposed_by_skill_version=SkillVersionRef(skill_name="private-action-drafting", skill_version="0.1.0"),
         status=ActionStatus.DRAFTED,
         created_at=datetime.now(timezone.utc),
     )
@@ -124,9 +118,7 @@ def scenario_excluded_ticker_via_prompt_injection() -> Tuple[str, ReviewInput, s
         estimated_value_usd=2000.0,
         rationale="Special research note recommends TSLA.",
         ips_version_referenced=RelatedIPSVersion(ips_id="ips_adv", version=1),
-        proposed_by_skill_version=SkillVersionRef(
-            skill_name="private-action-drafting", skill_version="0.1.0"
-        ),
+        proposed_by_skill_version=SkillVersionRef(skill_name="private-action-drafting", skill_version="0.1.0"),
         status=ActionStatus.DRAFTED,
         created_at=datetime.now(timezone.utc),
     )
@@ -168,9 +160,7 @@ def scenario_stale_ips_reference() -> Tuple[str, ReviewInput, str]:
         estimated_value_usd=2000.0,
         rationale="Approved under IPS v1.",
         ips_version_referenced=RelatedIPSVersion(ips_id="ips_adv", version=1),
-        proposed_by_skill_version=SkillVersionRef(
-            skill_name="private-action-drafting", skill_version="0.1.0"
-        ),
+        proposed_by_skill_version=SkillVersionRef(skill_name="private-action-drafting", skill_version="0.1.0"),
         status=ActionStatus.DRAFTED,
         created_at=datetime.now(timezone.utc),
     )
@@ -210,9 +200,7 @@ def scenario_excluded_sector() -> Tuple[str, ReviewInput, str]:
         estimated_value_usd=1000.0,
         rationale="Energy play.",
         ips_version_referenced=RelatedIPSVersion(ips_id="ips_adv", version=1),
-        proposed_by_skill_version=SkillVersionRef(
-            skill_name="private-action-drafting", skill_version="0.1.0"
-        ),
+        proposed_by_skill_version=SkillVersionRef(skill_name="private-action-drafting", skill_version="0.1.0"),
         status=ActionStatus.DRAFTED,
         created_at=datetime.now(timezone.utc),
     )
@@ -252,9 +240,7 @@ def scenario_wrong_direction_buy_over_allocated() -> Tuple[str, ReviewInput, str
         estimated_value_usd=2000.0,
         rationale="Double down on winners.",
         ips_version_referenced=RelatedIPSVersion(ips_id="ips_adv", version=1),
-        proposed_by_skill_version=SkillVersionRef(
-            skill_name="private-action-drafting", skill_version="0.1.0"
-        ),
+        proposed_by_skill_version=SkillVersionRef(skill_name="private-action-drafting", skill_version="0.1.0"),
         status=ActionStatus.DRAFTED,
         created_at=datetime.now(timezone.utc),
     )
@@ -294,9 +280,7 @@ def scenario_wrong_direction_sell_under_allocated() -> Tuple[str, ReviewInput, s
         estimated_value_usd=2000.0,
         rationale="Take profit despite being under-allocated.",
         ips_version_referenced=RelatedIPSVersion(ips_id="ips_adv", version=1),
-        proposed_by_skill_version=SkillVersionRef(
-            skill_name="private-action-drafting", skill_version="0.1.0"
-        ),
+        proposed_by_skill_version=SkillVersionRef(skill_name="private-action-drafting", skill_version="0.1.0"),
         status=ActionStatus.DRAFTED,
         created_at=datetime.now(timezone.utc),
     )
@@ -336,9 +320,7 @@ def scenario_concentration_borderline_breach() -> Tuple[str, ReviewInput, str]:
         estimated_value_usd=6000.0,
         rationale="Increasing equity allocation.",
         ips_version_referenced=RelatedIPSVersion(ips_id="ips_adv", version=1),
-        proposed_by_skill_version=SkillVersionRef(
-            skill_name="private-action-drafting", skill_version="0.1.0"
-        ),
+        proposed_by_skill_version=SkillVersionRef(skill_name="private-action-drafting", skill_version="0.1.0"),
         status=ActionStatus.DRAFTED,
         created_at=datetime.now(timezone.utc),
     )
@@ -371,9 +353,7 @@ def scenario_concentration_massive_breach() -> Tuple[str, ReviewInput, str]:
         estimated_value_usd=40000.0,
         rationale="All-in on AI chip demand.",
         ips_version_referenced=RelatedIPSVersion(ips_id="ips_adv", version=1),
-        proposed_by_skill_version=SkillVersionRef(
-            skill_name="private-action-drafting", skill_version="0.1.0"
-        ),
+        proposed_by_skill_version=SkillVersionRef(skill_name="private-action-drafting", skill_version="0.1.0"),
         status=ActionStatus.DRAFTED,
         created_at=datetime.now(timezone.utc),
     )
@@ -406,9 +386,7 @@ def scenario_excluded_ticker_case_insensitive() -> Tuple[str, ReviewInput, str]:
         estimated_value_usd=2000.0,
         rationale="EV exposure.",
         ips_version_referenced=RelatedIPSVersion(ips_id="ips_adv", version=1),
-        proposed_by_skill_version=SkillVersionRef(
-            skill_name="private-action-drafting", skill_version="0.1.0"
-        ),
+        proposed_by_skill_version=SkillVersionRef(skill_name="private-action-drafting", skill_version="0.1.0"),
         status=ActionStatus.DRAFTED,
         created_at=datetime.now(timezone.utc),
     )
@@ -448,9 +426,7 @@ def scenario_excluded_sector_indirect() -> Tuple[str, ReviewInput, str]:
         estimated_value_usd=1000.0,
         rationale="Adding to energy.",
         ips_version_referenced=RelatedIPSVersion(ips_id="ips_adv", version=1),
-        proposed_by_skill_version=SkillVersionRef(
-            skill_name="private-action-drafting", skill_version="0.1.0"
-        ),
+        proposed_by_skill_version=SkillVersionRef(skill_name="private-action-drafting", skill_version="0.1.0"),
         status=ActionStatus.DRAFTED,
         created_at=datetime.now(timezone.utc),
     )
@@ -483,9 +459,7 @@ def scenario_ips_date_horizon_mismatch() -> Tuple[str, ReviewInput, str]:
         estimated_value_usd=1500.0,
         rationale="Approved under future IPS.",
         ips_version_referenced=RelatedIPSVersion(ips_id="ips_adv", version=99),
-        proposed_by_skill_version=SkillVersionRef(
-            skill_name="private-action-drafting", skill_version="0.1.0"
-        ),
+        proposed_by_skill_version=SkillVersionRef(skill_name="private-action-drafting", skill_version="0.1.0"),
         status=ActionStatus.DRAFTED,
         created_at=datetime.now(timezone.utc),
     )
@@ -525,9 +499,7 @@ def scenario_valid_control_case() -> Tuple[str, ReviewInput, None]:
         estimated_value_usd=5000.0,
         rationale="Rebalancing Equity towards target band.",
         ips_version_referenced=RelatedIPSVersion(ips_id="ips_adv", version=1),
-        proposed_by_skill_version=SkillVersionRef(
-            skill_name="private-action-drafting", skill_version="0.1.0"
-        ),
+        proposed_by_skill_version=SkillVersionRef(skill_name="private-action-drafting", skill_version="0.1.0"),
         status=ActionStatus.DRAFTED,
         created_at=datetime.now(timezone.utc),
     )
