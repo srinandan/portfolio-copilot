@@ -113,6 +113,29 @@ describe('Frontend Views', () => {
     });
   });
 
+  it('DashboardView keeps suggestion prompts after a turn and renders responses as prose (not raw JSON)', async () => {
+    vi.spyOn(apiService, 'streamPlan').mockImplementation(async (_req, onEvent) => {
+      onEvent({
+        author: 'portfolio_copilot_planner',
+        output: ["spending-analysis_result: {'narrative_summary': 'You saved 40% of income this quarter.'}"]
+      });
+    });
+
+    render(DashboardView);
+    const prompts = screen.getAllByTestId('example-prompt');
+    await fireEvent.click(prompts[0]);
+
+    await waitFor(() => {
+      // Empty state is gone once a conversation starts...
+      expect(screen.queryByTestId('dashboard-empty-state')).toBeNull();
+      // ...but the suggestion chips persist so users can keep asking.
+      expect(screen.getAllByTestId('example-prompt').length).toBeGreaterThan(0);
+      // The agent reply is rendered as prose, not a raw JSON blob.
+      expect(screen.getByText(/You saved 40% of income this quarter\./)).toBeDefined();
+      expect(screen.queryByText(/narrative_summary/)).toBeNull();
+    });
+  });
+
   // Helper: mock streamPlan to synchronously deliver a HITL approval request
   // and then trigger a plan run so the ApprovalCard is on screen.
   const seedApprovalCard = async (rationale = 'Rebalance rationale') => {
