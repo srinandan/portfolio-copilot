@@ -3,10 +3,7 @@
     <!-- Left Panel (40%): Agent Activity & Conversational Stream -->
     <div class="flex flex-col gap-md lg:w-[40%] lg:flex-shrink-0">
       <div class="bg-surface-container-lowest rounded-xl p-md border border-surface-variant shadow-sm flex items-center justify-between">
-        <div class="flex items-center gap-sm">
-          <span class="material-symbols-outlined text-primary-container">smart_toy</span>
-          <h2 class="font-title-sm text-title-sm text-on-surface">Agent Activity Stream</h2>
-        </div>
+        <h2 class="font-title-sm text-title-sm text-on-surface">Agent Activity Stream</h2>
         <div class="flex items-center gap-sm">
           <span class="font-label-caps text-label-caps bg-secondary-container/50 text-on-secondary-container px-2 py-0.5 rounded uppercase">
             Live Governance
@@ -15,23 +12,44 @@
       </div>
 
       <!-- Action / Prompt Trigger -->
-      <div class="bg-surface-container-lowest rounded-xl p-sm border border-surface-variant shadow-sm flex gap-sm">
-        <input
+      <div class="bg-surface-container-lowest rounded-xl p-sm border border-surface-variant shadow-sm flex flex-col gap-sm">
+        <textarea
           v-model="inputPrompt"
-          type="text"
+          rows="4"
           placeholder="Ask Copilot (e.g. Analyze portfolio drift)..."
-          class="flex-1 px-3 py-2 text-sm rounded bg-surface border border-surface-variant font-body-base text-on-surface focus:outline-none focus:border-primary"
+          class="w-full px-3 py-2 text-sm rounded bg-surface border border-surface-variant font-body-base text-on-surface focus:outline-none focus:border-primary resize-y min-h-[96px]"
           :disabled="isStreaming"
-          @keydown.enter="triggerPlan(inputPrompt)"
-        />
-        <Button
-          variant="primary"
-          :disabled="isStreaming"
-          data-testid="btn-trigger-plan"
-          @click="triggerPlan(inputPrompt)"
-        >
-          {{ isStreaming ? 'Running...' : 'Run' }}
-        </Button>
+          @keydown.enter.exact.prevent="triggerPlan(inputPrompt)"
+        ></textarea>
+        <div class="flex items-center justify-between gap-sm">
+          <span class="text-xs text-on-surface-variant hidden sm:block">
+            Enter to send · Shift+Enter for a new line
+          </span>
+          <Button
+            variant="primary"
+            :disabled="isStreaming"
+            data-testid="btn-trigger-plan"
+            @click="triggerPlan(inputPrompt)"
+          >
+            {{ isStreaming ? 'Running...' : 'Run' }}
+          </Button>
+        </div>
+
+        <!-- Suggestion chips: always available, not just on the empty state -->
+        <div class="flex flex-wrap items-center gap-xs pt-xs border-t border-surface-variant">
+          <span class="text-xs text-on-surface-variant mr-1">Try:</span>
+          <button
+            v-for="prompt in examplePrompts"
+            :key="prompt"
+            type="button"
+            class="text-xs font-body-mono px-sm py-1 rounded-full bg-surface-container hover:bg-surface-container-high border border-surface-variant text-on-surface disabled:opacity-50"
+            data-testid="example-prompt"
+            :disabled="isStreaming"
+            @click="triggerPlan(prompt)"
+          >
+            {{ prompt }}
+          </button>
+        </div>
       </div>
 
       <!-- Messages Stream -->
@@ -44,20 +62,8 @@
         >
           <span class="material-symbols-outlined text-outline text-[28px]">chat</span>
           <p class="font-body-base text-sm text-on-surface-variant">
-            Ask Portfolio Copilot something to get started. Nothing has run yet.
+            Ask Portfolio Copilot something to get started, or pick a suggestion above. Nothing has run yet.
           </p>
-          <div class="flex flex-wrap gap-xs justify-center mt-xs">
-            <button
-              v-for="prompt in examplePrompts"
-              :key="prompt"
-              type="button"
-              class="text-xs font-body-mono px-sm py-1 rounded-full bg-surface-container hover:bg-surface-container-high border border-surface-variant text-on-surface"
-              data-testid="example-prompt"
-              @click="triggerPlan(prompt)"
-            >
-              {{ prompt }}
-            </button>
-          </div>
         </div>
 
         <div
@@ -70,7 +76,7 @@
             <span class="font-bold text-on-surface">{{ msg.sender === 'agent' ? 'Portfolio Copilot Agent' : 'User' }}</span>
             <span class="font-body-mono">{{ msg.timestamp }}</span>
           </div>
-          <p class="font-body-base text-sm text-on-surface whitespace-pre-line">
+          <p class="font-body-base text-sm text-on-surface whitespace-pre-wrap">
             {{ msg.text }}
           </p>
 
@@ -105,6 +111,7 @@ import AssetAllocationCard from '../components/dashboard/AssetAllocationCard.vue
 import TopHoldingsTable from '../components/portfolio/TopHoldingsTable.vue';
 import ApprovalCard from '../components/approval/ApprovalCard.vue';
 import Button from '../components/common/Button.vue';
+import { formatAgentResponse } from '../services/agentResponse';
 
 const holdings = ref<HoldingsSnapshot>({
   total_value_usd: 1248500,
@@ -206,12 +213,15 @@ function handleStreamEvent(event: Record<string, any>, currentMsg: ChatMessage) 
     return;
   }
 
-  if (event.author && event.output && typeof event.output === 'string') {
-    currentMsg.text = event.output;
+  if (event.output !== undefined && event.output !== null) {
+    const formatted = formatAgentResponse(event.output);
+    if (formatted) {
+      currentMsg.text = formatted;
+    }
   } else if (event.content?.parts) {
     const text = event.content.parts.map((p: any) => p.text || '').join('');
     if (text) {
-      currentMsg.text = text;
+      currentMsg.text = formatAgentResponse(text);
     }
   }
 }
