@@ -139,8 +139,16 @@ async def _postprocess_spending(user_id, result, ctx, input_dict, registry_entry
 
 
 def _build_goals_onboarding_input(user_id, input_dict, context):
-    trigger = input_dict.get("trigger", "initial")
-    return {"user_id": user_id, "trigger": trigger}
+    trigger = input_dict.get("trigger")
+    if not trigger:
+        try:
+            fs = FirestoreClient()
+            active_ips = fs.get_active_ips_by_user(user_id)
+            if active_ips is not None:
+                return None
+        except Exception:
+            pass
+    return {"user_id": user_id, "trigger": trigger or "initial"}
 
 
 async def _postprocess_goals_onboarding(user_id, result, ctx, input_dict, registry_entry_id=None):
