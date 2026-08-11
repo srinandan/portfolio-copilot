@@ -3,6 +3,7 @@
 import json
 import os
 import re
+import time
 from typing import Any, Dict, Optional, Type
 
 from google.adk import Context
@@ -122,6 +123,7 @@ async def dispatch_managed_skill(
     node_input: Any,
     ctx: Context,
     registry_client: Optional[AgentRegistryClient] = None,
+    registry_entry_id: Optional[str] = None,
 ) -> BaseModel | Any:
     """Dispatches a skill turn to the worker Managed Agent.
 
@@ -141,11 +143,13 @@ async def dispatch_managed_skill(
             logger.info(f"Research cache hit for '{cache_key}'")
             return _RESEARCH_CACHE[cache_key]
 
+    t_resolve_start = time.time()
     try:
         instructions = await resolve_skill_instructions(short_name, client=registry_client)
     except Exception as e:
         logger.exception("Failed to resolve skill instructions for %s", short_name)
         raise RuntimeError(f"Skill instruction resolution failed for {short_name}: {e}") from e
+    t_resolve_elapsed = time.time() - t_resolve_start
 
     agent = build_worker_managed_agent(
         name=short_name,
@@ -155,9 +159,25 @@ async def dispatch_managed_skill(
     )
 
     logger.info(
-        f"Dispatching skill '{short_name}' to worker Managed Agent (schema={output_schema.__name__ if output_schema else None})"
+        "Initiating Managed Agent API call: skill='%s', revision='%s', agent_id='%s', node='%s', timeout=%.1fs, schema=%s (resolved instructions in %.2fs, len=%d)",
+        short_name,
+        registry_entry_id or "unspecified",
+        agent.agent_id,
+        agent.name,
+        agent.timeout,
+        output_schema.__name__ if output_schema else None,
+        t_resolve_elapsed,
+        len(instructions),
     )
+    t_dispatch = time.time()
     raw_result = await ctx.run_node(agent, node_input=node_input)
+    t_elapsed = time.time() - t_dispatch
+    logger.info(
+        "Managed Agent API call completed: skill='%s', duration=%.2fs, raw_result_type=%s",
+        short_name,
+        t_elapsed,
+        type(raw_result).__name__,
+    )
 
     result_to_return = raw_result
     if output_schema:

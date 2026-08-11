@@ -441,7 +441,12 @@ async def _execute_skill(
     # 3. Dispatch to Managed Agent
     t0 = time.monotonic()
     try:
-        result = await dispatch_managed_skill(plan.short_name, node_input=node_input, ctx=ctx)
+        result = await dispatch_managed_skill(
+            plan.short_name,
+            node_input=node_input,
+            ctx=ctx,
+            registry_entry_id=registry_entry_id,
+        )
     except Exception as e:
         logger.exception("Skill %s dispatch failed", plan.short_name)
         emit_skill_failed_audit(
