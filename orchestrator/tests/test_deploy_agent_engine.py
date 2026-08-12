@@ -23,4 +23,3 @@ def test_agent_framework_google_adk_constant():
     """Verifies that deploy_agent_engine config declares google-adk as framework."""
     src = inspect.getsource(deploy_agent_engine.deploy_agent_engine.callback)
     assert '"agent_framework": "google-adk"' in src
-

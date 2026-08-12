@@ -40,6 +40,7 @@ once tagged. Nothing has been released yet — see the note under `[Unreleased]`
   `POST /api/stream_reasoning_engine`) built around the same `root_agent`
   workflow that runs in tests.
 - OpenTelemetry and Cloud Trace emission on Agent Runtime: injects telemetry environment variables (`GOOGLE_CLOUD_AGENT_ENGINE_ENABLE_TELEMETRY`, `OTEL_SEMCONV_STABILITY_OPT_IN`, `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT`) and grants `roles/cloudtrace.agent` to Agent Identity (#280).
+- Explicit Agent Runtime framework configuration: sets `agent_framework="google-adk"` across container and placeholder deployment paths (#279).
 - Structured onboarding endpoint `POST /v1/onboarding/apply` that persists a
   wizard-collected `GoalsOnboardingResult` directly via
   `write_ips_from_interview_result` — same writer + audit path as the LLM
