@@ -303,14 +303,20 @@ async function triggerPlan(promptText?: string) {
   };
   messages.value.push(userMsg);
 
-  const agentMsg: ChatMessage = {
+  const newAgentMsg: ChatMessage = {
     id: `msg-${Date.now()}-agent`,
     sender: 'agent',
     text: 'Analyzing portfolio and discovering authorized skills...',
     timestamp: formatTime(),
     session_id: currentSessionId.value
   };
-  messages.value.push(agentMsg);
+  messages.value.push(newAgentMsg);
+  // Drive streaming mutations through the REACTIVE array element, not the raw
+  // object. Mutating the raw object bypasses Vue's proxy set-trap, so per-event
+  // updates (notably the live progress stepper) would never re-render until some
+  // other reactive change forced it. The resume handlers already receive the
+  // reactive proxy via the template, which is why they were never affected.
+  const agentMsg = messages.value[messages.value.length - 1];
 
   isStreaming.value = true;
   try {
