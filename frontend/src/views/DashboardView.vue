@@ -2,15 +2,6 @@
   <div class="flex flex-col lg:flex-row gap-lg lg:gap-xl w-full">
     <!-- Left Panel (40%): Agent Activity & Conversational Stream -->
     <div class="flex flex-col gap-md lg:w-[40%] lg:flex-shrink-0">
-      <div class="bg-surface-container-lowest rounded-xl p-md border border-surface-variant shadow-sm flex items-center justify-between">
-        <h2 class="font-title-sm text-title-sm text-on-surface">Agent Activity Stream</h2>
-        <div class="flex items-center gap-sm">
-          <span class="font-label-caps text-label-caps bg-secondary-container/50 text-on-secondary-container px-2 py-0.5 rounded uppercase">
-            Live Governance
-          </span>
-        </div>
-      </div>
-
       <!-- Action / Prompt Trigger -->
       <div class="bg-surface-container-lowest rounded-xl p-sm border border-surface-variant shadow-sm flex flex-col gap-sm">
         <textarea
@@ -95,7 +86,7 @@
 
     <!-- Right Panel (60%): Financial Canvas -->
     <div class="flex flex-col gap-lg flex-1">
-      <NetWorthCard :total-value="holdings.total_value_usd" />
+      <NetWorthCard :total-value="holdings.total_value_usd" :as-of="holdings.as_of" />
       <AssetAllocationCard />
       <TopHoldingsTable :positions="holdings.positions" />
     </div>
@@ -259,6 +250,9 @@ async function triggerPlan(promptText?: string) {
   const text = (promptText || 'Analyze my portfolio drift and suggest rebalancing').trim();
   if (!text) return;
   inputPrompt.value = '';
+
+  // Clear previous agent messages/responses for the new interaction
+  messages.value = [];
 
   const userMsg: ChatMessage = {
     id: `msg-${Date.now()}-user`,

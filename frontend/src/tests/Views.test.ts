@@ -48,9 +48,9 @@ describe('Frontend Views', () => {
     cleanup();
   });
 
-  it('DashboardView renders agent activity stream, empty state, and financial canvas', async () => {
+  it('DashboardView renders prompt trigger, empty state, and financial canvas', async () => {
     render(DashboardView);
-    expect(screen.getByText('Agent Activity Stream')).toBeDefined();
+    expect(screen.getByTestId('btn-trigger-plan')).toBeDefined();
     expect(screen.getByText('Total Net Worth')).toBeDefined();
     expect(screen.getByText('Asset Allocation')).toBeDefined();
 
@@ -133,6 +133,33 @@ describe('Frontend Views', () => {
       // The agent reply is rendered as prose, not a raw JSON blob.
       expect(screen.getByText(/You saved 40% of income this quarter\./)).toBeDefined();
       expect(screen.queryByText(/narrative_summary/)).toBeNull();
+    });
+  });
+
+  it('DashboardView clears previous agent responses when the user starts a new interaction', async () => {
+    let callCount = 0;
+    vi.spyOn(apiService, 'streamPlan').mockImplementation(async (_req, onEvent) => {
+      callCount += 1;
+      onEvent({
+        author: 'portfolio_copilot_planner',
+        output: [`Turn ${callCount} response`]
+      });
+    });
+
+    render(DashboardView);
+    const prompts = screen.getAllByTestId('example-prompt');
+
+    // Turn 1
+    await fireEvent.click(prompts[0]);
+    await waitFor(() => {
+      expect(screen.getByText(/Turn 1 response/)).toBeDefined();
+    });
+
+    // Turn 2: should clear Turn 1 message and show Turn 2 message
+    await fireEvent.click(prompts[1]);
+    await waitFor(() => {
+      expect(screen.getByText(/Turn 2 response/)).toBeDefined();
+      expect(screen.queryByText(/Turn 1 response/)).toBeNull();
     });
   });
 
