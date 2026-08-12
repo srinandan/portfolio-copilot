@@ -6,6 +6,13 @@ endif
 AGENT_REGISTRY_LOCATION ?= global
 _COMMIT_SHA ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo local)
 
+# Propagate these to the delegated per-service Makefiles (orchestrator/, frontend/)
+# so `make deploy` reuses the values computed here — including the us-central1
+# fallback and _COMMIT_SHA — instead of each sub-make recomputing them. Without
+# this a delegated deploy with no gcloud compute/region configured would get an
+# empty --region.
+export GOOGLE_CLOUD_PROJECT GOOGLE_CLOUD_LOCATION AGENT_REGISTRY_LOCATION _COMMIT_SHA
+
 .PHONY: help install deploy deploy-orchestrator deploy-frontend deploy-managed-agent register-skills setup-agent-engine setup-all load-testdata local-orchestrator local-frontend local-server local-ui test test-orchestrator test-go test-frontend lint clean
 
 help:
@@ -32,13 +39,16 @@ help:
 	@echo "  make setup-agent-engine       - Setup Agent Runtime IAM, APIs, and permissions"
 	@echo "  make setup-all                - End-to-end infra & services setup (setup_all.sh)"
 	@echo "  make load-testdata            - Seed BigQuery and Firestore with canonical test data"
+	@echo ""
+	@echo "Teardown:"
+	@echo "  make clean                    - DELETE the deployed orchestrator Agent Engine(s) in GCP"
 
 install:
 	cd frontend && npm ci
 	cd orchestrator && uv sync
 
 local-orchestrator:
-	$(MAKE) -C orchestrator local
+	PORT=8000 $(MAKE) -C orchestrator local
 
 local-frontend:
 	$(MAKE) -C frontend local
@@ -57,25 +67,27 @@ deploy-frontend:
 deploy: deploy-orchestrator deploy-frontend
 
 deploy-managed-agent:
-	./scripts/setup_managed_agent.sh $(GOOGLE_CLOUD_PROJECT) $(GOOGLE_CLOUD_LOCATION)
+	./scripts/setup_managed_agent.sh "$(GOOGLE_CLOUD_PROJECT)" "$(GOOGLE_CLOUD_LOCATION)"
 
 register-skills:
-	./scripts/register_all_skills.sh $(GOOGLE_CLOUD_PROJECT) $(AGENT_REGISTRY_LOCATION)
+	./scripts/register_all_skills.sh "$(GOOGLE_CLOUD_PROJECT)" "$(AGENT_REGISTRY_LOCATION)"
 
 setup-agent-engine:
-	./scripts/setup_agent_engine.sh $(GOOGLE_CLOUD_PROJECT) $(GOOGLE_CLOUD_LOCATION)
+	./scripts/setup_agent_engine.sh "$(GOOGLE_CLOUD_PROJECT)" "$(GOOGLE_CLOUD_LOCATION)"
 
 setup-all:
-	./scripts/setup_all.sh $(GOOGLE_CLOUD_PROJECT) $(GOOGLE_CLOUD_LOCATION)
+	./scripts/setup_all.sh "$(GOOGLE_CLOUD_PROJECT)" "$(GOOGLE_CLOUD_LOCATION)"
 
 load-testdata:
-	./scripts/load_test_data.sh $(GOOGLE_CLOUD_PROJECT) $(GOOGLE_CLOUD_LOCATION)
+	./scripts/load_test_data.sh "$(GOOGLE_CLOUD_PROJECT)" "$(GOOGLE_CLOUD_LOCATION)"
 
 test-orchestrator:
 	$(MAKE) -C orchestrator test
 
+# frontend/server's Go tests run under `test-frontend`; scope this to the shared
+# Go libraries (pkg/...) so `make test` doesn't compile and run frontend/server twice.
 test-go:
-	go test ./... -cover
+	go test ./pkg/... -cover
 
 test-frontend:
 	$(MAKE) -C frontend test
@@ -84,7 +96,7 @@ test: test-orchestrator test-go test-frontend
 
 lint:
 	$(MAKE) -C orchestrator lint
+	go vet ./...
 
 clean:
 	$(MAKE) -C orchestrator clean
-	$(MAKE) -C frontend clean
