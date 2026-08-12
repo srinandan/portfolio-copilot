@@ -61,7 +61,7 @@ calls if the operation is genuinely absent.
 | Query an engine       | `... query --engine=portfolio-copilot-agent --input="hello"`     |
 | Delete an engine      | `... delete --engine=portfolio-copilot-agent` (prompts)          |
 | Tail logs (1h, ERROR) | `... logs --engine=portfolio-copilot-agent --severity=ERROR`     |
-| Deploy / update       | `scripts/deploy_agent_engine.py --container-uri=...`             |
+| Deploy / update       | `make deploy-orchestrator` (or `cd orchestrator && make deploy`) |
 | First-time setup      | `scripts/setup_agent_engine.sh`                                  |
 
 `--engine` accepts either the full resource name
