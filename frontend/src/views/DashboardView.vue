@@ -67,7 +67,17 @@
             <span class="font-bold text-on-surface">{{ msg.sender === 'agent' ? 'Portfolio Copilot Agent' : 'User' }}</span>
             <span class="font-body-mono">{{ msg.timestamp }}</span>
           </div>
-          <p class="font-body-base text-sm text-on-surface whitespace-pre-wrap">
+          <!-- Live analysis progress: shown while the run is in flight, then
+               cleared and replaced by the final output below. -->
+          <AnalysisProgress
+            v-if="msg.sender === 'agent' && msg.progressActive && msg.progress && msg.progress.length"
+            :stages="msg.progress"
+            :started-at="msg.startedAt"
+          />
+          <p
+            v-else
+            class="font-body-base text-sm text-on-surface whitespace-pre-wrap"
+          >
             {{ msg.text }}
           </p>
 
@@ -95,10 +105,11 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import type { HoldingsSnapshot, ChatMessage, ProposedAction, ReviewerVerdict } from '../types';
+import type { HoldingsSnapshot, ChatMessage, ProposedAction, ReviewerVerdict, ProgressStage } from '../types';
 import { apiService } from '../services/api';
 import NetWorthCard from '../components/dashboard/NetWorthCard.vue';
 import AssetAllocationCard from '../components/dashboard/AssetAllocationCard.vue';
+import AnalysisProgress from '../components/dashboard/AnalysisProgress.vue';
 import TopHoldingsTable from '../components/portfolio/TopHoldingsTable.vue';
 import ApprovalCard from '../components/approval/ApprovalCard.vue';
 import Button from '../components/common/Button.vue';
@@ -213,7 +224,34 @@ function extractHITLPayload(event: Record<string, any>): {
   return null;
 }
 
+/**
+ * Upsert a live progress stage into a message's stepper, keyed by stage id so
+ * repeated events (running -> done, or re-emitted stages on HITL resume) update
+ * the same row in place while preserving arrival order.
+ */
+function upsertProgress(msg: ChatMessage, event: Record<string, any>) {
+  const incoming: ProgressStage = {
+    stage: String(event.stage ?? ''),
+    label: String(event.label ?? event.stage ?? ''),
+    status: event.status,
+    detail: event.detail
+  };
+  const existing = msg.progress ? [...msg.progress] : [];
+  const idx = existing.findIndex((s) => s.stage === incoming.stage);
+  if (idx >= 0) existing[idx] = incoming;
+  else existing.push(incoming);
+  msg.progress = existing;
+  msg.progressActive = true;
+  if (!msg.startedAt) msg.startedAt = Date.now();
+}
+
 function handleStreamEvent(event: Record<string, any>, currentMsg: ChatMessage) {
+  // Live pipeline progress: update the stepper and stop — never touch text.
+  if (event.kind === 'progress' && event.stage) {
+    upsertProgress(currentMsg, event);
+    return;
+  }
+
   if (event.error || event.error_message) {
     currentMsg.text += `\n[Error]: ${event.error_message || event.error}`;
     return;
@@ -221,6 +259,9 @@ function handleStreamEvent(event: Record<string, any>, currentMsg: ChatMessage) 
 
   const hitl = extractHITLPayload(event);
   if (hitl) {
+    // The approval card is the point of interaction now — clear the stepper so
+    // the card replaces it.
+    currentMsg.progressActive = false;
     currentMsg.action = hitl.action;
     currentMsg.verdict = hitl.verdict;
     currentMsg.invocation_id = event.invocation_id;
@@ -262,14 +303,20 @@ async function triggerPlan(promptText?: string) {
   };
   messages.value.push(userMsg);
 
-  const agentMsg: ChatMessage = {
+  const newAgentMsg: ChatMessage = {
     id: `msg-${Date.now()}-agent`,
     sender: 'agent',
     text: 'Analyzing portfolio and discovering authorized skills...',
     timestamp: formatTime(),
     session_id: currentSessionId.value
   };
-  messages.value.push(agentMsg);
+  messages.value.push(newAgentMsg);
+  // Drive streaming mutations through the REACTIVE array element, not the raw
+  // object. Mutating the raw object bypasses Vue's proxy set-trap, so per-event
+  // updates (notably the live progress stepper) would never re-render until some
+  // other reactive change forced it. The resume handlers already receive the
+  // reactive proxy via the template, which is why they were never affected.
+  const agentMsg = messages.value[messages.value.length - 1];
 
   isStreaming.value = true;
   try {
@@ -288,6 +335,8 @@ async function triggerPlan(promptText?: string) {
     agentMsg.text += `\n[Request Failed]: ${err.message || err}`;
   } finally {
     isStreaming.value = false;
+    // Run complete: clear the stepper so the final output replaces it.
+    agentMsg.progressActive = false;
   }
 }
 
@@ -318,6 +367,7 @@ async function onApproveAction(msg: ChatMessage) {
     msg.text += `\n[Approval Recorded]`;
   } finally {
     isStreaming.value = false;
+    msg.progressActive = false;
   }
 }
 
@@ -348,6 +398,7 @@ async function onRejectAction(msg: ChatMessage) {
     msg.text += `\n[Rejection Recorded]`;
   } finally {
     isStreaming.value = false;
+    msg.progressActive = false;
   }
 }
 
@@ -379,6 +430,7 @@ async function onUpdateAction(msg: ChatMessage, updated: ProposedAction) {
     msg.text += `\n[Edit Saved]`;
   } finally {
     isStreaming.value = false;
+    msg.progressActive = false;
   }
 }
 </script>

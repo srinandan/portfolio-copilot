@@ -113,6 +113,56 @@ describe('Frontend Views', () => {
     });
   });
 
+  it('DashboardView renders the live progress stepper while an analysis is streaming, then clears it', async () => {
+    // Regression: progress events arrive asynchronously over the SSE stream,
+    // in ticks AFTER the initial render has settled. Mutating the raw agent
+    // message object at that point does not trigger a Vue re-render, so the
+    // stepper must be driven through the reactive array element. Delivering the
+    // events in later ticks (below) is what exposes the bug; the pending promise
+    // keeps the stream open so the stepper is asserted DURING streaming.
+    let resolveStream: () => void = () => {};
+    const tick = () => new Promise<void>((r) => setTimeout(r, 0));
+    vi.spyOn(apiService, 'streamPlan').mockImplementation(async (_req, onEvent) => {
+      await tick();
+      onEvent({ kind: 'progress', stage: 'discovery', status: 'running', label: 'Discovering authorized skills' });
+      await tick();
+      onEvent({
+        kind: 'progress',
+        stage: 'discovery',
+        status: 'done',
+        label: 'Discovering authorized skills',
+        detail: '5 authorized skill(s)'
+      });
+      onEvent({ kind: 'progress', stage: 'spending-analysis', status: 'running', label: 'Analyzing spending' });
+      await new Promise<void>((r) => {
+        resolveStream = r;
+      });
+    });
+
+    render(DashboardView);
+    await fireEvent.click(screen.getAllByTestId('example-prompt')[0]);
+
+    // Wait until all asynchronously-delivered stages have rendered. That the
+    // stepper appears at all from events fired in later ticks is the crux: the
+    // raw-object binding never re-renders here.
+    await waitFor(() => {
+      expect(screen.getByTestId('analysis-progress')).toBeDefined();
+      // discovery (upserted running -> done in place) + spending-analysis
+      expect(screen.getAllByTestId('progress-stage').length).toBe(2);
+    });
+    const rows = screen.getAllByTestId('progress-stage');
+    const byStage = (s: string) => rows.find((r) => r.getAttribute('data-stage') === s);
+    expect(byStage('discovery')?.getAttribute('data-status')).toBe('done');
+    expect(byStage('spending-analysis')?.getAttribute('data-status')).toBe('running');
+    expect(screen.getByText('5 authorized skill(s)')).toBeDefined();
+
+    // Completing the run clears the stepper so the final output can replace it.
+    resolveStream();
+    await waitFor(() => {
+      expect(screen.queryByTestId('analysis-progress')).toBeNull();
+    });
+  });
+
   it('DashboardView keeps suggestion prompts after a turn and renders responses as prose (not raw JSON)', async () => {
     vi.spyOn(apiService, 'streamPlan').mockImplementation(async (_req, onEvent) => {
       onEvent({

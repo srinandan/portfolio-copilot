@@ -21,12 +21,20 @@ Endpoints:
 The response format is a lightweight SSE — the gateway (Go) proxies these
 events straight through to the frontend, so the SSE shape is the wire
 contract with the frontend.
+
+Alongside the ADK Event frames, the stream also carries advisory *progress*
+frames — `data:` lines whose JSON has `{"kind": "progress", ...}` — reported by
+the planner as each pipeline stage runs, so the UI can show live progress during
+the 2-4 minute analysis. See `progress.py`, `_interleave_progress` below, and
+ADR-0018. Progress frames are advisory UI signals only; the authoritative record
+of what ran is the Firestore audit log.
 """
 
+import asyncio
 import json
 import os
 from contextlib import asynccontextmanager
-from typing import Any, AsyncIterator, Optional
+from typing import Any, AsyncIterator, Dict, Optional
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -37,6 +45,7 @@ from pydantic import BaseModel
 from .contracts.goals_onboarding import GoalsOnboardingResult
 from .logger import get_logger
 from .planner import root_agent
+from .progress import PROGRESS_CHANNEL
 from .session_manager import SessionManager
 from .state import write_ips_from_interview_result
 
@@ -151,29 +160,73 @@ def _event_to_wire(event: Any) -> dict[str, Any]:
     return {"raw": str(event)}
 
 
-async def _sse(events: AsyncIterator[Any]) -> AsyncIterator[bytes]:
+# Sentinel signalling the runner event stream has been fully drained.
+_STREAM_DONE = object()
+# Marker key wrapping a stream failure so the framing layer can emit an error frame.
+_STREAM_ERROR_KEY = "__stream_error__"
+
+
+async def _interleave_progress(events: AsyncIterator[Any]) -> AsyncIterator[Dict[str, Any]]:
+    """Yields wire dicts for both ADK Runner events and out-of-band progress events.
+
+    A per-run ``asyncio.Queue`` is installed on ``PROGRESS_CHANNEL`` for the
+    lifetime of the stream, so the planner's ``report_progress`` calls land here
+    and interleave with the ADK event stream in real arrival order. The context
+    variable is set *before* the drain task is created so the copied task
+    context (and any ``asyncio.gather`` sub-tasks the planner spawns) can see the
+    queue.
+
+    Progress dicts carry ``{"kind": "progress"}``; ADK events are serialized via
+    :func:`_event_to_wire`. A stream failure is surfaced as a dict keyed by
+    ``_STREAM_ERROR_KEY`` so the framing layer can emit the SSE ``error`` frame
+    the frontend expects (behavior preserved from the previous implementation).
+    """
+    queue: "asyncio.Queue[Any]" = asyncio.Queue()
+    token = PROGRESS_CHANNEL.set(queue)
+
+    async def _drain_runner() -> None:
+        try:
+            async for event in events:
+                queue.put_nowait(_event_to_wire(event))
+        except Exception as e:
+            # Logged here (with traceback) for operators; forwarded to the client
+            # as an error frame by the framing layer below.
+            logger.exception("event stream raised; forwarding error frame to client")
+            queue.put_nowait({_STREAM_ERROR_KEY: {"error": str(e), "type": type(e).__name__}})
+        finally:
+            queue.put_nowait(_STREAM_DONE)
+
+    task = asyncio.create_task(_drain_runner())
     try:
-        async for event in events:
-            payload = json.dumps(_event_to_wire(event), default=str)
-            yield f"data: {payload}\n\n".encode("utf-8")
-    except Exception as e:
-        # The frontend gets the message via the SSE `error` event, but that
-        # frame is opaque server-side — log the full traceback so operators
-        # can trace failures (e.g. Agent Registry 401s) in Cloud Logging.
-        logger.exception("SSE event stream raised; sending error frame to client")
-        err = json.dumps({"error": str(e), "type": type(e).__name__})
-        yield f"event: error\ndata: {err}\n\n".encode("utf-8")
+        while True:
+            item = await queue.get()
+            if item is _STREAM_DONE:
+                break
+            yield item
+    finally:
+        PROGRESS_CHANNEL.reset(token)
+        if not task.done():
+            task.cancel()
+
+
+async def _sse(events: AsyncIterator[Any]) -> AsyncIterator[bytes]:
+    async for item in _interleave_progress(events):
+        if _STREAM_ERROR_KEY in item:
+            err = json.dumps(item[_STREAM_ERROR_KEY], default=str)
+            yield f"event: error\ndata: {err}\n\n".encode("utf-8")
+            continue
+        payload = json.dumps(item, default=str)
+        yield f"data: {payload}\n\n".encode("utf-8")
 
 
 async def _stream_json_lines(events: AsyncIterator[Any]) -> AsyncIterator[bytes]:
-    try:
-        async for event in events:
-            payload = json.dumps(_event_to_wire(event), default=str)
-            yield f"{payload}\n".encode("utf-8")
-    except Exception as e:
-        logger.exception("NDJSON event stream raised; sending error line to client")
-        err = json.dumps({"error": str(e), "type": type(e).__name__})
-        yield f"{err}\n".encode("utf-8")
+    async for item in _interleave_progress(events):
+        if _STREAM_ERROR_KEY in item:
+            err = json.dumps(item[_STREAM_ERROR_KEY], default=str)
+            yield f"{err}\n".encode("utf-8")
+            continue
+        payload = json.dumps(item, default=str)
+        yield f"{payload}\n".encode("utf-8")
 
 
 @app.post("/api/stream_reasoning_engine")

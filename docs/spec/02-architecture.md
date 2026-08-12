@@ -173,6 +173,43 @@ layer).
 
 All sub-agents execute as Managed Agents via the Interactions API using a unified worker agent (`portfolio-copilot-worker`), customized per-interaction with registry-resolved `SKILL.md` instructions and pre-computed inputs from in-process primitives ([ADR-0014](../adr/0014-managed-agents-subagent-execution-layer.md), [ADR-0015](../adr/0015-real-user-data-antigravity-sandbox.md), [ADR-0016](../adr/0016-deterministic-primitives-in-orchestrator.md)).
 
+## Streaming and progress feedback
+
+The orchestrator streams its planning turn to the frontend over Server-Sent
+Events: `/v1/invoke` and `/v1/resume` emit ADK Runner events as `data:` frames,
+which the Go gateway proxies verbatim to the SPA (`frontend/server/plan.go`).
+The SSE shape is therefore the wire contract with the frontend.
+
+Because a full analysis takes **2–4 minutes**, the stream also carries
+**advisory progress events** so the UI can show which stage is running rather
+than a frozen line ([ADR-0018](../adr/0018-streaming-progress-events.md)). The
+planner reports each checkpoint as a side effect via
+`progress.report_progress(...)` — next to the existing `SKILL_INVOKED` audit
+write, and around discovery, the HITL gate, and the execution gate. These
+reports land on a per-run `asyncio.Queue` installed on a context variable
+(`PROGRESS_CHANNEL`); `server._interleave_progress` drains that queue together
+with the ADK event stream onto a single ordered stream (shared by both the SSE
+and Agent Runtime NDJSON framings).
+
+Progress events are discriminated by `kind` and are additive to the existing
+event/`error`/HITL frames:
+
+```json
+{"kind": "progress", "stage": "portfolio-analysis", "status": "running",
+ "label": "Analyzing portfolio drift", "detail": "8% over target"}
+```
+
+`status` is one of `running | done | skipped | failed`. The frontend
+(`AnalysisProgress.vue`) keys a live stepper on `stage`, advancing each row as
+events arrive and clearing the stepper — replacing it with the final output or
+the HITL approval card — once the run completes.
+
+These signals are **advisory only**: they never gate execution and carry no
+governance weight. The authoritative record of what ran is the immutable
+Firestore audit log (below); dropping a progress event affects nothing but the
+UI. `report_progress` is a silent no-op when no channel is installed
+(non-streaming paths, tests).
+
 ## Governance layer
 
 The governance layer enforces safety, policy compliance, and human oversight before any proposed financial action is executed. It executes in a strict three-stage sequence after the dynamic skill pipeline completes:
