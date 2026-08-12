@@ -1,3 +1,4 @@
+import inspect
 import sys
 from pathlib import Path
 
@@ -5,6 +6,7 @@ from pathlib import Path
 scripts_dir = Path(__file__).resolve().parent.parent.parent / "scripts"
 sys.path.insert(0, str(scripts_dir))
 
+import deploy_agent_engine
 from deploy_agent_engine import AGENT_IDENTITY_ROLES
 
 
@@ -19,9 +21,6 @@ def test_agent_identity_roles_includes_cloud_trace():
 
 def test_agent_framework_google_adk_constant():
     """Verifies that deploy_agent_engine config declares google-adk as framework."""
-    import inspect
-    import deploy_agent_engine
-
     src = inspect.getsource(deploy_agent_engine.deploy_agent_engine.callback)
     assert '"agent_framework": "google-adk"' in src
 
