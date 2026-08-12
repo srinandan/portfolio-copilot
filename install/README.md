@@ -100,12 +100,17 @@ This smoke test verifies that `resolve_managed_agent_id()` loads a live `MANAGED
 ## Running locally
 
 ```bash
-# orchestrator (Python)
-cd orchestrator && uv pip install -e ".[dev]" && uv run pytest
+# 1. Install all dependencies (Python uv + Node npm)
+make install
 
-# frontend UI & Go backend server
-cd frontend && npm install && npm run build
-go build -o bin/server ./frontend/server && ./bin/server
+# 2. Run Python ADK orchestrator locally on :8000
+make local-orchestrator
+
+# 3. Run Vue Vite dev server with hot reload on :5173
+make local-frontend
+
+# 4. Or build SPA & run production Go backend server on :8080
+make local-server
 ```
 
 ## Updating / redeploying after code changes

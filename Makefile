@@ -6,21 +6,47 @@ endif
 AGENT_REGISTRY_LOCATION ?= global
 _COMMIT_SHA ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo local)
 
-.PHONY: help deploy deploy-orchestrator deploy-frontend deploy-managed-agent register-skills setup-agent-engine setup-all load-testdata test test-orchestrator test-go test-frontend lint clean
+.PHONY: help install deploy deploy-orchestrator deploy-frontend deploy-managed-agent register-skills setup-agent-engine setup-all load-testdata local-orchestrator local-frontend local-server local-ui test test-orchestrator test-go test-frontend lint clean
 
 help:
 	@echo "Portfolio Copilot Makefile"
 	@echo "--------------------------"
-	@echo "make deploy               - Deploy full stack (orchestrator + frontend)"
-	@echo "make deploy-orchestrator  - Deploy orchestrator container to Vertex AI Agent Runtime"
-	@echo "make deploy-frontend      - Deploy frontend & Go server to Cloud Run"
-	@echo "make deploy-managed-agent - Provision worker Managed Agent in Vertex AI"
-	@echo "make register-skills      - Register all runtime skills in Agent Registry"
-	@echo "make setup-agent-engine   - Setup Agent Runtime IAM, APIs, and permissions"
-	@echo "make setup-all            - End-to-end infra & services setup (setup_all.sh)"
-	@echo "make load-testdata        - Seed BigQuery and Firestore with canonical test data"
-	@echo "make test                 - Run test suites across Python, Go, and Vue"
-	@echo "make lint                 - Run linters across Python and Go"
+	@echo "Local Development:"
+	@echo "  make install                  - Install all Python and frontend dependencies"
+	@echo "  make local-orchestrator       - Run Python ADK orchestrator locally on :8000"
+	@echo "  make local-frontend           - Run Vue Vite dev server with hot reload on :5173"
+	@echo "  make local-server             - Build SPA & run Go backend server on :8080"
+	@echo ""
+	@echo "Testing & Linting:"
+	@echo "  make test                     - Run test suites across Python, Go, and Vue"
+	@echo "  make lint                     - Run linters across Python and Go"
+	@echo ""
+	@echo "Cloud Deployment:"
+	@echo "  make deploy                   - Deploy full stack (orchestrator + frontend)"
+	@echo "  make deploy-orchestrator      - Deploy orchestrator container to Vertex AI Agent Runtime"
+	@echo "  make deploy-frontend          - Deploy frontend & Go server to Cloud Run"
+	@echo "  make deploy-managed-agent     - Provision worker Managed Agent in Vertex AI"
+	@echo "  make register-skills          - Register all runtime skills in Agent Registry"
+	@echo ""
+	@echo "Infra Provisioning & Test Data:"
+	@echo "  make setup-agent-engine       - Setup Agent Runtime IAM, APIs, and permissions"
+	@echo "  make setup-all                - End-to-end infra & services setup (setup_all.sh)"
+	@echo "  make load-testdata            - Seed BigQuery and Firestore with canonical test data"
+
+install:
+	cd frontend && npm ci
+	cd orchestrator && uv sync
+
+local-orchestrator:
+	$(MAKE) -C orchestrator local
+
+local-frontend:
+	$(MAKE) -C frontend local
+
+local-ui: local-frontend
+
+local-server:
+	$(MAKE) -C frontend local-server
 
 deploy-orchestrator:
 	$(MAKE) -C orchestrator deploy
