@@ -12,7 +12,8 @@
 Provisions Secret Manager, BigQuery, Firestore, Cloud Run, Managed Agent workers, and Agent Runtime, in the order each depends on the last:
 
 ```bash
-./scripts/setup_all.sh <PROJECT_ID> <REGION>
+make setup-all
+# or: ./scripts/setup_all.sh <PROJECT_ID> <REGION>
 ```
 
 This runs, in sequence:
@@ -52,12 +53,13 @@ Credentials (`MANAGED_AGENT_ID`, `ALPACA_API_KEY_ID`, and `ALPACA_API_SECRET`) a
 Each skill under `skills/` needs registering with the real Agent Registry before the orchestrator can discover it:
 
 ```bash
-# Register a single skill:
+# Register all runtime skills at once:
+make register-skills
+# or: ./scripts/register_all_skills.sh <PROJECT_ID> <REGION>
+
+# Or register a single skill:
 ./scripts/register_skill.sh <skill-name> <PROJECT_ID> <REGION>
 # e.g. ./scripts/register_skill.sh goals-onboarding <PROJECT_ID> us-central1
-
-# Or register all runtime skills at once:
-./scripts/register_all_skills.sh <PROJECT_ID> <REGION>
 ```
 
 Zips the skill directory and registers it as `private-<skill-name>`. Re-run this any time a skill's `SKILL.md` or supporting files change, this pushes a new revision, it doesn't mutate the existing one.
@@ -72,7 +74,8 @@ To seed your BigQuery dataset and Firestore database with canonical test fixture
 
 ```bash
 # Setup schemas and seed BigQuery + Firestore:
-./scripts/load_test_data.sh <PROJECT_ID> <REGION>
+make load-testdata
+# or: ./scripts/load_test_data.sh <PROJECT_ID> <REGION>
 
 # Or run dry-run validation locally without GCP calls:
 python3 scripts/load_test_data.py --dry-run
