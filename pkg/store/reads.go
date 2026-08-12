@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"cloud.google.com/go/firestore"
@@ -34,7 +35,13 @@ func (c *Client) GetHoldings(ctx context.Context, userID string) (*contracts.Hol
 	}
 	var snapshot contracts.HoldingsSnapshot
 	if err := doc.DataTo(&snapshot); err != nil {
-		return nil, fmt.Errorf("failed to parse holdings snapshot: %w", err)
+		dataBytes, jsonErr := json.Marshal(doc.Data())
+		if jsonErr != nil {
+			return nil, fmt.Errorf("failed to parse holdings snapshot: %w", err)
+		}
+		if jsonErr := json.Unmarshal(dataBytes, &snapshot); jsonErr != nil {
+			return nil, fmt.Errorf("failed to parse holdings snapshot: %w", err)
+		}
 	}
 	return &snapshot, nil
 }
