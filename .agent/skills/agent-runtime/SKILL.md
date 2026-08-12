@@ -120,3 +120,4 @@ When Agent Runtime looks broken:
    Registry reader grant on the service agent.
 5. If the SDK itself errors, verify `aiplatform.googleapis.com` is
    enabled: `gcloud services list --enabled --filter=aiplatform`.
+6. For OpenTelemetry / Cloud Trace verification, confirm `telemetry.googleapis.com` and `cloudtrace.googleapis.com` are enabled, and check the **Traces** tab under the Agent Platform deployment in Cloud Console.

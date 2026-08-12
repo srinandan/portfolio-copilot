@@ -155,19 +155,21 @@ for why. The web application service is deployed with `--no-allow-unauthenticate
 
 Every deployed component operates under a least-privilege, scoped identity (see [ADR-0011](../adr/0011-least-privilege-identities.md) and [ADR-0017](../adr/0017-unified-gateway-and-frontend.md)):
 - **`portfolio-copilot-frontend-sa`** (Cloud Run): Granted `roles/datastore.user` (Firestore audit log + holdings), `roles/bigquery.dataViewer` (fan-out chart queries), and `roles/aiplatform.user` (Reasoning Engine streaming query bridge). Does not have Secret Manager access.
-- **`orchestrator` Agent Identity** (Agent Runtime): Uses SPIFFE-based per-agent cryptographic identity with `roles/datastore.user`, `roles/bigquery.dataViewer`, and `roles/secretmanager.secretAccessor` (Alpaca API credentials and `MANAGED_AGENT_ID`). The Agent Platform Service Agent holds deployment-time secret accessor permissions.
+- **`orchestrator` Agent Identity** (Agent Runtime): Uses SPIFFE-based per-agent cryptographic identity with `roles/datastore.user`, `roles/bigquery.dataViewer`, `roles/cloudtrace.agent` (OpenTelemetry traces), and `roles/secretmanager.secretAccessor` (Alpaca API credentials and `MANAGED_AGENT_ID`). The Agent Platform Service Agent holds deployment-time secret accessor permissions.
 
 ## Language
 
 **Python for the orchestrator, primitives, and skill metadata; Go for frontend backend host and shared libraries.**
 Agent Runtime's deployment contract is Python-only, while the web host server and shared contracts remain in Go. See [ADR-0008](../adr/0008-python-for-orchestrator.md) and [ADR-0017](../adr/0017-unified-gateway-and-frontend.md).
 
-## Lifecycle
+## Lifecycle & Observability
 
 Follows the full ADK lifecycle: **define** (agent cards, tool contracts,
 approval schema) → **build** → **evaluate** (scenario + adversarial eval
 set) → **deploy** (Agent Engine) → **observe** (traces feed the governance
 layer).
+
+Agent Runtime exports OpenTelemetry traces to Google Cloud Trace (`telemetry.googleapis.com`, `cloudtrace.googleapis.com`) using GenAI semantic conventions (`OTEL_SEMCONV_STABILITY_OPT_IN=gen_ai_latest_experimental`, `GOOGLE_CLOUD_AGENT_ENGINE_ENABLE_TELEMETRY=true`). Spans capture pipeline latency, tool call sequences, and session DAGs, viewable under the **Traces** tab in the Agent Platform Deployments console.
 
 ## Sub-agent execution: Managed Agents
 
