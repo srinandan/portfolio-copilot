@@ -164,8 +164,10 @@ def test_sse_logs_exception_with_traceback(caplog):
     with caplog.at_level(logging.ERROR, logger="orchestrator.server"):
         asyncio.run(drain())
 
-    matching = [r for r in caplog.records if "SSE event stream raised" in r.getMessage()]
-    assert matching, f"expected SSE-raise log record, got {[r.getMessage() for r in caplog.records]}"
+    # Both streaming paths share one drain (_interleave_progress), which logs a
+    # single unified message with the traceback attached.
+    matching = [r for r in caplog.records if "event stream raised" in r.getMessage()]
+    assert matching, f"expected stream-raise log record, got {[r.getMessage() for r in caplog.records]}"
     record = matching[0]
     assert record.levelno == logging.ERROR
     assert record.exc_info is not None, "logger.exception must attach exc_info for tracebacks"
@@ -189,7 +191,7 @@ def test_stream_json_lines_logs_exception_with_traceback(caplog):
     with caplog.at_level(logging.ERROR, logger="orchestrator.server"):
         asyncio.run(drain())
 
-    matching = [r for r in caplog.records if "NDJSON event stream raised" in r.getMessage()]
+    matching = [r for r in caplog.records if "event stream raised" in r.getMessage()]
     assert matching
     assert matching[0].exc_info is not None
 

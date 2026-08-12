@@ -65,6 +65,12 @@ once tagged. Nothing has been released yet — see the note under `[Unreleased]`
   rejects `MERGE`/`EXPORT`/`LOAD`/`CALL`/`EXECUTE`/multi-statement scripts,
   wraps every query in a CTE that scopes `chase_transactions` to the caller's
   `user_id`, and strips any qualified prefix so the CTE always shadows.
+- Streaming progress events (ADR-0018): the planner reports each pipeline
+  stage (discovery, per-skill, approval, execution) as advisory
+  `{"kind":"progress"}` SSE frames, interleaved with the ADK event stream via a
+  context-variable channel (`progress.py`, `server._interleave_progress`), so
+  the UI can show live progress during the 2-4 minute analysis. Advisory only —
+  never gates execution; the Firestore audit log stays authoritative.
 
 **Frontend (Vue 3 + TypeScript SPA + Go host)**
 - Single Cloud Run service serving compiled SPA + `/api/*` in-process
@@ -78,6 +84,10 @@ once tagged. Nothing has been released yet — see the note under `[Unreleased]`
   extracts HITL approval requests from the ADK event envelope, renders the
   `<ApprovalCard />`, and drives approve / reject / edit through the
   orchestrator's resume path.
+- Live analysis progress stepper (`<AnalysisProgress />`, ADR-0018): routes
+  `{"kind":"progress"}` SSE frames into a stage checklist
+  (running → done / skipped / failed) with an elapsed timer, then clears and
+  replaces it with the final output / approval card when the run completes.
 - Empty-state on Dashboard with example prompts before any turn has run.
 - Structured logging middleware with GCP-compatible `severity` field and
   `X-Cloud-Trace-Context` propagation.

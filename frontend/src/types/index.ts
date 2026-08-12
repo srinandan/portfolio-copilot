@@ -82,6 +82,20 @@ export interface ProposedAction {
   status: ActionStatus;
 }
 
+export type ProgressStatus = 'running' | 'done' | 'skipped' | 'failed';
+
+/**
+ * A single pipeline stage surfaced live while an analysis runs. Emitted by the
+ * orchestrator as `{ kind: 'progress', ... }` SSE events and rendered as one row
+ * of the AnalysisProgress stepper. Advisory UI signal only — never authoritative.
+ */
+export interface ProgressStage {
+  stage: string;
+  label: string;
+  status: ProgressStatus;
+  detail?: string;
+}
+
 export interface ChatMessage {
   id: string;
   sender: 'user' | 'agent' | 'system';
@@ -92,6 +106,12 @@ export interface ChatMessage {
   session_id?: string;
   invocation_id?: string;
   interrupt_id?: string;
+  // Live analysis progress. `progress` accumulates stage rows; `progressActive`
+  // is true while the stepper should render (cleared when the run finishes so
+  // the final output replaces it).
+  progress?: ProgressStage[];
+  progressActive?: boolean;
+  startedAt?: number;
 }
 
 export interface CategorySpending {

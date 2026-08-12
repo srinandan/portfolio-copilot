@@ -25,6 +25,7 @@ from .data.firestore import FirestoreClient
 from .gates import execution_gate, hitl_approval_gate
 from .logger import get_logger
 from .managed_agents import dispatch_managed_skill
+from .progress import STAGE_LABELS, report_progress, report_skill_progress
 from .registry_client import AgentRegistryClient
 from .state import (
     PreloadDeclinedError,
@@ -467,6 +468,7 @@ async def _execute_skill(
     except PreloadDeclinedError as e:
         logger.info(f"Skill {plan.short_name} declined: {e}")
         emit_skill_failed_audit(plan.short_name, error=f"declined: {e}", registry_entry_id=registry_entry_id)
+        report_skill_progress(plan.short_name, "skipped", detail=str(e))
         return {"status": "declined", "message": str(e)}
     except Exception as e:
         logger.exception("Skill %s preload failed", plan.short_name)
@@ -475,10 +477,12 @@ async def _execute_skill(
             error=f"preload_failed: {e}",
             registry_entry_id=registry_entry_id,
         )
+        report_skill_progress(plan.short_name, "failed", detail="preload failed")
         raise
 
     if node_input is None:
         logger.info(f"Skipping skill {plan.short_name} (no input built)")
+        report_skill_progress(plan.short_name, "skipped")
         return None
 
     if isinstance(node_input, dict):
@@ -487,12 +491,13 @@ async def _execute_skill(
         if "preloaded" in node_input:
             input_dict.setdefault("preloaded", node_input.get("preloaded"))
 
-    # 2. Emit SKILL_INVOKED
+    # 2. Emit SKILL_INVOKED (audit) and announce the stage as running (UI progress).
     emit_skill_invoked_audit(
         plan.short_name,
         detail=f"Dispatching {plan.short_name}",
         registry_entry_id=registry_entry_id,
     )
+    report_skill_progress(plan.short_name, "running")
 
     # 3. Dispatch to Managed Agent
     t0 = time.monotonic()
@@ -510,6 +515,7 @@ async def _execute_skill(
             error=f"dispatch_failed: {e}",
             registry_entry_id=registry_entry_id,
         )
+        report_skill_progress(plan.short_name, "failed", detail="dispatch failed")
         raise
     finally:
         logger.info(
@@ -527,9 +533,11 @@ async def _execute_skill(
             error=f"postprocess_failed: {e}",
             registry_entry_id=registry_entry_id,
         )
+        report_skill_progress(plan.short_name, "failed", detail="postprocess failed")
         raise
 
     context.update(ctx_update)
+    report_skill_progress(plan.short_name, "done")
     return payload
 
 
@@ -578,12 +586,19 @@ def _detect_and_audit_revocations(
 async def root_planner(ctx: Context, node_input: Any):
     """Registry-driven dynamic planner. Iterates authorized skills in canonical order,
     dispatching each to the worker Managed Agent via a per-skill SkillPlan."""
+    report_progress("discovery", "running", STAGE_LABELS["discovery"])
     all_skills = await ctx.run_node(get_skills_from_registry, node_input=node_input)
     logger.info(f"Available skills from registry: {all_skills}")
 
     # Filter strictly to the Portfolio Copilot skills (the 6 skills in skills/)
     skills = [s for s in all_skills if _normalize_skill_key(s.name if hasattr(s, "name") else str(s)) in SKILL_PLANS]
     logger.info(f"Filtered Portfolio Copilot skills ({len(skills)}): {skills}")
+    report_progress(
+        "discovery",
+        "done",
+        STAGE_LABELS["discovery"],
+        detail=f"{len(skills)} authorized skill(s)",
+    )
 
     # Delta-detect revocations vs the previous planning cycle in this session.
     # Emits SKILL_REVOKED audit for anything that disappeared.
@@ -718,12 +733,18 @@ async def root_planner(ctx: Context, node_input: Any):
             "action": ad_result,
             "reviewer_verdict": context.get("reviewer_verdict"),
         }
+        # The gate pauses the workflow (RequestInput) until the user responds, so
+        # this "running" stage reads as "awaiting your approval" in the stepper.
+        report_progress("approval", "running", STAGE_LABELS["approval"])
         try:
             hitl_result = await ctx.run_node(hitl_approval_gate, node_input=gate_input)
         except Exception as e:
             logger.exception("HITL gate failed")
+            report_progress("approval", "failed", STAGE_LABELS["approval"])
             results.append(f"hitl_error: {e}")
         else:
+            outcome = hitl_result.get("outcome") if isinstance(hitl_result, dict) else None
+            report_progress("approval", "done", STAGE_LABELS["approval"], detail=outcome)
             results.append(f"hitl_decision: {hitl_result}")
             context["hitl_decision"] = hitl_result
             # Downstream: #23 G3 execution path picks up context["hitl_decision"] and
@@ -737,12 +758,21 @@ async def root_planner(ctx: Context, node_input: Any):
             or ctx.state.get("reviewer_verdict")
             or ctx.state.get("hitl_verdict"),
         }
+        report_progress("execution", "running", STAGE_LABELS["execution"])
         try:
             exec_result = await ctx.run_node(execution_gate, node_input=exec_input)
         except Exception as e:
             logger.exception("Execution gate raised")
+            report_progress("execution", "failed", STAGE_LABELS["execution"])
             results.append(f"execution_error: {e}")
         else:
+            exec_status = exec_result.get("status") if isinstance(exec_result, dict) else None
+            report_progress(
+                "execution",
+                "skipped" if exec_status == "skipped" else "done",
+                STAGE_LABELS["execution"],
+                detail=exec_status,
+            )
             results.append(f"execution_result: {exec_result}")
             context["execution_result"] = exec_result
 
