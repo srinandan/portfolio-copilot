@@ -90,8 +90,8 @@ for engine in client.agent_engines.list(config={"filter": 'display_name="foo"'})
     print(engine.api_resource.name)
 
 # Create / update
-client.agent_engines.create(config={"display_name": "foo", "container_spec": {...}})
-client.agent_engines.update(name="projects/.../reasoningEngines/123", config={...})
+client.agent_engines.create(config={"display_name": "foo", "agent_framework": "google-adk", "container_spec": {...}})
+client.agent_engines.update(name="projects/.../reasoningEngines/123", config={"agent_framework": "google-adk", ...})
 
 # Query
 engine.query(input="hello")

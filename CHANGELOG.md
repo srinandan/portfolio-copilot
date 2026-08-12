@@ -104,6 +104,7 @@ once tagged. Nothing has been released yet — see the note under `[Unreleased]`
   runs standalone and is composed by `setup_all.sh`.
 - Least-privilege per-service SAs (frontend, worker, orchestrator agent
   identity) — no default compute SA usage.
+- Agent Runtime explicit framework: deploy script (`scripts/deploy_agent_engine.py`) sets `agent_framework="google-adk"` during Reasoning Engine creation and updates (Issue #279).
 - Secret Manager resolution for `ALPACA_API_KEY_ID`, `ALPACA_API_SECRET`,
   and `MANAGED_AGENT_ID` with strict-mode failure at startup in production.
 

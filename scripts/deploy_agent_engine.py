@@ -169,6 +169,7 @@ def deploy_agent_engine(project: str | None, location: str, display_name: str, c
                 env_vars["AGENT_ENGINE_ID"] = engine_id
                 config = {
                     "display_name": display_name,
+                    "agent_framework": "google-adk",
                     "identity_type": types.IdentityType.AGENT_IDENTITY,
                     "container_spec": {"image_uri": container_uri},
                     "env_vars": env_vars,
@@ -178,6 +179,7 @@ def deploy_agent_engine(project: str | None, location: str, display_name: str, c
             else:
                 initial_config = {
                     "display_name": display_name,
+                    "agent_framework": "google-adk",
                     "identity_type": types.IdentityType.AGENT_IDENTITY,
                     "container_spec": {"image_uri": container_uri},
                 }
@@ -189,6 +191,7 @@ def deploy_agent_engine(project: str | None, location: str, display_name: str, c
                 env_vars["AGENT_ENGINE_ID"] = engine_id
                 update_config = {
                     "display_name": display_name,
+                    "agent_framework": "google-adk",
                     "identity_type": types.IdentityType.AGENT_IDENTITY,
                     "container_spec": {"image_uri": container_uri},
                     "env_vars": env_vars,
@@ -221,6 +224,7 @@ def deploy_agent_engine(project: str | None, location: str, display_name: str, c
             agent=agent,
             config={
                 "display_name": display_name,
+                "agent_framework": "google-adk",
                 "identity_type": types.IdentityType.AGENT_IDENTITY,
                 "staging_bucket": staging_bucket,
             },
