@@ -64,10 +64,15 @@ if `excluded_sectors` is defined in the IPS and the ticker isn't in the map (sec
 this rule fails-closed to prevent unverified sector exposure.
 
 ### `concentration_limit`
-Fails if the *resulting* position value (after the trade) exceeds
+Applies to **buys only**. Fails a buy whose *resulting* position value
+(current position + trade value) would exceed
 `active_ips.constraints.concentration_limit_percent` of total portfolio
-value. For a buy, resulting = current position + trade value. For a
-sell, resulting = current position - trade value.
+value. A **sell always passes** this rule: a concentration ceiling can
+only be breached by adding to a position, and a sell strictly reduces it —
+failing a trim because the remaining position is still above the limit
+would make an overweight holding (e.g. a broad-market ETF held as the core
+sleeve) impossible to unwind. `allocation_band_direction` separately vets
+that a sell moves the asset class the right way.
 
 ### `allocation_band_direction`
 Fails if the trade moves the asset class **away from** the IPS target

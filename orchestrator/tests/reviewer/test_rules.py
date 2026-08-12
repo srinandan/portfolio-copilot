@@ -97,6 +97,38 @@ def test_concentration_limit_zero_total_fails_gracefully(happy_review_input):
     assert "Portfolio total value is 0" in res.detail
 
 
+def test_concentration_limit_sell_trimming_over_limit_position_passes(happy_review_input):
+    """issue #272: a SELL that reduces an over-limit position must pass.
+
+    A concentration ceiling can't be breached by *reducing* a position; failing
+    the trim would make an overweight holding (e.g. a broad-market ETF held as
+    the core equity sleeve) impossible to unwind through the reviewer.
+    """
+    # AAPL is 50% of the portfolio, well over the 15% limit.
+    over_limit_positions = [
+        p.model_copy(update={"market_value_usd": 50000.0}) if p.ticker == "AAPL" else p
+        for p in happy_review_input.holdings.positions
+    ]
+    holdings = happy_review_input.holdings.model_copy(
+        update={"positions": over_limit_positions, "cash_usd": 40000.0, "total_value_usd": 100000.0}
+    )
+    # Trim $5,000 of AAPL: 50% -> 45%. Still above 15%, but moving the right way.
+    action = happy_review_input.action.model_copy(update={"side": Side.SELL, "estimated_value_usd": 5000.0})
+    inp = ReviewInput(action=action, ips=happy_review_input.ips, holdings=holdings)
+    res = rule_concentration_limit(inp)
+    assert res.passed is True
+    assert res.rule_id == "concentration_limit"
+
+
+def test_concentration_limit_still_blocks_over_limit_buy(happy_review_input):
+    """Guard: the ceiling is still enforced for BUYs that create over-concentration."""
+    action = happy_review_input.action.model_copy(update={"side": Side.BUY, "estimated_value_usd": 50000.0})
+    inp = ReviewInput(action=action, ips=happy_review_input.ips, holdings=happy_review_input.holdings)
+    res = rule_concentration_limit(inp)
+    assert res.passed is False
+    assert "60.00% (limit 15" in res.detail
+
+
 def test_allocation_band_direction_passes_moving_toward(happy_review_input):
     res = rule_allocation_band_direction(happy_review_input)
     assert res.passed is True

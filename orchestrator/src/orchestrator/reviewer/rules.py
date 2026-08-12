@@ -92,15 +92,28 @@ def rule_concentration_limit(inp: ReviewInput) -> RuleResult:
             passed=False,
             detail="Portfolio total value is 0; cannot evaluate concentration.",
         )
+
+    # A SELL strictly reduces the position, so it moves concentration toward the
+    # limit and can never *create* over-concentration. Failing a trim because the
+    # remaining position is still above the ceiling is a catch-22 that makes an
+    # overweight holding impossible to unwind (issue #272): a concentration
+    # ceiling only gates trades that add to a position, i.e. BUYs. The
+    # allocation_band_direction rule already vets that a sell moves the asset
+    # class the right way.
+    if inp.action.side != Side.BUY:
+        return RuleResult(
+            rule_id="concentration_limit",
+            description="Resulting position must be at/below concentration_limit_percent",
+            passed=True,
+            detail=f"{inp.action.ticker} sell reduces the position; concentration ceiling applies to buys only.",
+        )
+
     current_value = next(
         (p.market_value_usd for p in inp.holdings.positions if p.ticker == inp.action.ticker),
         0.0,
     )
     trade_value = inp.action.estimated_value_usd or 0.0
-    if inp.action.side == Side.BUY:
-        resulting = current_value + trade_value
-    else:
-        resulting = max(0.0, current_value - trade_value)
+    resulting = current_value + trade_value
     pct = (resulting / total) * 100.0
     limit = inp.ips.constraints.concentration_limit_percent
     if limit is not None and pct > limit:
