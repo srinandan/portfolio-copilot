@@ -37,6 +37,7 @@ AGENT_IDENTITY_ROLES = [
     "roles/serviceusage.serviceUsageConsumer",  # Service usage consumer
     "roles/logging.logWriter",  # Cloud Logging
     "roles/monitoring.metricWriter",  # Cloud Monitoring
+    "roles/cloudtrace.agent",  # Cloud Trace: emit OpenTelemetry spans
 ]
 
 
@@ -159,6 +160,9 @@ def deploy_agent_engine(project: str | None, location: str, display_name: str, c
                 "GOOGLE_GENAI_USE_ENTERPRISE": "true",
                 "GOOGLE_CLOUD_LOCATION": location,
                 "GOOGLE_API_PREVENT_AGENT_TOKEN_SHARING_FOR_GCP_SERVICES": "false",
+                "GOOGLE_CLOUD_AGENT_ENGINE_ENABLE_TELEMETRY": "true",
+                "OTEL_SEMCONV_STABILITY_OPT_IN": "gen_ai_latest_experimental",
+                "OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT": "EVENT_ONLY",
             }
             if existing is not None:
                 engine_id = existing.api_resource.name.split("/")[-1]

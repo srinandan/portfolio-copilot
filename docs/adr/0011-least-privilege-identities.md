@@ -26,6 +26,7 @@ Different components in the Portfolio Copilot architecture have distinct operati
      - `roles/datastore.user` (Firestore: IPS, holdings, liabilities)
      - `roles/bigquery.dataViewer` (BigQuery: spending analysis)
      - `roles/secretmanager.secretAccessor` (Secret Manager: Alpaca API key)
+     - `roles/cloudtrace.agent` (Cloud Trace: emit OpenTelemetry spans)
    - Agent Platform Service Agent (`service-${PROJECT_NUMBER}@gcp-sa-aiplatform.iam.gserviceaccount.com`) is granted `roles/secretmanager.secretAccessor` for deployment-time secret resolution.
 
 ## Consequences

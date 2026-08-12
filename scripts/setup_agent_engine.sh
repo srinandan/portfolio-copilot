@@ -12,8 +12,8 @@ fi
 
 echo "Setting up Agent Engine in project $PROJECT_ID ($REGION)..."
 
-# Enable Agent Platform / AI Platform API
-gcloud services enable aiplatform.googleapis.com --project="$PROJECT_ID"
+# Enable Agent Platform / AI Platform API, Telemetry API, Cloud Trace API, and Logging API
+gcloud services enable aiplatform.googleapis.com telemetry.googleapis.com cloudtrace.googleapis.com logging.googleapis.com --project="$PROJECT_ID"
 
 # 1. Grant Secret Manager access to Agent Platform Service Agent
 # Per Agent Runtime docs: secrets used as environment variables are fetched during deployment
@@ -92,7 +92,7 @@ if [ -n "$PROJECT_NUMBER" ]; then
     --condition=None \
     --quiet || echo "Note: AI Platform User IAM binding on principalSet skipped or already configured"
 
-  # Service Usage, Logging, and Monitoring
+  # Service Usage, Logging, Monitoring, and Cloud Trace
   gcloud projects add-iam-policy-binding "$PROJECT_ID" \
     --member="$PRINCIPAL_SET" \
     --role="roles/serviceusage.serviceUsageConsumer" \
@@ -108,6 +108,11 @@ if [ -n "$PROJECT_NUMBER" ]; then
     --role="roles/monitoring.metricWriter" \
     --condition=None \
     --quiet || echo "Note: Monitoring IAM binding on principalSet skipped or already configured"
+  gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+    --member="$PRINCIPAL_SET" \
+    --role="roles/cloudtrace.agent" \
+    --condition=None \
+    --quiet || echo "Note: Cloud Trace Agent IAM binding on principalSet skipped or already configured"
 fi
 
 # 3. Deploy Agent Engine instance with Agent Identity
