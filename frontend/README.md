@@ -17,7 +17,7 @@ See [ADR-0003](../docs/adr/0003-standalone-ui-not-agentspace.md) and [ADR-0017](
   - **Desktop Dual-Panel Layout**: Features a responsive split layout (`>=1024px`) with a **40% Conversational Stream / Live Governance Left Panel** and a **60% Financial Canvas Right Panel**.
   - **Air-Gapped Privacy Manifesto**: Highlights end-to-end local document processing ("Security Through Privacy" — no direct bank connections).
 - **Comprehensive Financial Views**:
-  - **Dashboard (`/`)**: Combines real-time agent planning messages with summary cards (`NetWorthCard`, `AssetAllocationCard`, `TopHoldingsTable`).
+  - **Dashboard (`/`)**: Combines real-time agent planning messages — including a live analysis progress stepper (`AnalysisProgress`) that tracks each pipeline stage during the minutes-long run and clears to reveal the final output (see [ADR-0018](../docs/adr/0018-streaming-progress-events.md)) — with summary cards (`NetWorthCard`, `AssetAllocationCard`, `TopHoldingsTable`).
   - **Portfolio (`/portfolio`)**: Itemizes holdings and displays the **Portfolio Drift Report** (`DriftReportCard`), comparing current asset allocation against active Investment Policy Statement (IPS) target bands (`skills/portfolio-analysis/SKILL.md`).
   - **Spending (`/spending`)**: Visualizes 30-day income, outflow, savings rate, reserve months, category breakdown, and anomaly detections (`skills/spending-analysis/SKILL.md`).
   - **Documents (`/documents`)**: Interactive drag-and-drop statement upload dropzone (`UploadDropzone`) and parsing history log.
@@ -48,7 +48,7 @@ frontend/
     ├── components/
     │   ├── approval/       # ApprovalCard (HITL trade governance centerpiece)
     │   ├── common/         # Button and StatusPill reusable UI components
-    │   ├── dashboard/      # NetWorthCard and AssetAllocationCard
+    │   ├── dashboard/      # NetWorthCard, AssetAllocationCard, AnalysisProgress (live progress stepper)
     │   ├── documents/      # UploadDropzone
     │   ├── layout/         # Navbar (brand header and navigation)
     │   ├── portfolio/      # TopHoldingsTable and DriftReportCard (IPS drift analysis)

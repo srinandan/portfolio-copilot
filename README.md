@@ -48,7 +48,7 @@ Portfolio Copilot provides a standalone Vue 3 + TypeScript web interface connect
 You answer a structured onboarding interview: your financial goals, time horizon, risk tolerance, and current debt obligations. From this, the agent synthesizes your active Investment Policy Statement (IPS) and Liabilities snapshot, stored in Firestore as the reference policy for all future actions.
 
 ### Day to day: checking in (`/dashboard`, `/portfolio`, `/spending`)
-- **Dashboard (`/`)**: View real-time agent planning conversations, net worth summaries, and current asset allocations.
+- **Dashboard (`/`)**: View real-time agent planning conversations — a live progress checklist tracks each stage of an analysis (discovering skills, analyzing, reviewing) as it runs, then clears to reveal the result — alongside net worth summaries and current asset allocations.
 - **Portfolio & Drift (`/portfolio`)**: Inspect current holdings alongside the live **Portfolio Drift Report**, comparing current allocations against your IPS target bands.
 - **Spending Analysis (`/spending`)**: Review 30-day income, outflows, savings rate, reserve months, and dual-condition anomaly detections against Chase transaction history.
 
