@@ -182,6 +182,12 @@ The shape language is **Rounded**, using `0.5rem` (8px) as the base radius for s
 - **Body:** A structured grid showing the trade details (Ticker, Side, Amount). Side must be color-coded (BUY: Emerald, SELL: Crimson).
 - **Verdict Section:** An itemized list of policy rules with "PASS/FAIL" badges. This creates a "Checklist" of safety before the user clicks execute.
 
+### Analysis Progress Stepper
+Surfaces the agent's live pipeline in the conversational stream during a minutes-long analysis, so the wait reads as visible progress rather than a frozen line.
+- **Rows:** One per stage (skill discovery, spending, portfolio drift, research, drafting, review, approval, execution). Each advances `running` → `done` / `skipped` / `failed`, with an optional monospaced detail line and a header-level elapsed timer.
+- **State Clarity:** `running` uses the "Agent Activity" accent with a spinning glyph; `done` uses Emerald (compliance/success); `skipped` is muted (Outline); `failed` is Crimson — matching the system's financial-health color-coding.
+- **Lifecycle:** Renders only while a run is streaming; on completion (or when it pauses for approval) it clears and is replaced by the final output or the Approval Card — replace, don't stack.
+
 ### Financial Visualizations
 - **Drift Bars:** A horizontal track (#E2E8F0) with a "Target Range" bracket. The actual value is a solid bar that turns Amber if it falls outside the bracket.
 - **Status Pills:** Small, bold, uppercase labels. Use emerald backgrounds for "PASS" and "APPROVED", amber for "PENDING" or "DRIFTED", and crimson for "VIOLATION".

@@ -34,6 +34,7 @@ orchestrator/
 │       ├── managed_agents/ # Managed Agent dispatcher, worker wrapper, and secret loader
 │       ├── planner.py      # Root dynamic planner workflow, node definitions, and dispatch logic
 │       ├── primitives/     # Deterministic evaluation logic (action drafting, portfolio, spending)
+│       ├── progress.py     # Advisory streaming progress channel (report_progress) surfaced to the UI
 │       ├── registry_client.py # Agent Registry client and runtime skill discovery
 │       ├── reviewer/       # Deterministic safety rule evaluation for reviewer verdicts
 │       ├── server.py       # FastAPI HTTP server (/livez, /readyz, /v1/invoke, /v1/resume)
@@ -187,7 +188,9 @@ The orchestrator is containerized using `Dockerfile` based on `python:3.12-slim`
 - Container CMD runs `uvicorn orchestrator.server:app` — the FastAPI wrapper
   around `root_agent` that serves the Agent Runtime custom-container contract
   (`/livez`, `/readyz`, `POST /v1/invoke`, `POST /v1/resume`; SSE-encoded ADK
-  event streams). `PORT` from the environment is honored (defaults to 8080).
+  event streams interleaved with advisory pipeline progress events, see
+  [ADR-0018](../docs/adr/0018-streaming-progress-events.md)). `PORT` from the
+  environment is honored (defaults to 8080).
 
 ### Running & deploying via the Makefile
 
