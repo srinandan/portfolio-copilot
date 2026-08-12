@@ -109,11 +109,11 @@ go build -o bin/server ./frontend/server && ./bin/server
 
 Depends on what changed:
 
-- **Frontend code**: use the frontend Makefile — `make -C frontend deploy` — which calls `gcloud builds submit --config=frontend/cloudbuild.yaml`. For a tagged release, push a `v*` tag and the Cloud Build triggers set up by `scripts/setup_cloudbuild_triggers.sh` build and deploy both services automatically (see below).
+- **Frontend code**: use the Makefile — `make deploy-frontend` (or `make -C frontend deploy`). For a tagged release, push a `v*` tag and the Cloud Build triggers set up by `scripts/setup_cloudbuild_triggers.sh` build and deploy both services automatically (see below).
 - **Worker Managed Agent code**: re-run
   `./scripts/setup_managed_agent.sh <PROJECT_ID> <REGION>` (or `python scripts/deploy_managed_agent.py --project=<PROJECT_ID> --location=<REGION>`).
-- **Orchestrator code**: re-run `python scripts/deploy_agent_engine.py`
-  to redeploy to Agent Runtime.
+- **Orchestrator code**: use the Makefile — `make deploy-orchestrator` (or `make -C orchestrator deploy`) to build and redeploy to Agent Runtime.
+- **Full stack (both services)**: use `make deploy` from repository root.
 - **A skill's `SKILL.md` or contents**: re-run `register_skill.sh` for
   that skill (or `register_all_skills.sh`), per above.
 - **Infra changes** (new secrets, new BigQuery columns, IAM changes):
@@ -159,17 +159,16 @@ per [ADR-0008](../docs/adr/0008-python-for-orchestrator.md).
 
 ### Triggering builds manually
 
-Use the per-service `Makefile` (`orchestrator/Makefile`,
-`frontend/Makefile`); each exposes two targets:
+Use the root `Makefile` or per-service Makefiles (`orchestrator/Makefile`,
+`frontend/Makefile`):
 
-- `make local` — runs the service on your machine (uv/go/npm as appropriate).
-- `make deploy` — calls `gcloud builds submit --config=<service>/cloudbuild.yaml`
-  with `_COMMIT_SHA=$(git rev-parse --short HEAD)` and the current gcloud
-  region as substitutions, then deploys — frontend to Cloud Run,
-  orchestrator to Agent Runtime. No tag push required.
+- `make deploy-orchestrator` (or `make -C orchestrator deploy`) — builds the container and deploys orchestrator to Agent Runtime.
+- `make deploy-frontend` (or `make -C frontend deploy`) — builds the container and deploys frontend/server to Cloud Run.
+- `make deploy` — deploys both services in sequence.
+- `make local` (in `frontend/` or `orchestrator/`) — runs the service on your machine (uv/go/npm as appropriate).
 
 Environment overrides (`GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`,
-`_COMMIT_SHA`) work the same way in both flows.
+`_COMMIT_SHA`) work the same way across all Makefiles.
 
 ## Demos
 
