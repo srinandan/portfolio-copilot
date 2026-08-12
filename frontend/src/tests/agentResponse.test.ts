@@ -1,5 +1,26 @@
 import { describe, it, expect } from 'vitest';
-import { formatAgentResponse } from '../services/agentResponse';
+import { formatAgentResponse, unwrapRationale } from '../services/agentResponse';
+
+describe('unwrapRationale', () => {
+  it('unwraps a JSON-encoded ProposedActionRationale string', () => {
+    const raw = '{"rationale":"Trim VTI back toward its target band.","supporting_research_refs":[]}';
+    expect(unwrapRationale(raw)).toBe('Trim VTI back toward its target band.');
+  });
+
+  it('passes plain-text rationale through unchanged', () => {
+    expect(unwrapRationale('Trim VTI back toward its target band.')).toBe('Trim VTI back toward its target band.');
+  });
+
+  it('leaves a non-rationale JSON object as-is (only unwraps a rationale field)', () => {
+    const raw = '{"foo":"bar"}';
+    expect(unwrapRationale(raw)).toBe(raw);
+  });
+
+  it('handles null/undefined and non-strings', () => {
+    expect(unwrapRationale(null)).toBe('');
+    expect(unwrapRationale(undefined)).toBe('');
+  });
+});
 
 describe('formatAgentResponse', () => {
   it('returns plain strings unchanged', () => {

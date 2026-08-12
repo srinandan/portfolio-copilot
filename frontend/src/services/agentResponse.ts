@@ -46,6 +46,24 @@ function tryParseJson(value: string): unknown {
   }
 }
 
+/**
+ * A ProposedAction.rationale sometimes arrives as a JSON-encoded
+ * ProposedActionRationale string — e.g. `{"rationale":"…","supporting_research_refs":[]}`
+ * — rather than plain text. Unwrap it to the inner rationale for display; plain
+ * strings (and non-strings) pass through unchanged.
+ */
+export function unwrapRationale(value: unknown): string {
+  if (typeof value !== 'string') return value == null ? '' : String(value);
+  const trimmed = value.trim();
+  if (trimmed.startsWith('{')) {
+    const parsed = tryParseJson(trimmed) as Record<string, unknown> | null;
+    if (parsed && typeof parsed === 'object' && typeof parsed.rationale === 'string') {
+      return parsed.rationale;
+    }
+  }
+  return value;
+}
+
 /** Best-effort extraction of a human-readable sentence from a payload string. */
 function extractNarrative(value: string): string {
   const trimmed = value.trim();

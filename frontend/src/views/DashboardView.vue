@@ -111,7 +111,7 @@ import AssetAllocationCard from '../components/dashboard/AssetAllocationCard.vue
 import TopHoldingsTable from '../components/portfolio/TopHoldingsTable.vue';
 import ApprovalCard from '../components/approval/ApprovalCard.vue';
 import Button from '../components/common/Button.vue';
-import { formatAgentResponse } from '../services/agentResponse';
+import { formatAgentResponse, unwrapRationale } from '../services/agentResponse';
 
 const holdings = ref<HoldingsSnapshot>({
   total_value_usd: 1248500,
@@ -207,8 +207,14 @@ function extractHITLPayload(event: Record<string, any>): {
   }
 
   if (raw && raw.action) {
+    const action = { ...raw.action };
+    // The rationale occasionally arrives as a JSON-encoded ProposedActionRationale
+    // string; show the inner text, not the raw JSON.
+    if (action.rationale !== undefined && action.rationale !== null) {
+      action.rationale = unwrapRationale(action.rationale);
+    }
     return {
-      action: raw.action,
+      action,
       verdict: raw.reviewer_verdict,
       interruptId
     };

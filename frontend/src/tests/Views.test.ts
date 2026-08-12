@@ -158,7 +158,8 @@ describe('Frontend Views', () => {
                       ticker: 'VTI',
                       side: 'sell',
                       quantity: 25,
-                      status: 'drafted'
+                      status: 'drafted',
+                      rationale: '{"rationale":"Trim VTI back toward its target band.","supporting_research_refs":[]}'
                     },
                     reviewer_verdict: {
                       verdict_id: 'v_fc_1',
@@ -182,6 +183,9 @@ describe('Frontend Views', () => {
       expect(screen.getByTestId('approval-card')).toBeDefined();
       expect(screen.getByText('Action ID: act_fc_1')).toBeDefined();
       expect(screen.getByText('VTI')).toBeDefined();
+      // The JSON-encoded rationale is unwrapped to its inner text, not shown raw.
+      expect(screen.getByText(/Trim VTI back toward its target band\./)).toBeDefined();
+      expect(screen.queryByText(/supporting_research_refs/)).toBeNull();
     });
   });
 
