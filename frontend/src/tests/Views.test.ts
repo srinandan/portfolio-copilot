@@ -136,6 +136,55 @@ describe('Frontend Views', () => {
     });
   });
 
+  it('DashboardView renders the ApprovalCard from an ADK adk_request_input function-call event', async () => {
+    // The real HITL request arrives as a function-call whose args.message holds
+    // the payload — not as event.output/kind. The card must still render.
+    vi.spyOn(apiService, 'streamPlan').mockImplementation(async (_req, onEvent) => {
+      onEvent({
+        id: 'evt_1',
+        invocation_id: 'inv_1',
+        content: {
+          parts: [
+            {
+              function_call: {
+                id: 'int_fc_1',
+                name: 'adk_request_input',
+                args: {
+                  interruptId: 'int_fc_1',
+                  message: JSON.stringify({
+                    kind: 'hitl_approval_request',
+                    action: {
+                      action_id: 'act_fc_1',
+                      ticker: 'VTI',
+                      side: 'sell',
+                      quantity: 25,
+                      status: 'drafted'
+                    },
+                    reviewer_verdict: {
+                      verdict_id: 'v_fc_1',
+                      overall_pass: true,
+                      requires_human_approval: true,
+                      rule_results: []
+                    }
+                  })
+                }
+              }
+            }
+          ]
+        }
+      });
+    });
+
+    render(DashboardView);
+    await fireEvent.click(screen.getAllByTestId('example-prompt')[0]);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('approval-card')).toBeDefined();
+      expect(screen.getByText('Action ID: act_fc_1')).toBeDefined();
+      expect(screen.getByText('VTI')).toBeDefined();
+    });
+  });
+
   // Helper: mock streamPlan to synchronously deliver a HITL approval request
   // and then trigger a plan run so the ApprovalCard is on screen.
   const seedApprovalCard = async (rationale = 'Rebalance rationale') => {

@@ -149,33 +149,55 @@ function formatTime(): string {
   return now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
+function asHitlRequest(v: any): any {
+  if (!v) return null;
+  if (typeof v === 'string') {
+    try {
+      const parsed = JSON.parse(v);
+      return parsed?.kind === 'hitl_approval_request' ? parsed : null;
+    } catch {
+      return null;
+    }
+  }
+  if (typeof v === 'object' && v.kind === 'hitl_approval_request') return v;
+  return null;
+}
+
 function extractHITLPayload(event: Record<string, any>): {
   action: ProposedAction;
   verdict?: ReviewerVerdict;
+  interruptId?: string;
 } | null {
   let raw: any = null;
+  let interruptId: string | undefined;
 
   if (event.kind === 'hitl_approval_request') {
     raw = event;
-  } else if (typeof event.output === 'string') {
-    try {
-      const parsed = JSON.parse(event.output);
-      if (parsed?.kind === 'hitl_approval_request') raw = parsed;
-    } catch {}
-  } else if (event.output && typeof event.output === 'object' && event.output.kind === 'hitl_approval_request') {
-    raw = event.output;
-  } else if (event.content?.parts) {
+  } else {
+    raw = asHitlRequest(event.output);
+  }
+
+  if (!raw && event.content?.parts) {
     for (const part of event.content.parts) {
-      const text = part.text || '';
-      try {
-        const parsed = JSON.parse(text);
-        if (parsed?.kind === 'hitl_approval_request') {
-          raw = parsed;
+      // Plain text part carrying the JSON payload.
+      raw = asHitlRequest(part.text);
+      if (raw) break;
+      // ADK RequestInput surfaces the approval request as an `adk_request_input`
+      // function-call whose args.message holds the JSON payload; the interrupt
+      // id is the function-call id. Without this the ApprovalCard never mounts
+      // and the raw action+verdict JSON leaks into the chat.
+      const fc = part.function_call;
+      if (fc?.args) {
+        raw = asHitlRequest(fc.args.message) || asHitlRequest(fc.args);
+        if (raw) {
+          interruptId = fc.id || fc.args.interruptId || fc.args.interrupt_id;
           break;
         }
-      } catch {}
+      }
     }
-  } else if (event.actions?.requested_tool_confirmations) {
+  }
+
+  if (!raw && event.actions?.requested_tool_confirmations) {
     for (const val of Object.values(event.actions.requested_tool_confirmations) as any[]) {
       if (val?.kind === 'hitl_approval_request') {
         raw = val;
@@ -187,7 +209,8 @@ function extractHITLPayload(event: Record<string, any>): {
   if (raw && raw.action) {
     return {
       action: raw.action,
-      verdict: raw.reviewer_verdict
+      verdict: raw.reviewer_verdict,
+      interruptId
     };
   }
   return null;
@@ -204,7 +227,7 @@ function handleStreamEvent(event: Record<string, any>, currentMsg: ChatMessage) 
     currentMsg.action = hitl.action;
     currentMsg.verdict = hitl.verdict;
     currentMsg.invocation_id = event.invocation_id;
-    currentMsg.interrupt_id = event.id;
+    currentMsg.interrupt_id = hitl.interruptId || event.id;
     if (event.session_id) {
       currentMsg.session_id = event.session_id;
       currentSessionId.value = event.session_id;
