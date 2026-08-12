@@ -105,9 +105,9 @@ import Button from '../components/common/Button.vue';
 import { formatAgentResponse, unwrapRationale } from '../services/agentResponse';
 
 const holdings = ref<HoldingsSnapshot>({
-  total_value_usd: 1248500,
-  cash_usd: 62400,
-  as_of: '2023-10-24',
+  total_value_usd: 0,
+  cash_usd: 0,
+  as_of: '',
   positions: []
 });
 
