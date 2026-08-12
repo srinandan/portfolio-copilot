@@ -52,13 +52,15 @@ steps:
           --no-allow-unauthenticated
         )
 
+        ENV_VARS="PROJECT_ID=${PROJECT_ID},FIRESTORE_PROJECT_ID=${PROJECT_ID}"
         if [ -n "$${AGENT_ENGINE_ID}" ]; then
           echo "Deploying ${_SERVICE} with AGENT_ENGINE_ID=$${AGENT_ENGINE_ID}"
-          DEPLOY_ARGS+=(--set-env-vars=AGENT_ENGINE_ID=$${AGENT_ENGINE_ID})
+          ENV_VARS="$${ENV_VARS},AGENT_ENGINE_ID=$${AGENT_ENGINE_ID}"
         else
           echo "WARN: no Agent Engine found with displayName=${_AGENT_DISPLAY_NAME} in ${_REGION};"
           echo "      /api/plan will return 503 until an orchestrator is deployed."
         fi
+        DEPLOY_ARGS+=(--set-env-vars="$${ENV_VARS}")
 
         gcloud "$${DEPLOY_ARGS[@]}"
 

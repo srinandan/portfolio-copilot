@@ -15,13 +15,9 @@
       <div class="flex flex-col gap-xs z-10">
         <span class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">Total Value</span>
         <h2 class="font-display-lg text-display-lg text-on-background tabular-nums">${{ totalValueFormatted }}</h2>
-        <div class="flex items-center gap-sm mt-1">
-          <span class="inline-flex items-center gap-xs px-2 py-1 rounded-md bg-tertiary-fixed/20 text-on-tertiary-fixed font-body-mono text-[11px] font-bold">
-            <span class="material-symbols-outlined text-[14px]">trending_up</span>
-            +2.4%
-          </span>
-          <span class="font-body-base text-body-base text-on-surface-variant text-sm">Today</span>
-        </div>
+        <p v-if="formattedAsOf" class="font-body-mono text-xs text-on-surface-variant mt-1">
+          {{ formattedAsOf }}
+        </p>
       </div>
 
       <div class="flex items-center gap-md z-10">
@@ -56,13 +52,6 @@
             <span class="font-body-mono text-body-mono text-on-surface">15%</span>
           </div>
         </div>
-      </div>
-
-      <div class="mt-4 flex items-start gap-sm bg-surface-container-low p-3 rounded-lg border border-surface-variant z-10">
-        <span class="material-symbols-outlined text-on-surface-variant text-[20px]">info</span>
-        <p class="font-body-base text-body-base text-on-surface-variant text-sm">
-          Data derived entirely from manual document uploads. Last verified on <span class="font-body-mono text-body-mono">2023-10-24</span>.
-        </p>
       </div>
     </div>
 
@@ -101,6 +90,16 @@ const totalValueFormatted = computed(() => {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   });
+});
+
+const formattedAsOf = computed(() => {
+  if (!holdings.value.as_of) return '';
+  const d = new Date(holdings.value.as_of);
+  if (isNaN(d.getTime())) {
+    return `As of ${holdings.value.as_of}`;
+  }
+  const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return `Updated ${dateStr}`;
 });
 
 onMounted(async () => {

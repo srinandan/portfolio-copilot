@@ -48,9 +48,9 @@ describe('Frontend Views', () => {
     cleanup();
   });
 
-  it('DashboardView renders agent activity stream, empty state, and financial canvas', async () => {
+  it('DashboardView renders prompt trigger, empty state, and financial canvas', async () => {
     render(DashboardView);
-    expect(screen.getByText('Agent Activity Stream')).toBeDefined();
+    expect(screen.getByTestId('btn-trigger-plan')).toBeDefined();
     expect(screen.getByText('Total Net Worth')).toBeDefined();
     expect(screen.getByText('Asset Allocation')).toBeDefined();
 
@@ -136,6 +136,33 @@ describe('Frontend Views', () => {
     });
   });
 
+  it('DashboardView clears previous agent responses when the user starts a new interaction', async () => {
+    let callCount = 0;
+    vi.spyOn(apiService, 'streamPlan').mockImplementation(async (_req, onEvent) => {
+      callCount += 1;
+      onEvent({
+        author: 'portfolio_copilot_planner',
+        output: [`Turn ${callCount} response`]
+      });
+    });
+
+    render(DashboardView);
+    const prompts = screen.getAllByTestId('example-prompt');
+
+    // Turn 1
+    await fireEvent.click(prompts[0]);
+    await waitFor(() => {
+      expect(screen.getByText(/Turn 1 response/)).toBeDefined();
+    });
+
+    // Turn 2: should clear Turn 1 message and show Turn 2 message
+    await fireEvent.click(prompts[1]);
+    await waitFor(() => {
+      expect(screen.getByText(/Turn 2 response/)).toBeDefined();
+      expect(screen.queryByText(/Turn 1 response/)).toBeNull();
+    });
+  });
+
   it('DashboardView renders the ApprovalCard from an ADK adk_request_input function-call event', async () => {
     // The real HITL request arrives as a function-call whose args.message holds
     // the payload — not as event.output/kind. The card must still render.
@@ -158,7 +185,8 @@ describe('Frontend Views', () => {
                       ticker: 'VTI',
                       side: 'sell',
                       quantity: 25,
-                      status: 'drafted'
+                      status: 'drafted',
+                      rationale: '{"rationale":"Trim VTI back toward its target band.","supporting_research_refs":[]}'
                     },
                     reviewer_verdict: {
                       verdict_id: 'v_fc_1',
@@ -182,6 +210,9 @@ describe('Frontend Views', () => {
       expect(screen.getByTestId('approval-card')).toBeDefined();
       expect(screen.getByText('Action ID: act_fc_1')).toBeDefined();
       expect(screen.getByText('VTI')).toBeDefined();
+      // The JSON-encoded rationale is unwrapped to its inner text, not shown raw.
+      expect(screen.getByText(/Trim VTI back toward its target band\./)).toBeDefined();
+      expect(screen.queryByText(/supporting_research_refs/)).toBeNull();
     });
   });
 

@@ -4,12 +4,14 @@ export interface HealthStatus {
 
 export interface Position {
   ticker: string;
-  name: string;
+  name?: string;
   asset_class: string;
   quantity: number;
-  current_price_usd: number;
-  current_value_usd: number;
+  market_value_usd?: number;
+  current_price_usd?: number;
+  current_value_usd?: number;
   change_percent?: number;
+  account_type?: string;
 }
 
 export interface HoldingsSnapshot {
