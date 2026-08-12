@@ -64,6 +64,10 @@ Zips the skill directory and registers it as `private-<skill-name>`. Re-run this
 
 ## Loading test and seed data
 
+To bring your own data instead of the fixtures, see
+[`testdata/README.md`](../testdata/README.md) for the input formats — the
+transactions CSV schema and the holdings / liabilities / IPS JSON documents.
+
 To seed your BigQuery dataset and Firestore database with canonical test fixtures from `testdata/`:
 
 ```bash
