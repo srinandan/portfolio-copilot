@@ -43,6 +43,8 @@ func main() {
 	r.GET("/api/spending_report", srv.HandleGetSpendingReport)
 	r.GET("/api/drift_report", srv.HandleGetDriftReport)
 	r.GET("/api/documents", srv.HandleGetDocuments)
+	r.GET("/api/profile", srv.HandleGetUserProfile)
+	r.POST("/api/profile", srv.HandleSetUserProfile)
 
 	// Orchestrator bridge: streams ADK planner events back to the frontend as SSE.
 	// Backend is either an HTTP orchestrator (ORCHESTRATOR_URL) or Agent Engine

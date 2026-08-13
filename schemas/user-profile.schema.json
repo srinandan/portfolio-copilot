@@ -1,0 +1,105 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "UserProfile",
+  "type": "object",
+  "required": ["user_id"],
+  "properties": {
+    "user_id": {
+      "type": "string",
+      "description": "Unique identifier for the user (default: demo_user)."
+    },
+    "full_name": {
+      "type": "string",
+      "description": "User's full name."
+    },
+    "email": {
+      "type": "string",
+      "description": "User's email address."
+    },
+    "date_of_birth": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "Date of birth in YYYY-MM-DD format."
+    },
+    "age": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 150,
+      "description": "User's current age in years."
+    },
+    "marital_status": {
+      "type": "string",
+      "enum": ["single", "married", "partnered", "divorced", "widowed", "other"],
+      "description": "Marital status."
+    },
+    "dependents_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of financial dependents."
+    },
+    "family_members": {
+      "type": "array",
+      "description": "List of family members and dependents.",
+      "items": {
+        "type": "object",
+        "required": ["name", "relationship"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Name of family member."
+          },
+          "relationship": {
+            "type": "string",
+            "description": "Relationship to user (e.g., spouse, child, parent)."
+          },
+          "age": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 150,
+            "description": "Age in years."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "employment_status": {
+      "type": "string",
+      "enum": ["employed", "self_employed", "retired", "student", "unemployed", "other"],
+      "description": "Current employment status."
+    },
+    "occupation": {
+      "type": "string",
+      "description": "Job title or profession."
+    },
+    "annual_income_usd": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Gross annual income in USD."
+    },
+    "target_retirement_age": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 120,
+      "description": "Target retirement age."
+    },
+    "monthly_housing_payment_usd": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Monthly rent or mortgage payment in USD."
+    },
+    "risk_tolerance_notes": {
+      "type": "string",
+      "description": "User notes regarding risk tolerance and volatility comfort."
+    },
+    "financial_goals_notes": {
+      "type": "string",
+      "description": "User notes regarding financial objectives and milestones."
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of last profile update."
+    }
+  },
+  "additionalProperties": false
+}

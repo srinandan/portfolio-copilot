@@ -405,5 +405,62 @@ describe('Frontend Views', () => {
     expect(screen.getAllByText('Welcome to Portfolio Copilot').length).toBeGreaterThan(0);
     expect(screen.getByTestId('step-title').textContent).toContain('Welcome to Portfolio Copilot');
   });
+
+  it('ProfileView renders profile form and handles saving', async () => {
+    const ProfileView = (await import('../views/ProfileView.vue')).default;
+    const mockProfile = {
+      user_id: 'demo_user',
+      full_name: 'Alex Mercer',
+      email: 'alex.mercer@example.com',
+      date_of_birth: '1980-06-15',
+      age: 46,
+      marital_status: 'married',
+      dependents_count: 2,
+      family_members: [{ name: 'Sarah', relationship: 'spouse', age: 44 }],
+      employment_status: 'employed',
+      occupation: 'Engineer',
+      annual_income_usd: 220000,
+      target_retirement_age: 61,
+      monthly_housing_payment_usd: 4200,
+      risk_tolerance_notes: 'Moderate risk notes',
+      financial_goals_notes: 'Retirement by 2041',
+      updated_at: '2026-08-01T00:00:00Z'
+    };
+
+    vi.spyOn(apiService, 'getUserProfile').mockResolvedValue(mockProfile);
+    const updateSpy = vi.spyOn(apiService, 'updateUserProfile').mockResolvedValue({
+      status: 'ok',
+      profile: { ...mockProfile, full_name: 'Alex Mercer Updated' }
+    });
+
+    render(ProfileView);
+
+    await waitFor(() => {
+      expect((screen.getByTestId('input-full-name') as HTMLInputElement).value).toBe('Alex Mercer');
+      expect((screen.getByTestId('input-email') as HTMLInputElement).value).toBe('alex.mercer@example.com');
+    });
+
+    // Test adding family member
+    const addBtn = screen.getByTestId('btn-add-family-member');
+    await fireEvent.click(addBtn);
+    expect(screen.getAllByTestId('family-member-row').length).toBe(2);
+
+    // Test removing family member
+    const removeBtns = screen.getAllByTestId('btn-remove-family-member');
+    await fireEvent.click(removeBtns[0]);
+    expect(screen.getAllByTestId('family-member-row').length).toBe(1);
+
+    // Test updating full name and saving
+    const nameInput = screen.getByTestId('input-full-name');
+    await fireEvent.update(nameInput, 'Alex Mercer Updated');
+
+    const saveBtn = screen.getByTestId('btn-save-profile');
+    await fireEvent.click(saveBtn);
+
+    await waitFor(() => {
+      expect(updateSpy).toHaveBeenCalled();
+      expect(screen.getByTestId('profile-save-success')).toBeDefined();
+    });
+  });
 });
 

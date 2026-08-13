@@ -148,3 +148,29 @@ func (c *Client) UpdateIPS(ctx context.Context, newIPS *contracts.InvestmentPoli
 
 	return nil
 }
+
+// SetUserProfile sets the user profile for a given user.
+func (c *Client) SetUserProfile(ctx context.Context, userID string, profile *contracts.UserProfile) error {
+	if profile == nil {
+		return fmt.Errorf("profile is nil")
+	}
+	if userID == "" {
+		return fmt.Errorf("userID is empty")
+	}
+	if profile.UserID == "" {
+		profile.UserID = userID
+	}
+
+	if c.userProfileSchema != nil {
+		if err := validate(c.userProfileSchema, profile); err != nil {
+			return fmt.Errorf("invalid user profile: %w", err)
+		}
+	}
+
+	_, err := c.fs.Collection(collectionUserProfiles).Doc(userID).Set(ctx, profile)
+	if err != nil {
+		return fmt.Errorf("failed to set user profile in firestore: %w", err)
+	}
+
+	return nil
+}

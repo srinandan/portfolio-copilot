@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -19,6 +20,8 @@ func setupTestRouter() *gin.Engine {
 	r.GET("/api/spending_report", srv.HandleGetSpendingReport)
 	r.GET("/api/drift_report", srv.HandleGetDriftReport)
 	r.GET("/api/documents", srv.HandleGetDocuments)
+	r.GET("/api/profile", srv.HandleGetUserProfile)
+	r.POST("/api/profile", srv.HandleSetUserProfile)
 	return r
 }
 
@@ -104,6 +107,54 @@ func TestGetDocumentsEndpoint(t *testing.T) {
 	}
 }
 
+func TestGetUserProfileEndpoint(t *testing.T) {
+	r := setupTestRouter()
+	req, _ := http.NewRequest(http.MethodGet, "/api/profile?user_id=demo_user", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", w.Code)
+	}
+
+	var profile contracts.UserProfile
+	if err := json.Unmarshal(w.Body.Bytes(), &profile); err != nil {
+		t.Fatalf("failed to unmarshal UserProfile: %v", err)
+	}
+	if profile.UserID != "demo_user" {
+		t.Errorf("expected UserID demo_user, got %s", profile.UserID)
+	}
+	if profile.FullName == "" {
+		t.Errorf("expected non-empty FullName in profile")
+	}
+}
+
+func TestSetUserProfileEndpoint_FallbackMode(t *testing.T) {
+	r := setupTestRouter()
+	body := `{"user_id":"demo_user","full_name":"Alex Mercer","age":46,"marital_status":"married"}`
+	req, _ := http.NewRequest(http.MethodPost, "/api/profile", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestSetUserProfileEndpoint_InvalidJSON(t *testing.T) {
+	r := setupTestRouter()
+	body := `{invalid json}`
+	req, _ := http.NewRequest(http.MethodPost, "/api/profile", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", w.Code)
+	}
+}
+
 func TestNewServer_WithProjectID(t *testing.T) {
 	t.Setenv("FIRESTORE_PROJECT_ID", "test-project-id")
 	srv := NewServer()
@@ -121,6 +172,7 @@ func TestHandlers_WithStoreFallback(t *testing.T) {
 	r.GET("/api/spending_report", srv.HandleGetSpendingReport)
 	r.GET("/api/drift_report", srv.HandleGetDriftReport)
 	r.GET("/api/documents", srv.HandleGetDocuments)
+	r.GET("/api/profile", srv.HandleGetUserProfile)
 
 	endpoints := []struct {
 		method string
@@ -130,6 +182,7 @@ func TestHandlers_WithStoreFallback(t *testing.T) {
 		{http.MethodGet, "/api/spending_report?user_id=usr_test"},
 		{http.MethodGet, "/api/drift_report?user_id=usr_test"},
 		{http.MethodGet, "/api/documents?user_id=usr_test"},
+		{http.MethodGet, "/api/profile?user_id=usr_test"},
 	}
 
 	for _, ep := range endpoints {
@@ -154,6 +207,7 @@ func TestHandlers_NilStoreReturnsFallback(t *testing.T) {
 	r.GET("/api/spending_report", srv.HandleGetSpendingReport)
 	r.GET("/api/drift_report", srv.HandleGetDriftReport)
 	r.GET("/api/documents", srv.HandleGetDocuments)
+	r.GET("/api/profile", srv.HandleGetUserProfile)
 
 	endpoints := []struct {
 		method string
@@ -163,6 +217,7 @@ func TestHandlers_NilStoreReturnsFallback(t *testing.T) {
 		{http.MethodGet, "/api/spending_report?user_id=usr_test"},
 		{http.MethodGet, "/api/drift_report?user_id=usr_test"},
 		{http.MethodGet, "/api/documents?user_id=usr_test"},
+		{http.MethodGet, "/api/profile?user_id=usr_test"},
 	}
 
 	for _, ep := range endpoints {

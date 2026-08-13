@@ -223,4 +223,29 @@ export interface OnboardingState {
   submitted?: boolean;
 }
 
+export interface FamilyMember {
+  name: string;
+  relationship: string;
+  age: number;
+}
+
+export interface UserProfile {
+  user_id: string;
+  full_name?: string;
+  email?: string;
+  date_of_birth?: string;
+  age?: number;
+  marital_status?: 'single' | 'married' | 'partnered' | 'divorced' | 'widowed' | 'other' | string;
+  dependents_count?: number;
+  family_members?: FamilyMember[];
+  employment_status?: 'employed' | 'self_employed' | 'retired' | 'student' | 'unemployed' | 'other' | string;
+  occupation?: string;
+  annual_income_usd?: number;
+  target_retirement_age?: number;
+  monthly_housing_payment_usd?: number;
+  risk_tolerance_notes?: string;
+  financial_goals_notes?: string;
+  updated_at?: string;
+}
+
 
