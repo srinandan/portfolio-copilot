@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -123,6 +124,49 @@ func (s *Server) HandleGetDocuments(c *gin.Context) {
 		slog.ErrorContext(c.Request.Context(), "Error reading documents from Firestore", "user_id", userID, "error", err)
 		c.JSON(http.StatusBadGateway, gin.H{"error": "upstream data unavailable"})
 	}
+}
+
+func (s *Server) HandleGetUserProfile(c *gin.Context) {
+	userID := c.DefaultQuery("user_id", "demo_user")
+	if s.Store == nil {
+		c.JSON(http.StatusOK, defaultUserProfile())
+		return
+	}
+	profile, err := s.Store.GetUserProfile(c.Request.Context(), userID)
+	switch {
+	case err == nil && profile != nil:
+		c.JSON(http.StatusOK, profile)
+	case store.IsNotFound(err):
+		c.JSON(http.StatusOK, defaultUserProfile())
+	default:
+		slog.ErrorContext(c.Request.Context(), "Error reading user profile from Firestore", "user_id", userID, "error", err)
+		c.JSON(http.StatusBadGateway, gin.H{"error": "upstream data unavailable"})
+	}
+}
+
+func (s *Server) HandleSetUserProfile(c *gin.Context) {
+	var profile contracts.UserProfile
+	if err := c.ShouldBindJSON(&profile); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("invalid payload: %v", err)})
+		return
+	}
+	if profile.UserID == "" {
+		profile.UserID = "demo_user"
+	}
+	profile.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+
+	if s.Store == nil {
+		c.JSON(http.StatusOK, gin.H{"status": "ok", "profile": profile})
+		return
+	}
+
+	if err := s.Store.SetUserProfile(c.Request.Context(), profile.UserID, &profile); err != nil {
+		slog.ErrorContext(c.Request.Context(), "Error saving user profile to Firestore", "user_id", profile.UserID, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to persist profile"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": "ok", "profile": profile})
 }
 
 func ptrInt(i int) *int {
@@ -263,5 +307,30 @@ func defaultDocuments() []contracts.DocumentItem {
 			Status:        "SUCCESS",
 			RecordsParsed: ptrInt(36),
 		},
+	}
+}
+
+func defaultUserProfile() *contracts.UserProfile {
+	return &contracts.UserProfile{
+		UserID:                  "demo_user",
+		FullName:                "Alex Mercer",
+		Email:                   "alex.mercer@example.com",
+		DateOfBirth:             "1980-06-15",
+		Age:                     46,
+		MaritalStatus:           "married",
+		DependentsCount:         2,
+		FamilyMembers: []contracts.FamilyMember{
+			{Name: "Sarah Mercer", Relationship: "spouse", Age: 44},
+			{Name: "Leo Mercer", Relationship: "child", Age: 12},
+			{Name: "Maya Mercer", Relationship: "child", Age: 9},
+		},
+		EmploymentStatus:        "employed",
+		Occupation:              "Staff Systems Engineer",
+		AnnualIncomeUSD:         220000.0,
+		TargetRetirementAge:     61,
+		MonthlyHousingPaymentUSD: 4200.0,
+		RiskToleranceNotes:      "Comfortable with moderate volatility in pursuit of long-term capital appreciation; prefers broad-market index funds.",
+		FinancialGoalsNotes:     "Build a $1.5M nest egg for retirement by 2041 and maintain 6 months of liquid emergency reserves.",
+		UpdatedAt:               "2026-08-01T00:00:00Z",
 	}
 }

@@ -35,6 +35,7 @@ def validate_fixtures() -> None:
         "ips.json": "ips.schema.json",
         "spending_report.json": "spending-report.schema.json",
         "drift_report.json": "drift-report.schema.json",
+        "user_profile.json": "user-profile.schema.json",
         "checking_transactions.json": "account-transaction.schema.json",
         "chase_transactions.json": "account-transaction.schema.json",
     }
@@ -163,7 +164,7 @@ def seed_bigquery(project_id: str, location: str, dataset_name: str, table_name:
 
 def seed_firestore(project_id: str, location: str, dry_run: bool) -> None:
     print(
-        f"\n[Firestore] Seeding IPS, Holdings, Liabilities, Spending Report, and Drift Report into project {project_id}..."
+        f"\n[Firestore] Seeding IPS, Holdings, Liabilities, Spending Report, Drift Report, and User Profile into project {project_id}..."
     )
 
     ips_data = load_json(TESTDATA_DIR / "ips.json")
@@ -171,6 +172,7 @@ def seed_firestore(project_id: str, location: str, dry_run: bool) -> None:
     liabilities_data = load_json(TESTDATA_DIR / "liabilities.json")
     spending_report_data = load_json(TESTDATA_DIR / "spending_report.json")
     drift_report_data = load_json(TESTDATA_DIR / "drift_report.json")
+    user_profile_data = load_json(TESTDATA_DIR / "user_profile.json")
 
     user_id = ips_data["user_id"]
     ips_id = ips_data["ips_id"]
@@ -182,6 +184,7 @@ def seed_firestore(project_id: str, location: str, dry_run: bool) -> None:
         print(f"  [DRY-RUN] Would write liabilities/{user_id}")
         print(f"  [DRY-RUN] Would write spending_reports/{user_id}")
         print(f"  [DRY-RUN] Would write drift_reports/{user_id}")
+        print(f"  [DRY-RUN] Would write user_profiles/{user_id}")
         return
 
     try:
@@ -213,6 +216,10 @@ def seed_firestore(project_id: str, location: str, dry_run: bool) -> None:
         # Write Drift Report
         db.collection("drift_reports").document(user_id).set(drift_report_data)
         print(f"  ✓ Written Drift Report document: drift_reports/{user_id}")
+
+        # Write User Profile
+        db.collection("user_profiles").document(user_id).set(user_profile_data)
+        print(f"  ✓ Written User Profile document: user_profiles/{user_id}")
 
     except Exception as e:
         print(f"  ✗ Error seeding Firestore: {e}", file=sys.stderr)

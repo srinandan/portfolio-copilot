@@ -228,4 +228,64 @@ describe('ApiService', () => {
     expect(globalThis.fetch).toHaveBeenCalledWith('http://localhost:8080/api/plan/resume', expect.any(Object));
     expect(events).toEqual([{ status: 'executed' }]);
   });
+
+  it('getUserProfile fetches user profile', async () => {
+    const mockProfile = {
+      user_id: 'demo_user',
+      full_name: 'Alex Mercer',
+      age: 46
+    };
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(mockProfile)
+    });
+
+    const result = await service.getUserProfile('demo_user');
+    expect(globalThis.fetch).toHaveBeenCalledWith('http://localhost:8080/api/profile?user_id=demo_user', withTraceparent());
+    expect(result).toEqual(mockProfile);
+  });
+
+  it('getUserProfile throws error when response is not ok', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 500
+    });
+
+    await expect(service.getUserProfile('demo_user')).rejects.toThrow('Get user profile failed with status 500');
+  });
+
+  it('updateUserProfile posts user profile payload', async () => {
+    const mockProfile = {
+      user_id: 'demo_user',
+      full_name: 'Alex Mercer',
+      age: 46
+    };
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ status: 'ok', profile: mockProfile })
+    });
+
+    const result = await service.updateUserProfile(mockProfile);
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      'http://localhost:8080/api/profile',
+      withTraceparent({
+        method: 'POST',
+        headers: expect.objectContaining({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(mockProfile)
+      })
+    );
+    expect(result.status).toBe('ok');
+    expect(result.profile).toEqual(mockProfile);
+  });
+
+  it('updateUserProfile throws error when response is not ok', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 400
+    });
+
+    await expect(
+      service.updateUserProfile({ user_id: 'demo_user' })
+    ).rejects.toThrow('Update user profile failed with status 400');
+  });
 });

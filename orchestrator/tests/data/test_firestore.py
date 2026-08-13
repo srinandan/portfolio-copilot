@@ -425,3 +425,41 @@ def test_set_and_get_drift_report():
         mock_doc_ref.get.return_value.exists = False
         assert client.get_drift_report("nonexistent") is None
 
+
+def test_set_and_get_user_profile():
+    with patch("google.cloud.firestore.Client"):
+        client = FirestoreClient(project="test-project")
+        client.db = MagicMock()
+
+        mock_doc_ref = MagicMock()
+        client.db.collection.return_value.document.return_value = mock_doc_ref
+
+        profile_data = {
+            "user_id": "user1",
+            "full_name": "Alex Mercer",
+            "email": "alex@example.com",
+            "date_of_birth": "1980-06-15",
+            "age": 46,
+            "marital_status": "married",
+            "dependents_count": 2,
+            "family_members": [{"name": "Sarah", "relationship": "spouse", "age": 44}],
+            "employment_status": "employed",
+            "occupation": "Engineer",
+            "annual_income_usd": 200000.0,
+            "target_retirement_age": 60,
+        }
+
+        client.set_user_profile("user1", profile_data)
+        client.db.collection.assert_called_with("user_profiles")
+        client.db.collection().document.assert_called_with("user1")
+        mock_doc_ref.set.assert_called_with(profile_data)
+
+        mock_doc_ref.get.return_value.exists = True
+        mock_doc_ref.get.return_value.to_dict.return_value = profile_data
+        result = client.get_user_profile("user1")
+        assert result == profile_data
+
+        mock_doc_ref.get.return_value.exists = False
+        assert client.get_user_profile("nonexistent") is None
+
+

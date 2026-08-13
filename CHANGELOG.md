@@ -94,8 +94,9 @@ once tagged. Nothing has been released yet — see the note under `[Unreleased]`
 **Frontend (Vue 3 + TypeScript SPA + Go host)**
 - Single Cloud Run service serving compiled SPA + `/api/*` in-process
   (ADR-0017) — no cross-service token minting.
-- Six-view SPA: Dashboard, Portfolio, Spending, Documents, Security,
+- Six-view SPA: Dashboard, Portfolio, Spending, Documents, Profile,
   Onboarding.
+- User Profile management (`/profile`): interactive page to view, edit, and persist personal details, family members, career milestones, retirement targets, and financial goals notes (Issue #298).
 - 7-step onboarding wizard collecting goals, liabilities, risk calibration,
   target bands, guardrails; submits typed data directly via
   `POST /api/onboarding` (no LLM re-parse of prose).
@@ -138,6 +139,7 @@ once tagged. Nothing has been released yet — see the note under `[Unreleased]`
 **Testing and CI**
 - Canonical drift report fixture (`testdata/drift_report.json`) validated against `schemas/drift-report.schema.json` and seeded into Firestore by `scripts/load_test_data.py` (Issue #293).
 - Canonical spending report fixture (`testdata/spending_report.json`) validated against `schemas/spending-report.schema.json` and seeded into Firestore by `scripts/load_test_data.py` (Issue #291).
+- Canonical user profile fixture (`testdata/user_profile.json`) validated against `schemas/user-profile.schema.json` and seeded into Firestore by `scripts/load_test_data.py` (Issue #298).
 - Upgraded `nanoid` to `>= 3.3.18` to resolve vulnerability GHSA-2v37-7h3g-55p8 (Issue #295).
 - ~295 Python tests + 66 Vue tests + Go tests across `pkg/{contracts,store,bigquery}`
   and `frontend/server`.

@@ -26,6 +26,8 @@ type Store interface {
 	SetLiabilities(ctx context.Context, userID string, snapshot *contracts.LiabilitiesSnapshot) error
 	AppendAuditLog(ctx context.Context, entry *contracts.AuditLogEntry) error
 	UpdateIPS(ctx context.Context, ips *contracts.InvestmentPolicyStatement) error
+	SetUserProfile(ctx context.Context, userID string, profile *contracts.UserProfile) error
+	GetUserProfile(ctx context.Context, userID string) (*contracts.UserProfile, error)
 }
 
 // Client wraps a real Firestore client.
@@ -37,6 +39,7 @@ type Client struct {
 	holdingsSchema    *gojsonschema.Schema
 	liabilitiesSchema *gojsonschema.Schema
 	auditLogSchema    *gojsonschema.Schema
+	userProfileSchema *gojsonschema.Schema
 }
 
 // NewClient initializes a new Client using ADC and the PROJECT_ID env var.
@@ -68,6 +71,7 @@ func (c *Client) loadSchemas() error {
 		"schemas/holdings.schema.json":        &c.holdingsSchema,
 		"schemas/liabilities.schema.json":     &c.liabilitiesSchema,
 		"schemas/audit-log-entry.schema.json": &c.auditLogSchema,
+		"schemas/user-profile.schema.json":    &c.userProfileSchema,
 	}
 
 	for path, schemaPtr := range loaders {

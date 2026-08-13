@@ -3,7 +3,8 @@ import type {
   HoldingsSnapshot,
   DocumentItem,
   SpendingReport,
-  DriftReport
+  DriftReport,
+  UserProfile
 } from '../types';
 import { traceRequest } from './tracing';
 
@@ -78,6 +79,29 @@ export class ApiService {
     const res = await this.tracedFetch('GET /api/drift_report', `${this.baseUrl}/api/drift_report`);
     if (!res.ok) {
       throw new Error(`Get drift report failed with status ${res.status}`);
+    }
+    return res.json();
+  }
+
+  async getUserProfile(userId = 'demo_user'): Promise<UserProfile> {
+    const res = await this.tracedFetch(
+      'GET /api/profile',
+      `${this.baseUrl}/api/profile?user_id=${encodeURIComponent(userId)}`
+    );
+    if (!res.ok) {
+      throw new Error(`Get user profile failed with status ${res.status}`);
+    }
+    return res.json();
+  }
+
+  async updateUserProfile(profile: UserProfile): Promise<{ status: string; profile: UserProfile }> {
+    const res = await this.tracedFetch('POST /api/profile', `${this.baseUrl}/api/profile`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(profile)
+    });
+    if (!res.ok) {
+      throw new Error(`Update user profile failed with status ${res.status}`);
     }
     return res.json();
   }

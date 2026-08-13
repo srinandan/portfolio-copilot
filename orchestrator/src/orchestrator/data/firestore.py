@@ -23,6 +23,7 @@ COLLECTION_IPS = "ips"
 COLLECTION_PROPOSED_ACTIONS = "proposed_actions"
 COLLECTION_SPENDING_REPORTS = "spending_reports"
 COLLECTION_DRIFT_REPORTS = "drift_reports"
+COLLECTION_USER_PROFILES = "user_profiles"
 
 
 def _default_dict_factory(obj: Any) -> dict[str, Any]:
@@ -227,6 +228,25 @@ class FirestoreClient:
     def get_drift_report(self, user_id: str) -> dict[str, Any] | None:
         """Reads a DriftReport dict by user_id."""
         doc_ref = self.db.collection(COLLECTION_DRIFT_REPORTS).document(user_id)
+        doc = doc_ref.get()
+        if doc.exists:
+            return doc.to_dict()
+        return None
+
+    def set_user_profile(self, user_id: str, profile: Any) -> None:
+        """Writes a UserProfile to Firestore, keyed by user_id."""
+        doc_ref = self.db.collection(COLLECTION_USER_PROFILES).document(user_id)
+        if isinstance(profile, dict):
+            data = profile
+        elif hasattr(profile, "model_dump"):
+            data = self._dict_factory(profile)
+        else:
+            data = dict(profile)
+        doc_ref.set(data)
+
+    def get_user_profile(self, user_id: str) -> dict[str, Any] | None:
+        """Reads a UserProfile dict by user_id."""
+        doc_ref = self.db.collection(COLLECTION_USER_PROFILES).document(user_id)
         doc = doc_ref.get()
         if doc.exists:
             return doc.to_dict()

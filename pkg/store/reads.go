@@ -18,6 +18,7 @@ const (
 	collectionDriftReports    = "drift_reports"
 	collectionDocuments       = "documents"
 	collectionProposedActions = "proposed_actions"
+	collectionUserProfiles    = "user_profiles"
 )
 
 // IsNotFound returns true if the error is a Firestore/gRPC NotFound error.
@@ -165,4 +166,27 @@ func (c *Client) UpdateProposedActionStatus(ctx context.Context, actionID string
 		return fmt.Errorf("failed to update proposed action status: %w", err)
 	}
 	return nil
+}
+
+// GetUserProfile reads the user profile for a given user from Firestore.
+func (c *Client) GetUserProfile(ctx context.Context, userID string) (*contracts.UserProfile, error) {
+	ctx, span := tracer.Start(ctx, "store.GetUserProfile", trace.WithAttributes(attribute.String("user_id", userID)))
+	defer span.End()
+	docRef := c.fs.Collection(collectionUserProfiles).Doc(userID)
+	doc, err := docRef.Get(ctx)
+	if err != nil {
+		span.RecordError(err)
+		return nil, err
+	}
+	var profile contracts.UserProfile
+	if err := doc.DataTo(&profile); err != nil {
+		dataBytes, jsonErr := json.Marshal(doc.Data())
+		if jsonErr != nil {
+			return nil, fmt.Errorf("failed to parse user profile: %w", err)
+		}
+		if jsonErr := json.Unmarshal(dataBytes, &profile); jsonErr != nil {
+			return nil, fmt.Errorf("failed to parse user profile: %w", err)
+		}
+	}
+	return &profile, nil
 }
