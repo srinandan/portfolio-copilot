@@ -174,3 +174,20 @@ func (c *Client) SetUserProfile(ctx context.Context, userID string, profile *con
 
 	return nil
 }
+
+// SetDocument records a DocumentItem in Firestore.
+func (c *Client) SetDocument(ctx context.Context, item *contracts.DocumentItem) error {
+	if item == nil {
+		return fmt.Errorf("document item is nil")
+	}
+	if item.ID == "" {
+		return fmt.Errorf("document item ID is empty")
+	}
+
+	_, err := c.fs.Collection(collectionDocuments).Doc(item.ID).Set(ctx, item)
+	if err != nil {
+		return fmt.Errorf("failed to set document in firestore: %w", err)
+	}
+
+	return nil
+}

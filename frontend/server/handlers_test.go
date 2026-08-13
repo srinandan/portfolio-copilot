@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -20,8 +22,10 @@ func setupTestRouter() *gin.Engine {
 	r.GET("/api/spending_report", srv.HandleGetSpendingReport)
 	r.GET("/api/drift_report", srv.HandleGetDriftReport)
 	r.GET("/api/documents", srv.HandleGetDocuments)
+	r.POST("/api/documents", srv.HandleUploadDocument)
 	r.GET("/api/profile", srv.HandleGetUserProfile)
 	r.POST("/api/profile", srv.HandleSetUserProfile)
+	r.GET("/api/onboarding", srv.HandleGetOnboarding)
 	return r
 }
 
@@ -155,6 +159,147 @@ func TestSetUserProfileEndpoint_InvalidJSON(t *testing.T) {
 	}
 }
 
+func TestGetOnboardingEndpoint(t *testing.T) {
+	r := setupTestRouter()
+	req, _ := http.NewRequest(http.MethodGet, "/api/onboarding?user_id=demo_user", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", w.Code)
+	}
+
+	var profile contracts.OnboardingProfile
+	if err := json.Unmarshal(w.Body.Bytes(), &profile); err != nil {
+		t.Fatalf("failed to unmarshal OnboardingProfile: %v", err)
+	}
+	if !profile.HasActiveIPS {
+		t.Errorf("expected has_active_ips to be true in fallback mode")
+	}
+	if len(profile.Goals) == 0 {
+		t.Errorf("expected non-empty goals in onboarding profile")
+	}
+}
+
+func createMultipartUpload(fieldName, filename, docType, targetTable string, content []byte) (*http.Request, error) {
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+
+	_ = writer.WriteField("document_type", docType)
+	if targetTable != "" {
+		_ = writer.WriteField("target_table", targetTable)
+	}
+	part, err := writer.CreateFormFile(fieldName, filename)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := part.Write(content); err != nil {
+		return nil, err
+	}
+	if err := writer.Close(); err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, "/api/documents", body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	return req, nil
+}
+
+func TestUploadDocumentEndpoint_CSVTransactions(t *testing.T) {
+	r := setupTestRouter()
+	csvData := []byte("user_id,transaction_date,amount,description,raw_category,normalized_category\ndemo_user,2026-05-01,100.0,Test,Food,dining\n")
+	req, err := createMultipartUpload("file", "transactions.csv", "transactions", "checking_transactions", csvData)
+	if err != nil {
+		t.Fatalf("failed to create multipart request: %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var doc contracts.DocumentItem
+	if err := json.Unmarshal(w.Body.Bytes(), &doc); err != nil {
+		t.Fatalf("failed to unmarshal DocumentItem: %v", err)
+	}
+	if doc.Status != "SUCCESS" {
+		t.Errorf("expected status SUCCESS, got %s", doc.Status)
+	}
+	if doc.RecordsParsed == nil || *doc.RecordsParsed != 1 {
+		t.Errorf("expected 1 record parsed, got %v", doc.RecordsParsed)
+	}
+}
+
+func TestUploadDocumentEndpoint_JSONHoldings(t *testing.T) {
+	r := setupTestRouter()
+	jsonData := []byte(`{"user_id":"demo_user","positions":[{"ticker":"AAPL","asset_class":"Equity","quantity":10}]}`)
+	req, err := createMultipartUpload("file", "holdings.json", "holdings", "", jsonData)
+	if err != nil {
+		t.Fatalf("failed to create multipart request: %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var doc contracts.DocumentItem
+	if err := json.Unmarshal(w.Body.Bytes(), &doc); err != nil {
+		t.Fatalf("failed to unmarshal DocumentItem: %v", err)
+	}
+	if doc.Status != "SUCCESS" || doc.RecordsParsed == nil || *doc.RecordsParsed != 1 {
+		t.Errorf("unexpected doc item result: %+v", doc)
+	}
+}
+
+func TestUploadDocumentEndpoint_InvalidExtension(t *testing.T) {
+	r := setupTestRouter()
+	req, err := createMultipartUpload("file", "test.pdf", "transactions", "", []byte("fake pdf"))
+	if err != nil {
+		t.Fatalf("failed to create multipart request: %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", w.Code)
+	}
+}
+
+func TestUploadDocumentEndpoint_InvalidJSON(t *testing.T) {
+	r := setupTestRouter()
+	req, err := createMultipartUpload("file", "holdings.json", "holdings", "", []byte("{invalid json}"))
+	if err != nil {
+		t.Fatalf("failed to create multipart request: %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", w.Code)
+	}
+}
+
+func TestUploadDocumentEndpoint_MissingDocType(t *testing.T) {
+	r := setupTestRouter()
+	req, _ := http.NewRequest(http.MethodPost, "/api/documents", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", w.Code)
+	}
+}
+
 func TestNewServer_WithProjectID(t *testing.T) {
 	t.Setenv("FIRESTORE_PROJECT_ID", "test-project-id")
 	srv := NewServer()
@@ -173,6 +318,7 @@ func TestHandlers_WithStoreFallback(t *testing.T) {
 	r.GET("/api/drift_report", srv.HandleGetDriftReport)
 	r.GET("/api/documents", srv.HandleGetDocuments)
 	r.GET("/api/profile", srv.HandleGetUserProfile)
+	r.GET("/api/onboarding", srv.HandleGetOnboarding)
 
 	endpoints := []struct {
 		method string
@@ -183,6 +329,7 @@ func TestHandlers_WithStoreFallback(t *testing.T) {
 		{http.MethodGet, "/api/drift_report?user_id=usr_test"},
 		{http.MethodGet, "/api/documents?user_id=usr_test"},
 		{http.MethodGet, "/api/profile?user_id=usr_test"},
+		{http.MethodGet, "/api/onboarding?user_id=usr_test"},
 	}
 
 	for _, ep := range endpoints {
@@ -208,6 +355,7 @@ func TestHandlers_NilStoreReturnsFallback(t *testing.T) {
 	r.GET("/api/drift_report", srv.HandleGetDriftReport)
 	r.GET("/api/documents", srv.HandleGetDocuments)
 	r.GET("/api/profile", srv.HandleGetUserProfile)
+	r.GET("/api/onboarding", srv.HandleGetOnboarding)
 
 	endpoints := []struct {
 		method string
@@ -218,6 +366,7 @@ func TestHandlers_NilStoreReturnsFallback(t *testing.T) {
 		{http.MethodGet, "/api/drift_report?user_id=usr_test"},
 		{http.MethodGet, "/api/documents?user_id=usr_test"},
 		{http.MethodGet, "/api/profile?user_id=usr_test"},
+		{http.MethodGet, "/api/onboarding?user_id=usr_test"},
 	}
 
 	for _, ep := range endpoints {

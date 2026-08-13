@@ -288,4 +288,71 @@ describe('ApiService', () => {
       service.updateUserProfile({ user_id: 'demo_user' })
     ).rejects.toThrow('Update user profile failed with status 400');
   });
+
+  it('getOnboarding fetches onboarding profile', async () => {
+    const mockProfile = {
+      has_active_ips: true,
+      user_id: 'demo_user',
+      goals: []
+    };
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(mockProfile)
+    });
+
+    const result = await service.getOnboarding('demo_user');
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      'http://localhost:8080/api/onboarding?user_id=demo_user',
+      withTraceparent()
+    );
+    expect(result).toEqual(mockProfile);
+  });
+
+  it('getOnboarding throws error on failure', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 502
+    });
+
+    await expect(service.getOnboarding('demo_user')).rejects.toThrow(
+      'Get onboarding profile failed with status 502'
+    );
+  });
+
+  it('uploadDocument sends multipart FormData and returns DocumentItem', async () => {
+    const mockDoc = {
+      id: 'doc-123',
+      filename: 'test.csv',
+      status: 'SUCCESS',
+      records_parsed: 5
+    };
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(mockDoc)
+    });
+
+    const file = new File(['a,b\n1,2'], 'test.csv', { type: 'text/csv' });
+    const result = await service.uploadDocument(file, 'transactions', 'checking_transactions');
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      'http://localhost:8080/api/documents',
+      withTraceparent({
+        method: 'POST',
+        body: expect.any(FormData)
+      })
+    );
+    expect(result).toEqual(mockDoc);
+  });
+
+  it('uploadDocument throws error when response is not ok', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: () => Promise.resolve({ error: 'invalid file extension' })
+    });
+
+    const file = new File(['bad'], 'test.pdf');
+    await expect(service.uploadDocument(file, 'transactions')).rejects.toThrow(
+      'invalid file extension'
+    );
+  });
 });

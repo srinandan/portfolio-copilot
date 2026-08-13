@@ -187,3 +187,21 @@ func (ips *InvestmentPolicyStatement) Validate() bool {
 	}
 	return true
 }
+
+// OnboardingProfile represents the combined active onboarding profile returned to the frontend.
+type OnboardingProfile struct {
+	HasActiveIPS                 bool             `json:"has_active_ips"`
+	UserID                       string           `json:"user_id"`
+	IPSID                        string           `json:"ips_id,omitempty"`
+	Version                      int              `json:"version,omitempty"`
+	Goals                        []Goal           `json:"goals,omitempty"`
+	TimeHorizonYears             int              `json:"time_horizon_years,omitempty"`
+	KnownUpcomingExpensesUSD     float64          `json:"known_upcoming_expenses_usd,omitempty"`
+	ReserveMonths                float64          `json:"reserve_months,omitempty"`
+	RiskTolerance                RiskTolerance    `json:"risk_tolerance,omitempty"`
+	TargetBands                  []AllocationBand `json:"target_bands,omitempty"`
+	Constraints                  Constraints      `json:"constraints,omitempty"`
+	ApprovalRequiredAboveUSD     float64          `json:"approval_required_above_usd,omitempty"`
+	ApprovalRequiredAbovePercent float64          `json:"approval_required_above_percent,omitempty"`
+	Liabilities                  []Liability      `json:"liabilities,omitempty"`
+}

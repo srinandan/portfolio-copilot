@@ -2,10 +2,15 @@ package main
 
 import (
 	"context"
+	"encoding/csv"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -167,6 +172,253 @@ func (s *Server) HandleSetUserProfile(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "ok", "profile": profile})
+}
+
+func (s *Server) HandleGetOnboarding(c *gin.Context) {
+	userID := c.DefaultQuery("user_id", "demo_user")
+	if s.Store == nil {
+		c.JSON(http.StatusOK, defaultOnboardingProfile(userID))
+		return
+	}
+
+	ips, ipsErr := s.Store.GetActiveIPS(c.Request.Context(), userID)
+	if ipsErr != nil && !store.IsNotFound(ipsErr) {
+		slog.ErrorContext(c.Request.Context(), "Error reading active IPS from Firestore", "user_id", userID, "error", ipsErr)
+		c.JSON(http.StatusBadGateway, gin.H{"error": "upstream data unavailable"})
+		return
+	}
+
+	if store.IsNotFound(ipsErr) || ips == nil {
+		c.JSON(http.StatusOK, contracts.OnboardingProfile{
+			HasActiveIPS: false,
+			UserID:       userID,
+		})
+		return
+	}
+
+	liabSnapshot, liabErr := s.Store.GetLiabilities(c.Request.Context(), userID)
+	var liabilities []contracts.Liability
+	if liabErr == nil && liabSnapshot != nil {
+		liabilities = liabSnapshot.Liabilities
+	}
+
+	var upcomingExpenses float64
+	var reserveMonths float64
+	if ips.LiquidityNeeds != nil {
+		if ips.LiquidityNeeds.KnownUpcomingExpensesUSD != nil {
+			upcomingExpenses = *ips.LiquidityNeeds.KnownUpcomingExpensesUSD
+		}
+		if ips.LiquidityNeeds.ReserveMonths != nil {
+			reserveMonths = *ips.LiquidityNeeds.ReserveMonths
+		}
+	}
+
+	var approvalUSD float64
+	var approvalPct float64
+	if ips.ApprovalRequiredAboveUSD != nil {
+		approvalUSD = *ips.ApprovalRequiredAboveUSD
+	}
+	if ips.ApprovalRequiredAbovePercent != nil {
+		approvalPct = *ips.ApprovalRequiredAbovePercent
+	}
+
+	profile := contracts.OnboardingProfile{
+		HasActiveIPS:                 true,
+		UserID:                       ips.UserID,
+		IPSID:                        ips.IPSID,
+		Version:                      ips.Version,
+		Goals:                        ips.Goals,
+		TimeHorizonYears:             ips.TimeHorizonYears,
+		KnownUpcomingExpensesUSD:     upcomingExpenses,
+		ReserveMonths:                reserveMonths,
+		RiskTolerance:                ips.RiskTolerance,
+		TargetBands:                  ips.TargetAllocation,
+		Constraints:                  ips.Constraints,
+		ApprovalRequiredAboveUSD:     approvalUSD,
+		ApprovalRequiredAbovePercent: approvalPct,
+		Liabilities:                  liabilities,
+	}
+
+	c.JSON(http.StatusOK, profile)
+}
+
+func (s *Server) HandleUploadDocument(c *gin.Context) {
+	userID := c.DefaultPostForm("user_id", "demo_user")
+	documentType := strings.ToLower(strings.TrimSpace(c.PostForm("document_type")))
+	targetTable := strings.TrimSpace(c.PostForm("target_table"))
+
+	if documentType == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "document_type is required (transactions, holdings, liabilities, ips)"})
+		return
+	}
+
+	fileHeader, err := c.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("file is required: %v", err)})
+		return
+	}
+
+	if fileHeader.Size > (10 << 20) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "file exceeds maximum allowed size of 10MB"})
+		return
+	}
+
+	ext := strings.ToLower(filepath.Ext(fileHeader.Filename))
+	var expectedExt string
+	switch documentType {
+	case "transactions":
+		expectedExt = ".csv"
+	case "holdings", "liabilities", "ips":
+		expectedExt = ".json"
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("unsupported document_type '%s'; accepted types: transactions, holdings, liabilities, ips", documentType)})
+		return
+	}
+
+	if ext != expectedExt {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("invalid file extension '%s' for document_type '%s'; expected '%s'", ext, documentType, expectedExt)})
+		return
+	}
+
+	file, err := fileHeader.Open()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to open uploaded file: %v", err)})
+		return
+	}
+	defer file.Close()
+
+	fileBytes, err := io.ReadAll(file)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to read uploaded file: %v", err)})
+		return
+	}
+
+	docID := fmt.Sprintf("doc-%d", time.Now().UnixNano())
+	docItem := contracts.DocumentItem{
+		ID:          docID,
+		Filename:    fileHeader.Filename,
+		AccountType: documentType,
+		TargetTable: targetTable,
+		SizeBytes:   fileHeader.Size,
+		UploadedAt:  time.Now().UTC().Format(time.RFC3339),
+		Status:      "SUCCESS",
+	}
+
+	var recordsParsed int
+	ctx := c.Request.Context()
+
+	switch documentType {
+	case "transactions":
+		reader := csv.NewReader(strings.NewReader(string(fileBytes)))
+		records, err := reader.ReadAll()
+		if err != nil || len(records) < 2 {
+			errMsg := "invalid CSV: must contain header and at least 1 data row"
+			if err != nil {
+				errMsg = fmt.Sprintf("CSV parse error: %v", err)
+			}
+			docItem.Status = "FAILED"
+			docItem.ErrorMessage = &errMsg
+			if s.Store != nil {
+				_ = s.Store.SetDocument(ctx, &docItem)
+			}
+			c.JSON(http.StatusBadRequest, gin.H{"error": errMsg, "document": docItem})
+			return
+		}
+		recordsParsed = len(records) - 1
+		if docItem.TargetTable == "" {
+			docItem.TargetTable = "checking_transactions"
+		}
+
+	case "holdings":
+		var snapshot contracts.HoldingsSnapshot
+		if err := json.Unmarshal(fileBytes, &snapshot); err != nil {
+			errMsg := fmt.Sprintf("JSON parse error for holdings: %v", err)
+			docItem.Status = "FAILED"
+			docItem.ErrorMessage = &errMsg
+			if s.Store != nil {
+				_ = s.Store.SetDocument(ctx, &docItem)
+			}
+			c.JSON(http.StatusBadRequest, gin.H{"error": errMsg, "document": docItem})
+			return
+		}
+		if snapshot.UserID == "" {
+			snapshot.UserID = userID
+		}
+		recordsParsed = len(snapshot.Positions)
+		if s.Store != nil {
+			if err := s.Store.SetHoldings(ctx, snapshot.UserID, &snapshot); err != nil {
+				errMsg := fmt.Sprintf("failed to persist holdings: %v", err)
+				docItem.Status = "FAILED"
+				docItem.ErrorMessage = &errMsg
+				_ = s.Store.SetDocument(ctx, &docItem)
+				c.JSON(http.StatusBadRequest, gin.H{"error": errMsg, "document": docItem})
+				return
+			}
+		}
+
+	case "liabilities":
+		var snapshot contracts.LiabilitiesSnapshot
+		if err := json.Unmarshal(fileBytes, &snapshot); err != nil {
+			errMsg := fmt.Sprintf("JSON parse error for liabilities: %v", err)
+			docItem.Status = "FAILED"
+			docItem.ErrorMessage = &errMsg
+			if s.Store != nil {
+				_ = s.Store.SetDocument(ctx, &docItem)
+			}
+			c.JSON(http.StatusBadRequest, gin.H{"error": errMsg, "document": docItem})
+			return
+		}
+		if snapshot.UserID == "" {
+			snapshot.UserID = userID
+		}
+		recordsParsed = len(snapshot.Liabilities)
+		if s.Store != nil {
+			if err := s.Store.SetLiabilities(ctx, snapshot.UserID, &snapshot); err != nil {
+				errMsg := fmt.Sprintf("failed to persist liabilities: %v", err)
+				docItem.Status = "FAILED"
+				docItem.ErrorMessage = &errMsg
+				_ = s.Store.SetDocument(ctx, &docItem)
+				c.JSON(http.StatusBadRequest, gin.H{"error": errMsg, "document": docItem})
+				return
+			}
+		}
+
+	case "ips":
+		var ips contracts.InvestmentPolicyStatement
+		if err := json.Unmarshal(fileBytes, &ips); err != nil {
+			errMsg := fmt.Sprintf("JSON parse error for IPS: %v", err)
+			docItem.Status = "FAILED"
+			docItem.ErrorMessage = &errMsg
+			if s.Store != nil {
+				_ = s.Store.SetDocument(ctx, &docItem)
+			}
+			c.JSON(http.StatusBadRequest, gin.H{"error": errMsg, "document": docItem})
+			return
+		}
+		if ips.UserID == "" {
+			ips.UserID = userID
+		}
+		recordsParsed = 1
+		if s.Store != nil {
+			if err := s.Store.UpdateIPS(ctx, &ips); err != nil {
+				errMsg := fmt.Sprintf("failed to update IPS: %v", err)
+				docItem.Status = "FAILED"
+				docItem.ErrorMessage = &errMsg
+				_ = s.Store.SetDocument(ctx, &docItem)
+				c.JSON(http.StatusBadRequest, gin.H{"error": errMsg, "document": docItem})
+				return
+			}
+		}
+	}
+
+	docItem.RecordsParsed = &recordsParsed
+	if s.Store != nil {
+		if err := s.Store.SetDocument(ctx, &docItem); err != nil {
+			slog.WarnContext(ctx, "Failed to record document metadata in store", "doc_id", docItem.ID, "error", err)
+		}
+	}
+
+	c.JSON(http.StatusOK, docItem)
 }
 
 func ptrInt(i int) *int {
@@ -333,4 +585,47 @@ func defaultUserProfile() *contracts.UserProfile {
 		FinancialGoalsNotes:     "Build a $1.5M nest egg for retirement by 2041 and maintain 6 months of liquid emergency reserves.",
 		UpdatedAt:               "2026-08-01T00:00:00Z",
 	}
+}
+
+func defaultOnboardingProfile(userID string) contracts.OnboardingProfile {
+	return contracts.OnboardingProfile{
+		HasActiveIPS:             true,
+		UserID:                   userID,
+		IPSID:                    "ips_demo_001",
+		Version:                  1,
+		TimeHorizonYears:         15,
+		KnownUpcomingExpensesUSD: 5000,
+		ReserveMonths:            6,
+		RiskTolerance:            contracts.RiskToleranceModerate,
+		Goals: []contracts.Goal{
+			{Name: "Retirement", TargetAmountUSD: 1500000, TargetDate: "2041-01-01"},
+			{Name: "Emergency Fund", TargetAmountUSD: 30000, TargetDate: "2026-12-31"},
+		},
+		TargetBands: []contracts.AllocationBand{
+			{AssetClass: "Equity", TargetPercent: 60, MinPercent: 50, MaxPercent: 70},
+			{AssetClass: "Fixed Income", TargetPercent: 30, MinPercent: 20, MaxPercent: 40},
+			{AssetClass: "Cash", TargetPercent: 10, MinPercent: 5, MaxPercent: 20},
+		},
+		Constraints: contracts.Constraints{
+			ConcentrationLimitPercent: 15,
+			ExcludedTickers:           []string{},
+			ExcludedSectors:           []string{"Tobacco", "Gambling"},
+		},
+		ApprovalRequiredAboveUSD:     10000,
+		ApprovalRequiredAbovePercent: 5,
+		Liabilities: []contracts.Liability{
+			{
+				LiabilityID:         "liab_mortgage_001",
+				Type:                contracts.LiabilityTypeMortgage,
+				Description:         ptrString("Primary Residence Mortgage (30yr Fixed @ 3.25%)"),
+				BalanceUSD:          420000,
+				InterestRatePercent: ptrFloat64(3.25),
+				MinimumPaymentUSD:   2450,
+			},
+		},
+	}
+}
+
+func ptrString(s string) *string {
+	return &s
 }

@@ -188,3 +188,69 @@ func TestUpdateIPSTransaction(t *testing.T) {
 		}
 	})
 }
+
+func TestSetDocumentAndGetDocuments(t *testing.T) {
+	c, ctx := setupTestClient(t)
+
+	doc := &contracts.DocumentItem{
+		ID:          "doc-test-123",
+		Filename:    "statement.csv",
+		AccountType: "checking",
+		TargetTable: "checking_transactions",
+		SizeBytes:   1024,
+		UploadedAt:  time.Now().UTC().Format(time.RFC3339),
+		Status:      "SUCCESS",
+	}
+
+	err := c.SetDocument(ctx, doc)
+	if err != nil {
+		t.Fatalf("SetDocument failed: %v", err)
+	}
+
+	docs, err := c.GetDocuments(ctx, "demo_user")
+	if err != nil {
+		t.Fatalf("GetDocuments failed: %v", err)
+	}
+	found := false
+	for _, d := range docs {
+		if d.ID == doc.ID {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected to find doc-test-123 in GetDocuments results")
+	}
+}
+
+func TestSetAndGetLiabilities(t *testing.T) {
+	c, ctx := setupTestClient(t)
+
+	snapshot := &contracts.LiabilitiesSnapshot{
+		UserID: "user_liab_test",
+		AsOf:   time.Now(),
+		Liabilities: []contracts.Liability{
+			{
+				LiabilityID:         "liab-1",
+				Type:                contracts.LiabilityTypeMortgage,
+				BalanceUSD:          100000,
+				MinimumPaymentUSD:   1000,
+				Description:         ptrString("Home Mortgage"),
+				InterestRatePercent: func(f float64) *float64 { return &f }(4.5),
+			},
+		},
+	}
+
+	err := c.SetLiabilities(ctx, snapshot.UserID, snapshot)
+	if err != nil {
+		t.Fatalf("SetLiabilities failed: %v", err)
+	}
+
+	retrieved, err := c.GetLiabilities(ctx, snapshot.UserID)
+	if err != nil {
+		t.Fatalf("GetLiabilities failed: %v", err)
+	}
+	if len(retrieved.Liabilities) != 1 || retrieved.Liabilities[0].LiabilityID != "liab-1" {
+		t.Errorf("unexpected liabilities snapshot: %+v", retrieved)
+	}
+}

@@ -385,12 +385,16 @@ describe('Frontend Views', () => {
     });
   });
 
-  it('DocumentsView renders a coming-soon placeholder and links back to the dashboard', () => {
+  it('DocumentsView renders ingestion dropzone and documents history table', async () => {
     render(DocumentsView);
     expect(screen.getByTestId('documents-view')).toBeDefined();
-    expect(screen.getByText('Statement upload — coming soon')).toBeDefined();
-    const backLink = screen.getByTestId('documents-back-to-dashboard') as HTMLAnchorElement;
-    expect(backLink.getAttribute('href')).toBe('/');
+    expect(screen.getByText('Documents & File Ingestion')).toBeDefined();
+    expect(screen.getByTestId('upload-dropzone')).toBeDefined();
+
+    await waitFor(() => {
+      expect(screen.getByText('Fidelity_Stmt_Oct2023.pdf')).toBeDefined();
+      expect(screen.getByText('42')).toBeDefined();
+    });
   });
 
   it('OnboardingView renders initial step and step title', async () => {

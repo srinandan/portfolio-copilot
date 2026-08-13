@@ -164,9 +164,15 @@ import { useRouter } from 'vue-router';
 import type { OnboardingState } from '../../types';
 import { apiService } from '../../services/api';
 
-const props = defineProps<{
-  state: OnboardingState;
-}>();
+const props = withDefaults(
+  defineProps<{
+    state: OnboardingState;
+    isUpdate?: boolean;
+  }>(),
+  {
+    isUpdate: false
+  }
+);
 
 const emit = defineEmits<{
   (e: 'complete'): void;
@@ -224,7 +230,7 @@ async function handleSubmit() {
     await apiService.applyOnboarding({
       user_id: userId,
       result,
-      trigger: 'initial',
+      trigger: props.isUpdate ? 'update' : 'initial',
       approval_required_above_usd: s.approval_thresholds.approval_required_above_usd,
       approval_required_above_percent: s.approval_thresholds.approval_required_above_percent
     });

@@ -52,6 +52,29 @@ func (c *Client) GetHoldings(ctx context.Context, userID string) (*contracts.Hol
 	return &snapshot, nil
 }
 
+// GetLiabilities reads the liabilities snapshot for a given user from Firestore.
+func (c *Client) GetLiabilities(ctx context.Context, userID string) (*contracts.LiabilitiesSnapshot, error) {
+	ctx, span := tracer.Start(ctx, "store.GetLiabilities", trace.WithAttributes(attribute.String("user_id", userID)))
+	defer span.End()
+	docRef := c.fs.Collection(collectionLiabilities).Doc(userID)
+	doc, err := docRef.Get(ctx)
+	if err != nil {
+		span.RecordError(err)
+		return nil, err
+	}
+	var snapshot contracts.LiabilitiesSnapshot
+	if err := doc.DataTo(&snapshot); err != nil {
+		dataBytes, jsonErr := json.Marshal(doc.Data())
+		if jsonErr != nil {
+			return nil, fmt.Errorf("failed to parse liabilities snapshot: %w", err)
+		}
+		if jsonErr := json.Unmarshal(dataBytes, &snapshot); jsonErr != nil {
+			return nil, fmt.Errorf("failed to parse liabilities snapshot: %w", err)
+		}
+	}
+	return &snapshot, nil
+}
+
 // GetActiveIPS reads the currently active InvestmentPolicyStatement for a given user from Firestore.
 func (c *Client) GetActiveIPS(ctx context.Context, userID string) (*contracts.InvestmentPolicyStatement, error) {
 	ctx, span := tracer.Start(ctx, "store.GetActiveIPS", trace.WithAttributes(attribute.String("user_id", userID)))

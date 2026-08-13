@@ -248,4 +248,21 @@ export interface UserProfile {
   updated_at?: string;
 }
 
+export interface OnboardingProfile {
+  has_active_ips: boolean;
+  user_id: string;
+  ips_id?: string;
+  version?: number;
+  goals?: Goal[];
+  time_horizon_years?: number;
+  known_upcoming_expenses_usd?: number;
+  reserve_months?: number;
+  risk_tolerance?: RiskToleranceTier;
+  target_bands?: AllocationBand[];
+  constraints?: IPSConstraints;
+  approval_required_above_usd?: number;
+  approval_required_above_percent?: number;
+  liabilities?: LiabilityItem[];
+}
+
 
