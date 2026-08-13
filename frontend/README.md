@@ -21,7 +21,6 @@ See [ADR-0003](../docs/adr/0003-standalone-ui-not-agentspace.md) and [ADR-0017](
   - **Portfolio (`/portfolio`)**: Itemizes holdings and displays the **Portfolio Drift Report** (`DriftReportCard`), comparing current asset allocation against active Investment Policy Statement (IPS) target bands (`skills/portfolio-analysis/SKILL.md`).
   - **Spending (`/spending`)**: Visualizes 30-day income, outflow, savings rate, reserve months, category breakdown, and anomaly detections (`skills/spending-analysis/SKILL.md`).
   - **Documents (`/documents`)**: Interactive drag-and-drop statement upload dropzone (`UploadDropzone`) and parsing history log.
-  - **Security (`/security`)**: Local privacy settings, 2FA toggle, encryption level options, and encrypted backup export.
 
 ---
 

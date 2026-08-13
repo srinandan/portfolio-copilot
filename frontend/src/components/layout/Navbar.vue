@@ -32,7 +32,6 @@ const navItems = [
   { name: 'Onboarding', path: '/onboarding' },
   { name: 'Portfolio', path: '/portfolio' },
   { name: 'Spending', path: '/spending' },
-  { name: 'Documents', path: '/documents' },
-  { name: 'Security', path: '/security' }
+  { name: 'Documents', path: '/documents' }
 ];
 </script>

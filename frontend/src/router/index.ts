@@ -3,7 +3,6 @@ import DashboardView from '../views/DashboardView.vue';
 import PortfolioView from '../views/PortfolioView.vue';
 import SpendingView from '../views/SpendingView.vue';
 import DocumentsView from '../views/DocumentsView.vue';
-import SecurityView from '../views/SecurityView.vue';
 import OnboardingView from '../views/OnboardingView.vue';
 
 export const router = createRouter({
@@ -33,11 +32,6 @@ export const router = createRouter({
       path: '/documents',
       name: 'documents',
       component: DocumentsView
-    },
-    {
-      path: '/security',
-      name: 'security',
-      component: SecurityView
     }
   ]
 });

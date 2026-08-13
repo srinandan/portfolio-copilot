@@ -3,7 +3,6 @@ import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/vu
 import DashboardView from '../views/DashboardView.vue';
 import PortfolioView from '../views/PortfolioView.vue';
 import DocumentsView from '../views/DocumentsView.vue';
-import SecurityView from '../views/SecurityView.vue';
 import { apiService } from '../services/api';
 
 describe('Frontend Views', () => {
@@ -392,18 +391,6 @@ describe('Frontend Views', () => {
     expect(screen.getByText('Statement upload — coming soon')).toBeDefined();
     const backLink = screen.getByTestId('documents-back-to-dashboard') as HTMLAnchorElement;
     expect(backLink.getAttribute('href')).toBe('/');
-  });
-
-  it('SecurityView renders privacy intro, 2FA toggle, and export button', async () => {
-    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
-    render(SecurityView);
-
-    expect(screen.getByText('Security Through Privacy')).toBeDefined();
-    expect(screen.getByText('Two-Factor Authentication')).toBeDefined();
-
-    const exportBtn = screen.getByText('Export Encrypted Backup');
-    await fireEvent.click(exportBtn);
-    expect(alertSpy).toHaveBeenCalledWith('Backup export initiated. Check your downloads.');
   });
 
   it('OnboardingView renders initial step and step title', async () => {
