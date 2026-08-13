@@ -117,12 +117,32 @@ async def _lifespan(_app: FastAPI):
 
 
 def _resolve_project_id() -> str:
-    """Resolves the GCP project for span export, mirroring the store/data clients."""
-    for key in ("GOOGLE_CLOUD_PROJECT", "PROJECT_ID", "FIRESTORE_PROJECT_ID"):
+    """Resolves the GCP project ID string for span export.
+
+    Cloud Trace requires an alphanumeric Project ID (e.g. 'my-project') and
+    rejects numeric Project Numbers (e.g. '432423772502') with:
+        400 Invalid project id in name!
+
+    In Agent Runtime containers, GOOGLE_CLOUD_PROJECT is often automatically
+    populated with the numeric project number, while PROJECT_ID carries the
+    user-configured string ID. We prefer non-numeric string IDs.
+    """
+    candidates = []
+    for key in (
+        "OTEL_EXPORTER_GCP_TRACE_PROJECT_ID",
+        "PROJECT_ID",
+        "FIRESTORE_PROJECT_ID",
+        "GOOGLE_CLOUD_PROJECT",
+    ):
         value = os.environ.get(key)
         if value:
-            return value
-    return ""
+            candidates.append(value)
+
+    # Prefer non-numeric project ID strings over numeric project numbers
+    for c in candidates:
+        if not c.isdigit():
+            return c
+    return candidates[0] if candidates else ""
 
 
 def _service_name() -> str:

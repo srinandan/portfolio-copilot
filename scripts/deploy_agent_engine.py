@@ -156,6 +156,7 @@ def deploy_agent_engine(project: str | None, location: str, display_name: str, c
             env_vars = {
                 "AGENT_ENGINE_ID": "",
                 "PROJECT_ID": project,
+                "OTEL_EXPORTER_GCP_TRACE_PROJECT_ID": project,
                 "AGENT_REGISTRY_LOCATION": "global",
                 "GOOGLE_GENAI_USE_ENTERPRISE": "true",
                 "GOOGLE_CLOUD_LOCATION": location,

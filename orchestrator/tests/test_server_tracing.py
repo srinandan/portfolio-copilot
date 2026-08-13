@@ -69,13 +69,38 @@ def test_service_name_default_and_override(monkeypatch):
 
 
 def test_resolve_project_id_precedence(monkeypatch):
-    for k in ("GOOGLE_CLOUD_PROJECT", "PROJECT_ID", "FIRESTORE_PROJECT_ID"):
+    for k in (
+        "OTEL_EXPORTER_GCP_TRACE_PROJECT_ID",
+        "GOOGLE_CLOUD_PROJECT",
+        "PROJECT_ID",
+        "FIRESTORE_PROJECT_ID",
+    ):
         monkeypatch.delenv(k, raising=False)
     assert server._resolve_project_id() == ""
     monkeypatch.setenv("FIRESTORE_PROJECT_ID", "fs-proj")
     assert server._resolve_project_id() == "fs-proj"
-    monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "gcp-proj")
-    assert server._resolve_project_id() == "gcp-proj"  # highest precedence
+    monkeypatch.setenv("PROJECT_ID", "my-app-proj")
+    assert server._resolve_project_id() == "my-app-proj"
+    monkeypatch.setenv("OTEL_EXPORTER_GCP_TRACE_PROJECT_ID", "otel-proj")
+    assert server._resolve_project_id() == "otel-proj"
+
+
+def test_resolve_project_id_rejects_numeric_project_number(monkeypatch):
+    """Cloud Trace rejects numeric project numbers (e.g. 432423772502) with 400.
+
+    When Agent Runtime automatically populates GOOGLE_CLOUD_PROJECT with the
+    numeric project number, _resolve_project_id must prefer the string PROJECT_ID.
+    """
+    for k in (
+        "OTEL_EXPORTER_GCP_TRACE_PROJECT_ID",
+        "GOOGLE_CLOUD_PROJECT",
+        "PROJECT_ID",
+        "FIRESTORE_PROJECT_ID",
+    ):
+        monkeypatch.delenv(k, raising=False)
+    monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "432423772502")
+    monkeypatch.setenv("PROJECT_ID", "srinandans-next25-demo")
+    assert server._resolve_project_id() == "srinandans-next25-demo"
 
 
 def test_build_tracer_provider_carries_service_name_and_exports():
