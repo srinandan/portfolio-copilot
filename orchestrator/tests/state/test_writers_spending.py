@@ -42,12 +42,14 @@ def test_write_spending_report_persists_to_firestore():
 def test_spending_report_serialized_shape_matches_schema():
     import json
     from pathlib import Path
+    from unittest.mock import patch
 
     import jsonschema
 
     from orchestrator.data.firestore import FirestoreClient
 
-    client = FirestoreClient(project="test-project")
+    with patch("google.cloud.firestore.Client"):
+        client = FirestoreClient(project="test-project")
     report = SpendingReport(
         user_id="user_123",
         total_income_usd=10000.0,

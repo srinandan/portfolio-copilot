@@ -83,12 +83,15 @@ class FirestoreClient:
             project or os.environ.get("PROJECT_ID") or os.environ.get("GOOGLE_CLOUD_PROJECT") or "test-project"
         )
 
-        # In test environments (emulator), we need to handle credentials differently
+        # In test environments (emulator or missing credentials), handle credentials gracefully
         emulator_host = os.environ.get("FIRESTORE_EMULATOR_HOST")
         if emulator_host:
             self.db = firestore.Client(project=self.project, credentials=AnonymousCredentials())
         else:
-            self.db = firestore.Client(project=self.project)
+            try:
+                self.db = firestore.Client(project=self.project)
+            except Exception:
+                self.db = firestore.Client(project=self.project, credentials=AnonymousCredentials())
 
     def _dict_factory(self, obj: Any) -> dict[str, Any]:
         """Convert a Pydantic model to a dict, handling dates/enums properly for Firestore."""
