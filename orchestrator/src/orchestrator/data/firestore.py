@@ -21,10 +21,11 @@ COLLECTION_LIABILITIES = "liabilities"
 COLLECTION_AUDIT_LOG = "audit_log"
 COLLECTION_IPS = "ips"
 COLLECTION_PROPOSED_ACTIONS = "proposed_actions"
+COLLECTION_SPENDING_REPORTS = "spending_reports"
 
 
 def _default_dict_factory(obj: Any) -> dict[str, Any]:
-    return json.loads(obj.model_dump_json(exclude_none=True))
+    return json.loads(obj.model_dump_json(by_alias=True, exclude_none=True))
 
 
 @firestore.transactional
@@ -82,17 +83,20 @@ class FirestoreClient:
             project or os.environ.get("PROJECT_ID") or os.environ.get("GOOGLE_CLOUD_PROJECT") or "test-project"
         )
 
-        # In test environments (emulator), we need to handle credentials differently
+        # In test environments (emulator or missing credentials), handle credentials gracefully
         emulator_host = os.environ.get("FIRESTORE_EMULATOR_HOST")
         if emulator_host:
             self.db = firestore.Client(project=self.project, credentials=AnonymousCredentials())
         else:
-            self.db = firestore.Client(project=self.project)
+            try:
+                self.db = firestore.Client(project=self.project)
+            except Exception:
+                self.db = firestore.Client(project=self.project, credentials=AnonymousCredentials())
 
     def _dict_factory(self, obj: Any) -> dict[str, Any]:
         """Convert a Pydantic model to a dict, handling dates/enums properly for Firestore."""
-        # We rely on Pydantic's model_dump with mode="json" to serialize enums/dates to primitives.
-        return json.loads(obj.model_dump_json(exclude_none=True))
+        # We rely on Pydantic's model_dump with mode="json" and by_alias=True to serialize enums/dates to primitives.
+        return json.loads(obj.model_dump_json(by_alias=True, exclude_none=True))
 
     def get_holdings(self, user_id: str) -> HoldingsSnapshot | None:
         """Gets the holdings snapshot for a given user."""
@@ -188,4 +192,23 @@ class FirestoreClient:
             raise ValueError(f"invariant violated: found multiple active IPS documents for user_id {user_id}")
         if len(docs) == 1:
             return InvestmentPolicyStatement.model_validate(docs[0].to_dict())
+        return None
+
+    def set_spending_report(self, user_id: str, report: Any) -> None:
+        """Writes a SpendingReport to Firestore, keyed by user_id."""
+        doc_ref = self.db.collection(COLLECTION_SPENDING_REPORTS).document(user_id)
+        if isinstance(report, dict):
+            data = report
+        elif hasattr(report, "model_dump"):
+            data = self._dict_factory(report)
+        else:
+            data = dict(report)
+        doc_ref.set(data)
+
+    def get_spending_report(self, user_id: str) -> dict[str, Any] | None:
+        """Reads a SpendingReport dict by user_id."""
+        doc_ref = self.db.collection(COLLECTION_SPENDING_REPORTS).document(user_id)
+        doc = doc_ref.get()
+        if doc.exists:
+            return doc.to_dict()
         return None

@@ -87,7 +87,13 @@ func (c *Client) GetSpendingReport(ctx context.Context, userID string) (*contrac
 	}
 	var report contracts.SpendingReport
 	if err := doc.DataTo(&report); err != nil {
-		return nil, fmt.Errorf("failed to parse spending report: %w", err)
+		dataBytes, jsonErr := json.Marshal(doc.Data())
+		if jsonErr != nil {
+			return nil, fmt.Errorf("failed to parse spending report: %w", err)
+		}
+		if jsonErr := json.Unmarshal(dataBytes, &report); jsonErr != nil {
+			return nil, fmt.Errorf("failed to parse spending report: %w", err)
+		}
 	}
 	return &report, nil
 }

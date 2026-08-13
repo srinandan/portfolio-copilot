@@ -35,6 +35,7 @@ once tagged. Nothing has been released yet — see the note under `[Unreleased]`
 - Live skill revocation detection: planner compares each cycle's authorized
   skills against the previous cycle and emits `SKILL_REVOKED` audit for any
   that disappeared.
+- Spending report persistence: orchestrator persists synthesized `SpendingReport` to Firestore collection `spending_reports/{user_id}` upon spending analysis completion (Issue #291).
 - HTTP surface for Agent Runtime custom-container deployment (`/livez`,
   `/readyz`, `POST /v1/invoke`, `POST /v1/resume`, `POST /api/reasoning_engine`,
   `POST /api/stream_reasoning_engine`) built around the same `root_agent`
@@ -135,6 +136,7 @@ once tagged. Nothing has been released yet — see the note under `[Unreleased]`
   and `MANAGED_AGENT_ID` with strict-mode failure at startup in production.
 
 **Testing and CI**
+- Canonical spending report fixture (`testdata/spending_report.json`) validated against `schemas/spending-report.schema.json` and seeded into Firestore by `scripts/load_test_data.py` (Issue #291).
 - ~295 Python tests + 66 Vue tests + Go tests across `pkg/{contracts,store,bigquery}`
   and `frontend/server`.
 - CI: Python (uv + pytest with coverage + ruff), Go (build + vet + test with

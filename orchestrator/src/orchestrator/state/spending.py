@@ -62,15 +62,23 @@ def preload_spending_facts(
         avg = float(row.get("trailing_3mo_avg", 0.0) or 0.0)
         pct = (curr / total_outflow * 100.0) if total_outflow > 0 else 0.0
 
-        category_breakdown.append(CategorySpending(category=cat, amount_usd=curr, percentage=pct))
+        category_breakdown.append(
+            CategorySpending(
+                category=cat,
+                amount_usd=curr,
+                percent_of_total=pct,
+                monthly_average_usd=avg if avg > 0 else None,
+            )
+        )
 
         if is_anomalous(curr, avg):
             anomalies.append(
                 SpendingAnomaly(
                     category=cat,
-                    current_spend_usd=curr,
-                    trailing_avg_usd=avg,
+                    amount_usd=curr,
+                    trailing_average_usd=avg,
                     description=f"Spending in '{cat}' surged from 3-month average ${avg:.2f} to ${curr:.2f}.",
+                    date=current_month_start,
                 )
             )
     calc_elapsed_sec = round(time.monotonic() - t_calc, 3)

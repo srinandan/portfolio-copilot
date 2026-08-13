@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://portfolio-copilot/schemas/spending-report.schema.json",
+  "title": "SpendingReport",
+  "description": "Comprehensive spending analysis report including income/outflow metrics, savings rate, liquidity reserves, category breakdown, and anomalies.",
+  "type": "object",
+  "required": [
+    "user_id",
+    "total_income_usd",
+    "total_outflow_usd",
+    "savings_rate",
+    "reserve_months",
+    "category_breakdown",
+    "anomalies",
+    "narrative_summary"
+  ],
+  "properties": {
+    "user_id": { "type": "string" },
+    "total_income_usd": { "type": "number", "minimum": 0 },
+    "total_outflow_usd": { "type": "number", "minimum": 0 },
+    "savings_rate": { "type": "number" },
+    "reserve_months": { "type": "number", "minimum": 0 },
+    "category_breakdown": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["category", "amount_usd", "percent_of_total"],
+        "properties": {
+          "category": { "type": "string" },
+          "amount_usd": { "type": "number", "minimum": 0 },
+          "percent_of_total": { "type": "number", "minimum": 0, "maximum": 100 },
+          "monthly_average_usd": { "type": "number", "minimum": 0 }
+        }
+      }
+    },
+    "anomalies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["category", "amount_usd", "trailing_average_usd", "description"],
+        "properties": {
+          "category": { "type": "string" },
+          "amount_usd": { "type": "number", "minimum": 0 },
+          "trailing_average_usd": { "type": "number", "minimum": 0 },
+          "description": { "type": "string" },
+          "date": { "type": "string" }
+        }
+      }
+    },
+    "narrative_summary": { "type": "string" }
+  }
+}

@@ -240,9 +240,7 @@ def _init_server_tracing(fastapi_app: FastAPI) -> None:
 
         # W3C TraceContext is OTel's default; set it explicitly so ingress
         # extraction is robust regardless of any runtime propagator override.
-        propagate.set_global_textmap(
-            CompositePropagator([TraceContextTextMapPropagator(), W3CBaggagePropagator()])
-        )
+        propagate.set_global_textmap(CompositePropagator([TraceContextTextMapPropagator(), W3CBaggagePropagator()]))
         # Wire the exporter BEFORE instrumenting so the server span is exported.
         _configure_span_export()
         FastAPIInstrumentor.instrument_app(fastapi_app)

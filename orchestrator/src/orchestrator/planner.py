@@ -40,6 +40,7 @@ from .state import (
     preload_spending_facts,
     write_ips_from_interview_result,
     write_proposed_action,
+    write_spending_report,
 )
 
 logger = get_logger(__name__)
@@ -135,6 +136,10 @@ async def _postprocess_spending(user_id, result, ctx, input_dict, registry_entry
         anomalies=anomalies_out,
         narrative_summary=narrative or "Spending analysis completed based on transaction facts.",
     )
+    try:
+        write_spending_report(user_id=report.user_id, report=report)
+    except Exception as e:
+        logger.warning("Failed to persist SpendingReport for user %s: %s", user_id, e)
     payload = report.model_dump()
     return payload, {"spending_analysis_result": report}
 

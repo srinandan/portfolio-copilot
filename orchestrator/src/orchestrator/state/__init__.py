@@ -21,6 +21,7 @@ from .writers import (
     emit_skill_revoked_audit,
     write_ips_from_interview_result,
     write_proposed_action,
+    write_spending_report,
 )
 
 __all__ = [
@@ -42,4 +43,5 @@ __all__ = [
     "emit_skill_revoked_audit",
     "write_ips_from_interview_result",
     "write_proposed_action",
+    "write_spending_report",
 ]

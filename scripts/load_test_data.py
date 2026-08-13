@@ -33,6 +33,7 @@ def validate_fixtures() -> None:
         "holdings.json": "holdings.schema.json",
         "liabilities.json": "liabilities.schema.json",
         "ips.json": "ips.schema.json",
+        "spending_report.json": "spending-report.schema.json",
         "checking_transactions.json": "account-transaction.schema.json",
         "chase_transactions.json": "account-transaction.schema.json",
     }
@@ -160,11 +161,12 @@ def seed_bigquery(project_id: str, location: str, dataset_name: str, table_name:
 
 
 def seed_firestore(project_id: str, location: str, dry_run: bool) -> None:
-    print(f"\n[Firestore] Seeding IPS, Holdings, and Liabilities into project {project_id}...")
+    print(f"\n[Firestore] Seeding IPS, Holdings, Liabilities, and Spending Report into project {project_id}...")
 
     ips_data = load_json(TESTDATA_DIR / "ips.json")
     holdings_data = load_json(TESTDATA_DIR / "holdings.json")
     liabilities_data = load_json(TESTDATA_DIR / "liabilities.json")
+    spending_report_data = load_json(TESTDATA_DIR / "spending_report.json")
 
     user_id = ips_data["user_id"]
     ips_id = ips_data["ips_id"]
@@ -174,6 +176,7 @@ def seed_firestore(project_id: str, location: str, dry_run: bool) -> None:
         print(f"  [DRY-RUN] Would write ips/{ips_doc_id} for user '{user_id}'")
         print(f"  [DRY-RUN] Would write holdings/{user_id}")
         print(f"  [DRY-RUN] Would write liabilities/{user_id}")
+        print(f"  [DRY-RUN] Would write spending_reports/{user_id}")
         return
 
     try:
@@ -197,6 +200,10 @@ def seed_firestore(project_id: str, location: str, dry_run: bool) -> None:
         # Write Liabilities
         db.collection("liabilities").document(user_id).set(liabilities_data)
         print(f"  ✓ Written Liabilities document: liabilities/{user_id}")
+
+        # Write Spending Report
+        db.collection("spending_reports").document(user_id).set(spending_report_data)
+        print(f"  ✓ Written Spending Report document: spending_reports/{user_id}")
 
     except Exception as e:
         print(f"  ✗ Error seeding Firestore: {e}", file=sys.stderr)

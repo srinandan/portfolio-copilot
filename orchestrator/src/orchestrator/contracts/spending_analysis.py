@@ -1,8 +1,6 @@
-"""Contract for the Spending Analysis Managed Agent output."""
+from typing import List, Optional
 
-from typing import List
-
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 
 class CategorySpending(BaseModel):
@@ -10,16 +8,51 @@ class CategorySpending(BaseModel):
 
     category: str = Field(description="Transaction category name.")
     amount_usd: float = Field(description="Total spend in USD for the window.")
-    percentage: float = Field(description="Percentage of total outflow.")
+    percent_of_total: float = Field(
+        default=0.0,
+        validation_alias=AliasChoices("percent_of_total", "percentage"),
+        serialization_alias="percent_of_total",
+        description="Percentage of total outflow.",
+    )
+    monthly_average_usd: Optional[float] = Field(
+        default=None, description="Optional trailing monthly average spend in USD."
+    )
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    @property
+    def percentage(self) -> float:
+        return self.percent_of_total
 
 
 class SpendingAnomaly(BaseModel):
     """Detected spending anomaly in a category."""
 
     category: str = Field(description="Category where anomalous spending was detected.")
-    current_spend_usd: float = Field(description="Current period spend in USD.")
-    trailing_avg_usd: float = Field(description="Trailing period average spend in USD.")
+    amount_usd: float = Field(
+        default=0.0,
+        validation_alias=AliasChoices("amount_usd", "current_spend_usd"),
+        serialization_alias="amount_usd",
+        description="Current period spend in USD.",
+    )
+    trailing_average_usd: float = Field(
+        default=0.0,
+        validation_alias=AliasChoices("trailing_average_usd", "trailing_avg_usd"),
+        serialization_alias="trailing_average_usd",
+        description="Trailing period average spend in USD.",
+    )
     description: str = Field(description="Explanation of anomaly.")
+    date: str = Field(default="", description="Date of the anomaly or reference period.")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    @property
+    def current_spend_usd(self) -> float:
+        return self.amount_usd
+
+    @property
+    def trailing_avg_usd(self) -> float:
+        return self.trailing_average_usd
 
 
 class SpendingReport(BaseModel):
@@ -35,6 +68,8 @@ class SpendingReport(BaseModel):
     )
     anomalies: List[SpendingAnomaly] = Field(default_factory=list, description="Detected spending anomalies.")
     narrative_summary: str = Field(description="Natural language narrative analysis and recommendations.")
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class SpendingNarrative(BaseModel):
