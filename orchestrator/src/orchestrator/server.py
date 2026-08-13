@@ -116,7 +116,52 @@ async def _lifespan(_app: FastAPI):
     state.ready = False
 
 
+def _init_server_tracing(fastapi_app: FastAPI) -> None:
+    """Instrument the FastAPI ingress for distributed tracing.
+
+    The Go gateway injects a W3C ``traceparent`` on its call to the orchestrator
+    (see ADR-0019). Agent Runtime already exports the orchestrator's ADK/GenAI
+    spans (``GOOGLE_CLOUD_AGENT_ENGINE_ENABLE_TELEMETRY``), but nothing extracted
+    that inbound header — so those spans started a *fresh* trace instead of
+    continuing the browser -> Go trace.
+
+    This installs FastAPI ingress instrumentation, which extracts the inbound
+    context, opens a **server span** as its child, and activates that context for
+    the request. The ADK/GenAI spans created while handling it then nest under it,
+    giving one Trace ID from browser click to agent execution.
+
+    It reuses whatever global TracerProvider Agent Runtime configured (no provider
+    in local/tests => non-recording spans, but context still propagates).
+    Opt-out via ``OTEL_TRACES_ENABLED=false``; never fatal — a telemetry failure
+    must not stop the server from serving.
+
+    Note: in Agent Engine (Vertex ``:streamQuery``) deployments, whether the
+    inbound ``traceparent`` reaches this container is subject to Vertex header
+    forwarding; in direct (``ORCHESTRATOR_URL``) mode it always does.
+    """
+    if os.environ.get("OTEL_TRACES_ENABLED", "").lower() in ("false", "0"):
+        logger.info("FastAPI server-side tracing disabled via OTEL_TRACES_ENABLED")
+        return
+    try:
+        from opentelemetry import propagate
+        from opentelemetry.baggage.propagation import W3CBaggagePropagator
+        from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+        from opentelemetry.propagators.composite import CompositePropagator
+        from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
+
+        # W3C TraceContext is OTel's default; set it explicitly so ingress
+        # extraction is robust regardless of any runtime propagator override.
+        propagate.set_global_textmap(
+            CompositePropagator([TraceContextTextMapPropagator(), W3CBaggagePropagator()])
+        )
+        FastAPIInstrumentor.instrument_app(fastapi_app)
+        logger.info("FastAPI server-side tracing enabled (W3C context extraction)")
+    except Exception:
+        logger.exception("FastAPI tracing init failed; continuing without ingress spans")
+
+
 app = FastAPI(title="Portfolio Copilot Orchestrator", version="0.1.0", lifespan=_lifespan)
+_init_server_tracing(app)
 
 
 @app.exception_handler(Exception)
