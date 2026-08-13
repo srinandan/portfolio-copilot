@@ -10,8 +10,7 @@ const router = createRouter({
     { path: '/onboarding', name: 'onboarding', component: { template: '<div></div>' } },
     { path: '/portfolio', name: 'portfolio', component: { template: '<div></div>' } },
     { path: '/spending', name: 'spending', component: { template: '<div></div>' } },
-    { path: '/documents', name: 'documents', component: { template: '<div></div>' } },
-    { path: '/security', name: 'security', component: { template: '<div></div>' } }
+    { path: '/documents', name: 'documents', component: { template: '<div></div>' } }
   ]
 });
 
@@ -37,7 +36,6 @@ describe('Navbar.vue', () => {
     expect(screen.getByText('Portfolio')).toBeDefined();
     expect(screen.getByText('Spending')).toBeDefined();
     expect(screen.getByText('Documents')).toBeDefined();
-    expect(screen.getByText('Security')).toBeDefined();
   });
 
   it('does not display gateway status badge or profile photo', async () => {

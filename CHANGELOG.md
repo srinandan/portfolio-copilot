@@ -158,6 +158,10 @@ once tagged. Nothing has been released yet — see the note under `[Unreleased]`
 - `AGENTS.md` for coding-agent contributors, distinguishing runtime skills
   (`/skills`) from engineering-practice skills (`/.agent/skills`).
 
+### Removed
+
+- Removed unused `/security` view (`SecurityView.vue`), its route, and navbar links (Issue #297).
+
 ### Fixed (second-pass review, PR #253)
 
 - `memory_interaction` node no longer writes a hardcoded "user prefers low-risk
