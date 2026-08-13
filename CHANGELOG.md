@@ -40,6 +40,14 @@ once tagged. Nothing has been released yet — see the note under `[Unreleased]`
   `POST /api/stream_reasoning_engine`) built around the same `root_agent`
   workflow that runs in tests.
 - OpenTelemetry and Cloud Trace emission on Agent Runtime: injects telemetry environment variables (`GOOGLE_CLOUD_AGENT_ENGINE_ENABLE_TELEMETRY`, `OTEL_SEMCONV_STABILITY_OPT_IN`, `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT`) and grants `roles/cloudtrace.agent` to Agent Identity (#280).
+- FastAPI ingress tracing (companion to ADR-0019): `server.py` instruments the
+  HTTP ingress (`opentelemetry-instrumentation-fastapi`) so the inbound W3C
+  `traceparent` from the frontend gateway is extracted and the orchestrator's
+  ADK/GenAI spans continue the same trace instead of starting a fresh one —
+  completing a single Trace ID from browser → Go server → orchestrator. Reuses
+  the Agent Runtime TracerProvider; opt-out via `OTEL_TRACES_ENABLED=false`;
+  never fatal. (The `#280` env vars enable the GenAI/client spans; this adds the
+  server-side context extraction that was missing.)
 - Explicit Agent Runtime framework configuration: sets `agent_framework="google-adk"` across container and placeholder deployment paths (#279).
 - Structured onboarding endpoint `POST /v1/onboarding/apply` that persists a
   wizard-collected `GoalsOnboardingResult` directly via
