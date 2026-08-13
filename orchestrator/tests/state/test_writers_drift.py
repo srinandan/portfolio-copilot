@@ -40,7 +40,10 @@ def test_write_drift_report_persists_to_firestore():
 
 
 def test_drift_report_serialized_shape_matches_schema():
-    client = FirestoreClient(project="test-project")
+    from unittest.mock import patch
+
+    with patch("google.cloud.firestore.Client"):
+        client = FirestoreClient(project="test-project")
     report = DriftReport(
         user_id="user_123",
         as_of="2026-08-01T00:00:00Z",
