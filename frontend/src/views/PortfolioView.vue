@@ -24,32 +24,34 @@
         <div class="w-24 h-24 relative flex-shrink-0">
           <svg class="w-full h-full transform -rotate-90 drop-shadow-sm" viewBox="0 0 100 100">
             <circle class="text-surface-variant opacity-30" cx="50" cy="50" fill="transparent" r="40" stroke="currentColor" stroke-width="12"></circle>
-            <circle class="text-primary-fixed drop-shadow-sm" cx="50" cy="50" fill="transparent" r="40" stroke="currentColor" stroke-dasharray="251.2" stroke-dashoffset="62.8" stroke-width="12"></circle>
-            <circle class="text-tertiary-fixed-dim drop-shadow-sm" cx="50" cy="50" fill="transparent" r="40" stroke="currentColor" stroke-dasharray="251.2" stroke-dashoffset="200.9" stroke-width="12"></circle>
-            <circle class="text-secondary drop-shadow-sm" cx="50" cy="50" fill="transparent" r="40" stroke="currentColor" stroke-dasharray="251.2" stroke-dashoffset="238.6" stroke-width="12"></circle>
+            <circle
+              v-for="item in allocationBreakdown"
+              :key="item.assetClass"
+              class="drop-shadow-sm transition-all duration-500"
+              :class="item.colorClass.replace('bg-', 'text-')"
+              cx="50"
+              cy="50"
+              fill="transparent"
+              r="40"
+              stroke="currentColor"
+              :stroke-dasharray="item.dasharray"
+              :stroke-dashoffset="item.dashoffset"
+              stroke-width="12"
+            ></circle>
           </svg>
         </div>
         <div class="flex flex-col gap-2 flex-1">
-          <div class="flex items-center justify-between">
+          <div
+            v-for="item in allocationBreakdown"
+            :key="item.assetClass"
+            class="flex items-center justify-between"
+            data-testid="allocation-row"
+          >
             <div class="flex items-center gap-2">
-              <div class="w-2 h-2 rounded-full bg-primary-fixed"></div>
-              <span class="font-body-base text-body-base text-on-surface">Stocks</span>
+              <div :class="['w-2 h-2 rounded-full', item.colorClass]"></div>
+              <span class="font-body-base text-body-base text-on-surface">{{ item.assetClass }}</span>
             </div>
-            <span class="font-body-mono text-body-mono text-on-surface">55%</span>
-          </div>
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <div class="w-2 h-2 rounded-full bg-tertiary-fixed-dim"></div>
-              <span class="font-body-base text-body-base text-on-surface">ETFs</span>
-            </div>
-            <span class="font-body-mono text-body-mono text-on-surface">30%</span>
-          </div>
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <div class="w-2 h-2 rounded-full bg-secondary"></div>
-              <span class="font-body-base text-body-base text-on-surface">Cash</span>
-            </div>
-            <span class="font-body-mono text-body-mono text-on-surface">15%</span>
+            <span class="font-body-mono text-body-mono text-on-surface">{{ item.percent.toFixed(1) }}%</span>
           </div>
         </div>
       </div>
@@ -69,6 +71,24 @@ import type { HoldingsSnapshot, DriftReport } from '../types';
 import { apiService } from '../services/api';
 import TopHoldingsTable from '../components/portfolio/TopHoldingsTable.vue';
 import DriftReportCard from '../components/portfolio/DriftReportCard.vue';
+
+interface AllocationItem {
+  assetClass: string;
+  valueUSD: number;
+  percent: number;
+  colorClass: string;
+  dasharray: string;
+  dashoffset: string;
+}
+
+const colorPalette = [
+  'bg-primary-fixed',
+  'bg-tertiary-fixed-dim',
+  'bg-secondary',
+  'bg-primary',
+  'bg-tertiary',
+  'bg-surface-variant'
+];
 
 const holdings = ref<HoldingsSnapshot>({
   total_value_usd: 1248500,
@@ -100,6 +120,54 @@ const formattedAsOf = computed(() => {
   }
   const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   return `Updated ${dateStr}`;
+});
+
+const allocationBreakdown = computed<AllocationItem[]>(() => {
+  const map: Record<string, number> = {};
+
+  for (const pos of holdings.value.positions || []) {
+    const cls = pos.asset_class || 'Other';
+    const val = pos.market_value_usd ?? pos.current_value_usd ?? (pos.quantity * (pos.current_price_usd ?? 0));
+    map[cls] = (map[cls] || 0) + val;
+  }
+
+  const cash = holdings.value.cash_usd || 0;
+  if (cash > 0) {
+    map['Cash'] = (map['Cash'] || 0) + cash;
+  }
+
+  const total = holdings.value.total_value_usd || Object.values(map).reduce((a, b) => a + b, 0);
+
+  if (total <= 0 || Object.keys(map).length === 0) {
+    return [
+      { assetClass: 'Stocks', valueUSD: 0, percent: 55, colorClass: 'bg-primary-fixed', dasharray: `${0.55 * 251.2} 251.2`, dashoffset: '0' },
+      { assetClass: 'ETFs', valueUSD: 0, percent: 30, colorClass: 'bg-tertiary-fixed-dim', dasharray: `${0.30 * 251.2} 251.2`, dashoffset: `${-0.55 * 251.2}` },
+      { assetClass: 'Cash', valueUSD: 0, percent: 15, colorClass: 'bg-secondary', dasharray: `${0.15 * 251.2} 251.2`, dashoffset: `${-0.85 * 251.2}` }
+    ];
+  }
+
+  let accumulatedPercent = 0;
+  const items: AllocationItem[] = [];
+  const entries = Object.entries(map).sort((a, b) => b[1] - a[1]);
+
+  entries.forEach(([assetClass, val], idx) => {
+    const percent = (val / total) * 100;
+    const colorClass = colorPalette[idx % colorPalette.length];
+    const segmentLength = (percent / 100) * 251.2;
+    const offset = (accumulatedPercent / 100) * 251.2;
+    accumulatedPercent += percent;
+
+    items.push({
+      assetClass,
+      valueUSD: val,
+      percent,
+      colorClass,
+      dasharray: `${segmentLength} 251.2`,
+      dashoffset: `${-offset}`
+    });
+  });
+
+  return items;
 });
 
 onMounted(async () => {

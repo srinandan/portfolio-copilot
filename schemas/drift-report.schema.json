@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://portfolio-copilot/schemas/drift-report.schema.json",
+  "title": "DriftReport",
+  "description": "Comprehensive drift analysis report across target asset classes against IPS allocation bands.",
+  "type": "object",
+  "required": [
+    "as_of",
+    "bands",
+    "unclassified_value_usd",
+    "rebalance_recommended",
+    "has_active_ips"
+  ],
+  "properties": {
+    "user_id": { "type": "string" },
+    "as_of": { "type": "string" },
+    "bands": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "asset_class",
+          "current_percent",
+          "target_percent",
+          "min_percent",
+          "max_percent",
+          "in_band",
+          "drift_amount_percent"
+        ],
+        "properties": {
+          "asset_class": { "type": "string" },
+          "current_percent": { "type": "number", "minimum": 0, "maximum": 100 },
+          "target_percent": { "type": "number", "minimum": 0, "maximum": 100 },
+          "min_percent": { "type": "number", "minimum": 0, "maximum": 100 },
+          "max_percent": { "type": "number", "minimum": 0, "maximum": 100 },
+          "in_band": { "type": "boolean" },
+          "drift_amount_percent": { "type": "number", "minimum": 0 }
+        }
+      }
+    },
+    "unclassified_value_usd": { "type": "number", "minimum": 0 },
+    "rebalance_recommended": { "type": "boolean" },
+    "has_active_ips": { "type": "boolean" }
+  }
+}

@@ -1,5 +1,7 @@
 """Core calculations for portfolio drift analysis against Investment Policy Statement target allocation."""
 
+from datetime import datetime
+
 from ..contracts.drift_report import DriftReport, DriftReportEntry
 from ..contracts.holdings import HoldingsSnapshot
 from ..contracts.ips import InvestmentPolicyStatement
@@ -16,6 +18,14 @@ CASH_ASSET_CLASS_SYNONYMS = {
 }
 
 
+def _format_as_of(as_of: datetime | str | None) -> str:
+    if as_of is None:
+        return ""
+    if isinstance(as_of, datetime):
+        return as_of.isoformat()
+    return str(as_of)
+
+
 def calculate_drift(holdings: HoldingsSnapshot, ips: InvestmentPolicyStatement) -> DriftReport:
     """Calculates portfolio allocation drift against the active Investment Policy Statement.
 
@@ -26,6 +36,7 @@ def calculate_drift(holdings: HoldingsSnapshot, ips: InvestmentPolicyStatement) 
     Returns:
         DriftReport detailing asset class allocations, drift percentages, and rebalance recommendation.
     """
+    as_of_str = _format_as_of(holdings.as_of)
     cash_amount = holdings.cash_usd or 0.0
     cash_in_positions = sum(
         p.market_value_usd for p in holdings.positions if p.asset_class.strip().lower() in CASH_ASSET_CLASS_SYNONYMS
@@ -71,7 +82,15 @@ def calculate_drift(holdings: HoldingsSnapshot, ips: InvestmentPolicyStatement) 
                     drift_amount_percent=drift_amount,
                 )
             )
-        return DriftReport(entries=entries, unclassified_value_usd=0.0, rebalance_recommended=False)
+        user_id = holdings.user_id if isinstance(holdings.user_id, str) else None
+        return DriftReport(
+            user_id=user_id,
+            as_of=as_of_str,
+            bands=entries,
+            unclassified_value_usd=0.0,
+            rebalance_recommended=False,
+            has_active_ips=True,
+        )
 
     # Accumulate market value by asset class
     value_by_class: dict[str, float] = {}
@@ -132,8 +151,13 @@ def calculate_drift(holdings: HoldingsSnapshot, ips: InvestmentPolicyStatement) 
         if ac not in bands:
             unclassified_value += val
 
+    user_id = holdings.user_id if isinstance(holdings.user_id, str) else None
+
     return DriftReport(
-        entries=entries,
+        user_id=user_id,
+        as_of=as_of_str,
+        bands=entries,
         unclassified_value_usd=unclassified_value,
         rebalance_recommended=rebalance_recommended,
+        has_active_ips=True,
     )

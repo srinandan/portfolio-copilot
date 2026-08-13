@@ -379,6 +379,7 @@ describe('Frontend Views', () => {
     expect(screen.getByText('Total Value')).toBeDefined();
     expect(screen.getByText('Portfolio Drift Report')).toBeDefined();
     expect(screen.getByText('Top Holdings')).toBeDefined();
+    expect(screen.getAllByTestId('allocation-row').length).toBeGreaterThan(0);
 
     await waitFor(() => {
       expect(screen.getByText('$1,248,500.00')).toBeDefined();

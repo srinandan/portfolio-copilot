@@ -38,6 +38,7 @@ from .state import (
     preload_for_research,
     preload_for_reviewer,
     preload_spending_facts,
+    write_drift_report,
     write_ips_from_interview_result,
     write_proposed_action,
     write_spending_report,
@@ -197,6 +198,10 @@ def _build_portfolio_analysis_input(user_id, input_dict, context):
 
 async def _postprocess_portfolio_analysis(user_id, result, ctx, input_dict, registry_entry_id=None):
     payload = result.model_dump() if hasattr(result, "model_dump") else result
+    try:
+        write_drift_report(user_id=user_id, report=result)
+    except Exception as e:
+        logger.warning("Failed to persist DriftReport for user %s: %s", user_id, e)
     context_update = {"portfolio_analysis_result": payload}
     # Thread the drift_report forward so action-drafting can consume it (I1 chaining)
     if hasattr(result, "model_dump"):
