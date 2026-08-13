@@ -52,6 +52,34 @@ go test ./... -cover
 cd frontend && npm run build && npm run test -- --coverage
 ```
 
+## Deployment — Always Use Makefile
+
+**Always use the Makefile to deploy services.** Do not run ad-hoc `gcloud builds submit` or manual deployment commands directly.
+
+```bash
+# Deploy Full Stack (Both Orchestrator and Frontend)
+make deploy
+
+# Deploy Orchestrator to Vertex AI Agent Runtime
+make deploy-orchestrator   # or: cd orchestrator && make deploy
+
+# Deploy Frontend to Cloud Run
+make deploy-frontend       # or: cd frontend && make deploy
+
+# Provision Worker Managed Agent
+make deploy-managed-agent
+
+# Register Skills with Agent Registry
+make register-skills
+
+# Setup Agent Runtime IAM & Permissions
+make setup-agent-engine
+
+# End-to-End Environment Provisioning & Test Data
+make setup-all
+make load-testdata
+```
+
 ## Before writing code
 
 1. Read `.agent/skills/concise-code/SKILL.md`,

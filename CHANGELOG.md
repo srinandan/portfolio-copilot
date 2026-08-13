@@ -98,8 +98,8 @@ once tagged. Nothing has been released yet — see the note under `[Unreleased]`
 - Tag-triggered Cloud Build releases via Developer Connect: pushing a
   `v*` tag builds and deploys orchestrator (Agent Runtime) + frontend
   (Cloud Run) in parallel.
-- Per-service Makefiles (`make -C orchestrator deploy`,
-  `make -C frontend deploy`) for manual deploys without a tag.
+- Root and per-service Makefiles (`make deploy`, `make deploy-orchestrator`,
+  `make deploy-frontend`) with deployment rules mandated in `AGENTS.md`.
 - Setup scripts under `scripts/` for Secret Manager, BigQuery, Firestore,
   Cloud Run, Managed Agent, Agent Runtime, and skill registration; each
   runs standalone and is composed by `setup_all.sh`.

@@ -12,7 +12,8 @@
 Provisions Secret Manager, BigQuery, Firestore, Cloud Run, Managed Agent workers, and Agent Runtime, in the order each depends on the last:
 
 ```bash
-./scripts/setup_all.sh <PROJECT_ID> <REGION>
+make setup-all
+# or: ./scripts/setup_all.sh <PROJECT_ID> <REGION>
 ```
 
 This runs, in sequence:
@@ -52,12 +53,13 @@ Credentials (`MANAGED_AGENT_ID`, `ALPACA_API_KEY_ID`, and `ALPACA_API_SECRET`) a
 Each skill under `skills/` needs registering with the real Agent Registry before the orchestrator can discover it:
 
 ```bash
-# Register a single skill:
+# Register all runtime skills at once:
+make register-skills
+# or: ./scripts/register_all_skills.sh <PROJECT_ID> <REGION>
+
+# Or register a single skill:
 ./scripts/register_skill.sh <skill-name> <PROJECT_ID> <REGION>
 # e.g. ./scripts/register_skill.sh goals-onboarding <PROJECT_ID> us-central1
-
-# Or register all runtime skills at once:
-./scripts/register_all_skills.sh <PROJECT_ID> <REGION>
 ```
 
 Zips the skill directory and registers it as `private-<skill-name>`. Re-run this any time a skill's `SKILL.md` or supporting files change, this pushes a new revision, it doesn't mutate the existing one.
@@ -72,7 +74,8 @@ To seed your BigQuery dataset and Firestore database with canonical test fixture
 
 ```bash
 # Setup schemas and seed BigQuery + Firestore:
-./scripts/load_test_data.sh <PROJECT_ID> <REGION>
+make load-testdata
+# or: ./scripts/load_test_data.sh <PROJECT_ID> <REGION>
 
 # Or run dry-run validation locally without GCP calls:
 python3 scripts/load_test_data.py --dry-run
@@ -97,23 +100,28 @@ This smoke test verifies that `resolve_managed_agent_id()` loads a live `MANAGED
 ## Running locally
 
 ```bash
-# orchestrator (Python)
-cd orchestrator && uv pip install -e ".[dev]" && uv run pytest
+# 1. Install all dependencies (Python uv + Node npm)
+make install
 
-# frontend UI & Go backend server
-cd frontend && npm install && npm run build
-go build -o bin/server ./frontend/server && ./bin/server
+# 2. Run Python ADK orchestrator locally on :8000
+make local-orchestrator
+
+# 3. Run Vue Vite dev server with hot reload on :5173
+make local-frontend
+
+# 4. Or build SPA & run production Go backend server on :8080
+make local-server
 ```
 
 ## Updating / redeploying after code changes
 
 Depends on what changed:
 
-- **Frontend code**: use the frontend Makefile — `make -C frontend deploy` — which calls `gcloud builds submit --config=frontend/cloudbuild.yaml`. For a tagged release, push a `v*` tag and the Cloud Build triggers set up by `scripts/setup_cloudbuild_triggers.sh` build and deploy both services automatically (see below).
+- **Frontend code**: use the Makefile — `make deploy-frontend` (or `make -C frontend deploy`). For a tagged release, push a `v*` tag and the Cloud Build triggers set up by `scripts/setup_cloudbuild_triggers.sh` build and deploy both services automatically (see below).
 - **Worker Managed Agent code**: re-run
   `./scripts/setup_managed_agent.sh <PROJECT_ID> <REGION>` (or `python scripts/deploy_managed_agent.py --project=<PROJECT_ID> --location=<REGION>`).
-- **Orchestrator code**: re-run `python scripts/deploy_agent_engine.py`
-  to redeploy to Agent Runtime.
+- **Orchestrator code**: use the Makefile — `make deploy-orchestrator` (or `make -C orchestrator deploy`) to build and redeploy to Agent Runtime.
+- **Full stack (both services)**: use `make deploy` from repository root.
 - **A skill's `SKILL.md` or contents**: re-run `register_skill.sh` for
   that skill (or `register_all_skills.sh`), per above.
 - **Infra changes** (new secrets, new BigQuery columns, IAM changes):
@@ -159,17 +167,16 @@ per [ADR-0008](../docs/adr/0008-python-for-orchestrator.md).
 
 ### Triggering builds manually
 
-Use the per-service `Makefile` (`orchestrator/Makefile`,
-`frontend/Makefile`); each exposes two targets:
+Use the root `Makefile` or per-service Makefiles (`orchestrator/Makefile`,
+`frontend/Makefile`):
 
-- `make local` — runs the service on your machine (uv/go/npm as appropriate).
-- `make deploy` — calls `gcloud builds submit --config=<service>/cloudbuild.yaml`
-  with `_COMMIT_SHA=$(git rev-parse --short HEAD)` and the current gcloud
-  region as substitutions, then deploys — frontend to Cloud Run,
-  orchestrator to Agent Runtime. No tag push required.
+- `make deploy-orchestrator` (or `make -C orchestrator deploy`) — builds the container and deploys orchestrator to Agent Runtime.
+- `make deploy-frontend` (or `make -C frontend deploy`) — builds the container and deploys frontend/server to Cloud Run.
+- `make deploy` — deploys both services in sequence.
+- `make local` (in `frontend/` or `orchestrator/`) — runs the service on your machine (uv/go/npm as appropriate).
 
 Environment overrides (`GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`,
-`_COMMIT_SHA`) work the same way in both flows.
+`_COMMIT_SHA`) work the same way across all Makefiles.
 
 ## Demos
 
