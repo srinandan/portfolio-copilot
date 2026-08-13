@@ -138,6 +138,7 @@ once tagged. Nothing has been released yet — see the note under `[Unreleased]`
 **Testing and CI**
 - Canonical drift report fixture (`testdata/drift_report.json`) validated against `schemas/drift-report.schema.json` and seeded into Firestore by `scripts/load_test_data.py` (Issue #293).
 - Canonical spending report fixture (`testdata/spending_report.json`) validated against `schemas/spending-report.schema.json` and seeded into Firestore by `scripts/load_test_data.py` (Issue #291).
+- Upgraded `nanoid` to `>= 3.3.18` to resolve vulnerability GHSA-2v37-7h3g-55p8 (Issue #295).
 - ~295 Python tests + 66 Vue tests + Go tests across `pkg/{contracts,store,bigquery}`
   and `frontend/server`.
 - CI: Python (uv + pytest with coverage + ruff), Go (build + vet + test with
