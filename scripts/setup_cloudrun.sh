@@ -32,9 +32,10 @@ fi
 # - Firestore (roles/datastore.user): reads holdings, writes audit log directly (ADR-0003)
 # - BigQuery (roles/bigquery.dataViewer): fan-out chart reads
 # - Agent Platform (roles/aiplatform.user): invokes ReasoningEngine / Agent Engine /api/plan streamQuery
+# - Cloud Trace (roles/cloudtrace.agent): exports OpenTelemetry spans to Cloud Trace (ADR-0019)
 # Note: Frontend does NOT need Secret Manager access (Alpaca access is orchestrator-only per ADR-0005).
 echo "Configuring IAM policy bindings for portfolio-copilot-frontend-sa..."
-for ROLE in roles/datastore.user roles/bigquery.dataViewer roles/aiplatform.user; do
+for ROLE in roles/datastore.user roles/bigquery.dataViewer roles/aiplatform.user roles/cloudtrace.agent; do
   gcloud projects add-iam-policy-binding "$PROJECT_ID" \
     --member="serviceAccount:$FRONTEND_SA" \
     --role="$ROLE" \

@@ -1,6 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ApiService } from '../services/api';
 
+// Every request now carries an injected W3C traceparent header (distributed
+// tracing). Assertions allow it via objectContaining + this matcher.
+const TRACEPARENT_RE = /^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/;
+const withTraceparent = (extra: Record<string, unknown> = {}) =>
+  expect.objectContaining({
+    headers: expect.objectContaining({ traceparent: expect.stringMatching(TRACEPARENT_RE) }),
+    ...extra
+  });
+
 describe('ApiService', () => {
   let service: ApiService;
 
@@ -17,7 +26,7 @@ describe('ApiService', () => {
     });
 
     const result = await service.checkHealth();
-    expect(globalThis.fetch).toHaveBeenCalledWith('http://localhost:8080/health');
+    expect(globalThis.fetch).toHaveBeenCalledWith('http://localhost:8080/health', withTraceparent());
     expect(result).toEqual(mockHealth);
   });
 
@@ -44,7 +53,7 @@ describe('ApiService', () => {
     });
 
     const result = await service.getHoldings();
-    expect(globalThis.fetch).toHaveBeenCalledWith('http://localhost:8080/api/holdings');
+    expect(globalThis.fetch).toHaveBeenCalledWith('http://localhost:8080/api/holdings', withTraceparent());
     expect(result).toEqual(mockHoldings);
   });
 
@@ -56,7 +65,7 @@ describe('ApiService', () => {
     });
 
     const result = await service.getDocuments();
-    expect(globalThis.fetch).toHaveBeenCalledWith('http://localhost:8080/api/documents');
+    expect(globalThis.fetch).toHaveBeenCalledWith('http://localhost:8080/api/documents', withTraceparent());
     expect(result).toEqual(mockDocs);
   });
 
@@ -76,7 +85,10 @@ describe('ApiService', () => {
     });
 
     const result = await service.getSpendingReport(6);
-    expect(globalThis.fetch).toHaveBeenCalledWith('http://localhost:8080/api/spending_report?window_months=6');
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      'http://localhost:8080/api/spending_report?window_months=6',
+      withTraceparent()
+    );
     expect(result).toEqual(mockReport);
   });
 
@@ -94,7 +106,7 @@ describe('ApiService', () => {
     });
 
     const result = await service.getDriftReport();
-    expect(globalThis.fetch).toHaveBeenCalledWith('http://localhost:8080/api/drift_report');
+    expect(globalThis.fetch).toHaveBeenCalledWith('http://localhost:8080/api/drift_report', withTraceparent());
     expect(result).toEqual(mockDrift);
   });
 
@@ -104,11 +116,10 @@ describe('ApiService', () => {
 
     const payload = { user_id: 'usr_1', message: 'Hello planner' };
     const res = await service.triggerPlan(payload);
-    expect(globalThis.fetch).toHaveBeenCalledWith('http://localhost:8080/api/plan', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      'http://localhost:8080/api/plan',
+      withTraceparent({ method: 'POST', body: JSON.stringify(payload) })
+    );
     expect(res).toBe(mockResponse);
   });
 
@@ -124,11 +135,10 @@ describe('ApiService', () => {
       payload: { decision: 'approved' }
     };
     const res = await service.resumePlan(payload);
-    expect(globalThis.fetch).toHaveBeenCalledWith('http://localhost:8080/api/plan/resume', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      'http://localhost:8080/api/plan/resume',
+      withTraceparent({ method: 'POST', body: JSON.stringify(payload) })
+    );
     expect(res).toBe(mockResponse);
   });
 

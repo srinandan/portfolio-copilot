@@ -171,6 +171,12 @@ layer).
 
 Agent Runtime exports OpenTelemetry traces to Google Cloud Trace (`telemetry.googleapis.com`, `cloudtrace.googleapis.com`) using GenAI semantic conventions (`OTEL_SEMCONV_STABILITY_OPT_IN=gen_ai_latest_experimental`, `GOOGLE_CLOUD_AGENT_ENGINE_ENABLE_TELEMETRY=true`). Spans capture pipeline latency, tool call sequences, and session DAGs, viewable under the **Traces** tab in the Agent Platform Deployments console.
 
+**End-to-end distributed tracing** ([ADR-0019](../adr/0019-distributed-tracing-frontend-and-server.md)) extends this forward of the orchestrator so a single **W3C Trace Context** (`traceparent`) — and thus a single Trace ID — flows browser → Go server → orchestrator:
+
+- The **Vue SPA** generates client/user-action spans (`services/tracing.ts`) and injects `traceparent` on every `/api/*` and SSE request (header-only, so the streaming reader is untouched), batching its spans to `POST /api/telemetry/v1/traces`.
+- The **Go server** (`frontend/server`) runs the OpenTelemetry SDK with a Cloud Trace exporter: `otelgin` creates server spans and extracts the incoming `traceparent`; an `otelhttp` transport re-injects it onto the orchestrator call; `pkg/store` and `pkg/bigquery` emit child spans for Firestore/BigQuery. The W3C propagator is installed even when span export is disabled, so context flows in every environment. IAM: `roles/cloudtrace.agent` on `portfolio-copilot-frontend-sa`.
+- The **telemetry sink** (`/api/telemetry/v1/traces`) records browser spans as trace-correlated structured logs, so they surface in the same Cloud Trace timeline as the server and orchestrator spans. Like progress events, tracing is advisory — it never breaks a request.
+
 ## Sub-agent execution: Managed Agents
 
 All sub-agents execute as Managed Agents via the Interactions API using a unified worker agent (`portfolio-copilot-worker`), customized per-interaction with registry-resolved `SKILL.md` instructions and pre-computed inputs from in-process primitives ([ADR-0014](../adr/0014-managed-agents-subagent-execution-layer.md), [ADR-0015](../adr/0015-real-user-data-antigravity-sandbox.md), [ADR-0016](../adr/0016-deterministic-primitives-in-orchestrator.md)).

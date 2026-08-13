@@ -6,6 +6,8 @@ import (
 	"fmt"
 
 	"cloud.google.com/go/firestore"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"portfolio-copilot/pkg/contracts"
@@ -28,9 +30,12 @@ func IsNotFound(err error) bool {
 
 // GetHoldings reads the holdings snapshot for a given user from Firestore.
 func (c *Client) GetHoldings(ctx context.Context, userID string) (*contracts.HoldingsSnapshot, error) {
+	ctx, span := tracer.Start(ctx, "store.GetHoldings", trace.WithAttributes(attribute.String("user_id", userID)))
+	defer span.End()
 	docRef := c.fs.Collection(collectionHoldings).Doc(userID)
 	doc, err := docRef.Get(ctx)
 	if err != nil {
+		span.RecordError(err)
 		return nil, err
 	}
 	var snapshot contracts.HoldingsSnapshot
@@ -48,6 +53,8 @@ func (c *Client) GetHoldings(ctx context.Context, userID string) (*contracts.Hol
 
 // GetActiveIPS reads the currently active InvestmentPolicyStatement for a given user from Firestore.
 func (c *Client) GetActiveIPS(ctx context.Context, userID string) (*contracts.InvestmentPolicyStatement, error) {
+	ctx, span := tracer.Start(ctx, "store.GetActiveIPS", trace.WithAttributes(attribute.String("user_id", userID)))
+	defer span.End()
 	query := c.fs.Collection(collectionIPS).
 		Where("user_id", "==", userID).
 		Where("status", "==", contracts.IPSStatusActive).
@@ -55,6 +62,7 @@ func (c *Client) GetActiveIPS(ctx context.Context, userID string) (*contracts.In
 
 	docs, err := query.Documents(ctx).GetAll()
 	if err != nil {
+		span.RecordError(err)
 		return nil, err
 	}
 	if len(docs) == 0 {
@@ -69,9 +77,12 @@ func (c *Client) GetActiveIPS(ctx context.Context, userID string) (*contracts.In
 
 // GetSpendingReport reads the spending report for a given user from Firestore.
 func (c *Client) GetSpendingReport(ctx context.Context, userID string) (*contracts.SpendingReport, error) {
+	ctx, span := tracer.Start(ctx, "store.GetSpendingReport", trace.WithAttributes(attribute.String("user_id", userID)))
+	defer span.End()
 	docRef := c.fs.Collection(collectionSpendingReports).Doc(userID)
 	doc, err := docRef.Get(ctx)
 	if err != nil {
+		span.RecordError(err)
 		return nil, err
 	}
 	var report contracts.SpendingReport
@@ -83,9 +94,12 @@ func (c *Client) GetSpendingReport(ctx context.Context, userID string) (*contrac
 
 // GetDriftReport reads the drift report for a given user from Firestore.
 func (c *Client) GetDriftReport(ctx context.Context, userID string) (*contracts.DriftReport, error) {
+	ctx, span := tracer.Start(ctx, "store.GetDriftReport", trace.WithAttributes(attribute.String("user_id", userID)))
+	defer span.End()
 	docRef := c.fs.Collection(collectionDriftReports).Doc(userID)
 	doc, err := docRef.Get(ctx)
 	if err != nil {
+		span.RecordError(err)
 		return nil, err
 	}
 	var report contracts.DriftReport
@@ -97,9 +111,12 @@ func (c *Client) GetDriftReport(ctx context.Context, userID string) (*contracts.
 
 // GetDocuments reads uploaded document metadata items from Firestore.
 func (c *Client) GetDocuments(ctx context.Context, userID string) ([]contracts.DocumentItem, error) {
+	ctx, span := tracer.Start(ctx, "store.GetDocuments", trace.WithAttributes(attribute.String("user_id", userID)))
+	defer span.End()
 	query := c.fs.Collection(collectionDocuments).Limit(50)
 	docs, err := query.Documents(ctx).GetAll()
 	if err != nil {
+		span.RecordError(err)
 		return nil, err
 	}
 	items := make([]contracts.DocumentItem, 0, len(docs))

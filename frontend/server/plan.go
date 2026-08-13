@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"golang.org/x/oauth2/google"
 )
 
@@ -30,10 +31,10 @@ type PlanRequest struct {
 
 // OrchestratorClient talks to the orchestrator. Two modes:
 //
-//   * Direct HTTP: ORCHESTRATOR_URL set to a URL like http://localhost:8080 or the
+//   - Direct HTTP: ORCHESTRATOR_URL set to a URL like http://localhost:8080 or the
 //     internal URL of the orchestrator's FastAPI server. The gateway calls
 //     <URL>/v1/invoke and <URL>/v1/resume, forwarding the SSE response as-is.
-//   * Agent Engine streamQuery: AGENT_ENGINE_ID set to a full resource name
+//   - Agent Engine streamQuery: AGENT_ENGINE_ID set to a full resource name
 //     projects/<num>/locations/<region>/reasoningEngines/<id>. The gateway calls
 //     https://<region>-aiplatform.googleapis.com/v1beta1/<name>:streamQuery with
 //     an ADC bearer token, wraps the frontend body in the reasoning-engine input
@@ -51,8 +52,12 @@ func NewOrchestratorClient() *OrchestratorClient {
 	return &OrchestratorClient{
 		directURL:     os.Getenv("ORCHESTRATOR_URL"),
 		agentEngineID: os.Getenv("AGENT_ENGINE_ID"),
-		httpClient:    &http.Client{},
-		tokenSource:   defaultAccessToken,
+		// otelhttp transport creates a client span per outgoing call and injects
+		// the W3C `traceparent` header, continuing the browser-originated trace
+		// into the orchestrator. It streams the SSE body through unbuffered, so
+		// the client span simply spans the life of the stream.
+		httpClient:  &http.Client{Transport: otelhttp.NewTransport(http.DefaultTransport)},
+		tokenSource: defaultAccessToken,
 	}
 }
 

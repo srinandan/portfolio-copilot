@@ -5,8 +5,15 @@ import (
 	"fmt"
 
 	"cloud.google.com/go/bigquery"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/api/iterator"
 )
+
+// tracer emits a child span for each analytics query so BigQuery reads nest
+// under the incoming request's server span in Cloud Trace.
+var tracer = otel.Tracer("portfolio-copilot/pkg/bigquery")
 
 // BigQueryRunner handles running generated SQL safely
 type BigQueryRunner struct {
@@ -20,9 +27,13 @@ func NewBigQueryRunner(client *bigquery.Client) *BigQueryRunner {
 
 // RunSecureQuery enforces row-level user_id scoping and byte ceilings, and executes the query
 func (r *BigQueryRunner) RunSecureQuery(ctx context.Context, generatedSQL, userID string) ([]map[string]bigquery.Value, error) {
+	ctx, span := tracer.Start(ctx, "bigquery.RunSecureQuery", trace.WithAttributes(attribute.String("user_id", userID)))
+	defer span.End()
+
 	// Let PrepareSecureSQL handle the constraints and rewriting
 	secureSQL, params, err := PrepareSecureSQL(generatedSQL, userID)
 	if err != nil {
+		span.RecordError(err)
 		return nil, fmt.Errorf("invalid query: %w", err)
 	}
 
@@ -41,6 +52,7 @@ func (r *BigQueryRunner) RunSecureQuery(ctx context.Context, generatedSQL, userI
 
 	it, err := q.Read(ctx)
 	if err != nil {
+		span.RecordError(err)
 		return nil, fmt.Errorf("error executing query: %w", err)
 	}
 
