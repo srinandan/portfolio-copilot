@@ -25,7 +25,7 @@ COLLECTION_SPENDING_REPORTS = "spending_reports"
 
 
 def _default_dict_factory(obj: Any) -> dict[str, Any]:
-    return json.loads(obj.model_dump_json(exclude_none=True))
+    return json.loads(obj.model_dump_json(by_alias=True, exclude_none=True))
 
 
 @firestore.transactional
@@ -92,8 +92,8 @@ class FirestoreClient:
 
     def _dict_factory(self, obj: Any) -> dict[str, Any]:
         """Convert a Pydantic model to a dict, handling dates/enums properly for Firestore."""
-        # We rely on Pydantic's model_dump with mode="json" to serialize enums/dates to primitives.
-        return json.loads(obj.model_dump_json(exclude_none=True))
+        # We rely on Pydantic's model_dump with mode="json" and by_alias=True to serialize enums/dates to primitives.
+        return json.loads(obj.model_dump_json(by_alias=True, exclude_none=True))
 
     def get_holdings(self, user_id: str) -> HoldingsSnapshot | None:
         """Gets the holdings snapshot for a given user."""
