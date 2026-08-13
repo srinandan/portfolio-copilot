@@ -156,6 +156,7 @@ def deploy_agent_engine(project: str | None, location: str, display_name: str, c
             env_vars = {
                 "AGENT_ENGINE_ID": "",
                 "PROJECT_ID": project,
+                "OTEL_EXPORTER_GCP_TRACE_PROJECT_ID": project,
                 "AGENT_REGISTRY_LOCATION": "global",
                 "GOOGLE_GENAI_USE_ENTERPRISE": "true",
                 "GOOGLE_CLOUD_LOCATION": location,
@@ -163,6 +164,9 @@ def deploy_agent_engine(project: str | None, location: str, display_name: str, c
                 "GOOGLE_CLOUD_AGENT_ENGINE_ENABLE_TELEMETRY": "true",
                 "OTEL_SEMCONV_STABILITY_OPT_IN": "gen_ai_latest_experimental",
                 "OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT": "EVENT_ONLY",
+                # Names the orchestrator's spans in Cloud Trace (server.py exports
+                # them via the Cloud Trace exporter it configures at startup).
+                "OTEL_SERVICE_NAME": "portfolio-copilot-orchestrator",
             }
             if existing is not None:
                 engine_id = existing.api_resource.name.split("/")[-1]

@@ -13,6 +13,7 @@ dependencies = [
     "google-cloud-secret-manager>=2.20.0",
     "httpx>=0.28.1",
     "mcp<2",
+    "opentelemetry-exporter-gcp-trace>=1.9.0",
     "opentelemetry-instrumentation-fastapi>=0.63b0",
     "pydantic>=2.13.4",
     "uvicorn>=0.32.0",

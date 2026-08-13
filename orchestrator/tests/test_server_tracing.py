@@ -59,3 +59,63 @@ def test_ingress_starts_span_without_inbound_traceparent():
     assert resp.status_code == 200
     server_spans = [s for s in exporter.get_finished_spans() if s.kind == trace.SpanKind.SERVER]
     assert server_spans, "expected a SERVER span even without an inbound traceparent"
+
+
+def test_service_name_default_and_override(monkeypatch):
+    monkeypatch.delenv("OTEL_SERVICE_NAME", raising=False)
+    assert server._service_name() == "portfolio-copilot-orchestrator"
+    monkeypatch.setenv("OTEL_SERVICE_NAME", "custom-orchestrator")
+    assert server._service_name() == "custom-orchestrator"
+
+
+def test_resolve_project_id_precedence(monkeypatch):
+    for k in (
+        "OTEL_EXPORTER_GCP_TRACE_PROJECT_ID",
+        "GOOGLE_CLOUD_PROJECT",
+        "PROJECT_ID",
+        "FIRESTORE_PROJECT_ID",
+    ):
+        monkeypatch.delenv(k, raising=False)
+    assert server._resolve_project_id() == ""
+    monkeypatch.setenv("FIRESTORE_PROJECT_ID", "fs-proj")
+    assert server._resolve_project_id() == "fs-proj"
+    monkeypatch.setenv("PROJECT_ID", "my-app-proj")
+    assert server._resolve_project_id() == "my-app-proj"
+    monkeypatch.setenv("OTEL_EXPORTER_GCP_TRACE_PROJECT_ID", "otel-proj")
+    assert server._resolve_project_id() == "otel-proj"
+
+
+def test_resolve_project_id_rejects_numeric_project_number(monkeypatch):
+    """Cloud Trace rejects numeric project numbers (e.g. 432423772502) with 400.
+
+    When Agent Runtime automatically populates GOOGLE_CLOUD_PROJECT with the
+    numeric project number, _resolve_project_id must prefer the string PROJECT_ID.
+    """
+    for k in (
+        "OTEL_EXPORTER_GCP_TRACE_PROJECT_ID",
+        "GOOGLE_CLOUD_PROJECT",
+        "PROJECT_ID",
+        "FIRESTORE_PROJECT_ID",
+    ):
+        monkeypatch.delenv(k, raising=False)
+    monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "432423772502")
+    monkeypatch.setenv("PROJECT_ID", "srinandans-next25-demo")
+    assert server._resolve_project_id() == "srinandans-next25-demo"
+
+
+def test_build_tracer_provider_carries_service_name_and_exports():
+    """The provider we install must (a) tag spans with our service.name resource so
+    they are attributable in Cloud Trace, and (b) actually export ended spans."""
+    exporter = InMemorySpanExporter()
+    provider = server._build_tracer_provider("portfolio-copilot-orchestrator", exporter)
+
+    assert provider.resource.attributes.get("service.name") == "portfolio-copilot-orchestrator"
+
+    tracer = provider.get_tracer("test")
+    with tracer.start_as_current_span("unit-span"):
+        pass
+    provider.force_flush()
+
+    spans = exporter.get_finished_spans()
+    assert [s.name for s in spans] == ["unit-span"]
+    assert spans[0].resource.attributes.get("service.name") == "portfolio-copilot-orchestrator"
