@@ -59,3 +59,38 @@ def test_ingress_starts_span_without_inbound_traceparent():
     assert resp.status_code == 200
     server_spans = [s for s in exporter.get_finished_spans() if s.kind == trace.SpanKind.SERVER]
     assert server_spans, "expected a SERVER span even without an inbound traceparent"
+
+
+def test_service_name_default_and_override(monkeypatch):
+    monkeypatch.delenv("OTEL_SERVICE_NAME", raising=False)
+    assert server._service_name() == "portfolio-copilot-orchestrator"
+    monkeypatch.setenv("OTEL_SERVICE_NAME", "custom-orchestrator")
+    assert server._service_name() == "custom-orchestrator"
+
+
+def test_resolve_project_id_precedence(monkeypatch):
+    for k in ("GOOGLE_CLOUD_PROJECT", "PROJECT_ID", "FIRESTORE_PROJECT_ID"):
+        monkeypatch.delenv(k, raising=False)
+    assert server._resolve_project_id() == ""
+    monkeypatch.setenv("FIRESTORE_PROJECT_ID", "fs-proj")
+    assert server._resolve_project_id() == "fs-proj"
+    monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "gcp-proj")
+    assert server._resolve_project_id() == "gcp-proj"  # highest precedence
+
+
+def test_build_tracer_provider_carries_service_name_and_exports():
+    """The provider we install must (a) tag spans with our service.name resource so
+    they are attributable in Cloud Trace, and (b) actually export ended spans."""
+    exporter = InMemorySpanExporter()
+    provider = server._build_tracer_provider("portfolio-copilot-orchestrator", exporter)
+
+    assert provider.resource.attributes.get("service.name") == "portfolio-copilot-orchestrator"
+
+    tracer = provider.get_tracer("test")
+    with tracer.start_as_current_span("unit-span"):
+        pass
+    provider.force_flush()
+
+    spans = exporter.get_finished_spans()
+    assert [s.name for s in spans] == ["unit-span"]
+    assert spans[0].resource.attributes.get("service.name") == "portfolio-copilot-orchestrator"

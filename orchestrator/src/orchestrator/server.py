@@ -116,28 +116,97 @@ async def _lifespan(_app: FastAPI):
     state.ready = False
 
 
+def _resolve_project_id() -> str:
+    """Resolves the GCP project for span export, mirroring the store/data clients."""
+    for key in ("GOOGLE_CLOUD_PROJECT", "PROJECT_ID", "FIRESTORE_PROJECT_ID"):
+        value = os.environ.get(key)
+        if value:
+            return value
+    return ""
+
+
+def _service_name() -> str:
+    """The OpenTelemetry ``service.name`` the orchestrator's spans group under in Cloud Trace."""
+    return os.environ.get("OTEL_SERVICE_NAME") or "portfolio-copilot-orchestrator"
+
+
+def _build_tracer_provider(service_name: str, exporter):
+    """Builds a TracerProvider carrying a ``service.name`` resource and exporting via
+    ``exporter`` (batched). Pure — no global side effects — so it is unit-testable."""
+    from opentelemetry.sdk.resources import Resource
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
+    provider = TracerProvider(resource=Resource.create({"service.name": service_name}))
+    provider.add_span_processor(BatchSpanProcessor(exporter))
+    return provider
+
+
+def _configure_span_export() -> None:
+    """Ensures the orchestrator's own spans are exported to Cloud Trace.
+
+    Ingress instrumentation alone (extracting ``traceparent`` and opening a server
+    span) does not *emit* anything — it needs a TracerProvider with an exporter.
+    Nothing in this process configured one for these SDK spans, so the
+    orchestrator emitted no traces (only the frontend did). This wires a Cloud
+    Trace exporter, with a ``service.name`` resource so the spans are attributable,
+    so the server span and the ADK/GenAI spans nesting under it actually reach
+    Cloud Trace.
+
+    If a real SDK TracerProvider already exists (e.g. one Agent Runtime installed),
+    the Cloud Trace exporter is attached to it; otherwise a new provider carrying
+    our ``service.name`` is installed. Skips silently when no project is resolvable
+    (local/tests) — trace-context propagation still works.
+    """
+    project_id = _resolve_project_id()
+    if not project_id:
+        logger.info("No GCP project resolvable; orchestrator span export disabled (propagation still active)")
+        return
+    try:
+        from opentelemetry import trace as ot_trace
+        from opentelemetry.exporter.cloud_trace import CloudTraceSpanExporter
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
+        exporter = CloudTraceSpanExporter(project_id=project_id)
+        current = ot_trace.get_tracer_provider()
+        if isinstance(current, TracerProvider):
+            current.add_span_processor(BatchSpanProcessor(exporter))
+            logger.info("Attached Cloud Trace exporter to existing TracerProvider (project=%s)", project_id)
+        else:
+            ot_trace.set_tracer_provider(_build_tracer_provider(_service_name(), exporter))
+            logger.info(
+                "Installed orchestrator TracerProvider with Cloud Trace exporter (service=%s, project=%s)",
+                _service_name(),
+                project_id,
+            )
+    except Exception:
+        logger.exception("Cloud Trace exporter setup failed; orchestrator span export disabled")
+
+
 def _init_server_tracing(fastapi_app: FastAPI) -> None:
-    """Instrument the FastAPI ingress for distributed tracing.
+    """Instrument the FastAPI ingress AND export the orchestrator's spans to Cloud Trace.
 
-    The Go gateway injects a W3C ``traceparent`` on its call to the orchestrator
-    (see ADR-0019). Agent Runtime already exports the orchestrator's ADK/GenAI
-    spans (``GOOGLE_CLOUD_AGENT_ENGINE_ENABLE_TELEMETRY``), but nothing extracted
-    that inbound header — so those spans started a *fresh* trace instead of
-    continuing the browser -> Go trace.
+    Two pieces are needed for the orchestrator to participate in the end-to-end
+    trace (ADR-0019):
 
-    This installs FastAPI ingress instrumentation, which extracts the inbound
-    context, opens a **server span** as its child, and activates that context for
-    the request. The ADK/GenAI spans created while handling it then nest under it,
-    giving one Trace ID from browser click to agent execution.
+    1. **Context extraction (ingress).** The Go gateway injects a W3C
+       ``traceparent``; FastAPI instrumentation extracts it, opens a **server
+       span** as its child, and activates that context so the ADK/GenAI spans
+       created while handling the request nest under it — one Trace ID from
+       browser click to agent execution.
+    2. **Span export.** Extraction alone emits nothing. Agent Runtime's
+       ``GOOGLE_CLOUD_AGENT_ENGINE_ENABLE_TELEMETRY`` did not install an exporting
+       provider for these SDK spans in-process, so ``_configure_span_export``
+       wires a Cloud Trace exporter with a ``service.name`` resource.
 
-    It reuses whatever global TracerProvider Agent Runtime configured (no provider
-    in local/tests => non-recording spans, but context still propagates).
     Opt-out via ``OTEL_TRACES_ENABLED=false``; never fatal — a telemetry failure
     must not stop the server from serving.
 
     Note: in Agent Engine (Vertex ``:streamQuery``) deployments, whether the
     inbound ``traceparent`` reaches this container is subject to Vertex header
-    forwarding; in direct (``ORCHESTRATOR_URL``) mode it always does.
+    forwarding; in direct (``ORCHESTRATOR_URL``) mode it always does. Either way,
+    the orchestrator now emits its own spans.
     """
     if os.environ.get("OTEL_TRACES_ENABLED", "").lower() in ("false", "0"):
         logger.info("FastAPI server-side tracing disabled via OTEL_TRACES_ENABLED")
@@ -154,8 +223,10 @@ def _init_server_tracing(fastapi_app: FastAPI) -> None:
         propagate.set_global_textmap(
             CompositePropagator([TraceContextTextMapPropagator(), W3CBaggagePropagator()])
         )
+        # Wire the exporter BEFORE instrumenting so the server span is exported.
+        _configure_span_export()
         FastAPIInstrumentor.instrument_app(fastapi_app)
-        logger.info("FastAPI server-side tracing enabled (W3C context extraction)")
+        logger.info("FastAPI server-side tracing enabled (W3C extraction + Cloud Trace export)")
     except Exception:
         logger.exception("FastAPI tracing init failed; continuing without ingress spans")
 

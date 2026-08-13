@@ -44,10 +44,18 @@ once tagged. Nothing has been released yet — see the note under `[Unreleased]`
   HTTP ingress (`opentelemetry-instrumentation-fastapi`) so the inbound W3C
   `traceparent` from the frontend gateway is extracted and the orchestrator's
   ADK/GenAI spans continue the same trace instead of starting a fresh one —
-  completing a single Trace ID from browser → Go server → orchestrator. Reuses
-  the Agent Runtime TracerProvider; opt-out via `OTEL_TRACES_ENABLED=false`;
-  never fatal. (The `#280` env vars enable the GenAI/client spans; this adds the
-  server-side context extraction that was missing.)
+  completing a single Trace ID from browser → Go server → orchestrator. Opt-out
+  via `OTEL_TRACES_ENABLED=false`; never fatal. (The `#280` env vars enable the
+  GenAI/client spans; this adds the server-side context extraction that was
+  missing.)
+- Orchestrator span export to Cloud Trace: `server.py` configures a Cloud Trace
+  exporter (`opentelemetry-exporter-gcp-trace`) with a `service.name` resource
+  (`portfolio-copilot-orchestrator`, `OTEL_SERVICE_NAME`) so its server and
+  ADK/GenAI spans are actually emitted. Extraction alone (previous item) does not
+  export; nothing in-process had wired an exporter, so the orchestrator emitted
+  no traces while the frontend did. Attaches to an existing TracerProvider if one
+  is present, else installs its own; skips when no project is resolvable. IAM
+  (`roles/cloudtrace.agent`) already granted to the Agent Identity in #280.
 - Explicit Agent Runtime framework configuration: sets `agent_framework="google-adk"` across container and placeholder deployment paths (#279).
 - Structured onboarding endpoint `POST /v1/onboarding/apply` that persists a
   wizard-collected `GoalsOnboardingResult` directly via
