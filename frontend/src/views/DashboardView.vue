@@ -114,6 +114,7 @@ import TopHoldingsTable from '../components/portfolio/TopHoldingsTable.vue';
 import ApprovalCard from '../components/approval/ApprovalCard.vue';
 import Button from '../components/common/Button.vue';
 import { formatAgentResponse, unwrapRationale } from '../services/agentResponse';
+import { startSpan, runWithSpan } from '../services/tracing';
 
 const holdings = ref<HoldingsSnapshot>({
   total_value_usd: 0,
@@ -320,16 +321,26 @@ async function triggerPlan(promptText?: string) {
 
   isStreaming.value = true;
   try {
-    await apiService.streamPlan(
-      {
-        user_id: currentUserId.value,
-        message: text,
-        session_id: currentSessionId.value
-      },
-      (event) => handleStreamEvent(event, agentMsg),
-      (err) => {
-        agentMsg.text += `\n[Stream Error]: ${err.message || err}`;
-      }
+    // User-action span: the API client span for POST /api/plan nests under this,
+    // and the whole trace continues into the Go server and orchestrator.
+    await runWithSpan(
+      startSpan('planning_turn_triggered', {
+        'user.id': currentUserId.value,
+        'prompt.length': text.length,
+        'session.id': currentSessionId.value || ''
+      }),
+      () =>
+        apiService.streamPlan(
+          {
+            user_id: currentUserId.value,
+            message: text,
+            session_id: currentSessionId.value
+          },
+          (event) => handleStreamEvent(event, agentMsg),
+          (err) => {
+            agentMsg.text += `\n[Stream Error]: ${err.message || err}`;
+          }
+        )
     );
   } catch (err: any) {
     agentMsg.text += `\n[Request Failed]: ${err.message || err}`;
@@ -346,21 +357,25 @@ async function onApproveAction(msg: ChatMessage) {
   }
   isStreaming.value = true;
   try {
-    await apiService.streamPlanResume(
-      {
-        user_id: currentUserId.value,
-        session_id: msg.session_id || currentSessionId.value || '',
-        invocation_id: msg.invocation_id || '',
-        interrupt_id: msg.interrupt_id || '',
-        payload: {
-          decision: 'approve',
-          user_id: currentUserId.value
-        }
-      },
-      (event) => handleStreamEvent(event, msg),
-      (err) => {
-        msg.text += `\n[Resume Error]: ${err.message || err}`;
-      }
+    await runWithSpan(
+      startSpan('hitl_decision_submitted', { decision: 'approve', 'action.id': msg.action?.action_id || '' }),
+      () =>
+        apiService.streamPlanResume(
+          {
+            user_id: currentUserId.value,
+            session_id: msg.session_id || currentSessionId.value || '',
+            invocation_id: msg.invocation_id || '',
+            interrupt_id: msg.interrupt_id || '',
+            payload: {
+              decision: 'approve',
+              user_id: currentUserId.value
+            }
+          },
+          (event) => handleStreamEvent(event, msg),
+          (err) => {
+            msg.text += `\n[Resume Error]: ${err.message || err}`;
+          }
+        )
     );
   } catch (err: any) {
     // If orchestrator is not running or mock test environment, status remains updated
@@ -377,22 +392,26 @@ async function onRejectAction(msg: ChatMessage) {
   }
   isStreaming.value = true;
   try {
-    await apiService.streamPlanResume(
-      {
-        user_id: currentUserId.value,
-        session_id: msg.session_id || currentSessionId.value || '',
-        invocation_id: msg.invocation_id || '',
-        interrupt_id: msg.interrupt_id || '',
-        payload: {
-          decision: 'reject',
-          reason: 'User rejected proposed trade',
-          user_id: currentUserId.value
-        }
-      },
-      (event) => handleStreamEvent(event, msg),
-      (err) => {
-        msg.text += `\n[Resume Error]: ${err.message || err}`;
-      }
+    await runWithSpan(
+      startSpan('hitl_decision_submitted', { decision: 'reject', 'action.id': msg.action?.action_id || '' }),
+      () =>
+        apiService.streamPlanResume(
+          {
+            user_id: currentUserId.value,
+            session_id: msg.session_id || currentSessionId.value || '',
+            invocation_id: msg.invocation_id || '',
+            interrupt_id: msg.interrupt_id || '',
+            payload: {
+              decision: 'reject',
+              reason: 'User rejected proposed trade',
+              user_id: currentUserId.value
+            }
+          },
+          (event) => handleStreamEvent(event, msg),
+          (err) => {
+            msg.text += `\n[Resume Error]: ${err.message || err}`;
+          }
+        )
     );
   } catch (err: any) {
     msg.text += `\n[Rejection Recorded]`;
@@ -406,25 +425,29 @@ async function onUpdateAction(msg: ChatMessage, updated: ProposedAction) {
   msg.action = updated;
   isStreaming.value = true;
   try {
-    await apiService.streamPlanResume(
-      {
-        user_id: currentUserId.value,
-        session_id: msg.session_id || currentSessionId.value || '',
-        invocation_id: msg.invocation_id || '',
-        interrupt_id: msg.interrupt_id || '',
-        payload: {
-          decision: 'edit',
-          changes: {
-            quantity: updated.quantity,
-            rationale: updated.rationale
+    await runWithSpan(
+      startSpan('hitl_decision_submitted', { decision: 'edit', 'action.id': msg.action?.action_id || '' }),
+      () =>
+        apiService.streamPlanResume(
+          {
+            user_id: currentUserId.value,
+            session_id: msg.session_id || currentSessionId.value || '',
+            invocation_id: msg.invocation_id || '',
+            interrupt_id: msg.interrupt_id || '',
+            payload: {
+              decision: 'edit',
+              changes: {
+                quantity: updated.quantity,
+                rationale: updated.rationale
+              },
+              user_id: currentUserId.value
+            }
           },
-          user_id: currentUserId.value
-        }
-      },
-      (event) => handleStreamEvent(event, msg),
-      (err) => {
-        msg.text += `\n[Resume Error]: ${err.message || err}`;
-      }
+          (event) => handleStreamEvent(event, msg),
+          (err) => {
+            msg.text += `\n[Resume Error]: ${err.message || err}`;
+          }
+        )
     );
   } catch (err: any) {
     msg.text += `\n[Edit Saved]`;

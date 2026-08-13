@@ -93,6 +93,15 @@ once tagged. Nothing has been released yet — see the note under `[Unreleased]`
 - Empty-state on Dashboard with example prompts before any turn has run.
 - Structured logging middleware with GCP-compatible `severity` field and
   `X-Cloud-Trace-Context` propagation.
+- End-to-end distributed tracing (ADR-0019): a single W3C `traceparent` flows
+  browser → Go server → orchestrator. The Go server runs the OpenTelemetry SDK
+  with a Cloud Trace exporter (`otelgin` server spans, `otelhttp` propagation to
+  the orchestrator, `pkg/store`/`pkg/bigquery` child spans, `roles/cloudtrace.agent`
+  on the frontend SA). The SPA generates client/user-action spans and injects
+  `traceparent` on every API/SSE call via a dependency-free tracer
+  (`services/tracing.ts`), batching spans to `POST /api/telemetry/v1/traces`,
+  which records them as trace-correlated logs. Propagation stays on even when
+  export is disabled; telemetry never breaks a request.
 
 **Deployment and infrastructure**
 - Tag-triggered Cloud Build releases via Developer Connect: pushing a
@@ -124,7 +133,7 @@ once tagged. Nothing has been released yet — see the note under `[Unreleased]`
 **Documentation**
 - Spec-driven design under `docs/spec/` (overview, functional, architecture,
   contracts).
-- 17 ADRs under `docs/adr/` covering key architectural decisions.
+- 19 ADRs under `docs/adr/` covering key architectural decisions.
 - Per-component READMEs (orchestrator, frontend, install, skills).
 - `AGENTS.md` for coding-agent contributors, distinguishing runtime skills
   (`/skills`) from engineering-practice skills (`/.agent/skills`).

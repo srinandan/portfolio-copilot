@@ -1,20 +1,35 @@
 package main
 
 import (
+	"context"
+	"log/slog"
 	"net/http"
 	"os"
 
 	"github.com/gin-gonic/gin"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 )
 
 func main() {
 	InitLogger()
 
+	// Initialize OpenTelemetry: installs the W3C propagator (always) and, when a
+	// project is configured, a Cloud Trace exporter. Shutdown flushes on exit.
+	ctx := context.Background()
+	shutdownTracing, err := InitTracing(ctx)
+	if err != nil {
+		slog.ErrorContext(ctx, "tracing init failed; continuing without span export", "error", err)
+	}
+	defer func() { _ = shutdownTracing(context.Background()) }()
+
 	r := gin.New()
-	r.Use(StructuredLogMiddleware(), gin.Recovery())
+	// otelgin first so the server span (with any extracted `traceparent`) is in
+	// the request context for the logging middleware and all handlers.
+	r.Use(otelgin.Middleware(serviceName()), StructuredLogMiddleware(), gin.Recovery())
 
 	srv := NewServer()
 	oc := NewOrchestratorClient()
+	ti := NewTelemetryIngest()
 
 	// Health check endpoint for Cloud Run
 	r.GET("/health", func(c *gin.Context) {
@@ -38,6 +53,10 @@ func main() {
 	// Structured wizard submission: bypasses the LLM interview and writes the
 	// IPS directly via the same writer the LLM path uses. See onboarding.go.
 	r.POST("/api/onboarding", oc.HandleApplyOnboarding)
+
+	// Browser telemetry sink: the SPA posts its client spans here so they
+	// correlate with server/orchestrator spans of the same trace. See telemetry.go.
+	r.POST("/api/telemetry/v1/traces", ti.HandleIngestTraces)
 
 	// Mount SPA static file serving and Vue client route fallback
 	setupSPARoutes(r, "")

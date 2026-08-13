@@ -9,11 +9,16 @@ import (
 
 	"cloud.google.com/go/firestore"
 	"github.com/xeipuuv/gojsonschema"
+	"go.opentelemetry.io/otel"
 	"portfolio-copilot/pkg/contracts"
 )
 
 //go:embed schemas/*.schema.json
 var schemaFS embed.FS
+
+// tracer emits child spans for Firestore reads/writes so they nest under the
+// incoming request's server span in Cloud Trace.
+var tracer = otel.Tracer("portfolio-copilot/pkg/store")
 
 // Store is an interface for the Firestore client wrappers to allow for easier testing.
 type Store interface {

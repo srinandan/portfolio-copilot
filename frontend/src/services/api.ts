@@ -5,6 +5,7 @@ import type {
   SpendingReport,
   DriftReport
 } from '../types';
+import { traceRequest } from './tracing';
 
 export class ApiService {
   private baseUrl: string;
@@ -13,8 +14,33 @@ export class ApiService {
     this.baseUrl = baseUrl;
   }
 
+  /**
+   * fetch wrapper that records a client span and injects a W3C `traceparent`
+   * header, so every request continues the browser trace into the Go server and
+   * orchestrator. Header-only injection (rather than patching global fetch)
+   * keeps the SSE streaming reader untouched. The span ends once response
+   * headers arrive; the SSE body then streams outside the span.
+   */
+  private async tracedFetch(name: string, url: string, init: RequestInit = {}): Promise<Response> {
+    const existing = (init.headers as Record<string, string>) || {};
+    const { headers, span } = traceRequest(name, existing, {
+      'http.url': url,
+      'http.method': init.method || 'GET'
+    });
+    try {
+      const res = await fetch(url, { ...init, headers });
+      span.setAttribute('http.status_code', res.status);
+      return res;
+    } catch (err) {
+      span.setAttribute('error', true);
+      throw err;
+    } finally {
+      span.end();
+    }
+  }
+
   async checkHealth(): Promise<HealthStatus> {
-    const res = await fetch(`${this.baseUrl}/health`);
+    const res = await this.tracedFetch('GET /health', `${this.baseUrl}/health`);
     if (!res.ok) {
       throw new Error(`Health check failed with status ${res.status}`);
     }
@@ -22,7 +48,7 @@ export class ApiService {
   }
 
   async getHoldings(): Promise<HoldingsSnapshot> {
-    const res = await fetch(`${this.baseUrl}/api/holdings`);
+    const res = await this.tracedFetch('GET /api/holdings', `${this.baseUrl}/api/holdings`);
     if (!res.ok) {
       throw new Error(`Get holdings failed with status ${res.status}`);
     }
@@ -30,7 +56,7 @@ export class ApiService {
   }
 
   async getDocuments(): Promise<DocumentItem[]> {
-    const res = await fetch(`${this.baseUrl}/api/documents`);
+    const res = await this.tracedFetch('GET /api/documents', `${this.baseUrl}/api/documents`);
     if (!res.ok) {
       throw new Error(`Get documents failed with status ${res.status}`);
     }
@@ -38,7 +64,10 @@ export class ApiService {
   }
 
   async getSpendingReport(windowMonths = 3): Promise<SpendingReport> {
-    const res = await fetch(`${this.baseUrl}/api/spending_report?window_months=${windowMonths}`);
+    const res = await this.tracedFetch(
+      'GET /api/spending_report',
+      `${this.baseUrl}/api/spending_report?window_months=${windowMonths}`
+    );
     if (!res.ok) {
       throw new Error(`Get spending report failed with status ${res.status}`);
     }
@@ -46,7 +75,7 @@ export class ApiService {
   }
 
   async getDriftReport(): Promise<DriftReport> {
-    const res = await fetch(`${this.baseUrl}/api/drift_report`);
+    const res = await this.tracedFetch('GET /api/drift_report', `${this.baseUrl}/api/drift_report`);
     if (!res.ok) {
       throw new Error(`Get drift report failed with status ${res.status}`);
     }
@@ -54,7 +83,7 @@ export class ApiService {
   }
 
   async triggerPlan(req: { user_id: string; message: string; session_id?: string }): Promise<Response> {
-    const res = await fetch(`${this.baseUrl}/api/plan`, {
+    const res = await this.tracedFetch('POST /api/plan', `${this.baseUrl}/api/plan`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(req)
@@ -72,7 +101,7 @@ export class ApiService {
     interrupt_id: string;
     payload: Record<string, unknown>;
   }): Promise<Response> {
-    const res = await fetch(`${this.baseUrl}/api/plan/resume`, {
+    const res = await this.tracedFetch('POST /api/plan/resume', `${this.baseUrl}/api/plan/resume`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(req)
@@ -123,7 +152,7 @@ export class ApiService {
     approval_required_above_usd?: number;
     approval_required_above_percent?: number;
   }): Promise<{ status: string; ips_id: string; version: number; liabilities_count: number }> {
-    const res = await fetch(`${this.baseUrl}/api/onboarding`, {
+    const res = await this.tracedFetch('POST /api/onboarding', `${this.baseUrl}/api/onboarding`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(req)
