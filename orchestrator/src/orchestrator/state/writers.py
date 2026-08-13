@@ -9,6 +9,7 @@ from ..contracts.ips import Constraints, InvestmentPolicyStatement, IPSStatus, L
 from ..contracts.liabilities import LiabilitiesSnapshot
 from ..contracts.proposed_action import ProposedAction
 from ..contracts.reviewer_verdict import ReviewerVerdict
+from ..contracts.spending_analysis import SpendingReport
 from ..data.firestore import FirestoreClient
 from ..logger import get_logger
 from ..skills._skill_metadata import read_skill_approval_scope, read_skill_version
@@ -539,3 +540,18 @@ def emit_action_failed_audit(
     except Exception as e:
         logger.error(f"Failed to append ACTION_FAILED audit for {action.action_id}: {e}")
         raise RuntimeError(f"Audit log write failed for action failure: {e}") from e
+
+
+def write_spending_report(
+    user_id: str,
+    report: SpendingReport | dict,
+    db_client: Optional[FirestoreClient] = None,
+) -> None:
+    """Persists a synthesized SpendingReport to Firestore."""
+    client = db_client or FirestoreClient()
+    client.set_spending_report(user_id, report)
+    logger.info(
+        "Persisted SpendingReport for user %s to Firestore",
+        user_id,
+        extra={"event": "spending_report_written", "user_id": user_id},
+    )

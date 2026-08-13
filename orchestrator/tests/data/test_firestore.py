@@ -350,3 +350,36 @@ def test_proposed_action_roundtrip_with_broker_order_id():
         loaded_action = client.get_proposed_action("act_123")
         assert loaded_action is not None
         assert loaded_action.broker_order_id == "broker_ord_999"
+
+
+def test_set_and_get_spending_report():
+    with patch("google.cloud.firestore.Client"):
+        client = FirestoreClient(project="test-project")
+        client.db = MagicMock()
+
+        mock_doc_ref = MagicMock()
+        client.db.collection.return_value.document.return_value = mock_doc_ref
+
+        report_data = {
+            "user_id": "user1",
+            "total_income_usd": 10000.0,
+            "total_outflow_usd": 7000.0,
+            "savings_rate": 0.3,
+            "reserve_months": 5.0,
+            "category_breakdown": [],
+            "anomalies": [],
+            "narrative_summary": "Test narrative",
+        }
+
+        client.set_spending_report("user1", report_data)
+        client.db.collection.assert_called_with("spending_reports")
+        client.db.collection().document.assert_called_with("user1")
+        mock_doc_ref.set.assert_called_with(report_data)
+
+        mock_doc_ref.get.return_value.exists = True
+        mock_doc_ref.get.return_value.to_dict.return_value = report_data
+        result = client.get_spending_report("user1")
+        assert result == report_data
+
+        mock_doc_ref.get.return_value.exists = False
+        assert client.get_spending_report("nonexistent") is None
