@@ -136,6 +136,7 @@ once tagged. Nothing has been released yet — see the note under `[Unreleased]`
   and `MANAGED_AGENT_ID` with strict-mode failure at startup in production.
 
 **Testing and CI**
+- Canonical drift report fixture (`testdata/drift_report.json`) validated against `schemas/drift-report.schema.json` and seeded into Firestore by `scripts/load_test_data.py` (Issue #293).
 - Canonical spending report fixture (`testdata/spending_report.json`) validated against `schemas/spending-report.schema.json` and seeded into Firestore by `scripts/load_test_data.py` (Issue #291).
 - ~295 Python tests + 66 Vue tests + Go tests across `pkg/{contracts,store,bigquery}`
   and `frontend/server`.

@@ -383,3 +383,44 @@ def test_set_and_get_spending_report():
 
         mock_doc_ref.get.return_value.exists = False
         assert client.get_spending_report("nonexistent") is None
+
+
+def test_set_and_get_drift_report():
+    with patch("google.cloud.firestore.Client"):
+        client = FirestoreClient(project="test-project")
+        client.db = MagicMock()
+
+        mock_doc_ref = MagicMock()
+        client.db.collection.return_value.document.return_value = mock_doc_ref
+
+        drift_data = {
+            "user_id": "user1",
+            "as_of": "2026-08-01T00:00:00Z",
+            "bands": [
+                {
+                    "asset_class": "Equity",
+                    "current_percent": 60.0,
+                    "target_percent": 60.0,
+                    "min_percent": 50.0,
+                    "max_percent": 70.0,
+                    "in_band": True,
+                    "drift_amount_percent": 0.0,
+                }
+            ],
+            "unclassified_value_usd": 0.0,
+            "rebalance_recommended": False,
+            "has_active_ips": True,
+        }
+
+        client.set_drift_report("user1", drift_data)
+        client.db.collection.assert_called_with("drift_reports")
+        client.db.collection().document.assert_called_with("user1")
+        mock_doc_ref.set.assert_called_with(drift_data)
+
+        mock_doc_ref.get.return_value.exists = True
+        mock_doc_ref.get.return_value.to_dict.return_value = drift_data
+        result = client.get_drift_report("user1")
+        assert result == drift_data
+
+        mock_doc_ref.get.return_value.exists = False
+        assert client.get_drift_report("nonexistent") is None

@@ -1,0 +1,36 @@
+{
+  "user_id": "demo_user",
+  "as_of": "2026-08-01T00:00:00Z",
+  "bands": [
+    {
+      "asset_class": "Equity",
+      "current_percent": 67.5,
+      "target_percent": 60.0,
+      "min_percent": 50.0,
+      "max_percent": 65.0,
+      "in_band": false,
+      "drift_amount_percent": 2.5
+    },
+    {
+      "asset_class": "Bonds",
+      "current_percent": 17.5,
+      "target_percent": 30.0,
+      "min_percent": 25.0,
+      "max_percent": 35.0,
+      "in_band": false,
+      "drift_amount_percent": 7.5
+    },
+    {
+      "asset_class": "Cash",
+      "current_percent": 10.0,
+      "target_percent": 10.0,
+      "min_percent": 5.0,
+      "max_percent": 15.0,
+      "in_band": true,
+      "drift_amount_percent": 0.0
+    }
+  ],
+  "unclassified_value_usd": 10000.0,
+  "rebalance_recommended": true,
+  "has_active_ips": true
+}

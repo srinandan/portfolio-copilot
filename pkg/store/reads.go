@@ -110,7 +110,13 @@ func (c *Client) GetDriftReport(ctx context.Context, userID string) (*contracts.
 	}
 	var report contracts.DriftReport
 	if err := doc.DataTo(&report); err != nil {
-		return nil, fmt.Errorf("failed to parse drift report: %w", err)
+		dataBytes, jsonErr := json.Marshal(doc.Data())
+		if jsonErr != nil {
+			return nil, fmt.Errorf("failed to parse drift report: %w", err)
+		}
+		if jsonErr := json.Unmarshal(dataBytes, &report); jsonErr != nil {
+			return nil, fmt.Errorf("failed to parse drift report: %w", err)
+		}
 	}
 	return &report, nil
 }

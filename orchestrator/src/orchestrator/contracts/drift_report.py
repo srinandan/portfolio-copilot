@@ -1,8 +1,8 @@
 """Contract for Portfolio Analysis drift report."""
 
-from typing import List
+from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 
 class DriftReportEntry(BaseModel):
@@ -16,12 +16,30 @@ class DriftReportEntry(BaseModel):
     in_band: bool = Field(description="Whether the current allocation falls within [min_percent, max_percent].")
     drift_amount_percent: float = Field(description="Absolute percentage distance outside the tolerance band (>= 0.0).")
 
+    model_config = ConfigDict(populate_by_name=True)
+
 
 class DriftReport(BaseModel):
     """Comprehensive drift analysis report across all target asset classes."""
 
-    entries: List[DriftReportEntry] = Field(description="Per-asset-class allocation and drift entries.")
-    unclassified_value_usd: float = Field(description="Total USD value of holdings not mapped to any IPS target band.")
-    rebalance_recommended: bool = Field(
-        description="True if rebalancing threshold is exceeded for an out-of-band class."
+    user_id: Optional[str] = Field(default=None, description="User identifier.")
+    as_of: str = Field(default="", description="When this drift snapshot was computed.")
+    bands: List[DriftReportEntry] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices("bands", "entries"),
+        serialization_alias="bands",
+        description="Per-asset-class allocation and drift entries.",
     )
+    unclassified_value_usd: float = Field(
+        default=0.0, description="Total USD value of holdings not mapped to any IPS target band."
+    )
+    rebalance_recommended: bool = Field(
+        default=False, description="True if rebalancing threshold is exceeded for an out-of-band class."
+    )
+    has_active_ips: bool = Field(default=True, description="Whether user has an active IPS.")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    @property
+    def entries(self) -> List[DriftReportEntry]:
+        return self.bands

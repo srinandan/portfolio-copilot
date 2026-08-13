@@ -69,7 +69,7 @@ def test_preload_portfolio_analysis_success(sample_ips, sample_holdings):
     assert result["holdings"]["user_id"] == "user_123"
     assert "drift_report" in result
     assert isinstance(result["drift_report"], dict)
-    assert "entries" in result["drift_report"]
+    assert "bands" in result["drift_report"] or "entries" in result["drift_report"]
     assert "rebalance_recommended" in result["drift_report"]
     assert result["drift_report"]["rebalance_recommended"] is True
     assert result["drift_report"]["unclassified_value_usd"] == 0.0

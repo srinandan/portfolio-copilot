@@ -73,7 +73,7 @@ async def test_pa_dispatch_happy_path(mock_dispatch, mock_emit_invoked, mock_fs_
     payload = await _execute_skill(plan, "private-portfolio-analysis", "user_123", {}, context, ctx)
 
     assert payload is not None
-    assert "entries" in payload
+    assert "bands" in payload or "entries" in payload
     assert "rebalance_recommended" in payload
     assert "drift_report" in context
     assert context["drift_report"] == expected_report.model_dump()

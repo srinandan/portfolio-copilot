@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from typing import Optional, Tuple
 
 from ..contracts.audit_log import Actor, ActorType, AuditLogEntry, EventType
+from ..contracts.drift_report import DriftReport
 from ..contracts.goals_onboarding import GoalsOnboardingResult
 from ..contracts.ips import Constraints, InvestmentPolicyStatement, IPSStatus, LiquidityNeeds
 from ..contracts.liabilities import LiabilitiesSnapshot
@@ -554,4 +555,19 @@ def write_spending_report(
         "Persisted SpendingReport for user %s to Firestore",
         user_id,
         extra={"event": "spending_report_written", "user_id": user_id},
+    )
+
+
+def write_drift_report(
+    user_id: str,
+    report: DriftReport | dict,
+    db_client: Optional[FirestoreClient] = None,
+) -> None:
+    """Persists a synthesized DriftReport to Firestore."""
+    client = db_client or FirestoreClient()
+    client.set_drift_report(user_id, report)
+    logger.info(
+        "Persisted DriftReport for user %s to Firestore",
+        user_id,
+        extra={"event": "drift_report_written", "user_id": user_id},
     )
