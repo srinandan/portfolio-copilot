@@ -214,6 +214,8 @@ def seed_firestore(project_id: str, location: str, dry_run: bool) -> None:
         db.collection("drift_reports").document(user_id).set(drift_report_data)
         print(f"  ✓ Written Drift Report document: drift_reports/{user_id}")
 
+=======
+>>>>>>> origin/main
     except Exception as e:
         print(f"  ✗ Error seeding Firestore: {e}", file=sys.stderr)
         raise

@@ -213,7 +213,6 @@ class FirestoreClient:
         if doc.exists:
             return doc.to_dict()
         return None
-
     def set_drift_report(self, user_id: str, report: Any) -> None:
         """Writes a DriftReport to Firestore, keyed by user_id."""
         doc_ref = self.db.collection(COLLECTION_DRIFT_REPORTS).document(user_id)

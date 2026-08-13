@@ -424,3 +424,4 @@ def test_set_and_get_drift_report():
 
         mock_doc_ref.get.return_value.exists = False
         assert client.get_drift_report("nonexistent") is None
+
