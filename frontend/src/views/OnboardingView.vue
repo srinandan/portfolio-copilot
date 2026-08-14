@@ -2,20 +2,32 @@
   <div class="flex flex-col min-h-screen bg-surface text-on-surface" data-testid="onboarding-view">
     <!-- Header with Back Button, Step Title, and Progress Bar -->
     <header class="fixed top-0 w-full z-50 pt-safe bg-surface/80 backdrop-blur-xl shadow-sm border-b border-outline-variant/30">
-      <div class="flex items-center h-16 px-margin-mobile md:px-margin-desktop gap-md">
-        <button
-          class="w-10 h-10 flex items-center justify-center -ml-2 text-on-surface-variant hover:bg-surface-container rounded-full transition-colors"
-          data-testid="onboarding-back-btn"
-          @click="goBack"
-        >
-          <span class="material-symbols-outlined">arrow_back</span>
-        </button>
-        <div class="flex items-center gap-sm">
-          <img alt="Logo" class="h-6 w-auto object-contain" src="/images/logo.png" />
-          <span class="font-title-sm text-title-sm text-primary tracking-tight" data-testid="step-title">
-            {{ stepTitle }}
-          </span>
+      <div class="flex items-center justify-between h-16 px-margin-mobile md:px-margin-desktop gap-md">
+        <div class="flex items-center gap-md">
+          <button
+            class="w-10 h-10 flex items-center justify-center -ml-2 text-on-surface-variant hover:bg-surface-container rounded-full transition-colors"
+            data-testid="onboarding-back-btn"
+            @click="goBack"
+          >
+            <span class="material-symbols-outlined">arrow_back</span>
+          </button>
+          <div class="flex items-center gap-sm">
+            <img alt="Logo" class="h-6 w-auto object-contain" src="/images/logo.png" />
+            <span class="font-title-sm text-title-sm text-primary tracking-tight" data-testid="step-title">
+              {{ stepTitle }}
+            </span>
+          </div>
         </div>
+
+        <button
+          type="button"
+          class="text-xs text-on-surface-variant hover:text-on-surface flex items-center gap-1 font-medium px-2 py-1 rounded hover:bg-surface-container transition-colors"
+          data-testid="link-to-profile"
+          @click="router.push('/profile')"
+        >
+          <span class="material-symbols-outlined text-[16px]">settings</span>
+          <span class="hidden sm:inline">Profile &amp; Policy Hub</span>
+        </button>
       </div>
       <!-- Progress Bar -->
       <div class="h-1 bg-surface-container w-full">

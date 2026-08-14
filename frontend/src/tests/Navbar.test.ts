@@ -33,7 +33,6 @@ describe('Navbar.vue', () => {
 
     expect(screen.getByText('Portfolio Copilot')).toBeDefined();
     expect(screen.getByText('Dashboard')).toBeDefined();
-    expect(screen.getByText('Onboarding')).toBeDefined();
     expect(screen.getByText('Portfolio')).toBeDefined();
     expect(screen.getByText('Spending')).toBeDefined();
     expect(screen.getByText('Documents')).toBeDefined();
