@@ -44,13 +44,14 @@ Setup instructions: [`install/`](install/).
 
 Portfolio Copilot provides a standalone Vue 3 + TypeScript web interface connected to the backend server and Python orchestrator:
 
-### First time: onboarding (`/onboarding`)
-You answer a structured onboarding interview: your financial goals, time horizon, risk tolerance, and current debt obligations. From this, the agent synthesizes your active Investment Policy Statement (IPS) and Liabilities snapshot, stored in Firestore as the reference policy for all future actions.
+### First time: onboarding & profile (`/onboarding`, `/profile`)
+You can complete the guided onboarding interview or configure the 5-tab **Profile & Policy Hub** (`/profile`): personal demographics, family dependents, career and retirement milestones, financial goals, risk tolerance, target allocation bands, liabilities, and policy guardrails. The system synthesizes and atomically persists your active Investment Policy Statement (IPS), Liabilities snapshot, and User Profile.
 
-### Day to day: checking in (`/dashboard`, `/portfolio`, `/spending`)
+### Day to day: checking in (`/dashboard`, `/portfolio`, `/spending`, `/documents`)
 - **Dashboard (`/`)**: View real-time agent planning conversations — a live progress checklist tracks each stage of an analysis (discovering skills, analyzing, reviewing) as it runs, then clears to reveal the result — alongside net worth summaries and current asset allocations.
 - **Portfolio & Drift (`/portfolio`)**: Inspect current holdings alongside the live **Portfolio Drift Report**, comparing current allocations against your IPS target bands.
 - **Spending Analysis (`/spending`)**: Review 30-day income, outflows, savings rate, reserve months, and dual-condition anomaly detections against Chase transaction history.
+- **Document Ingestion (`/documents`)**: Upload bank transaction CSVs (streamed directly into BigQuery with deduplication) and holdings/liabilities JSON snapshots into Firestore.
 
 ### When it wants to act: approving a trade (`<ApprovalCard />`)
 If rebalancing or an investment trade is warranted:
@@ -63,6 +64,8 @@ If rebalancing or an investment trade is warranted:
 - **Component Documentation**:
   - [`orchestrator/README.md`](orchestrator/README.md): Python ADK root planner & dynamic planning workflow
   - [`frontend/README.md`](frontend/README.md): Standalone Vue 3 + TypeScript SPA & Go backend host
+  - [`pkg/README.md`](pkg/README.md): Shared Go packages (contracts, Firestore repository, BigQuery runner)
+  - [`scripts/README.md`](scripts/README.md): Provisioning, deployment, data loading, and admin scripts
 - **Specifications & Architecture**: see [`docs/spec/`](docs/spec/) and [`docs/adr/`](docs/adr/).
 - **Contributor / Coding-Agent Instructions**: see [`AGENTS.md`](AGENTS.md).
 

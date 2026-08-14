@@ -27,7 +27,8 @@ Analysis can showcase NL-to-SQL analytics (trend/aggregation questions),
 which Firestore's point-read model doesn't support well.
 
 **Firestore** — everything transactional and structural: the IPS document,
-portfolio holdings, current liabilities, and the approval/audit log.
+portfolio holdings, current liabilities, user profile demographics, uploaded
+documents metadata, baseline reports, and the approval/audit log.
 Needs millisecond reads, real transactional writes, and row-level
 concurrency control — none of which BigQuery is built for.
 
@@ -43,13 +44,13 @@ data.
 ```mermaid
 flowchart TD
     subgraph Client ["Client Layer"]
-        UI["Vue 3 + TypeScript SPA<br/><i>(Dashboard, Portfolio Drift, Spending, Onboarding Wizard, HITL Card)</i>"]
+        UI["Vue 3 + TypeScript SPA<br/><i>(Dashboard, Portfolio Drift, Spending, Profile & Policy Hub, Documents Ingestion, Onboarding Wizard, HITL Card)</i>"]
     end
 
     subgraph WebHost ["Web Host & API Gateway (Cloud Run)"]
         Server["Go Backend Server<br/><code>frontend/server</code> (:8080)"]
         SPA["Static Asset Host<br/><code>/dist</code>"]
-        APIProxy["REST & SSE Streaming Proxy<br/><code>/api/plan</code>, <code>/api/holdings</code>, <code>/api/spending_report</code>"]
+        APIProxy["REST & SSE Streaming Proxy<br/><code>/api/plan</code>, <code>/api/holdings</code>, <code>/api/spending_report</code>, <code>/api/profile</code>, <code>/api/documents</code>"]
         Server --> SPA
         Server --> APIProxy
     end

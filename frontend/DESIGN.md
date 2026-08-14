@@ -205,3 +205,9 @@ Surfaces the agent's live pipeline in the conversational stream during a minutes
 - **SVG Donut Chart:** Inline vector chart computed via stroke-dasharray and stroke-dashoffset based on the circle's circumference ($2\pi r = 251.2$). Segmented by Equities (`#131B2E`), Fixed Income (`#B9C7E0`), and Cash (`#565E74`).
 - **Synchronized Sliders & Inputs:** Dual-control range sliders and monospaced number inputs for granular target band overrides.
 - **100% Total Validation:** Fail-closed error toast (`bg-error-container text-on-error-container`) warning the user whenever allocations sum to $\ne 100\%$, disabling the "Confirm Allocation" CTA until balanced.
+
+### Unified Profile & Policy Hub (`/profile`)
+- **5-Tab Navigation Layout:** Horizontal pill/tab selector switching cleanly between Personal & Family, Goals & Timeline, Risk Calibration & Allocation, Liabilities & Debt, and Policy Guardrails without page reload.
+- **Personal & Family Canvas:** Dynamic table allowing inline addition and removal of family members (Spouse, Child, Dependent Parent) with auto-computed household dependent counters.
+- **Debt Obligations Ledger:** Tabular list of debts featuring monospaced APRs, balances, and minimum payments with automatic aggregated debt computation.
+- **Policy Guardrails Surface:** Dedicated inputs for concentration limits, liquidity floors, trade approval thresholds, and excluded tickers/sectors.

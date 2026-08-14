@@ -35,8 +35,21 @@ spending history. Produces an **Investment Policy Statement (IPS)** — a
 structured artifact written to long-term memory — that becomes the
 reference plan for everything else, and captures a current
 **Liabilities Snapshot** alongside it (debt data self-reported, since
-it isn't derivable from Chase transactions). Runs once at onboarding,
-revisited on drift or major life events.
+it isn't derivable from Chase transactions). Runs during initial onboarding,
+revisited on drift, or directly updated via the Profile & Policy hub.
+
+### Profile & Policy Management
+Provides a unified settings hub (`/profile`) with 5 dedicated configuration
+tabs (Personal & Family, Goals & Timeline, Risk Calibration & Allocation,
+Liabilities & Debt, Policy Guardrails) that captures user demographics
+(`UserProfile`), debt obligations (`LiabilitiesSnapshot`), and active
+portfolio guardrails (`IPS`), with atomic versioning on every update.
+
+### Typed Document Ingestion
+Ingests real statement files (`/documents`): bank transactions CSVs are
+validated and streamed into BigQuery (with deterministic row deduplication),
+while portfolio holdings, liabilities, and IPS snapshot JSONs are validated
+against canonical schemas and stored in Firestore.
 
 ### Spending Analysis
 Analyzes Chase transaction data (BigQuery). Categorizes spend, flags

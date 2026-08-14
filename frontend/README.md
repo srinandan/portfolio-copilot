@@ -20,8 +20,9 @@ See [ADR-0003](../docs/adr/0003-standalone-ui-not-agentspace.md) and [ADR-0017](
   - **Dashboard (`/`)**: Combines real-time agent planning messages — including a live analysis progress stepper (`AnalysisProgress`) that tracks each pipeline stage during the minutes-long run and clears to reveal the final output (see [ADR-0018](../docs/adr/0018-streaming-progress-events.md)) — with summary cards (`NetWorthCard`, `AssetAllocationCard`, `TopHoldingsTable`).
   - **Portfolio (`/portfolio`)**: Itemizes holdings and displays the **Portfolio Drift Report** (`DriftReportCard`), comparing current asset allocation against active Investment Policy Statement (IPS) target bands (`skills/portfolio-analysis/SKILL.md`).
   - **Spending (`/spending`)**: Visualizes 30-day income, outflow, savings rate, reserve months, category breakdown, and anomaly detections (`skills/spending-analysis/SKILL.md`).
-  - **Documents (`/documents`)**: Interactive drag-and-drop statement upload dropzone (`UploadDropzone`) and parsing history log.
-  - **Profile (`/profile`)**: Captures user demographics, age, date of birth, family dependents, employment status, retirement target age, and financial goals notes persisted to Firestore (`user_profiles/{user_id}`).
+  - **Documents (`/documents`)**: Typed document ingestion dropzone (`UploadDropzone`) and parsing history log, supporting bank transaction CSVs (streamed into BigQuery with deduplication) and financial snapshot JSONs (persisted to Firestore).
+  - **Profile & Policy Hub (`/profile`)**: Comprehensive 5-tab settings hub (Personal & Family, Goals & Timeline, Risk Calibration & Allocation, Liabilities & Debt, Policy Guardrails) that atomically updates user demographics (`user_profiles/{user_id}`) and creates versioned IPS/liabilities records (`ips/{ips_id}_v{version}`, `liabilities/{user_id}`).
+  - **Onboarding (`/onboarding`)**: Guided interactive onboarding wizard with prefill support from active IPS and direct navigation to the unified Profile & Policy hub.
 
 ---
 

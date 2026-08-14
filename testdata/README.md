@@ -12,8 +12,11 @@ There are **two input shapes**, because the data lands in two stores:
 | **Holdings** | JSON | Firestore (`holdings/<user_id>`) | `holdings.json` |
 | **Liabilities** | JSON | Firestore (`liabilities/<user_id>`) | `liabilities.json` |
 | **Investment Policy Statement (IPS)** | JSON | Firestore (`ips/<ips_id>_v<version>`) | `ips.json` |
+| **User Profile** | JSON | Firestore (`user_profiles/<user_id>`) | `user_profile.json` |
+| **Drift Report** | JSON | Firestore (`drift_reports/<user_id>`) | `drift_report.json` |
+| **Spending Report** | JSON | Firestore (`spending_reports/<user_id>`) | `spending_report.json` |
 
-> Only **transactions** use CSV. Holdings, liabilities, and the IPS are JSON
+> Only **transactions** use CSV. Holdings, liabilities, user profiles, reports, and the IPS are JSON
 > documents (Firestore stores documents, not tabular rows). The JSON files here
 > double as the `*.json` fixtures validated against [`/schemas`](../schemas)
 > during loading — those schema files are the source of truth; this README is
@@ -181,6 +184,41 @@ Key fields: `ips_id`, `user_id`, `version`, `status` (`active`/`superseded`),
 `target_allocation[]` (asset-class **bands** with `target_percent` /
 `min_percent` / `max_percent`), and `constraints` (`concentration_limit_percent`,
 `excluded_tickers`, `excluded_sectors`). See `ips.json` for a complete example.
+
+---
+
+## 5. User Profile — JSON
+
+User demographic, employment, family, retirement timeline, and qualitative
+financial goals notes. Captured and edited in the Profile & Policy Hub (`/profile`).
+Stored at Firestore `user_profiles/<user_id>`. Schema:
+[`user-profile.schema.json`](../schemas/user-profile.schema.json).
+
+Key fields: `user_id`, `full_name`, `email`, `date_of_birth`, `age`,
+`marital_status`, `dependents_count`, `family_members[]` (`name`, `relationship`,
+`age`), `employment_status`, `occupation`, `annual_income_usd`,
+`target_retirement_age`, `monthly_housing_payment_usd`, `risk_tolerance_notes`,
+`financial_goals_notes`, `updated_at`.
+
+```json
+{
+  "user_id": "demo_user",
+  "full_name": "Alex Mercer",
+  "email": "alex.mercer@example.com",
+  "date_of_birth": "1980-06-15",
+  "age": 46,
+  "marital_status": "married",
+  "dependents_count": 2,
+  "employment_status": "employed",
+  "occupation": "Staff Systems Engineer",
+  "annual_income_usd": 220000,
+  "target_retirement_age": 61,
+  "monthly_housing_payment_usd": 4200,
+  "risk_tolerance_notes": "Comfortable with moderate volatility in pursuit of long-term capital appreciation; prefers broad-market index funds.",
+  "financial_goals_notes": "Build a $1.5M nest egg for retirement by 2041 and maintain 6 months of liquid emergency reserves.",
+  "updated_at": "2026-08-01T00:00:00Z"
+}
+```
 
 ---
 

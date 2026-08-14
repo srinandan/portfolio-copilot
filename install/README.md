@@ -83,7 +83,7 @@ python3 scripts/load_test_data.py --dry-run
 
 This populates:
 - **BigQuery (`portfolio_copilot.chase_transactions`)**: 4 months of transaction history exercising the dual-condition spending anomaly rule.
-- **Firestore (`ips/ips_demo_001_v1`, `holdings/demo_user`, `liabilities/demo_user`)**: Canonical active IPS reference policy, multi-asset class holdings (with out-of-band equity drift and unclassified crypto asset class), and credit liabilities.
+- **Firestore (`ips/ips_demo_001_v1`, `holdings/demo_user`, `liabilities/demo_user`, `user_profiles/demo_user`, `drift_reports/demo_user`, `spending_reports/demo_user`)**: Canonical active IPS reference policy, multi-asset class holdings (with out-of-band equity drift and unclassified crypto asset class), credit liabilities, user profile demographic data, and canonical baseline reports.
 
 ## Verify installation
 
