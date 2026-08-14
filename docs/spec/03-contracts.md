@@ -175,6 +175,62 @@ workflow gates:
 
 See [`audit-log-entry.schema.json`](../../schemas/audit-log-entry.schema.json).
 
+## 7. User Profile
+
+User demographic profile, career milestones, family dependents, retirement timeline,
+and qualitative financial goal notes. Captured and edited in the Profile & Policy Hub (`/profile`),
+persisted to Firestore at `user_profiles/{user_id}`.
+
+Notable fields:
+- `user_id` — unique user identifier scoping profile data
+- `full_name`, `email`, `date_of_birth`, `age` — demographic foundation
+- `marital_status`, `dependents_count`, `family_members[]` — household context for risk capacity
+- `employment_status`, `occupation`, `annual_income_usd`, `monthly_housing_payment_usd` — cashflow stability
+- `target_retirement_age` — time horizon calibration anchor
+- `risk_tolerance_notes`, `financial_goals_notes` — qualitative goal memory
+
+See [`user-profile.schema.json`](../../schemas/user-profile.schema.json).
+
+## 8. Drift Report
+
+Output of the Portfolio Analysis skill. Compares current portfolio allocations
+against the target allocation bands defined in the active IPS.
+
+Notable fields:
+- `user_id`, `as_of`, `ips_id`, `ips_version` — policy reference traceability
+- `drift_detected` — boolean flag indicating if any asset class breached target min/max bounds
+- `allocations[]` — per asset class: `current_percent`, `target_percent`, `min_percent`, `max_percent`, `drift_percent`, and `status` (`OK` / `DRIFTED`)
+
+See [`drift-report.schema.json`](../../schemas/drift-report.schema.json).
+
+## 9. Spending Report
+
+Output of the Spending Analysis skill. Synthesizes 30-day cashflow metrics,
+category spending breakdowns, savings rate, emergency reserve runway, and
+spending anomaly detections.
+
+Notable fields:
+- `user_id`, `analysis_period_start`, `analysis_period_end`
+- `total_income_usd`, `total_outflow_usd`, `net_savings_usd`, `savings_rate_percent`
+- `reserve_months` — emergency reserve runway computed against average monthly outflow
+- `category_breakdown[]` — normalized spending per category with percentage of outflow
+- `anomalies[]` — detected spending anomalies meeting dual-condition triggers ($> $100 and $> 2.0\times$ category monthly average)
+
+See [`spending-report.schema.json`](../../schemas/spending-report.schema.json).
+
+## 10. Account Transaction
+
+Canonical transaction schema representing individual bank or credit account movements.
+Ingested into BigQuery dataset `portfolio_copilot`, table `chase_transactions` or `checking_transactions`.
+
+Notable fields:
+- `user_id` — row-level security identifier for CTE sandboxing
+- `transaction_date` — `YYYY-MM-DD`
+- `amount` — signed amount (positive for income/inflows, negative for expenses/outflows)
+- `description`, `raw_category`, `normalized_category` — standardized taxonomy categories
+
+See [`account-transaction.schema.json`](../../schemas/account-transaction.schema.json).
+
 ## Changing these contracts
 
 Additive changes (new optional field) are fine as a normal PR. A breaking

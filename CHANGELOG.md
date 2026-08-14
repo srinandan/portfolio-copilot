@@ -8,9 +8,9 @@ once tagged. Nothing has been released yet — see the note under `[Unreleased]`
 
 ## [Unreleased]
 
-> This section is a rolling snapshot of everything shipped since project
-> inception. When you cut `v0.1.0`, rename this header to
-> `## [0.1.0] - YYYY-MM-DD` and start a fresh empty `[Unreleased]` block above.
+### Added
+
+## [0.1.0] - 2026-08-14
 
 ### Added
 
@@ -96,10 +96,9 @@ once tagged. Nothing has been released yet — see the note under `[Unreleased]`
   (ADR-0017) — no cross-service token minting.
 - Six-view SPA: Dashboard, Portfolio, Spending, Documents, Profile,
   Onboarding.
-- User Profile management (`/profile`): interactive page to view, edit, and persist personal details, family members, career milestones, retirement targets, and financial goals notes (Issue #298).
-- 7-step onboarding wizard collecting goals, liabilities, risk calibration,
-  target bands, guardrails; submits typed data directly via
-  `POST /api/onboarding` (no LLM re-parse of prose).
+- Unified Profile & Policy hub (`/profile`): 5-tab settings layout (Personal & Family, Goals & Timeline, Risk Calibration & Allocation, Liabilities & Debt, Policy Guardrails) that synchronizes demographic attributes (`user_profiles/{user_id}`) and policy configurations (`ips/{ips_id}_v{version}` and `liabilities/{user_id}`) with atomic versioning (Issue #303, ADR-0021).
+- Typed document ingestion (`/documents`): `POST /api/documents` streaming bank transactions CSV to BigQuery (with 1-minute deduplication) and snapshot JSONs to Firestore with IDOR protection (ADR-0020).
+- 7-step onboarding wizard with prefill support from active IPS and direct navigation to the unified Profile & Policy hub.
 - Dashboard SSE stream wired to `/api/plan` and `/api/plan/resume`:
   extracts HITL approval requests from the ADK event envelope, renders the
   `<ApprovalCard />`, and drives approve / reject / edit through the
@@ -208,8 +207,6 @@ once tagged. Nothing has been released yet — see the note under `[Unreleased]`
 
 ### Deferred to a later release
 
-- **Documents upload**: needs a real POST endpoint, GCS write, parser (CSV
-  first, PDF later), and Firestore metadata record.
 - **Frontend enum union** still accepts both cases for status/type/side —
   target: normalize on ingest and drop the uppercase variants.
 - **Drafting-side sector fail-closed** to mirror the reviewer fix, so
