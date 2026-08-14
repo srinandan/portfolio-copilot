@@ -2,6 +2,8 @@ package bigquery
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 
 	"cloud.google.com/go/bigquery"
@@ -46,7 +48,7 @@ func NewBigQueryRunner(client *bigquery.Client) *BigQueryRunner {
 	return &BigQueryRunner{client: client}
 }
 
-// InsertTransactions streams rows into a BigQuery dataset table.
+// InsertTransactions streams rows into a BigQuery dataset table using deterministic insertIDs for deduplication.
 func (r *BigQueryRunner) InsertTransactions(ctx context.Context, datasetName, tableName string, rows []TransactionRecord) error {
 	ctx, span := tracer.Start(ctx, "bigquery.InsertTransactions", trace.WithAttributes(
 		attribute.String("dataset", datasetName),
@@ -58,8 +60,19 @@ func (r *BigQueryRunner) InsertTransactions(ctx context.Context, datasetName, ta
 	if len(rows) == 0 {
 		return nil
 	}
+
+	savers := make([]*bigquery.StructSaver, len(rows))
+	for i, row := range rows {
+		// Deterministic insertID based on row content hash provides BigQuery streaming deduplication
+		hash := sha256.Sum256([]byte(fmt.Sprintf("%s:%s:%.4f:%s:%s:%s", row.UserID, row.TransactionDate, row.Amount, row.Description, row.RawCategory, row.NormalizedCategory)))
+		savers[i] = &bigquery.StructSaver{
+			Struct:   row,
+			InsertID: hex.EncodeToString(hash[:16]),
+		}
+	}
+
 	inserter := r.client.Dataset(datasetName).Table(tableName).Inserter()
-	if err := inserter.Put(ctx, rows); err != nil {
+	if err := inserter.Put(ctx, savers); err != nil {
 		span.RecordError(err)
 		return fmt.Errorf("failed to insert transactions into BigQuery table %s.%s: %w", datasetName, tableName, err)
 	}

@@ -333,14 +333,15 @@ func (s *Server) HandleUploadDocument(c *gin.Context) {
 
 	docID := fmt.Sprintf("doc-%d", time.Now().UnixNano())
 	docItem := contracts.DocumentItem{
-		ID:          docID,
-		UserID:      userID,
-		Filename:    fileHeader.Filename,
-		AccountType: documentType,
-		TargetTable: targetTable,
-		SizeBytes:   fileHeader.Size,
-		UploadedAt:  time.Now().UTC().Format(time.RFC3339),
-		Status:      "SUCCESS",
+		ID:           docID,
+		UserID:       userID,
+		Filename:     fileHeader.Filename,
+		DocumentType: documentType,
+		AccountType:  documentType,
+		TargetTable:  targetTable,
+		SizeBytes:    fileHeader.Size,
+		UploadedAt:   time.Now().UTC().Format(time.RFC3339),
+		Status:       "SUCCESS",
 	}
 
 	var recordsParsed int
@@ -348,6 +349,15 @@ func (s *Server) HandleUploadDocument(c *gin.Context) {
 
 	switch documentType {
 	case "transactions":
+		if s.BQRunner == nil {
+			errMsg := "transactions ingestion unavailable: BigQuery is not connected"
+			docItem.Status = "FAILED"
+			docItem.ErrorMessage = &errMsg
+			_ = s.Store.SetDocument(ctx, &docItem)
+			c.JSON(http.StatusServiceUnavailable, gin.H{"error": errMsg, "document": docItem})
+			return
+		}
+
 		if docItem.TargetTable == "" {
 			docItem.TargetTable = "checking_transactions"
 		}
@@ -374,22 +384,34 @@ func (s *Server) HandleUploadDocument(c *gin.Context) {
 			return
 		}
 
-		// Validate header columns against schema
+		// Validate header columns and order against canonical schema
+		expectedHeaders := []string{"user_id", "transaction_date", "amount", "description", "raw_category", "normalized_category"}
 		header := records[0]
-		if len(header) < 6 {
-			errMsg := fmt.Sprintf("invalid CSV header: expected 6 columns (user_id, transaction_date, amount, description, raw_category, normalized_category), got %d", len(header))
+		if len(header) != len(expectedHeaders) {
+			errMsg := fmt.Sprintf("invalid CSV header: expected %d columns (%s), got %d", len(expectedHeaders), strings.Join(expectedHeaders, ", "), len(header))
 			docItem.Status = "FAILED"
 			docItem.ErrorMessage = &errMsg
 			_ = s.Store.SetDocument(ctx, &docItem)
 			c.JSON(http.StatusBadRequest, gin.H{"error": errMsg, "document": docItem})
 			return
 		}
+		for i, expected := range expectedHeaders {
+			actual := strings.TrimSpace(strings.ToLower(header[i]))
+			if actual != expected {
+				errMsg := fmt.Sprintf("invalid CSV header at column %d: expected %q, got %q", i+1, expected, header[i])
+				docItem.Status = "FAILED"
+				docItem.ErrorMessage = &errMsg
+				_ = s.Store.SetDocument(ctx, &docItem)
+				c.JSON(http.StatusBadRequest, gin.H{"error": errMsg, "document": docItem})
+				return
+			}
+		}
 
 		var txRecords []bigquery.TransactionRecord
 		for i, row := range records[1:] {
 			rowNum := i + 2
-			if len(row) < 6 {
-				errMsg := fmt.Sprintf("row %d: expected 6 columns, got %d", rowNum, len(row))
+			if len(row) != len(expectedHeaders) {
+				errMsg := fmt.Sprintf("row %d: expected %d columns, got %d", rowNum, len(expectedHeaders), len(row))
 				docItem.Status = "FAILED"
 				docItem.ErrorMessage = &errMsg
 				_ = s.Store.SetDocument(ctx, &docItem)
@@ -438,19 +460,17 @@ func (s *Server) HandleUploadDocument(c *gin.Context) {
 			})
 		}
 
-		if s.BQRunner != nil {
-			dataset := os.Getenv("BIGQUERY_DATASET")
-			if dataset == "" {
-				dataset = "portfolio_copilot"
-			}
-			if err := s.BQRunner.InsertTransactions(ctx, dataset, docItem.TargetTable, txRecords); err != nil {
-				errMsg := fmt.Sprintf("failed to insert transactions into BigQuery: %v", err)
-				docItem.Status = "FAILED"
-				docItem.ErrorMessage = &errMsg
-				_ = s.Store.SetDocument(ctx, &docItem)
-				c.JSON(http.StatusBadRequest, gin.H{"error": errMsg, "document": docItem})
-				return
-			}
+		dataset := os.Getenv("BIGQUERY_DATASET")
+		if dataset == "" {
+			dataset = "portfolio_copilot"
+		}
+		if err := s.BQRunner.InsertTransactions(ctx, dataset, docItem.TargetTable, txRecords); err != nil {
+			errMsg := fmt.Sprintf("failed to insert transactions into BigQuery: %v", err)
+			docItem.Status = "FAILED"
+			docItem.ErrorMessage = &errMsg
+			_ = s.Store.SetDocument(ctx, &docItem)
+			c.JSON(http.StatusBadRequest, gin.H{"error": errMsg, "document": docItem})
+			return
 		}
 
 		recordsParsed = len(txRecords)

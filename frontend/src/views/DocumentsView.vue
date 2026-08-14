@@ -22,7 +22,7 @@
         <span class="material-symbols-outlined text-emerald-600 dark:text-emerald-400">check_circle</span>
         <div class="text-sm font-body-base">
           <span class="font-bold">Ingestion Successful:</span>
-          Parsed <span class="font-mono font-bold">{{ uploadSuccess.records_parsed ?? 0 }}</span> records from <span class="font-mono">{{ uploadSuccess.filename }}</span> into {{ uploadSuccess.target_table || uploadSuccess.account_type }}.
+          Parsed <span class="font-mono font-bold">{{ uploadSuccess.records_parsed ?? 0 }}</span> records from <span class="font-mono">{{ uploadSuccess.filename }}</span> into {{ uploadSuccess.target_table || uploadSuccess.document_type || uploadSuccess.account_type }}.
         </div>
       </div>
       <button class="text-xs uppercase font-label-caps hover:underline opacity-80" @click="uploadSuccess = null">Dismiss</button>
@@ -101,7 +101,7 @@
                 </div>
               </td>
               <td class="py-sm px-md uppercase text-xs font-mono text-on-surface-variant">
-                {{ doc.account_type }}
+                {{ doc.document_type || doc.account_type }}
               </td>
               <td class="py-sm px-md font-mono text-xs text-on-surface-variant">
                 {{ doc.target_table || 'firestore' }}

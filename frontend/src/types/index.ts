@@ -25,7 +25,8 @@ export interface DocumentItem {
   id: string;
   user_id?: string;
   filename: string;
-  account_type?: 'checking' | 'savings' | 'brokerage' | 'credit_card' | 'other' | string;
+  document_type?: 'transactions' | 'holdings' | 'liabilities' | 'ips' | string;
+  account_type?: string;
   target_table?: string;
   size_bytes: number;
   uploaded_at: string;

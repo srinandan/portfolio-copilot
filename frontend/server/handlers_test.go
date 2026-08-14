@@ -458,24 +458,52 @@ func TestUploadDocumentEndpoint_CSVTransactions_SuccessAndBigQueryIngestion(t *t
 	}
 }
 
-func TestUploadDocumentEndpoint_CSVTransactions_InvalidHeader(t *testing.T) {
+func TestUploadDocumentEndpoint_CSVTransactions_NilBQRunnerReturns503(t *testing.T) {
 	mock := newMockStore()
-	srv := &Server{Store: mock}
+	srv := &Server{Store: mock, BQRunner: nil}
 	r := setupTestRouterWithServer(srv)
 
+	csvData := []byte("user_id,transaction_date,amount,description,raw_category,normalized_category\ndemo_user,2026-05-01,100.50,Grocery,Food,groceries\n")
+	req, _ := createMultipartUpload("file", "test.csv", "transactions", "checking_transactions", "demo_user", csvData)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected status 503 when BQRunner is nil for transactions, got %d", w.Code)
+	}
+}
+
+func TestUploadDocumentEndpoint_CSVTransactions_InvalidHeader(t *testing.T) {
+	mock := newMockStore()
+	mockBQ := newMockBQRunner()
+	srv := &Server{Store: mock, BQRunner: mockBQ}
+	r := setupTestRouterWithServer(srv)
+
+	// Wrong column count
 	csvData := []byte("col1,col2\nval1,val2\n")
 	req, _ := createMultipartUpload("file", "bad.csv", "transactions", "checking_transactions", "demo_user", csvData)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected status 400 for bad header, got %d", w.Code)
+		t.Fatalf("expected status 400 for bad header count, got %d", w.Code)
+	}
+
+	// Misordered columns
+	csvData2 := []byte("user_id,amount,transaction_date,description,raw_category,normalized_category\ndemo_user,100.0,2026-05-01,Grocery,Food,groceries\n")
+	req2, _ := createMultipartUpload("file", "misordered.csv", "transactions", "checking_transactions", "demo_user", csvData2)
+	w2 := httptest.NewRecorder()
+	r.ServeHTTP(w2, req2)
+
+	if w2.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400 for misordered header, got %d", w2.Code)
 	}
 }
 
 func TestUploadDocumentEndpoint_CSVTransactions_InvalidDateFormat(t *testing.T) {
 	mock := newMockStore()
-	srv := &Server{Store: mock}
+	mockBQ := newMockBQRunner()
+	srv := &Server{Store: mock, BQRunner: mockBQ}
 	r := setupTestRouterWithServer(srv)
 
 	csvData := []byte("user_id,transaction_date,amount,description,raw_category,normalized_category\ndemo_user,05/01/2026,100.50,Grocery,Food,groceries\n")
@@ -490,7 +518,8 @@ func TestUploadDocumentEndpoint_CSVTransactions_InvalidDateFormat(t *testing.T) 
 
 func TestUploadDocumentEndpoint_CSVTransactions_InvalidAmount(t *testing.T) {
 	mock := newMockStore()
-	srv := &Server{Store: mock}
+	mockBQ := newMockBQRunner()
+	srv := &Server{Store: mock, BQRunner: mockBQ}
 	r := setupTestRouterWithServer(srv)
 
 	csvData := []byte("user_id,transaction_date,amount,description,raw_category,normalized_category\ndemo_user,2026-05-01,notanumber,Grocery,Food,groceries\n")
