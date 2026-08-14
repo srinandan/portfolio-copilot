@@ -50,7 +50,7 @@ flowchart TD
     subgraph WebHost ["Web Host & API Gateway (Cloud Run)"]
         Server["Go Backend Server<br/><code>frontend/server</code> (:8080)"]
         SPA["Static Asset Host<br/><code>/dist</code>"]
-        APIProxy["REST & SSE Streaming Proxy<br/><code>/api/plan</code>, <code>/api/holdings</code>, <code>/api/spending_report</code>, <code>/api/profile</code>, <code>/api/documents</code>"]
+        APIProxy["REST & SSE Streaming Gateway<br/><code>/api/{plan,holdings,spending_report,drift_report,profile,documents,onboarding,telemetry}</code>"]
         Server --> SPA
         Server --> APIProxy
     end
@@ -67,6 +67,7 @@ flowchart TD
             HITL["6. HITL Approval Gate<br/><code>gates/hitl.py</code> (RequestInput)"]
             ExecGate["7. Execution Gate<br/><code>gates/execution.py</code>"]
             Writers["8. Audit & State Writers<br/><code>state/writers.py</code>"]
+            Progress["Advisory Progress Channel<br/><code>progress.py</code> (SSE Interleaving)"]
         end
 
         Planner --> Discovery
@@ -77,6 +78,7 @@ flowchart TD
         Planner --> HITL
         Planner --> ExecGate
         Planner --> Writers
+        Planner -.-> Progress
     end
 
     subgraph ManagedAgents ["Managed Agents Layer (Antigravity Sandbox)"]
@@ -87,18 +89,21 @@ flowchart TD
 
     subgraph GCPInfra ["Google Cloud Services & External APIs"]
         Registry[("Agent Registry<br/><i>(6 Runtime Skills)</i>")]
-        Firestore[("Cloud Firestore<br/><i>(IPS, Holdings, Liabilities, Audit Log)</i>")]
+        Firestore[("Cloud Firestore<br/><i>(IPS, Holdings, Liabilities, User Profiles, Documents, Reports, Audit Log)</i>")]
         BigQuery[("BigQuery<br/><i>(Chase Transactions)</i>")]
         SessionsStore[("Agent Platform Sessions<br/>& Memory Bank")]
         SecretMgr[("Secret Manager<br/><i>(Alpaca Keys, MA ID)</i>")]
         AlpacaAPI[("Alpaca Trading API<br/><i>(Paper Brokerage)</i>")]
+        CloudTrace[("Cloud Trace<br/><i>(End-to-End OTel Spans)</i>")]
     end
 
     %% Client / Server
     UI <-->|"HTTP REST & Server-Sent Events (SSE)"| Server
-    APIProxy -->|"Direct Fan-out Reads"| Firestore
-    APIProxy -->|"Direct Aggregate Reads"| BigQuery
-    APIProxy <-->|"POST /v1/invoke & /v1/resume (SSE Stream)"| Planner
+    UI -.->|"Client Spans (W3C traceparent)"| APIProxy
+    APIProxy <-->|"Direct Reads & Profile/Document Writes"| Firestore
+    APIProxy -->|"Aggregate Reads & Streaming CSV Ingestion"| BigQuery
+    APIProxy <-->|"POST /v1/invoke & /v1/resume (SSE Stream + Progress)"| Planner
+    APIProxy -.->|"Export Server Spans"| CloudTrace
 
     %% Orchestrator Cloud Interactions
     Discovery <-->|"Discover Authorized Skills"| Registry
@@ -108,9 +113,10 @@ flowchart TD
     Reviewer <-->|"Verify Draft Actions"| WorkerMA
     HITL <-->|"Checkpoint Turn State"| SessionsStore
     ExecGate -->|"Submit Paper Orders (idempotent action_id)"| AlpacaAPI
-    Writers -->|"Write IPS, ProposedAction, Audit Log"| Firestore
+    Writers -->|"Write IPS, ProposedAction, Reports, Audit Log"| Firestore
     Planner <-->|"Session State (ctx.state)"| SessionsStore
     AgentRuntimeLayer -.->|"Retrieve Secrets"| SecretMgr
+    AgentRuntimeLayer -.->|"Export Orchestrator / GenAI Spans"| CloudTrace
 ```
 
 ## Deployment topology
