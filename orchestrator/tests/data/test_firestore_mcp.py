@@ -1,6 +1,6 @@
 """Unit tests for Firestore Remote MCP toolset and client integration."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import ANY, AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -9,6 +9,7 @@ from src.orchestrator.data.firestore_mcp import (
     create_firestore_mcp_toolset,
     get_firestore_auth_headers,
     get_firestore_mcp_toolset_from_registry,
+    google_auth_header_provider,
     list_available_mcp_tools,
 )
 
@@ -108,6 +109,7 @@ def test_get_firestore_mcp_toolset_from_registry_success(mock_registry_cls):
     mock_registry_cls.assert_called_once_with(
         project_id="my-demo-project",
         location="us-central1",
+        header_provider=ANY,
     )
     mock_registry_instance.get_mcp_toolset.assert_called_once_with(
         mcp_server_name="projects/my-demo-project/locations/us-central1/mcpServers/firestore-mcp"
@@ -150,6 +152,16 @@ def test_get_firestore_auth_headers_refresh_exception_handled():
     assert headers["Authorization"] == "Bearer recovered-token"
 
 
+def test_google_auth_header_provider():
+    """Golden path: header provider calls get_firestore_auth_headers."""
+    mock_creds = MagicMock()
+    mock_creds.valid = True
+    mock_creds.token = "provider-test-token"
+    with patch("src.orchestrator.data.firestore_mcp.google_auth_default", return_value=(mock_creds, "test-proj")):
+        headers = google_auth_header_provider()
+        assert headers["Authorization"] == "Bearer provider-test-token"
+
+
 @patch("src.orchestrator.data.firestore_mcp.create_firestore_mcp_toolset")
 @patch("src.orchestrator.data.firestore_mcp.google_auth_default", return_value=(MagicMock(), None))
 def test_get_firestore_mcp_toolset_from_registry_no_project_falls_back(
@@ -176,7 +188,9 @@ def test_get_firestore_mcp_toolset_from_registry_inferred_project(
         mock_registry_cls.assert_called_once_with(
             project_id="inferred-project",
             location="global",
+            header_provider=ANY,
         )
+
 
 
 @patch("src.orchestrator.data.firestore_mcp.create_firestore_mcp_toolset")

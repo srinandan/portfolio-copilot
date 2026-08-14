@@ -95,14 +95,21 @@ state = ServerState()
 
 @asynccontextmanager
 async def _lifespan(_app: FastAPI):
-    # Startup verification of SKILL.md metadata reachability and required secrets
+    from .data.firestore_mcp import get_firestore_mcp_toolset_from_registry
     from .managed_agents.secret_loader import verify_required_secrets
     from .skills._skill_metadata import verify_all_skills_metadata
 
     verify_all_skills_metadata()
     verify_required_secrets()
 
+    try:
+        get_firestore_mcp_toolset_from_registry()
+        logger.info("Firestore Remote MCP Server toolset initialized successfully on startup.")
+    except Exception as e:
+        logger.warning("Firestore Remote MCP startup check deferred: %s", e)
+
     state.session_manager = SessionManager()
+
     state.runner = Runner(
         app_name=APP_NAME,
         agent=root_agent,

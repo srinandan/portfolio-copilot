@@ -22,6 +22,7 @@ from .contracts.proposed_action import (
 )
 from .contracts.spending_analysis import SpendingReport
 from .data.firestore import FirestoreClient
+from .data.firestore_mcp import get_firestore_mcp_toolset_from_registry
 from .gates import execution_gate, hitl_approval_gate
 from .logger import get_logger
 from .managed_agents import dispatch_managed_skill
@@ -442,7 +443,7 @@ SKILL_PLANS: Dict[str, SkillPlan] = {
 
 @node(name="get_skills", rerun_on_resume=False)
 async def get_skills_from_registry(ctx: Context, node_input: Any):
-    """Queries the Agent Registry for available skills."""
+    """Queries the Agent Registry for available skills and discovers MCP toolsets."""
     project_id = os.environ.get("PROJECT_ID") or os.environ.get("GOOGLE_CLOUD_PROJECT")
     if not project_id:
         try:
@@ -455,7 +456,18 @@ async def get_skills_from_registry(ctx: Context, node_input: Any):
     logger.info(f"Goal received: {node_input}, project_id: {project_id}, location: {location}")
     client = AgentRegistryClient(project_id=project_id, location=location)
     skills = await client.list_authorized_skills()
+
+    # Discover and initialize Firestore Remote MCP Toolset from Agent Registry per ADK integration
+    try:
+        get_firestore_mcp_toolset_from_registry(project_id=project_id, location=location)
+        if hasattr(ctx, "state") and ctx.state is not None:
+            ctx.state["firestore_mcp_available"] = True
+        logger.info("Resolved Firestore Remote MCP toolset from Agent Registry")
+    except Exception as e:
+        logger.warning("Firestore Remote MCP resolution deferred: %s", e)
+
     return skills
+
 
 
 async def _execute_skill(

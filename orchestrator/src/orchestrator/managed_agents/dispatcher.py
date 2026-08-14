@@ -56,6 +56,7 @@ def get_skill_tools(skill_name: str) -> list:
     return []
 
 
+
 def normalize_skill_name(skill_name: str) -> str:
     """Extracts short skill ID from full resource name without prefix."""
     base = skill_name.split("/")[-1] if "/" in skill_name else skill_name

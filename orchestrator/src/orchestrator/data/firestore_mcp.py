@@ -64,6 +64,11 @@ def create_firestore_mcp_toolset(
     )
 
 
+def google_auth_header_provider(context: Any = None) -> Dict[str, str]:
+    """Header provider callback for AgentRegistry ADK integration."""
+    return get_firestore_auth_headers()
+
+
 def get_firestore_mcp_toolset_from_registry(
     project_id: Optional[str] = None,
     location: str = "global",
@@ -86,6 +91,7 @@ def get_firestore_mcp_toolset_from_registry(
             registry = AgentRegistry(
                 project_id=proj,
                 location=location,
+                header_provider=google_auth_header_provider,
             )
             # Query standard registered resource name for Firestore MCP
             server_name = f"projects/{proj}/locations/{location}/mcpServers/firestore-mcp"
