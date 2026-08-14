@@ -4,7 +4,8 @@ import type {
   DocumentItem,
   SpendingReport,
   DriftReport,
-  UserProfile
+  UserProfile,
+  OnboardingProfile
 } from '../types';
 import { traceRequest } from './tracing';
 
@@ -60,6 +61,42 @@ export class ApiService {
     const res = await this.tracedFetch('GET /api/documents', `${this.baseUrl}/api/documents`);
     if (!res.ok) {
       throw new Error(`Get documents failed with status ${res.status}`);
+    }
+    return res.json();
+  }
+
+  async uploadDocument(
+    file: File,
+    documentType: string,
+    targetTable?: string,
+    userId = 'demo_user'
+  ): Promise<DocumentItem> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('document_type', documentType);
+    formData.append('user_id', userId);
+    if (targetTable) {
+      formData.append('target_table', targetTable);
+    }
+
+    const res = await this.tracedFetch('POST /api/documents', `${this.baseUrl}/api/documents`, {
+      method: 'POST',
+      body: formData
+    });
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => ({}));
+      throw new Error(errJson.error || `Upload document failed with status ${res.status}`);
+    }
+    return res.json();
+  }
+
+  async getOnboarding(userId = 'demo_user'): Promise<OnboardingProfile> {
+    const res = await this.tracedFetch(
+      'GET /api/onboarding',
+      `${this.baseUrl}/api/onboarding?user_id=${encodeURIComponent(userId)}`
+    );
+    if (!res.ok) {
+      throw new Error(`Get onboarding profile failed with status ${res.status}`);
     }
     return res.json();
   }

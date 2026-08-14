@@ -23,8 +23,10 @@ export interface HoldingsSnapshot {
 
 export interface DocumentItem {
   id: string;
+  user_id?: string;
   filename: string;
-  account_type?: 'checking' | 'savings' | 'brokerage' | 'credit_card' | 'other' | string;
+  document_type?: 'transactions' | 'holdings' | 'liabilities' | 'ips' | string;
+  account_type?: string;
   target_table?: string;
   size_bytes: number;
   uploaded_at: string;
@@ -246,6 +248,23 @@ export interface UserProfile {
   risk_tolerance_notes?: string;
   financial_goals_notes?: string;
   updated_at?: string;
+}
+
+export interface OnboardingProfile {
+  has_active_ips: boolean;
+  user_id: string;
+  ips_id?: string;
+  version?: number;
+  goals?: Goal[];
+  time_horizon_years?: number;
+  known_upcoming_expenses_usd?: number;
+  reserve_months?: number;
+  risk_tolerance?: RiskToleranceTier;
+  target_bands?: AllocationBand[];
+  constraints?: IPSConstraints;
+  approval_required_above_usd?: number;
+  approval_required_above_percent?: number;
+  liabilities?: LiabilityItem[];
 }
 
 

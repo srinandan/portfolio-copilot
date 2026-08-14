@@ -351,5 +351,78 @@ describe('Goals & Onboarding Interview (Issue #28 / S1)', () => {
       await fireEvent.click(screen.getByTestId('onboarding-back-btn'));
       expect(mockPush).toHaveBeenCalledWith('/');
     });
+
+    it('prefills saved onboarding profile and displays active IPS banner', async () => {
+      vi.spyOn(apiService, 'getOnboarding').mockResolvedValue({
+        has_active_ips: true,
+        user_id: 'demo_user',
+        ips_id: 'ips_custom_001',
+        version: 2,
+        time_horizon_years: 20,
+        risk_tolerance: 'aggressive',
+        goals: [
+          { name: 'Financial Independence', target_amount_usd: 2000000, target_date: '2045-01-01' }
+        ],
+        target_bands: [
+          { asset_class: 'Equity', target_percent: 70, min_percent: 60, max_percent: 80 }
+        ],
+        liabilities: [
+          {
+            liability_id: 'liab_1',
+            type: 'mortgage',
+            description: 'Primary Residence Mortgage',
+            balance_usd: 300000,
+            interest_rate_percent: 3.5,
+            minimum_payment_usd: 1800
+          }
+        ]
+      });
+
+      const applySpy = vi.spyOn(apiService, 'applyOnboarding').mockResolvedValue({
+        status: 'applied',
+        ips_id: 'ips_custom_001',
+        version: 3,
+        liabilities_count: 1
+      });
+
+      render(OnboardingView);
+
+      // Welcome step should show active IPS banner
+      await screen.findByTestId('active-ips-banner');
+      expect(screen.getByText(/Active IPS \(v2\) Found:/)).toBeDefined();
+      expect(screen.getByText('Review & Edit Policy')).toBeDefined();
+
+      await fireEvent.click(screen.getByTestId('start-setup-btn'));
+
+      // Goals step
+      expect(screen.getByTestId('goals-step')).toBeDefined();
+      await fireEvent.click(screen.getByTestId('confirm-goals-btn'));
+
+      // Liabilities step
+      expect(screen.getByTestId('liabilities-step')).toBeDefined();
+      await fireEvent.click(screen.getByTestId('confirm-liabilities-btn'));
+
+      // Risk Calibration step
+      expect(screen.getByTestId('risk-calibration-step')).toBeDefined();
+      await fireEvent.click(screen.getByTestId('confirm-risk-calibration-btn'));
+
+      // Target Allocation step
+      expect(screen.getByTestId('target-allocation-step')).toBeDefined();
+      await fireEvent.click(screen.getByTestId('confirm-allocation-btn'));
+
+      // Constraints step
+      expect(screen.getByTestId('constraints-step')).toBeDefined();
+      await fireEvent.click(screen.getByTestId('confirm-constraints-btn'));
+
+      // Submission step
+      expect(screen.getByTestId('submission-step')).toBeDefined();
+      await fireEvent.click(screen.getByTestId('submit-ips-btn'));
+
+      expect(applySpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          trigger: 'update'
+        })
+      );
+    });
   });
 });

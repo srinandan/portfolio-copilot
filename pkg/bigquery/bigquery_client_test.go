@@ -70,3 +70,11 @@ func TestSecureSQLRegex(t *testing.T) {
 		})
 	}
 }
+
+func TestInsertTransactions_EmptyRows(t *testing.T) {
+	runner := &BigQueryRunner{client: nil}
+	err := runner.InsertTransactions(t.Context(), "portfolio_copilot", "checking_transactions", nil)
+	if err != nil {
+		t.Errorf("expected nil error on empty rows, got: %v", err)
+	}
+}

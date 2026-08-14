@@ -23,11 +23,18 @@ var tracer = otel.Tracer("portfolio-copilot/pkg/store")
 // Store is an interface for the Firestore client wrappers to allow for easier testing.
 type Store interface {
 	SetHoldings(ctx context.Context, userID string, snapshot *contracts.HoldingsSnapshot) error
+	GetHoldings(ctx context.Context, userID string) (*contracts.HoldingsSnapshot, error)
 	SetLiabilities(ctx context.Context, userID string, snapshot *contracts.LiabilitiesSnapshot) error
+	GetLiabilities(ctx context.Context, userID string) (*contracts.LiabilitiesSnapshot, error)
 	AppendAuditLog(ctx context.Context, entry *contracts.AuditLogEntry) error
 	UpdateIPS(ctx context.Context, ips *contracts.InvestmentPolicyStatement) error
+	GetActiveIPS(ctx context.Context, userID string) (*contracts.InvestmentPolicyStatement, error)
 	SetUserProfile(ctx context.Context, userID string, profile *contracts.UserProfile) error
 	GetUserProfile(ctx context.Context, userID string) (*contracts.UserProfile, error)
+	GetSpendingReport(ctx context.Context, userID string) (*contracts.SpendingReport, error)
+	GetDriftReport(ctx context.Context, userID string) (*contracts.DriftReport, error)
+	GetDocuments(ctx context.Context, userID string) ([]contracts.DocumentItem, error)
+	SetDocument(ctx context.Context, item *contracts.DocumentItem) error
 }
 
 // Client wraps a real Firestore client.

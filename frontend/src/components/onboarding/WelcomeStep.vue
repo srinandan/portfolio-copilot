@@ -49,6 +49,18 @@
           </p>
         </div>
       </div>
+
+      <div
+        v-if="hasActiveProfile"
+        class="bg-tertiary-container/30 border border-tertiary-fixed-dim/50 rounded-xl p-md flex gap-sm items-center text-on-surface"
+        data-testid="active-ips-banner"
+      >
+        <span class="material-symbols-outlined text-tertiary-fixed-dim">verified_user</span>
+        <div class="text-xs font-body-base">
+          <span class="font-bold">Active IPS (v{{ activeVersion || 1 }}) Found:</span>
+          Your current goals, target bands, and guardrails have been pre-filled. Proceed to review or update.
+        </div>
+      </div>
     </div>
 
     <!-- CTA -->
@@ -58,7 +70,7 @@
         data-testid="start-setup-btn"
         @click="$emit('next')"
       >
-        <span class="font-title-sm">Start Setup</span>
+        <span class="font-title-sm">{{ hasActiveProfile ? 'Review & Edit Policy' : 'Start Setup' }}</span>
         <span class="material-symbols-outlined text-title-sm">
           arrow_forward
         </span>
@@ -68,6 +80,17 @@
 </template>
 
 <script setup lang="ts">
+withDefaults(
+  defineProps<{
+    hasActiveProfile?: boolean;
+    activeVersion?: number;
+  }>(),
+  {
+    hasActiveProfile: false,
+    activeVersion: 1
+  }
+);
+
 defineEmits<{
   (e: 'next'): void;
 }>();

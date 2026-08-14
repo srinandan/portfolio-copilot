@@ -2,23 +2,32 @@ package main
 
 import (
 	"context"
+	"encoding/csv"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
 	"time"
 
+	cloudbigquery "cloud.google.com/go/bigquery"
 	"github.com/gin-gonic/gin"
+	"portfolio-copilot/pkg/bigquery"
 	"portfolio-copilot/pkg/contracts"
 	"portfolio-copilot/pkg/store"
 )
 
-// Server holds dependencies for HTTP handlers, including the Firestore store client.
+// Server holds dependencies for HTTP handlers, using interfaces for testability.
 type Server struct {
-	Store *store.Client
+	Store    store.Store
+	BQRunner bigquery.Runner
 }
 
-// NewServer initializes a Server, attempting to connect to Firestore if configured.
+// NewServer initializes a Server, attempting to connect to Firestore and BigQuery if configured.
 func NewServer() *Server {
 	ctx := context.Background()
 	projectID := os.Getenv("FIRESTORE_PROJECT_ID")
@@ -28,25 +37,35 @@ func NewServer() *Server {
 	if projectID == "" {
 		projectID = os.Getenv("PROJECT_ID")
 	}
-	var storeClient *store.Client
+	var storeClient store.Store
+	var bqRunner bigquery.Runner
 	if projectID != "" {
 		// store.NewClient reads PROJECT_ID from the environment; set it once at server initialization
 		// if not already present.
 		if os.Getenv("PROJECT_ID") == "" {
 			os.Setenv("PROJECT_ID", projectID)
 		}
-		var err error
-		storeClient, err = store.NewClient(ctx)
+		client, err := store.NewClient(ctx)
 		if err != nil {
 			slog.Warn("Failed to initialize Firestore store client; using fallback mode", "error", err)
 		} else {
+			storeClient = client
 			slog.Info("Connected to Firestore store client", "project_id", projectID)
+		}
+
+		bqClient, err := cloudbigquery.NewClient(ctx, projectID)
+		if err != nil {
+			slog.Warn("Failed to initialize BigQuery client; transactions will not stream to BigQuery", "error", err)
+		} else {
+			bqRunner = bigquery.NewBigQueryRunner(bqClient)
+			slog.Info("Connected to BigQuery client", "project_id", projectID)
 		}
 	} else {
 		slog.Info("No PROJECT_ID set; server running in fallback mode")
 	}
 	return &Server{
-		Store: storeClient,
+		Store:    storeClient,
+		BQRunner: bqRunner,
 	}
 }
 
@@ -167,6 +186,368 @@ func (s *Server) HandleSetUserProfile(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "ok", "profile": profile})
+}
+
+func (s *Server) HandleGetOnboarding(c *gin.Context) {
+	userID := c.DefaultQuery("user_id", "demo_user")
+	if s.Store == nil {
+		c.JSON(http.StatusOK, contracts.OnboardingProfile{
+			HasActiveIPS: false,
+			UserID:       userID,
+		})
+		return
+	}
+
+	ips, ipsErr := s.Store.GetActiveIPS(c.Request.Context(), userID)
+	if ipsErr != nil && !store.IsNotFound(ipsErr) {
+		slog.ErrorContext(c.Request.Context(), "Error reading active IPS from Firestore", "user_id", userID, "error", ipsErr)
+		c.JSON(http.StatusBadGateway, gin.H{"error": "upstream data unavailable"})
+		return
+	}
+
+	if store.IsNotFound(ipsErr) || ips == nil {
+		c.JSON(http.StatusOK, contracts.OnboardingProfile{
+			HasActiveIPS: false,
+			UserID:       userID,
+		})
+		return
+	}
+
+	liabSnapshot, liabErr := s.Store.GetLiabilities(c.Request.Context(), userID)
+	var liabilities []contracts.Liability
+	if liabErr == nil && liabSnapshot != nil {
+		liabilities = liabSnapshot.Liabilities
+	}
+
+	var upcomingExpenses float64
+	var reserveMonths float64
+	if ips.LiquidityNeeds != nil {
+		if ips.LiquidityNeeds.KnownUpcomingExpensesUSD != nil {
+			upcomingExpenses = *ips.LiquidityNeeds.KnownUpcomingExpensesUSD
+		}
+		if ips.LiquidityNeeds.ReserveMonths != nil {
+			reserveMonths = *ips.LiquidityNeeds.ReserveMonths
+		}
+	}
+
+	var approvalUSD float64
+	var approvalPct float64
+	if ips.ApprovalRequiredAboveUSD != nil {
+		approvalUSD = *ips.ApprovalRequiredAboveUSD
+	}
+	if ips.ApprovalRequiredAbovePercent != nil {
+		approvalPct = *ips.ApprovalRequiredAbovePercent
+	}
+
+	var constraints *contracts.Constraints
+	if ips.Constraints.ConcentrationLimitPercent > 0 || len(ips.Constraints.ExcludedTickers) > 0 || len(ips.Constraints.ExcludedSectors) > 0 {
+		c := ips.Constraints
+		constraints = &c
+	}
+
+	profile := contracts.OnboardingProfile{
+		HasActiveIPS:                 true,
+		UserID:                       ips.UserID,
+		IPSID:                        ips.IPSID,
+		Version:                      ips.Version,
+		Goals:                        ips.Goals,
+		TimeHorizonYears:             ips.TimeHorizonYears,
+		KnownUpcomingExpensesUSD:     upcomingExpenses,
+		ReserveMonths:                reserveMonths,
+		RiskTolerance:                ips.RiskTolerance,
+		TargetBands:                  ips.TargetAllocation,
+		Constraints:                  constraints,
+		ApprovalRequiredAboveUSD:     approvalUSD,
+		ApprovalRequiredAbovePercent: approvalPct,
+		Liabilities:                  liabilities,
+	}
+
+	c.JSON(http.StatusOK, profile)
+}
+
+func (s *Server) HandleUploadDocument(c *gin.Context) {
+	userID := c.DefaultPostForm("user_id", "demo_user")
+	documentType := strings.ToLower(strings.TrimSpace(c.PostForm("document_type")))
+	targetTable := strings.TrimSpace(c.PostForm("target_table"))
+
+	if s.Store == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"error": "document ingestion unavailable: storage backend is not connected",
+		})
+		return
+	}
+
+	if documentType == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "document_type is required (transactions, holdings, liabilities, ips)"})
+		return
+	}
+
+	allowedTypes := map[string]bool{
+		"transactions": true,
+		"holdings":     true,
+		"liabilities":  true,
+		"ips":          true,
+	}
+	if !allowedTypes[documentType] {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("unsupported document_type '%s'; accepted types: transactions, holdings, liabilities, ips", documentType)})
+		return
+	}
+
+	fileHeader, err := c.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("file is required: %v", err)})
+		return
+	}
+
+	if fileHeader.Size > (10 << 20) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "file exceeds maximum allowed size of 10MB"})
+		return
+	}
+
+	ext := strings.ToLower(filepath.Ext(fileHeader.Filename))
+	var expectedExt string
+	switch documentType {
+	case "transactions":
+		expectedExt = ".csv"
+	case "holdings", "liabilities", "ips":
+		expectedExt = ".json"
+	}
+
+	if ext != expectedExt {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("invalid file extension '%s' for document_type '%s'; expected '%s'", ext, documentType, expectedExt)})
+		return
+	}
+
+	file, err := fileHeader.Open()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to open uploaded file: %v", err)})
+		return
+	}
+	defer file.Close()
+
+	fileBytes, err := io.ReadAll(file)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to read uploaded file: %v", err)})
+		return
+	}
+
+	docID := fmt.Sprintf("doc-%d", time.Now().UnixNano())
+	docItem := contracts.DocumentItem{
+		ID:           docID,
+		UserID:       userID,
+		Filename:     fileHeader.Filename,
+		DocumentType: documentType,
+		AccountType:  documentType,
+		TargetTable:  targetTable,
+		SizeBytes:    fileHeader.Size,
+		UploadedAt:   time.Now().UTC().Format(time.RFC3339),
+		Status:       "SUCCESS",
+	}
+
+	var recordsParsed int
+	ctx := c.Request.Context()
+
+	switch documentType {
+	case "transactions":
+		if s.BQRunner == nil {
+			errMsg := "transactions ingestion unavailable: BigQuery is not connected"
+			docItem.Status = "FAILED"
+			docItem.ErrorMessage = &errMsg
+			_ = s.Store.SetDocument(ctx, &docItem)
+			c.JSON(http.StatusServiceUnavailable, gin.H{"error": errMsg, "document": docItem})
+			return
+		}
+
+		if docItem.TargetTable == "" {
+			docItem.TargetTable = "checking_transactions"
+		}
+		if docItem.TargetTable != "checking_transactions" && docItem.TargetTable != "chase_transactions" {
+			errMsg := fmt.Sprintf("invalid target_table: %s (must be checking_transactions or chase_transactions)", docItem.TargetTable)
+			docItem.Status = "FAILED"
+			docItem.ErrorMessage = &errMsg
+			_ = s.Store.SetDocument(ctx, &docItem)
+			c.JSON(http.StatusBadRequest, gin.H{"error": errMsg, "document": docItem})
+			return
+		}
+
+		reader := csv.NewReader(strings.NewReader(string(fileBytes)))
+		records, err := reader.ReadAll()
+		if err != nil || len(records) < 2 {
+			errMsg := "invalid CSV: must contain header and at least 1 data row"
+			if err != nil {
+				errMsg = fmt.Sprintf("CSV parse error: %v", err)
+			}
+			docItem.Status = "FAILED"
+			docItem.ErrorMessage = &errMsg
+			_ = s.Store.SetDocument(ctx, &docItem)
+			c.JSON(http.StatusBadRequest, gin.H{"error": errMsg, "document": docItem})
+			return
+		}
+
+		// Validate header columns and order against canonical schema
+		expectedHeaders := []string{"user_id", "transaction_date", "amount", "description", "raw_category", "normalized_category"}
+		header := records[0]
+		if len(header) != len(expectedHeaders) {
+			errMsg := fmt.Sprintf("invalid CSV header: expected %d columns (%s), got %d", len(expectedHeaders), strings.Join(expectedHeaders, ", "), len(header))
+			docItem.Status = "FAILED"
+			docItem.ErrorMessage = &errMsg
+			_ = s.Store.SetDocument(ctx, &docItem)
+			c.JSON(http.StatusBadRequest, gin.H{"error": errMsg, "document": docItem})
+			return
+		}
+		for i, expected := range expectedHeaders {
+			actual := strings.TrimSpace(strings.ToLower(header[i]))
+			if actual != expected {
+				errMsg := fmt.Sprintf("invalid CSV header at column %d: expected %q, got %q", i+1, expected, header[i])
+				docItem.Status = "FAILED"
+				docItem.ErrorMessage = &errMsg
+				_ = s.Store.SetDocument(ctx, &docItem)
+				c.JSON(http.StatusBadRequest, gin.H{"error": errMsg, "document": docItem})
+				return
+			}
+		}
+
+		var txRecords []bigquery.TransactionRecord
+		for i, row := range records[1:] {
+			rowNum := i + 2
+			if len(row) != len(expectedHeaders) {
+				errMsg := fmt.Sprintf("row %d: expected %d columns, got %d", rowNum, len(expectedHeaders), len(row))
+				docItem.Status = "FAILED"
+				docItem.ErrorMessage = &errMsg
+				_ = s.Store.SetDocument(ctx, &docItem)
+				c.JSON(http.StatusBadRequest, gin.H{"error": errMsg, "document": docItem})
+				return
+			}
+
+			txDate := strings.TrimSpace(row[1])
+			if _, err := time.Parse("2006-01-02", txDate); err != nil {
+				errMsg := fmt.Sprintf("row %d: invalid transaction_date '%s' (expected YYYY-MM-DD)", rowNum, txDate)
+				docItem.Status = "FAILED"
+				docItem.ErrorMessage = &errMsg
+				_ = s.Store.SetDocument(ctx, &docItem)
+				c.JSON(http.StatusBadRequest, gin.H{"error": errMsg, "document": docItem})
+				return
+			}
+
+			amtStr := strings.TrimSpace(row[2])
+			amt, err := strconv.ParseFloat(amtStr, 64)
+			if err != nil {
+				errMsg := fmt.Sprintf("row %d: invalid amount '%s'", rowNum, amtStr)
+				docItem.Status = "FAILED"
+				docItem.ErrorMessage = &errMsg
+				_ = s.Store.SetDocument(ctx, &docItem)
+				c.JSON(http.StatusBadRequest, gin.H{"error": errMsg, "document": docItem})
+				return
+			}
+
+			normCat := strings.TrimSpace(row[5])
+			if normCat == "" {
+				errMsg := fmt.Sprintf("row %d: normalized_category cannot be empty", rowNum)
+				docItem.Status = "FAILED"
+				docItem.ErrorMessage = &errMsg
+				_ = s.Store.SetDocument(ctx, &docItem)
+				c.JSON(http.StatusBadRequest, gin.H{"error": errMsg, "document": docItem})
+				return
+			}
+
+			txRecords = append(txRecords, bigquery.TransactionRecord{
+				UserID:             userID, // Force scope to authenticated request identity
+				TransactionDate:    txDate,
+				Amount:             amt,
+				Description:        strings.TrimSpace(row[3]),
+				RawCategory:        strings.TrimSpace(row[4]),
+				NormalizedCategory: normCat,
+			})
+		}
+
+		dataset := os.Getenv("BIGQUERY_DATASET")
+		if dataset == "" {
+			dataset = "portfolio_copilot"
+		}
+		if err := s.BQRunner.InsertTransactions(ctx, dataset, docItem.TargetTable, txRecords); err != nil {
+			errMsg := fmt.Sprintf("failed to insert transactions into BigQuery: %v", err)
+			docItem.Status = "FAILED"
+			docItem.ErrorMessage = &errMsg
+			_ = s.Store.SetDocument(ctx, &docItem)
+			c.JSON(http.StatusBadRequest, gin.H{"error": errMsg, "document": docItem})
+			return
+		}
+
+		recordsParsed = len(txRecords)
+
+	case "holdings":
+		var snapshot contracts.HoldingsSnapshot
+		if err := json.Unmarshal(fileBytes, &snapshot); err != nil {
+			errMsg := fmt.Sprintf("JSON parse error for holdings: %v", err)
+			docItem.Status = "FAILED"
+			docItem.ErrorMessage = &errMsg
+			_ = s.Store.SetDocument(ctx, &docItem)
+			c.JSON(http.StatusBadRequest, gin.H{"error": errMsg, "document": docItem})
+			return
+		}
+		// Force request identity
+		snapshot.UserID = userID
+		recordsParsed = len(snapshot.Positions)
+		if err := s.Store.SetHoldings(ctx, userID, &snapshot); err != nil {
+			errMsg := fmt.Sprintf("failed to persist holdings: %v", err)
+			docItem.Status = "FAILED"
+			docItem.ErrorMessage = &errMsg
+			_ = s.Store.SetDocument(ctx, &docItem)
+			c.JSON(http.StatusBadRequest, gin.H{"error": errMsg, "document": docItem})
+			return
+		}
+
+	case "liabilities":
+		var snapshot contracts.LiabilitiesSnapshot
+		if err := json.Unmarshal(fileBytes, &snapshot); err != nil {
+			errMsg := fmt.Sprintf("JSON parse error for liabilities: %v", err)
+			docItem.Status = "FAILED"
+			docItem.ErrorMessage = &errMsg
+			_ = s.Store.SetDocument(ctx, &docItem)
+			c.JSON(http.StatusBadRequest, gin.H{"error": errMsg, "document": docItem})
+			return
+		}
+		// Force request identity
+		snapshot.UserID = userID
+		recordsParsed = len(snapshot.Liabilities)
+		if err := s.Store.SetLiabilities(ctx, userID, &snapshot); err != nil {
+			errMsg := fmt.Sprintf("failed to persist liabilities: %v", err)
+			docItem.Status = "FAILED"
+			docItem.ErrorMessage = &errMsg
+			_ = s.Store.SetDocument(ctx, &docItem)
+			c.JSON(http.StatusBadRequest, gin.H{"error": errMsg, "document": docItem})
+			return
+		}
+
+	case "ips":
+		var ips contracts.InvestmentPolicyStatement
+		if err := json.Unmarshal(fileBytes, &ips); err != nil {
+			errMsg := fmt.Sprintf("JSON parse error for IPS: %v", err)
+			docItem.Status = "FAILED"
+			docItem.ErrorMessage = &errMsg
+			_ = s.Store.SetDocument(ctx, &docItem)
+			c.JSON(http.StatusBadRequest, gin.H{"error": errMsg, "document": docItem})
+			return
+		}
+		// Force request identity
+		ips.UserID = userID
+		recordsParsed = 1
+		if err := s.Store.UpdateIPS(ctx, &ips); err != nil {
+			errMsg := fmt.Sprintf("failed to update IPS: %v", err)
+			docItem.Status = "FAILED"
+			docItem.ErrorMessage = &errMsg
+			_ = s.Store.SetDocument(ctx, &docItem)
+			c.JSON(http.StatusBadRequest, gin.H{"error": errMsg, "document": docItem})
+			return
+		}
+	}
+
+	docItem.RecordsParsed = &recordsParsed
+	if err := s.Store.SetDocument(ctx, &docItem); err != nil {
+		slog.WarnContext(ctx, "Failed to record document metadata in store", "doc_id", docItem.ID, "error", err)
+	}
+
+	c.JSON(http.StatusOK, docItem)
 }
 
 func ptrInt(i int) *int {
@@ -333,4 +714,8 @@ func defaultUserProfile() *contracts.UserProfile {
 		FinancialGoalsNotes:     "Build a $1.5M nest egg for retirement by 2041 and maintain 6 months of liquid emergency reserves.",
 		UpdatedAt:               "2026-08-01T00:00:00Z",
 	}
+}
+
+func ptrString(s string) *string {
+	return &s
 }

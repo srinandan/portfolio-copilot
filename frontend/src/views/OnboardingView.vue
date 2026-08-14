@@ -32,6 +32,8 @@
       <!-- Step 1: Welcome -->
       <WelcomeStep
         v-if="currentStep === 1"
+        :has-active-profile="hasActiveProfile"
+        :active-version="activeVersion"
         @next="goToStep(2)"
       />
 
@@ -79,6 +81,7 @@
       <SubmissionStep
         v-else-if="currentStep === 7"
         :state="state"
+        :is-update="hasActiveProfile"
         @complete="onComplete"
       />
     </main>
@@ -86,7 +89,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue';
+import { ref, reactive, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import type {
   OnboardingState,
@@ -99,6 +102,7 @@ import type {
   ApprovalThresholds
 } from '../types';
 import { getDefaultAllocationBands } from '../services/onboarding';
+import { apiService } from '../services/api';
 
 import WelcomeStep from '../components/onboarding/WelcomeStep.vue';
 import GoalsStep from '../components/onboarding/GoalsStep.vue';
@@ -111,6 +115,8 @@ import SubmissionStep from '../components/onboarding/SubmissionStep.vue';
 const router = useRouter();
 
 const currentStep = ref(1);
+const hasActiveProfile = ref(false);
+const activeVersion = ref(1);
 
 const state = reactive<OnboardingState>({
   step: 1,
@@ -228,4 +234,48 @@ function onConstraintsConfirmed(payload: {
 function onComplete() {
   router.push('/');
 }
+
+onMounted(async () => {
+  try {
+    const profile = await apiService.getOnboarding(state.user_id);
+    if (profile && profile.has_active_ips) {
+      hasActiveProfile.value = true;
+      if (profile.version) {
+        activeVersion.value = profile.version;
+      }
+      if (profile.goals && profile.goals.length > 0) {
+        state.goals = profile.goals;
+      }
+      if (profile.time_horizon_years) {
+        state.time_horizon_years = profile.time_horizon_years;
+      }
+      if (profile.known_upcoming_expenses_usd !== undefined) {
+        state.known_upcoming_expenses_usd = profile.known_upcoming_expenses_usd;
+      }
+      if (profile.reserve_months !== undefined) {
+        state.reserve_months = profile.reserve_months;
+      }
+      if (profile.risk_tolerance) {
+        state.risk_tolerance = profile.risk_tolerance;
+      }
+      if (profile.target_bands && profile.target_bands.length > 0) {
+        state.target_bands = profile.target_bands;
+      }
+      if (profile.constraints) {
+        state.constraints = { ...state.constraints, ...profile.constraints };
+      }
+      if (profile.approval_required_above_usd !== undefined || profile.approval_required_above_percent !== undefined) {
+        state.approval_thresholds = {
+          approval_required_above_usd: profile.approval_required_above_usd ?? state.approval_thresholds.approval_required_above_usd,
+          approval_required_above_percent: profile.approval_required_above_percent ?? state.approval_thresholds.approval_required_above_percent
+        };
+      }
+      if (profile.liabilities && profile.liabilities.length > 0) {
+        state.liabilities = profile.liabilities;
+      }
+    }
+  } catch {
+    // Non-blocking: falls back to default onboarding state
+  }
+});
 </script>

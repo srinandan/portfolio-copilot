@@ -52,7 +52,9 @@ type DriftReport struct {
 // DocumentItem represents uploaded document metadata.
 type DocumentItem struct {
 	ID            string  `json:"id" firestore:"id"`
+	UserID        string  `json:"user_id" firestore:"user_id"`
 	Filename      string  `json:"filename" firestore:"filename"`
+	DocumentType  string  `json:"document_type,omitempty" firestore:"document_type,omitempty"`
 	AccountType   string  `json:"account_type,omitempty" firestore:"account_type,omitempty"`
 	TargetTable   string  `json:"target_table,omitempty" firestore:"target_table,omitempty"`
 	SizeBytes     int64   `json:"size_bytes" firestore:"size_bytes"`
