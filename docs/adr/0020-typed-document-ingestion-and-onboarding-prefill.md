@@ -19,15 +19,18 @@ Two key usability gaps existed in Portfolio Copilot:
 
 ### 2. Typed Document Ingestion Endpoint & Validation
 - Added `POST /api/documents` (multipart/form-data) in `frontend/server/handlers.go`.
+- Server uses `store.Store` and `bigquery.Runner` interfaces for dependency injection and testability.
 - Defined a document-type contract with strict extension and schema validation:
-  - `transactions` (CSV): validated for header and record counts, targeted at `checking_transactions` or `chase_transactions`.
-  - `holdings` (JSON): validated against `holdings.schema.json` and saved to `holdings/{user_id}`.
-  - `liabilities` (JSON): validated against `liabilities.schema.json` and saved to `liabilities/{user_id}`.
-  - `ips` (JSON): validated against `ips.schema.json` and updated in `ips/{ips_id}_v{version}`.
-- Added `SetDocument` to `pkg/store/crud.go` and `Store` interface, recording `contracts.DocumentItem` metadata (ID, filename, type, target, size, timestamp, status, and parsed record count) into Firestore collection `documents`.
+  - `transactions` (CSV): validated for exact 6-column header (`user_id,transaction_date,amount,description,raw_category,normalized_category`), ISO date format, valid amounts, and non-empty categories. Rows are strictly scoped to the request `user_id` and streamed directly into BigQuery (`portfolio_copilot.<target_table>`) via `BigQueryRunner.InsertTransactions`.
+  - `holdings` (JSON): validated against `holdings.schema.json`, request `user_id` enforced over any body payload to prevent IDOR/cross-tenant overwrite, and saved to `holdings/{user_id}`.
+  - `liabilities` (JSON): validated against `liabilities.schema.json`, request `user_id` enforced, and saved to `liabilities/{user_id}`.
+  - `ips` (JSON): validated against `ips.schema.json`, request `user_id` enforced, and updated in `ips/{ips_id}_v{version}`.
+- Added `UserID` to `contracts.DocumentItem` and scoped `GetDocuments` query via `.Where("user_id", "==", userID)` to prevent cross-tenant document metadata leakage.
+- Added `SetDocument` to `pkg/store/crud.go` and `Store` interface, recording `contracts.DocumentItem` audit metadata into Firestore collection `documents`.
+- When storage backends are uninitialized / nil, endpoints return honest `503 Service Unavailable` or `HasActiveIPS: false` rather than reporting synthetic success.
 - Re-enabled `DocumentsView.vue` with `UploadDropzone.vue` type selector and live Ingested Documents History table.
 
 ## Consequences
 - Single-click review and update of investment policies without losing prior versions.
-- Full end-to-end data ingestion pipeline supporting bank CSVs and financial snapshot JSONs without synthetic mocks.
+- Full end-to-end data ingestion pipeline supporting bank CSVs directly into BigQuery and financial snapshot JSONs into Firestore with complete IDOR protection and user scoping.
 - All 110 Vue unit tests, Go tests, and 351 Python tests remain green.

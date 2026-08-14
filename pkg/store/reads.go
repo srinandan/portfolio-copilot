@@ -145,11 +145,11 @@ func (c *Client) GetDriftReport(ctx context.Context, userID string) (*contracts.
 	return &report, nil
 }
 
-// GetDocuments reads uploaded document metadata items from Firestore.
+// GetDocuments reads uploaded document metadata items for a given user from Firestore.
 func (c *Client) GetDocuments(ctx context.Context, userID string) ([]contracts.DocumentItem, error) {
 	ctx, span := tracer.Start(ctx, "store.GetDocuments", trace.WithAttributes(attribute.String("user_id", userID)))
 	defer span.End()
-	query := c.fs.Collection(collectionDocuments).Limit(50)
+	query := c.fs.Collection(collectionDocuments).Where("user_id", "==", userID).Limit(50)
 	docs, err := query.Documents(ctx).GetAll()
 	if err != nil {
 		span.RecordError(err)

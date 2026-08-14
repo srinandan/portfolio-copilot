@@ -23,6 +23,7 @@ export interface HoldingsSnapshot {
 
 export interface DocumentItem {
   id: string;
+  user_id?: string;
   filename: string;
   account_type?: 'checking' | 'savings' | 'brokerage' | 'credit_card' | 'other' | string;
   target_table?: string;

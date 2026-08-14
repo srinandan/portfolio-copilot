@@ -10,20 +10,24 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
+	cloudbigquery "cloud.google.com/go/bigquery"
 	"github.com/gin-gonic/gin"
+	"portfolio-copilot/pkg/bigquery"
 	"portfolio-copilot/pkg/contracts"
 	"portfolio-copilot/pkg/store"
 )
 
-// Server holds dependencies for HTTP handlers, including the Firestore store client.
+// Server holds dependencies for HTTP handlers, using interfaces for testability.
 type Server struct {
-	Store *store.Client
+	Store    store.Store
+	BQRunner bigquery.Runner
 }
 
-// NewServer initializes a Server, attempting to connect to Firestore if configured.
+// NewServer initializes a Server, attempting to connect to Firestore and BigQuery if configured.
 func NewServer() *Server {
 	ctx := context.Background()
 	projectID := os.Getenv("FIRESTORE_PROJECT_ID")
@@ -33,25 +37,35 @@ func NewServer() *Server {
 	if projectID == "" {
 		projectID = os.Getenv("PROJECT_ID")
 	}
-	var storeClient *store.Client
+	var storeClient store.Store
+	var bqRunner bigquery.Runner
 	if projectID != "" {
 		// store.NewClient reads PROJECT_ID from the environment; set it once at server initialization
 		// if not already present.
 		if os.Getenv("PROJECT_ID") == "" {
 			os.Setenv("PROJECT_ID", projectID)
 		}
-		var err error
-		storeClient, err = store.NewClient(ctx)
+		client, err := store.NewClient(ctx)
 		if err != nil {
 			slog.Warn("Failed to initialize Firestore store client; using fallback mode", "error", err)
 		} else {
+			storeClient = client
 			slog.Info("Connected to Firestore store client", "project_id", projectID)
+		}
+
+		bqClient, err := cloudbigquery.NewClient(ctx, projectID)
+		if err != nil {
+			slog.Warn("Failed to initialize BigQuery client; transactions will not stream to BigQuery", "error", err)
+		} else {
+			bqRunner = bigquery.NewBigQueryRunner(bqClient)
+			slog.Info("Connected to BigQuery client", "project_id", projectID)
 		}
 	} else {
 		slog.Info("No PROJECT_ID set; server running in fallback mode")
 	}
 	return &Server{
-		Store: storeClient,
+		Store:    storeClient,
+		BQRunner: bqRunner,
 	}
 }
 
@@ -177,7 +191,10 @@ func (s *Server) HandleSetUserProfile(c *gin.Context) {
 func (s *Server) HandleGetOnboarding(c *gin.Context) {
 	userID := c.DefaultQuery("user_id", "demo_user")
 	if s.Store == nil {
-		c.JSON(http.StatusOK, defaultOnboardingProfile(userID))
+		c.JSON(http.StatusOK, contracts.OnboardingProfile{
+			HasActiveIPS: false,
+			UserID:       userID,
+		})
 		return
 	}
 
@@ -222,6 +239,12 @@ func (s *Server) HandleGetOnboarding(c *gin.Context) {
 		approvalPct = *ips.ApprovalRequiredAbovePercent
 	}
 
+	var constraints *contracts.Constraints
+	if ips.Constraints.ConcentrationLimitPercent > 0 || len(ips.Constraints.ExcludedTickers) > 0 || len(ips.Constraints.ExcludedSectors) > 0 {
+		c := ips.Constraints
+		constraints = &c
+	}
+
 	profile := contracts.OnboardingProfile{
 		HasActiveIPS:                 true,
 		UserID:                       ips.UserID,
@@ -233,7 +256,7 @@ func (s *Server) HandleGetOnboarding(c *gin.Context) {
 		ReserveMonths:                reserveMonths,
 		RiskTolerance:                ips.RiskTolerance,
 		TargetBands:                  ips.TargetAllocation,
-		Constraints:                  ips.Constraints,
+		Constraints:                  constraints,
 		ApprovalRequiredAboveUSD:     approvalUSD,
 		ApprovalRequiredAbovePercent: approvalPct,
 		Liabilities:                  liabilities,
@@ -247,8 +270,26 @@ func (s *Server) HandleUploadDocument(c *gin.Context) {
 	documentType := strings.ToLower(strings.TrimSpace(c.PostForm("document_type")))
 	targetTable := strings.TrimSpace(c.PostForm("target_table"))
 
+	if s.Store == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"error": "document ingestion unavailable: storage backend is not connected",
+		})
+		return
+	}
+
 	if documentType == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "document_type is required (transactions, holdings, liabilities, ips)"})
+		return
+	}
+
+	allowedTypes := map[string]bool{
+		"transactions": true,
+		"holdings":     true,
+		"liabilities":  true,
+		"ips":          true,
+	}
+	if !allowedTypes[documentType] {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("unsupported document_type '%s'; accepted types: transactions, holdings, liabilities, ips", documentType)})
 		return
 	}
 
@@ -270,9 +311,6 @@ func (s *Server) HandleUploadDocument(c *gin.Context) {
 		expectedExt = ".csv"
 	case "holdings", "liabilities", "ips":
 		expectedExt = ".json"
-	default:
-		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("unsupported document_type '%s'; accepted types: transactions, holdings, liabilities, ips", documentType)})
-		return
 	}
 
 	if ext != expectedExt {
@@ -296,6 +334,7 @@ func (s *Server) HandleUploadDocument(c *gin.Context) {
 	docID := fmt.Sprintf("doc-%d", time.Now().UnixNano())
 	docItem := contracts.DocumentItem{
 		ID:          docID,
+		UserID:      userID,
 		Filename:    fileHeader.Filename,
 		AccountType: documentType,
 		TargetTable: targetTable,
@@ -309,6 +348,18 @@ func (s *Server) HandleUploadDocument(c *gin.Context) {
 
 	switch documentType {
 	case "transactions":
+		if docItem.TargetTable == "" {
+			docItem.TargetTable = "checking_transactions"
+		}
+		if docItem.TargetTable != "checking_transactions" && docItem.TargetTable != "chase_transactions" {
+			errMsg := fmt.Sprintf("invalid target_table: %s (must be checking_transactions or chase_transactions)", docItem.TargetTable)
+			docItem.Status = "FAILED"
+			docItem.ErrorMessage = &errMsg
+			_ = s.Store.SetDocument(ctx, &docItem)
+			c.JSON(http.StatusBadRequest, gin.H{"error": errMsg, "document": docItem})
+			return
+		}
+
 		reader := csv.NewReader(strings.NewReader(string(fileBytes)))
 		records, err := reader.ReadAll()
 		if err != nil || len(records) < 2 {
@@ -318,16 +369,91 @@ func (s *Server) HandleUploadDocument(c *gin.Context) {
 			}
 			docItem.Status = "FAILED"
 			docItem.ErrorMessage = &errMsg
-			if s.Store != nil {
-				_ = s.Store.SetDocument(ctx, &docItem)
-			}
+			_ = s.Store.SetDocument(ctx, &docItem)
 			c.JSON(http.StatusBadRequest, gin.H{"error": errMsg, "document": docItem})
 			return
 		}
-		recordsParsed = len(records) - 1
-		if docItem.TargetTable == "" {
-			docItem.TargetTable = "checking_transactions"
+
+		// Validate header columns against schema
+		header := records[0]
+		if len(header) < 6 {
+			errMsg := fmt.Sprintf("invalid CSV header: expected 6 columns (user_id, transaction_date, amount, description, raw_category, normalized_category), got %d", len(header))
+			docItem.Status = "FAILED"
+			docItem.ErrorMessage = &errMsg
+			_ = s.Store.SetDocument(ctx, &docItem)
+			c.JSON(http.StatusBadRequest, gin.H{"error": errMsg, "document": docItem})
+			return
 		}
+
+		var txRecords []bigquery.TransactionRecord
+		for i, row := range records[1:] {
+			rowNum := i + 2
+			if len(row) < 6 {
+				errMsg := fmt.Sprintf("row %d: expected 6 columns, got %d", rowNum, len(row))
+				docItem.Status = "FAILED"
+				docItem.ErrorMessage = &errMsg
+				_ = s.Store.SetDocument(ctx, &docItem)
+				c.JSON(http.StatusBadRequest, gin.H{"error": errMsg, "document": docItem})
+				return
+			}
+
+			txDate := strings.TrimSpace(row[1])
+			if _, err := time.Parse("2006-01-02", txDate); err != nil {
+				errMsg := fmt.Sprintf("row %d: invalid transaction_date '%s' (expected YYYY-MM-DD)", rowNum, txDate)
+				docItem.Status = "FAILED"
+				docItem.ErrorMessage = &errMsg
+				_ = s.Store.SetDocument(ctx, &docItem)
+				c.JSON(http.StatusBadRequest, gin.H{"error": errMsg, "document": docItem})
+				return
+			}
+
+			amtStr := strings.TrimSpace(row[2])
+			amt, err := strconv.ParseFloat(amtStr, 64)
+			if err != nil {
+				errMsg := fmt.Sprintf("row %d: invalid amount '%s'", rowNum, amtStr)
+				docItem.Status = "FAILED"
+				docItem.ErrorMessage = &errMsg
+				_ = s.Store.SetDocument(ctx, &docItem)
+				c.JSON(http.StatusBadRequest, gin.H{"error": errMsg, "document": docItem})
+				return
+			}
+
+			normCat := strings.TrimSpace(row[5])
+			if normCat == "" {
+				errMsg := fmt.Sprintf("row %d: normalized_category cannot be empty", rowNum)
+				docItem.Status = "FAILED"
+				docItem.ErrorMessage = &errMsg
+				_ = s.Store.SetDocument(ctx, &docItem)
+				c.JSON(http.StatusBadRequest, gin.H{"error": errMsg, "document": docItem})
+				return
+			}
+
+			txRecords = append(txRecords, bigquery.TransactionRecord{
+				UserID:             userID, // Force scope to authenticated request identity
+				TransactionDate:    txDate,
+				Amount:             amt,
+				Description:        strings.TrimSpace(row[3]),
+				RawCategory:        strings.TrimSpace(row[4]),
+				NormalizedCategory: normCat,
+			})
+		}
+
+		if s.BQRunner != nil {
+			dataset := os.Getenv("BIGQUERY_DATASET")
+			if dataset == "" {
+				dataset = "portfolio_copilot"
+			}
+			if err := s.BQRunner.InsertTransactions(ctx, dataset, docItem.TargetTable, txRecords); err != nil {
+				errMsg := fmt.Sprintf("failed to insert transactions into BigQuery: %v", err)
+				docItem.Status = "FAILED"
+				docItem.ErrorMessage = &errMsg
+				_ = s.Store.SetDocument(ctx, &docItem)
+				c.JSON(http.StatusBadRequest, gin.H{"error": errMsg, "document": docItem})
+				return
+			}
+		}
+
+		recordsParsed = len(txRecords)
 
 	case "holdings":
 		var snapshot contracts.HoldingsSnapshot
@@ -335,25 +461,20 @@ func (s *Server) HandleUploadDocument(c *gin.Context) {
 			errMsg := fmt.Sprintf("JSON parse error for holdings: %v", err)
 			docItem.Status = "FAILED"
 			docItem.ErrorMessage = &errMsg
-			if s.Store != nil {
-				_ = s.Store.SetDocument(ctx, &docItem)
-			}
+			_ = s.Store.SetDocument(ctx, &docItem)
 			c.JSON(http.StatusBadRequest, gin.H{"error": errMsg, "document": docItem})
 			return
 		}
-		if snapshot.UserID == "" {
-			snapshot.UserID = userID
-		}
+		// Force request identity
+		snapshot.UserID = userID
 		recordsParsed = len(snapshot.Positions)
-		if s.Store != nil {
-			if err := s.Store.SetHoldings(ctx, snapshot.UserID, &snapshot); err != nil {
-				errMsg := fmt.Sprintf("failed to persist holdings: %v", err)
-				docItem.Status = "FAILED"
-				docItem.ErrorMessage = &errMsg
-				_ = s.Store.SetDocument(ctx, &docItem)
-				c.JSON(http.StatusBadRequest, gin.H{"error": errMsg, "document": docItem})
-				return
-			}
+		if err := s.Store.SetHoldings(ctx, userID, &snapshot); err != nil {
+			errMsg := fmt.Sprintf("failed to persist holdings: %v", err)
+			docItem.Status = "FAILED"
+			docItem.ErrorMessage = &errMsg
+			_ = s.Store.SetDocument(ctx, &docItem)
+			c.JSON(http.StatusBadRequest, gin.H{"error": errMsg, "document": docItem})
+			return
 		}
 
 	case "liabilities":
@@ -362,25 +483,20 @@ func (s *Server) HandleUploadDocument(c *gin.Context) {
 			errMsg := fmt.Sprintf("JSON parse error for liabilities: %v", err)
 			docItem.Status = "FAILED"
 			docItem.ErrorMessage = &errMsg
-			if s.Store != nil {
-				_ = s.Store.SetDocument(ctx, &docItem)
-			}
+			_ = s.Store.SetDocument(ctx, &docItem)
 			c.JSON(http.StatusBadRequest, gin.H{"error": errMsg, "document": docItem})
 			return
 		}
-		if snapshot.UserID == "" {
-			snapshot.UserID = userID
-		}
+		// Force request identity
+		snapshot.UserID = userID
 		recordsParsed = len(snapshot.Liabilities)
-		if s.Store != nil {
-			if err := s.Store.SetLiabilities(ctx, snapshot.UserID, &snapshot); err != nil {
-				errMsg := fmt.Sprintf("failed to persist liabilities: %v", err)
-				docItem.Status = "FAILED"
-				docItem.ErrorMessage = &errMsg
-				_ = s.Store.SetDocument(ctx, &docItem)
-				c.JSON(http.StatusBadRequest, gin.H{"error": errMsg, "document": docItem})
-				return
-			}
+		if err := s.Store.SetLiabilities(ctx, userID, &snapshot); err != nil {
+			errMsg := fmt.Sprintf("failed to persist liabilities: %v", err)
+			docItem.Status = "FAILED"
+			docItem.ErrorMessage = &errMsg
+			_ = s.Store.SetDocument(ctx, &docItem)
+			c.JSON(http.StatusBadRequest, gin.H{"error": errMsg, "document": docItem})
+			return
 		}
 
 	case "ips":
@@ -389,33 +505,26 @@ func (s *Server) HandleUploadDocument(c *gin.Context) {
 			errMsg := fmt.Sprintf("JSON parse error for IPS: %v", err)
 			docItem.Status = "FAILED"
 			docItem.ErrorMessage = &errMsg
-			if s.Store != nil {
-				_ = s.Store.SetDocument(ctx, &docItem)
-			}
+			_ = s.Store.SetDocument(ctx, &docItem)
 			c.JSON(http.StatusBadRequest, gin.H{"error": errMsg, "document": docItem})
 			return
 		}
-		if ips.UserID == "" {
-			ips.UserID = userID
-		}
+		// Force request identity
+		ips.UserID = userID
 		recordsParsed = 1
-		if s.Store != nil {
-			if err := s.Store.UpdateIPS(ctx, &ips); err != nil {
-				errMsg := fmt.Sprintf("failed to update IPS: %v", err)
-				docItem.Status = "FAILED"
-				docItem.ErrorMessage = &errMsg
-				_ = s.Store.SetDocument(ctx, &docItem)
-				c.JSON(http.StatusBadRequest, gin.H{"error": errMsg, "document": docItem})
-				return
-			}
+		if err := s.Store.UpdateIPS(ctx, &ips); err != nil {
+			errMsg := fmt.Sprintf("failed to update IPS: %v", err)
+			docItem.Status = "FAILED"
+			docItem.ErrorMessage = &errMsg
+			_ = s.Store.SetDocument(ctx, &docItem)
+			c.JSON(http.StatusBadRequest, gin.H{"error": errMsg, "document": docItem})
+			return
 		}
 	}
 
 	docItem.RecordsParsed = &recordsParsed
-	if s.Store != nil {
-		if err := s.Store.SetDocument(ctx, &docItem); err != nil {
-			slog.WarnContext(ctx, "Failed to record document metadata in store", "doc_id", docItem.ID, "error", err)
-		}
+	if err := s.Store.SetDocument(ctx, &docItem); err != nil {
+		slog.WarnContext(ctx, "Failed to record document metadata in store", "doc_id", docItem.ID, "error", err)
 	}
 
 	c.JSON(http.StatusOK, docItem)
@@ -584,45 +693,6 @@ func defaultUserProfile() *contracts.UserProfile {
 		RiskToleranceNotes:      "Comfortable with moderate volatility in pursuit of long-term capital appreciation; prefers broad-market index funds.",
 		FinancialGoalsNotes:     "Build a $1.5M nest egg for retirement by 2041 and maintain 6 months of liquid emergency reserves.",
 		UpdatedAt:               "2026-08-01T00:00:00Z",
-	}
-}
-
-func defaultOnboardingProfile(userID string) contracts.OnboardingProfile {
-	return contracts.OnboardingProfile{
-		HasActiveIPS:             true,
-		UserID:                   userID,
-		IPSID:                    "ips_demo_001",
-		Version:                  1,
-		TimeHorizonYears:         15,
-		KnownUpcomingExpensesUSD: 5000,
-		ReserveMonths:            6,
-		RiskTolerance:            contracts.RiskToleranceModerate,
-		Goals: []contracts.Goal{
-			{Name: "Retirement", TargetAmountUSD: 1500000, TargetDate: "2041-01-01"},
-			{Name: "Emergency Fund", TargetAmountUSD: 30000, TargetDate: "2026-12-31"},
-		},
-		TargetBands: []contracts.AllocationBand{
-			{AssetClass: "Equity", TargetPercent: 60, MinPercent: 50, MaxPercent: 70},
-			{AssetClass: "Fixed Income", TargetPercent: 30, MinPercent: 20, MaxPercent: 40},
-			{AssetClass: "Cash", TargetPercent: 10, MinPercent: 5, MaxPercent: 20},
-		},
-		Constraints: contracts.Constraints{
-			ConcentrationLimitPercent: 15,
-			ExcludedTickers:           []string{},
-			ExcludedSectors:           []string{"Tobacco", "Gambling"},
-		},
-		ApprovalRequiredAboveUSD:     10000,
-		ApprovalRequiredAbovePercent: 5,
-		Liabilities: []contracts.Liability{
-			{
-				LiabilityID:         "liab_mortgage_001",
-				Type:                contracts.LiabilityTypeMortgage,
-				Description:         ptrString("Primary Residence Mortgage (30yr Fixed @ 3.25%)"),
-				BalanceUSD:          420000,
-				InterestRatePercent: ptrFloat64(3.25),
-				MinimumPaymentUSD:   2450,
-			},
-		},
 	}
 }
 

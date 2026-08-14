@@ -200,7 +200,7 @@ type OnboardingProfile struct {
 	ReserveMonths                float64          `json:"reserve_months,omitempty"`
 	RiskTolerance                RiskTolerance    `json:"risk_tolerance,omitempty"`
 	TargetBands                  []AllocationBand `json:"target_bands,omitempty"`
-	Constraints                  Constraints      `json:"constraints,omitempty"`
+	Constraints                  *Constraints     `json:"constraints,omitempty"`
 	ApprovalRequiredAboveUSD     float64          `json:"approval_required_above_usd,omitempty"`
 	ApprovalRequiredAbovePercent float64          `json:"approval_required_above_percent,omitempty"`
 	Liabilities                  []Liability      `json:"liabilities,omitempty"`

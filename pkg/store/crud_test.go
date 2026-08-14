@@ -194,6 +194,7 @@ func TestSetDocumentAndGetDocuments(t *testing.T) {
 
 	doc := &contracts.DocumentItem{
 		ID:          "doc-test-123",
+		UserID:      "demo_user",
 		Filename:    "statement.csv",
 		AccountType: "checking",
 		TargetTable: "checking_transactions",
