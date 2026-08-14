@@ -410,8 +410,9 @@ describe('Frontend Views', () => {
     expect(screen.getByTestId('step-title').textContent).toContain('Welcome to Portfolio Copilot');
   });
 
-  it('ProfileView renders profile form and handles saving', async () => {
+  it('ProfileView renders profile & policy hub with tabs and handles full save', async () => {
     const ProfileView = (await import('../views/ProfileView.vue')).default;
+    const { router } = await import('../router');
     const mockProfile = {
       user_id: 'demo_user',
       full_name: 'Alex Mercer',
@@ -431,38 +432,113 @@ describe('Frontend Views', () => {
       updated_at: '2026-08-01T00:00:00Z'
     };
 
+    const mockOnboarding = {
+      has_active_ips: true,
+      user_id: 'demo_user',
+      version: 2,
+      time_horizon_years: 15,
+      risk_tolerance: 'aggressive' as const,
+      goals: [
+        { name: 'Retirement Compounding', target_amount_usd: 1500000, target_date: '2039-12-31' }
+      ],
+      target_bands: [
+        { asset_class: 'Equities (US & Global)', target_percent: 85, min_percent: 75, max_percent: 95 },
+        { asset_class: 'Fixed Income (Bonds)', target_percent: 10, min_percent: 0, max_percent: 20 },
+        { asset_class: 'Cash & Equivalents', target_percent: 5, min_percent: 0, max_percent: 10 }
+      ],
+      liabilities: [
+        {
+          liability_id: 'liab_001',
+          type: 'credit_card' as const,
+          description: 'Chase Sapphire',
+          balance_usd: 4850,
+          interest_rate_percent: 24.99,
+          minimum_payment_usd: 150
+        }
+      ],
+      constraints: {
+        concentration_limit_percent: 15,
+        excluded_tickers: ['TSLA'],
+        excluded_sectors: ['tobacco'],
+        account_type: 'taxable' as const,
+        tax_loss_harvesting_enabled: true
+      },
+      approval_required_above_usd: 1000,
+      approval_required_above_percent: 5
+    };
+
     vi.spyOn(apiService, 'getUserProfile').mockResolvedValue(mockProfile);
-    const updateSpy = vi.spyOn(apiService, 'updateUserProfile').mockResolvedValue({
+    vi.spyOn(apiService, 'getOnboarding').mockResolvedValue(mockOnboarding);
+
+    const updateProfileSpy = vi.spyOn(apiService, 'updateUserProfile').mockResolvedValue({
       status: 'ok',
       profile: { ...mockProfile, full_name: 'Alex Mercer Updated' }
     });
 
-    render(ProfileView);
+    const applyOnboardingSpy = vi.spyOn(apiService, 'applyOnboarding').mockResolvedValue({
+      status: 'applied',
+      ips_id: 'ips_test_1',
+      version: 3,
+      liabilities_count: 1
+    });
+
+    render(ProfileView, {
+      global: {
+        plugins: [router]
+      }
+    });
 
     await waitFor(() => {
       expect((screen.getByTestId('input-full-name') as HTMLInputElement).value).toBe('Alex Mercer');
       expect((screen.getByTestId('input-email') as HTMLInputElement).value).toBe('alex.mercer@example.com');
+      expect(screen.getByTestId('badge-ips-status').textContent).toContain('Active IPS (v2)');
     });
 
-    // Test adding family member
-    const addBtn = screen.getByTestId('btn-add-family-member');
-    await fireEvent.click(addBtn);
+    // Test adding and removing family members in Personal tab
+    const addMemberBtn = screen.getByTestId('btn-add-family-member');
+    await fireEvent.click(addMemberBtn);
     expect(screen.getAllByTestId('family-member-row').length).toBe(2);
 
-    // Test removing family member
-    const removeBtns = screen.getAllByTestId('btn-remove-family-member');
-    await fireEvent.click(removeBtns[0]);
+    const removeMemberBtns = screen.getAllByTestId('btn-remove-family-member');
+    await fireEvent.click(removeMemberBtns[0]);
     expect(screen.getAllByTestId('family-member-row').length).toBe(1);
 
-    // Test updating full name and saving
-    const nameInput = screen.getByTestId('input-full-name');
-    await fireEvent.update(nameInput, 'Alex Mercer Updated');
+    // Switch to Goals tab and verify controls
+    const goalsTabBtn = screen.getByTestId('tab-goals');
+    await fireEvent.click(goalsTabBtn);
+    expect(screen.getByTestId('section-goals')).toBeDefined();
 
+    const addGoalBtn = screen.getByTestId('btn-add-goal');
+    await fireEvent.click(addGoalBtn);
+    expect(screen.getAllByTestId('goal-item-row').length).toBe(2);
+
+    // Switch to Risk tab and verify reaction / allocation controls
+    const riskTabBtn = screen.getByTestId('tab-risk');
+    await fireEvent.click(riskTabBtn);
+    expect(screen.getByTestId('section-risk')).toBeDefined();
+
+    const holdOpt = screen.getByTestId('reaction-opt-hold');
+    await fireEvent.click(holdOpt);
+    expect(screen.getByTestId('total-percent-display').textContent?.trim()).toBe('100%');
+
+    // Switch to Liabilities tab
+    const liabilitiesTabBtn = screen.getByTestId('tab-liabilities');
+    await fireEvent.click(liabilitiesTabBtn);
+    expect(screen.getByTestId('section-liabilities')).toBeDefined();
+    expect(screen.getByTestId('total-liabilities-display').textContent).toContain('$4,850');
+
+    // Switch to Policy Guardrails tab
+    const policyTabBtn = screen.getByTestId('tab-policy');
+    await fireEvent.click(policyTabBtn);
+    expect(screen.getByTestId('section-policy')).toBeDefined();
+
+    // Trigger save
     const saveBtn = screen.getByTestId('btn-save-profile');
     await fireEvent.click(saveBtn);
 
     await waitFor(() => {
-      expect(updateSpy).toHaveBeenCalled();
+      expect(updateProfileSpy).toHaveBeenCalled();
+      expect(applyOnboardingSpy).toHaveBeenCalled();
       expect(screen.getByTestId('profile-save-success')).toBeDefined();
     });
   });
