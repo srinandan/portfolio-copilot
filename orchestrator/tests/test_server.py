@@ -69,6 +69,82 @@ def test_lifespan_runs_startup_verifications():
             mock_verify_secrets.assert_called_once()
 
 
+def test_lifespan_initializes_and_closes_firestore_mcp_toolset():
+    from src.orchestrator import server
+
+    mock_toolset = MagicMock()
+    mock_toolset.close = AsyncMock()
+
+    with (
+        patch("src.orchestrator.skills._skill_metadata.verify_all_skills_metadata"),
+        patch("src.orchestrator.managed_agents.secret_loader.verify_required_secrets"),
+        patch(
+            "src.orchestrator.data.firestore_mcp.get_firestore_mcp_toolset_from_registry",
+            return_value=mock_toolset,
+        ),
+        patch(
+            "src.orchestrator.data.firestore_mcp.list_available_mcp_tools",
+            new_callable=AsyncMock,
+            return_value=["list_documents", "get_document"],
+        ),
+        patch("src.orchestrator.server.SessionManager"),
+        patch("src.orchestrator.server.Runner"),
+    ):
+        with TestClient(server.app):
+            assert server.state.firestore_mcp_toolset == mock_toolset
+
+        # After lifespan exit, toolset must be closed and cleared
+        mock_toolset.close.assert_awaited_once()
+        assert server.state.firestore_mcp_toolset is None
+
+
+def test_lifespan_firestore_mcp_discovery_failure_handled_gracefully():
+    from src.orchestrator import server
+
+    with (
+        patch("src.orchestrator.skills._skill_metadata.verify_all_skills_metadata"),
+        patch("src.orchestrator.managed_agents.secret_loader.verify_required_secrets"),
+        patch(
+            "src.orchestrator.data.firestore_mcp.get_firestore_mcp_toolset_from_registry",
+            side_effect=RuntimeError("Firestore MCP unreachable"),
+        ),
+        patch("src.orchestrator.server.SessionManager"),
+        patch("src.orchestrator.server.Runner"),
+    ):
+        with TestClient(server.app):
+            assert server.state.ready is True
+            assert server.state.firestore_mcp_toolset is None
+
+
+def test_lifespan_firestore_mcp_timeout_handled_gracefully():
+    import asyncio
+
+    from src.orchestrator import server
+
+    mock_toolset = MagicMock()
+    mock_toolset.close = AsyncMock()
+
+    with (
+        patch("src.orchestrator.skills._skill_metadata.verify_all_skills_metadata"),
+        patch("src.orchestrator.managed_agents.secret_loader.verify_required_secrets"),
+        patch(
+            "src.orchestrator.data.firestore_mcp.get_firestore_mcp_toolset_from_registry",
+            return_value=mock_toolset,
+        ),
+        patch(
+            "src.orchestrator.data.firestore_mcp.list_available_mcp_tools",
+            side_effect=asyncio.TimeoutError("Probe timed out"),
+        ),
+        patch("src.orchestrator.server.SessionManager"),
+        patch("src.orchestrator.server.Runner"),
+    ):
+        with TestClient(server.app):
+            assert server.state.ready is True
+            assert server.state.firestore_mcp_toolset is None
+
+        mock_toolset.close.assert_awaited_once()
+
+
 def test_readyz_503_before_startup_completes():
     from src.orchestrator import server
 
