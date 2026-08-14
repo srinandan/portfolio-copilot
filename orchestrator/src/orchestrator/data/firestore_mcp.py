@@ -1,14 +1,15 @@
 """Firestore Remote MCP Server toolset and client integration."""
 
 import os
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from google.adk.integrations.agent_registry import AgentRegistry
-from google.adk.tools.mcp_tool.mcp_toolset import McpToolset, StreamableHTTPConnectionParams
 from google.auth import default as google_auth_default
 from google.auth.transport.requests import Request as GoogleAuthRequest
 
 from ..logger import get_logger
+
+if TYPE_CHECKING:
+    from google.adk.tools.mcp_tool.mcp_toolset import McpToolset
 
 logger = get_logger(__name__)
 
@@ -45,16 +46,13 @@ def get_firestore_auth_headers(credentials: Any = None) -> Dict[str, str]:
 def create_firestore_mcp_toolset(
     url: str = DEFAULT_FIRESTORE_MCP_URL,
     credentials: Any = None,
-) -> McpToolset:
+) -> "McpToolset":
     """Constructs an ADK McpToolset connecting to the remote Firestore MCP endpoint."""
-    headers = get_firestore_auth_headers(credentials=credentials)
+    from google.adk.tools.mcp_tool.mcp_toolset import McpToolset, StreamableHTTPConnectionParams
 
-    connection_params = StreamableHTTPConnectionParams(
-        url=url,
-        headers=headers,
-    )
+    connection_params = StreamableHTTPConnectionParams(url=url)
 
-    def header_provider(context: Any) -> Dict[str, str]:
+    def header_provider(context: Any = None) -> Dict[str, str]:
         return get_firestore_auth_headers(credentials=credentials)
 
     return McpToolset(
@@ -73,7 +71,7 @@ def get_firestore_mcp_toolset_from_registry(
     project_id: Optional[str] = None,
     location: str = "global",
     credentials: Any = None,
-) -> McpToolset:
+) -> "McpToolset":
     """Discovers and constructs the Firestore McpToolset from Agent Registry with fallback."""
     proj = (
         project_id
@@ -87,26 +85,27 @@ def get_firestore_mcp_toolset_from_registry(
             pass
 
     if proj:
+        server_name = f"projects/{proj}/locations/{location}/mcpServers/firestore-mcp"
         try:
+            from google.adk.integrations.agent_registry import AgentRegistry
+
             registry = AgentRegistry(
                 project_id=proj,
                 location=location,
                 header_provider=google_auth_header_provider,
             )
-            # Query standard registered resource name for Firestore MCP
-            server_name = f"projects/{proj}/locations/{location}/mcpServers/firestore-mcp"
             return registry.get_mcp_toolset(mcp_server_name=server_name)
         except Exception as e:
             logger.info(
                 "Agent Registry lookup for %s failed (%s), falling back to direct endpoint",
-                server_name if "server_name" in locals() else "firestore-mcp",
+                server_name,
                 e,
             )
 
     return create_firestore_mcp_toolset(credentials=credentials)
 
 
-async def list_available_mcp_tools(toolset: McpToolset) -> List[str]:
+async def list_available_mcp_tools(toolset: Any) -> List[str]:
     """Inspects and returns the names of all tools exposed by the MCP toolset."""
     tools = await toolset.get_tools()
     tool_names = []

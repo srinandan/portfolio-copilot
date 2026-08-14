@@ -30,7 +30,6 @@ dev = [
 [tool.pytest.ini_options]
 pythonpath = [".", "src", ".."]
 testpaths = ["tests"]
-norecursedirs = [".*", "google3", "build", "dist", ".venv", "frontend", "pkg", "scripts"]
 
 
 [tool.ruff]

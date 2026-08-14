@@ -2,7 +2,7 @@
 """CLI utility to verify connectivity and tool discovery with Firestore Remote MCP Server.
 
 Usage:
-  python3 scripts/test_firestore_mcp.py [--url MCP_URL] [--project PROJECT_ID] [--location LOCATION]
+  python3 scripts/verify_firestore_mcp.py [--url MCP_URL] [--project PROJECT_ID] [--location LOCATION]
 """
 
 import argparse

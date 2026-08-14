@@ -58,7 +58,7 @@ def test_get_firestore_auth_headers_default_credentials():
         assert headers["Authorization"] == "Bearer default-creds-token"
 
 
-@patch("src.orchestrator.data.firestore_mcp.McpToolset")
+@patch("google.adk.tools.mcp_tool.mcp_toolset.McpToolset")
 def test_create_firestore_mcp_toolset(mock_mcp_toolset_cls):
     """Golden path: create_firestore_mcp_toolset initializes McpToolset with streamable HTTP."""
     mock_creds = MagicMock()
@@ -78,7 +78,7 @@ def test_create_firestore_mcp_toolset(mock_mcp_toolset_cls):
     assert provider_headers["Authorization"] == "Bearer test-token"
 
 
-@patch("src.orchestrator.data.firestore_mcp.McpToolset")
+@patch("google.adk.tools.mcp_tool.mcp_toolset.McpToolset")
 def test_create_firestore_mcp_toolset_custom_url(mock_mcp_toolset_cls):
     """Parametrized custom URL override."""
     mock_creds = MagicMock()
@@ -93,7 +93,7 @@ def test_create_firestore_mcp_toolset_custom_url(mock_mcp_toolset_cls):
     assert kwargs["connection_params"].url == custom_url
 
 
-@patch("src.orchestrator.data.firestore_mcp.AgentRegistry")
+@patch("google.adk.integrations.agent_registry.AgentRegistry")
 def test_get_firestore_mcp_toolset_from_registry_success(mock_registry_cls):
     """Golden path: AgentRegistry resolves registered MCP toolset."""
     mock_registry_instance = MagicMock()
@@ -118,7 +118,7 @@ def test_get_firestore_mcp_toolset_from_registry_success(mock_registry_cls):
 
 
 @patch("src.orchestrator.data.firestore_mcp.create_firestore_mcp_toolset")
-@patch("src.orchestrator.data.firestore_mcp.AgentRegistry")
+@patch("google.adk.integrations.agent_registry.AgentRegistry")
 def test_get_firestore_mcp_toolset_from_registry_fallback_on_error(
     mock_registry_cls, mock_create_toolset
 ):
@@ -176,7 +176,7 @@ def test_get_firestore_mcp_toolset_from_registry_no_project_falls_back(
 
 @patch("src.orchestrator.data.firestore_mcp.create_firestore_mcp_toolset")
 @patch("src.orchestrator.data.firestore_mcp.google_auth_default", return_value=(MagicMock(), "inferred-project"))
-@patch("src.orchestrator.data.firestore_mcp.AgentRegistry")
+@patch("google.adk.integrations.agent_registry.AgentRegistry")
 def test_get_firestore_mcp_toolset_from_registry_inferred_project(
     mock_registry_cls, mock_auth_default, mock_create_toolset
 ):

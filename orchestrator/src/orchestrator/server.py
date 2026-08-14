@@ -87,6 +87,7 @@ class ApplyOnboardingRequest(BaseModel):
 class ServerState:
     session_manager: Optional[SessionManager] = None
     runner: Optional[Runner] = None
+    firestore_mcp_toolset: Optional[Any] = None
     ready: bool = False
 
 
@@ -95,7 +96,10 @@ state = ServerState()
 
 @asynccontextmanager
 async def _lifespan(_app: FastAPI):
-    from .data.firestore_mcp import get_firestore_mcp_toolset_from_registry
+    from .data.firestore_mcp import (
+        get_firestore_mcp_toolset_from_registry,
+        list_available_mcp_tools,
+    )
     from .managed_agents.secret_loader import verify_required_secrets
     from .skills._skill_metadata import verify_all_skills_metadata
 
@@ -103,8 +107,20 @@ async def _lifespan(_app: FastAPI):
     verify_required_secrets()
 
     try:
-        get_firestore_mcp_toolset_from_registry()
-        logger.info("Firestore Remote MCP Server toolset initialized successfully on startup.")
+        toolset = get_firestore_mcp_toolset_from_registry()
+        try:
+            tools = await list_available_mcp_tools(toolset)
+            state.firestore_mcp_toolset = toolset
+            logger.info(
+                "Firestore Remote MCP Server toolset initialized successfully on startup (tools=%d).",
+                len(tools),
+            )
+        except Exception:
+            try:
+                await toolset.close()
+            except Exception:
+                pass
+            raise
     except Exception as e:
         logger.warning("Firestore Remote MCP startup check deferred: %s", e)
 
@@ -119,8 +135,17 @@ async def _lifespan(_app: FastAPI):
     )
     state.ready = True
     logger.info("Orchestrator HTTP server ready (app_name=%s)", APP_NAME)
-    yield
-    state.ready = False
+    try:
+        yield
+    finally:
+        state.ready = False
+        if state.firestore_mcp_toolset is not None:
+            try:
+                await state.firestore_mcp_toolset.close()
+                logger.info("Firestore Remote MCP toolset closed successfully.")
+            except Exception as e:
+                logger.warning("Failed to close Firestore Remote MCP toolset on shutdown: %s", e)
+            state.firestore_mcp_toolset = None
 
 
 def _resolve_project_id() -> str:

@@ -1,4 +1,4 @@
-# ADR-0022: Firestore Remote MCP Server in Python Agent Orchestrator
+# ADR-0023: Firestore Remote MCP Server in Python Agent Orchestrator
 
 ## Status
 **Accepted.** Extends [ADR-0006](0006-agent-registry-api-alignment.md), [ADR-0008](0008-python-for-orchestrator.md), [ADR-0014](0014-managed-agents-subagent-execution-layer.md), and [ADR-0016](0016-deterministic-primitives-in-orchestrator.md).
