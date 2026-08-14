@@ -109,7 +109,7 @@ async def _lifespan(_app: FastAPI):
     try:
         toolset = get_firestore_mcp_toolset_from_registry()
         try:
-            tools = await list_available_mcp_tools(toolset)
+            tools = await asyncio.wait_for(list_available_mcp_tools(toolset), timeout=10.0)
             state.firestore_mcp_toolset = toolset
             logger.info(
                 "Firestore Remote MCP Server toolset initialized successfully on startup (tools=%d).",

@@ -116,6 +116,35 @@ def test_lifespan_firestore_mcp_discovery_failure_handled_gracefully():
             assert server.state.firestore_mcp_toolset is None
 
 
+def test_lifespan_firestore_mcp_timeout_handled_gracefully():
+    import asyncio
+
+    from src.orchestrator import server
+
+    mock_toolset = MagicMock()
+    mock_toolset.close = AsyncMock()
+
+    with (
+        patch("src.orchestrator.skills._skill_metadata.verify_all_skills_metadata"),
+        patch("src.orchestrator.managed_agents.secret_loader.verify_required_secrets"),
+        patch(
+            "src.orchestrator.data.firestore_mcp.get_firestore_mcp_toolset_from_registry",
+            return_value=mock_toolset,
+        ),
+        patch(
+            "src.orchestrator.data.firestore_mcp.list_available_mcp_tools",
+            side_effect=asyncio.TimeoutError("Probe timed out"),
+        ),
+        patch("src.orchestrator.server.SessionManager"),
+        patch("src.orchestrator.server.Runner"),
+    ):
+        with TestClient(server.app):
+            assert server.state.ready is True
+            assert server.state.firestore_mcp_toolset is None
+
+        mock_toolset.close.assert_awaited_once()
+
+
 def test_readyz_503_before_startup_completes():
     from src.orchestrator import server
 
