@@ -8,33 +8,29 @@
 [![CodeQL](https://github.com/srinandan/portfolio-copilot/actions/workflows/codeql.yml/badge.svg)](https://github.com/srinandan/portfolio-copilot/actions/workflows/codeql.yml)
 
 Portfolio Copilot is a personal finance and investing assistant that
-plans its own next move.
-
-Instead of following a fixed script, a single agent looks at your goal,
-checks what it's currently allowed to do, and decides for itself how to
-get there, pulling in research, checking your portfolio, and drafting a
-trade if one's warranted. Nothing happens with your money without your
-sign-off, and every decision it makes is traceable back to exactly which
-capability made it, and why.
+plans its own next move instead of following a fixed script. A single
+agent reads your goal, checks which capabilities it's currently allowed
+to use, and composes a plan at runtime — pulling research, checking your
+portfolio, and drafting a trade when warranted. No trade executes without
+your approval, and every action is traceable to the capability that
+produced it.
 
 ## Why try it
 
-- **It plans, it doesn't run a script.** Ask it something and watch it
-  work out, in the moment, what it needs to check and do. It's not a
-  hardcoded pipeline of steps that runs the same way every time.
-- **You can revoke what it's allowed to do, live, mid-conversation**,
-  and watch it adapt on the very next step. No restart, no error.
-- **Nothing happens with your money without you approving it first.**
-  Proposed trades are drafted, checked against your own stated
-  investment policy, and only ever executed after you say yes.
-- **It's a real demonstration of agent governance**, not a slide about
-  it. Every action is traceable to the exact skill, version, and
-  approval that authorized it.
+- **It plans, it doesn't run a script.** The agent decides what to check
+  and do at request time, rather than executing a hardcoded pipeline.
+- **Capabilities can be revoked live, mid-conversation.** Revoke a skill
+  and the agent adapts on its next planning step — no restart, no error.
+- **No trade executes without your approval.** Trades are drafted,
+  checked against your stated investment policy, and executed only after
+  you approve.
+- **Governance is real, not a slide.** Every action is traceable to the
+  exact skill, version, and approval that authorized it.
 
-This is a personal project and demo, built on Google Cloud's Gemini
-Enterprise Agent Platform. It's not a product, not investment advice,
-and not connected to a real brokerage (trades run through Alpaca's
-paper trading API).
+This is a personal project and demo built on Google Cloud's Gemini
+Enterprise Agent Platform. It is not a product, not investment advice,
+and not connected to a real brokerage (trades run through Alpaca's paper
+trading API).
 
 ## Get started
 
@@ -45,10 +41,10 @@ Setup instructions: [`install/`](install/).
 Portfolio Copilot provides a standalone Vue 3 + TypeScript web interface connected to the backend server and Python orchestrator:
 
 ### First time: onboarding & profile (`/onboarding`, `/profile`)
-You can complete the guided onboarding interview or configure the 5-tab **Profile & Policy Hub** (`/profile`): personal demographics, family dependents, career and retirement milestones, financial goals, risk tolerance, target allocation bands, liabilities, and policy guardrails. The system synthesizes and atomically persists your active Investment Policy Statement (IPS), Liabilities snapshot, and User Profile.
+Complete the guided onboarding interview, or configure the 5-tab **Profile & Policy Hub** (`/profile`): demographics, family dependents, career and retirement milestones, financial goals, risk tolerance, target allocation bands, liabilities, and policy guardrails. This atomically persists your active Investment Policy Statement (IPS), Liabilities snapshot, and User Profile.
 
 ### Day to day: checking in (`/dashboard`, `/portfolio`, `/spending`, `/documents`)
-- **Dashboard (`/`)**: View real-time agent planning conversations — a live progress checklist tracks each stage of an analysis (discovering skills, analyzing, reviewing) as it runs, then clears to reveal the result — alongside net worth summaries and current asset allocations.
+- **Dashboard (`/`)**: Watch real-time agent planning, with a live progress checklist for each analysis stage (discovering skills, analyzing, reviewing), alongside net worth summaries and asset allocations.
 - **Portfolio & Drift (`/portfolio`)**: Inspect current holdings alongside the live **Portfolio Drift Report**, comparing current allocations against your IPS target bands.
 - **Spending Analysis (`/spending`)**: Review 30-day income, outflows, savings rate, reserve months, and dual-condition anomaly detections against Chase transaction history.
 - **Document Ingestion (`/documents`)**: Upload bank transaction CSVs (streamed directly into BigQuery with deduplication) and holdings/liabilities JSON snapshots into Firestore.

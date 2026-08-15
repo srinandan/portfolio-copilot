@@ -11,12 +11,12 @@ See [ADR-0003](../docs/adr/0003-standalone-ui-not-agentspace.md) and [ADR-0017](
 ## What It Does
 
 - **Unified Web & API Architecture**: Hosts the compiled Vue 3 SPA and handles `/api/*` data requests (Firestore, BigQuery, Orchestrator SSE streaming) in-process without cross-service network hops (ADR-0017).
-- **Human-in-the-Loop (HITL) Governance Centerpiece**: Renders structured interactive cards (`<ApprovalCard />`) for proposed trades and rebalancing actions. Displays itemized Policy Safety Checklists (`verdict.rule_results`) with individual `PASS` / `FAIL` (`VIOLATION`) status pills and supports inline quantity/rationale editing before human sign-off.
-- **Stitch Design System Alignment**:
-  - **Dual-Font Typography**: Uses **Geist** for headings, navigation, and conversational text, and **JetBrains Mono** (`tabular-nums`) for all monetary values, tickers, trade quantities, and audit IDs.
-  - **Desktop Dual-Panel Layout**: Features a responsive split layout (`>=1024px`) with a **40% Conversational Stream / Live Governance Left Panel** and a **60% Financial Canvas Right Panel**.
-  - **Air-Gapped Privacy Manifesto**: Highlights end-to-end local document processing ("Security Through Privacy" — no direct bank connections).
-- **Comprehensive Financial Views**:
+- **Human-in-the-Loop (HITL) Governance**: Renders interactive cards (`<ApprovalCard />`) for proposed trades and rebalancing actions, with itemized Policy Safety Checklists (`verdict.rule_results`) showing `PASS` / `FAIL` (`VIOLATION`) status pills and inline quantity/rationale editing before sign-off.
+- **Stitch Design System**:
+  - **Typography**: **Geist** for headings, navigation, and conversational text; **JetBrains Mono** (`tabular-nums`) for monetary values, tickers, trade quantities, and audit IDs.
+  - **Desktop layout**: Responsive split layout (`>=1024px`) — 40% conversational stream / live governance on the left, 60% financial canvas on the right.
+  - **Local document processing**: No direct bank connections; documents are processed locally.
+- **Financial Views**:
   - **Dashboard (`/`)**: Combines real-time agent planning messages — including a live analysis progress stepper (`AnalysisProgress`) that tracks each pipeline stage during the minutes-long run and clears to reveal the final output (see [ADR-0018](../docs/adr/0018-streaming-progress-events.md)) — with summary cards (`NetWorthCard`, `AssetAllocationCard`, `TopHoldingsTable`).
   - **Portfolio (`/portfolio`)**: Itemizes holdings and displays the **Portfolio Drift Report** (`DriftReportCard`), comparing current asset allocation against active Investment Policy Statement (IPS) target bands (`skills/portfolio-analysis/SKILL.md`).
   - **Spending (`/spending`)**: Visualizes 30-day income, outflow, savings rate, reserve months, category breakdown, and anomaly detections (`skills/spending-analysis/SKILL.md`).
