@@ -1,5 +1,5 @@
 # Stage 1: Build virtual environment with all dependencies
-FROM python:3.12-slim AS builder
+FROM python:3.12-slim-bookworm AS builder
 
 WORKDIR /app
 
@@ -21,7 +21,7 @@ COPY orchestrator/src/ ./src/
 RUN uv pip install --no-cache .
 
 # Stage 2: Hardened minimal runtime
-FROM python:3.12-slim AS runner
+FROM python:3.12-slim-bookworm AS runner
 
 WORKDIR /app
 
@@ -34,10 +34,11 @@ ENV GOOGLE_GENAI_USE_ENTERPRISE=true
 ENV AGENT_REGISTRY_LOCATION=global
 ENV GOOGLE_CLOUD_LOCATION=us-central1
 
-# Apply OS-level security updates and clean package cache
+# Apply OS-level security updates, upgrade pip, and clean package cache
 RUN apt-get update && \
     apt-get upgrade -y --no-install-recommends && \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/* && \
+    pip install --no-cache-dir --upgrade "pip>=26.1.2"
 
 # Copy virtual environment from builder stage
 COPY --from=builder /opt/venv /opt/venv
