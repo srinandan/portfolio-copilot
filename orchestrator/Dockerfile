@@ -29,7 +29,6 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV PATH="/opt/venv/bin:/usr/local/bin:$PATH"
 ENV PYTHONPATH="/app/src"
-ENV SKILLS_DIR=/app/skills
 ENV GOOGLE_API_PREVENT_AGENT_TOKEN_SHARING_FOR_GCP_SERVICES=false
 ENV GOOGLE_GENAI_USE_ENTERPRISE=true
 ENV AGENT_REGISTRY_LOCATION=global
@@ -43,9 +42,8 @@ COPY --from=builder /usr/lib/x86_64-linux-gnu /usr/lib/x86_64-linux-gnu
 COPY --from=builder /usr/local /usr/local
 COPY --from=builder /opt/venv /opt/venv
 
-# Copy runtime skills and source code
+# Copy source code
 COPY orchestrator/src/ ./src/
-COPY skills/ ./skills/
 
 # Expose port 8080 for Agent Platform Agent Runtime custom-container serving.
 EXPOSE 8080
