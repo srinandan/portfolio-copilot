@@ -276,6 +276,8 @@ def _configure_span_export() -> None:
         )
         return
 
+    if project_id:
+        os.environ.setdefault("GOOGLE_CLOUD_PROJECT", project_id)
     if os.environ.get("AGENT_ENGINE_ID"):
         os.environ.setdefault("GOOGLE_CLOUD_AGENT_ENGINE_ID", os.environ["AGENT_ENGINE_ID"])
     if os.environ.get("GOOGLE_CLOUD_LOCATION"):
