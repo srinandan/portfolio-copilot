@@ -171,6 +171,9 @@ def deploy_agent_engine(project: str | None, location: str, display_name: str, c
             if existing is not None:
                 engine_id = existing.api_resource.name.split("/")[-1]
                 env_vars["AGENT_ENGINE_ID"] = engine_id
+                env_vars["GOOGLE_CLOUD_AGENT_ENGINE_ID"] = engine_id
+                env_vars["GOOGLE_CLOUD_AGENT_ENGINE_LOCATION"] = location
+                env_vars["GOOGLE_CLOUD_PROJECT"] = project
                 config = {
                     "display_name": display_name,
                     "agent_framework": "google-adk",
@@ -193,6 +196,9 @@ def deploy_agent_engine(project: str | None, location: str, display_name: str, c
                     f"Created Agent Engine: {remote_app.api_resource.name}. Updating with AGENT_ENGINE_ID={engine_id}..."
                 )
                 env_vars["AGENT_ENGINE_ID"] = engine_id
+                env_vars["GOOGLE_CLOUD_AGENT_ENGINE_ID"] = engine_id
+                env_vars["GOOGLE_CLOUD_AGENT_ENGINE_LOCATION"] = location
+                env_vars["GOOGLE_CLOUD_PROJECT"] = project
                 update_config = {
                     "display_name": display_name,
                     "agent_framework": "google-adk",

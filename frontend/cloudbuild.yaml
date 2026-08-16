@@ -52,7 +52,7 @@ steps:
           --no-allow-unauthenticated
         )
 
-        ENV_VARS="PROJECT_ID=${PROJECT_ID},FIRESTORE_PROJECT_ID=${PROJECT_ID}"
+        ENV_VARS="PROJECT_ID=${PROJECT_ID},FIRESTORE_PROJECT_ID=${PROJECT_ID},GOOGLE_CLOUD_PROJECT=${PROJECT_ID},OTEL_SERVICE_NAME=portfolio-copilot-frontend"
         if [ -n "$${AGENT_ENGINE_ID}" ]; then
           echo "Deploying ${_SERVICE} with AGENT_ENGINE_ID=$${AGENT_ENGINE_ID}"
           ENV_VARS="$${ENV_VARS},AGENT_ENGINE_ID=$${AGENT_ENGINE_ID}"
