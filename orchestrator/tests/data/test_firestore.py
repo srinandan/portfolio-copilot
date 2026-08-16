@@ -15,6 +15,12 @@ from src.orchestrator.contracts import (
 from src.orchestrator.data.firestore import FirestoreClient, _update_ips_transactional
 
 
+@pytest.fixture(autouse=True)
+def disable_mcp_env(monkeypatch):
+    """Ensure direct SDK tests in this file test direct SDK operations by default."""
+    monkeypatch.setenv("FIRESTORE_USE_MCP", "false")
+
+
 def test_pydantic_dict_factory():
     with patch("google.cloud.firestore.Client"):
         client = FirestoreClient(project="test-project")
