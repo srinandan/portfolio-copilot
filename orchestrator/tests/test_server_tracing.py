@@ -187,6 +187,50 @@ def test_build_tracer_provider_carries_service_name_and_exports():
     assert spans[0].resource.attributes.get("service.name") == "portfolio-copilot-orchestrator"
 
 
+def test_reasoning_stream_roots_span_at_body_trace_context():
+    """Agent Engine :streamQuery is Vertex-proxied, so the real trace context
+    arrives in the request BODY (``trace_context``), not a header. The reasoning
+    stream must root its SERVER span under that context — and ADK spans created
+    while the stream is iterated must nest under it — so the orchestrator rejoins
+    the browser -> Go trace instead of a 'Missing span' Vertex root."""
+    import asyncio
+
+    exporter = _install_exporter()
+    trace_id = "0af7651916cd43dd8448eb211c80319c"
+    gateway_span = "b7ad6b7169203331"
+    body = {"input": {"user_id": "u"}, "trace_context": {"traceparent": f"00-{trace_id}-{gateway_span}-01"}}
+    parent_ctx = server._extract_body_trace_context(body)
+
+    async def _inner():
+        # An ADK span emitted DURING streaming must land under the server span.
+        trace.get_tracer("google.adk").start_span("invoke_workflow").end()
+        yield b'{"x":1}\n'
+
+    async def _drain():
+        return [c async for c in server._traced_reasoning_stream(_inner(), parent_ctx, "POST /api/stream_reasoning_engine")]
+
+    chunks = asyncio.run(_drain())
+    assert chunks == [b'{"x":1}\n']
+
+    spans = {s.name: s for s in exporter.get_finished_spans()}
+    srv = spans["POST /api/stream_reasoning_engine"]
+    assert format(srv.context.trace_id, "032x") == trace_id
+    assert srv.parent is not None and format(srv.parent.span_id, "016x") == gateway_span
+    # ADK work created during iteration shares the trace and nests under the server span.
+    adk = spans["invoke_workflow"]
+    assert adk.context.trace_id == srv.context.trace_id
+    assert adk.parent is not None and adk.parent.span_id == srv.context.span_id
+
+
+def test_extract_body_trace_context_absent_or_invalid_returns_none():
+    """No/blank/invalid trace_context => None (the stream then roots a fresh trace),
+    never an exception."""
+    assert server._extract_body_trace_context({"input": {}}) is None
+    assert server._extract_body_trace_context({"trace_context": {}}) is None
+    assert server._extract_body_trace_context({"trace_context": "nope"}) is None
+    assert server._extract_body_trace_context("not-a-dict") is None
+
+
 def test_outbound_httpx_emits_client_span_and_injects_traceparent():
     """The Firestore Remote MCP hop is an outbound httpx call. After
     ``_instrument_outbound_http`` it must (a) emit a CLIENT span under the active

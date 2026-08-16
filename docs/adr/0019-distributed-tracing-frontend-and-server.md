@@ -100,5 +100,17 @@ spans are skipped (not fatal), and disabled export still propagates context.
   (`HTTPXClientInstrumentor`) — the Python analogue of §1's `otelhttp` transport —
   so the MCP call emits a CLIENT span and injects `traceparent`, extending the
   single Trace ID through the orchestrator → Firestore MCP hop.
+- **Vertex `:streamQuery` breaks header propagation (follow-up)**: in Agent Engine
+  mode the gateway calls Vertex `:streamQuery`, and Vertex terminates that call and
+  re-issues its own request to the container — so the `traceparent` `otelhttp`
+  injects on the gateway→Vertex request never reaches the orchestrator, which then
+  parents its work under an *unexported* Vertex span (a "Missing span ID" root, in a
+  separate Trace ID). The fix carries the W3C context **in the request body** as
+  well: the gateway injects `trace_context` into the `:streamQuery` envelope
+  (`plan.go`), and the orchestrator roots the `:streamQuery`/`:query` handlers from
+  that body context instead of the header (`server.py`, those routes excluded from
+  header-based ingress). This restores one Trace ID from browser click through the
+  orchestrator even across the Vertex proxy hop. Direct (`ORCHESTRATOR_URL`) mode is
+  unaffected — its `/v1/*` routes keep normal header-based ingress spans.
 - **Numbering note**: issue #286 referenced "ADR-0022"; this is filed as the
   next sequential number, 0019.

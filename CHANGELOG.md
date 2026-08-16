@@ -11,6 +11,14 @@ once tagged. Nothing has been released yet — see the note under `[Unreleased]`
 ### Added
 
 ### Fixed
+- Stitch the orchestrator back into the browser → Go trace across the Vertex `:streamQuery`
+  proxy hop. Vertex terminates the gateway's call and re-issues its own request to the
+  container, dropping the injected `traceparent` header — so the orchestrator parented its
+  work under an unexported Vertex span (a "Missing span ID" root, in a separate Trace ID).
+  The gateway now also injects the W3C context into the `:streamQuery` request **body**
+  (`plan.go` → `trace_context`), and the orchestrator roots its `:streamQuery`/`:query`
+  handlers from that body context (`server.py`; those routes excluded from header-based
+  ingress). Direct (`ORCHESTRATOR_URL`) mode keeps normal header ingress on `/v1/*`.
 - Give reused-provider orchestrator spans a `service.name`. When Agent Runtime has already
   installed a `TracerProvider`, `_configure_span_export` reuses it (so ADK GenAI spans keep
   exporting) and attaches the Cloud Trace exporter — but that provider's resource carries the

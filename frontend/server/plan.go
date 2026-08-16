@@ -15,6 +15,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
 	"golang.org/x/oauth2/google"
 )
 
@@ -121,6 +123,17 @@ func (c *OrchestratorClient) invokeAgentEngine(ctx context.Context, body PlanReq
 	envelope := map[string]interface{}{
 		"class_method": classMethod,
 		"input":        body,
+	}
+	// Vertex :streamQuery terminates this HTTP call and re-issues its own request
+	// to the orchestrator container, so the W3C `traceparent` otelhttp injects on
+	// *this* request's headers does not survive the proxy hop — the orchestrator
+	// would start a fresh trace (ADR-0019). Carry the trace context in the request
+	// BODY as well, where it does survive, so the orchestrator can continue the
+	// browser → Go → orchestrator trace instead of rooting a disconnected one.
+	carrier := propagation.MapCarrier{}
+	otel.GetTextMapPropagator().Inject(ctx, carrier)
+	if len(carrier) > 0 {
+		envelope["trace_context"] = map[string]string(carrier)
 	}
 	buf, err := json.Marshal(envelope)
 	if err != nil {

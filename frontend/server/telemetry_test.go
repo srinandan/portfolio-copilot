@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -139,5 +140,58 @@ func TestHandlePlan_PropagatesTraceparentToOrchestrator(t *testing.T) {
 	}
 	if !strings.Contains(gotTraceparent, incomingTraceID) {
 		t.Errorf("expected propagated trace id %s in %q", incomingTraceID, gotTraceparent)
+	}
+}
+
+// TestInvokeAgentEngine_PropagatesTraceContextInBody covers the Vertex
+// :streamQuery workaround: Vertex re-issues its own request to the container and
+// drops the header traceparent, so the gateway also injects the W3C context into
+// the request BODY (`trace_context`) — that is what lets the orchestrator continue
+// the browser -> Go trace instead of a disconnected one.
+func TestInvokeAgentEngine_PropagatesTraceContextInBody(t *testing.T) {
+	tp := sdktrace.NewTracerProvider(sdktrace.WithSampler(sdktrace.AlwaysSample()))
+	prevTP := otel.GetTracerProvider()
+	prevProp := otel.GetTextMapPropagator()
+	otel.SetTracerProvider(tp)
+	otel.SetTextMapPropagator(propagation.TraceContext{})
+	t.Cleanup(func() {
+		otel.SetTracerProvider(prevTP)
+		otel.SetTextMapPropagator(prevProp)
+		_ = tp.Shutdown(context.Background())
+	})
+
+	var gotBody string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		gotBody = string(b)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, "{}\n")
+	}))
+	defer upstream.Close()
+
+	oc := &OrchestratorClient{
+		agentEngineID: "projects/123/locations/us-central1/reasoningEngines/eng-xyz",
+		tokenSource:   func(context.Context) (string, error) { return "test-token", nil },
+		httpClient:    &http.Client{Transport: rewriteHostTransport{target: upstream.URL, base: http.DefaultTransport}},
+	}
+
+	// An active span so there is a trace context to inject into the body.
+	ctx, span := tp.Tracer("test").Start(context.Background(), "gateway-span")
+	traceID := span.SpanContext().TraceID().String()
+	defer span.End()
+
+	body, _, err := oc.invokeAgentEngine(ctx, PlanRequest{UserID: "u1", Message: "hi"}, false)
+	if err != nil {
+		t.Fatalf("invokeAgentEngine: %v", err)
+	}
+	_, _ = io.Copy(io.Discard, body)
+	_ = body.Close()
+
+	if !strings.Contains(gotBody, `"trace_context"`) {
+		t.Fatalf("expected trace_context in :streamQuery body, got %s", gotBody)
+	}
+	if !strings.Contains(gotBody, traceID) {
+		t.Errorf("expected body trace_context to carry trace id %s, got %s", traceID, gotBody)
 	}
 }

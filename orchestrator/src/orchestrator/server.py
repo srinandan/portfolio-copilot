@@ -359,10 +359,14 @@ def _init_server_tracing(fastapi_app: FastAPI) -> None:
     Opt-out via ``OTEL_TRACES_ENABLED=false``; never fatal — a telemetry failure
     must not stop the server from serving.
 
-    Note: in Agent Engine (Vertex ``:streamQuery``) deployments, whether the
-    inbound ``traceparent`` reaches this container is subject to Vertex header
-    forwarding; in direct (``ORCHESTRATOR_URL``) mode it always does. Either way,
-    the orchestrator now emits its own spans.
+    Note: in Agent Engine (Vertex ``:streamQuery``) deployments the inbound
+    ``traceparent`` header is Vertex's own — it terminates the gateway's call and
+    re-issues its own request — so header-based ingress would parent these routes
+    under an unexported Vertex span ("Missing span ID" root). The gateway therefore
+    also passes the real W3C context in the request *body*; the ``:streamQuery``
+    routes are excluded from header-based ingress here and instead rooted from that
+    body context (``_traced_reasoning_stream``). In direct (``ORCHESTRATOR_URL``)
+    mode the header always reaches ``/v1/*``, which keep normal ingress spans.
     """
     if os.environ.get("OTEL_TRACES_ENABLED", "").lower() in ("false", "0"):
         logger.info("FastAPI server-side tracing disabled via OTEL_TRACES_ENABLED")
@@ -379,7 +383,14 @@ def _init_server_tracing(fastapi_app: FastAPI) -> None:
         propagate.set_global_textmap(CompositePropagator([TraceContextTextMapPropagator(), W3CBaggagePropagator()]))
         # Wire the exporter BEFORE instrumenting so the server span is exported.
         _configure_span_export()
-        FastAPIInstrumentor.instrument_app(fastapi_app)
+        FastAPIInstrumentor.instrument_app(
+            fastapi_app,
+            # The Vertex :streamQuery routes carry Vertex's traceparent, not the
+            # gateway's — we root them from the body-carried context instead
+            # (_traced_reasoning_stream), so skip header-based ingress spans here to
+            # avoid a mis-parented duplicate under the "Missing span" Vertex root.
+            excluded_urls="api/stream_reasoning_engine,api/reasoning_engine",
+        )
         # Instrument the egress too, so the Firestore Remote MCP hop is traced and
         # propagates context (the propagator above governs the injected headers).
         _instrument_outbound_http()
@@ -502,6 +513,66 @@ async def _stream_json_lines(events: AsyncIterator[Any]) -> AsyncIterator[bytes]
         yield f"{payload}\n".encode("utf-8")
 
 
+def _extract_body_trace_context(body: Any):
+    """Extract the W3C trace context the gateway passes in a Vertex ``:streamQuery``
+    request *body* under ``trace_context``.
+
+    Vertex re-issues its own request to this container, so the inbound
+    ``traceparent`` header is Vertex's, not the gateway's (ADR-0019). The gateway
+    therefore also injects the real context into the body; extracting it here lets
+    the orchestrator root its spans under the browser -> Go span instead of an
+    unexported Vertex one. Returns an OTel ``Context`` to parent under, or ``None``
+    when absent/unusable (then spans root a fresh trace). Never raises.
+    """
+    try:
+        carrier = body.get("trace_context") if isinstance(body, dict) else None
+        if not isinstance(carrier, dict) or not carrier:
+            return None
+        from opentelemetry.propagate import extract
+
+        return extract({str(k): str(v) for k, v in carrier.items()})
+    except Exception:
+        logger.exception("Failed to extract body trace_context; rooting a fresh trace")
+        return None
+
+
+def _traced_reasoning_stream(inner: AsyncIterator[bytes], parent_ctx: Any, span_name: str) -> AsyncIterator[bytes]:
+    """Wrap a reasoning-engine byte stream in a SERVER span rooted at ``parent_ctx``
+    (the body-carried gateway context), keeping it active across the whole stream so
+    the ADK spans created *during* iteration nest under it — stitching the
+    orchestrator back into the browser -> Go -> orchestrator trace. Never fatal: on
+    any telemetry error it just streams the bytes through untraced.
+    """
+
+    async def _gen() -> AsyncIterator[bytes]:
+        span = None
+        token = None
+        try:
+            from opentelemetry import context as otel_context
+            from opentelemetry import trace as ot_trace
+
+            tracer = ot_trace.get_tracer("orchestrator.reasoning_engine")
+            span = tracer.start_span(span_name, context=parent_ctx, kind=ot_trace.SpanKind.SERVER)
+            token = otel_context.attach(ot_trace.set_span_in_context(span))
+        except Exception:
+            logger.exception("reasoning-engine span setup failed; streaming without it")
+        try:
+            async for chunk in inner:
+                yield chunk
+        finally:
+            try:
+                if token is not None:
+                    from opentelemetry import context as otel_context
+
+                    otel_context.detach(token)
+                if span is not None:
+                    span.end()
+            except Exception:
+                logger.exception("reasoning-engine span teardown failed")
+
+    return _gen()
+
+
 @app.post("/api/stream_reasoning_engine")
 async def stream_reasoning_engine(request: Request) -> StreamingResponse:
     """Agent Runtime (Reasoning Engine :streamQuery) endpoint."""
@@ -509,6 +580,7 @@ async def stream_reasoning_engine(request: Request) -> StreamingResponse:
         raise HTTPException(status_code=503, detail="runner not initialized")
 
     body = await request.json()
+    parent_ctx = _extract_body_trace_context(body)
     class_method = body.get("class_method", "invoke")
     input_data = body.get("input", body)
     if not isinstance(input_data, dict):
@@ -545,7 +617,10 @@ async def stream_reasoning_engine(request: Request) -> StreamingResponse:
             new_message=UserContent(parts=[Part.from_text(text=message)]),
         )
 
-    return StreamingResponse(_stream_json_lines(events), media_type="application/x-ndjson")
+    return StreamingResponse(
+        _traced_reasoning_stream(_stream_json_lines(events), parent_ctx, "POST /api/stream_reasoning_engine"),
+        media_type="application/x-ndjson",
+    )
 
 
 @app.post("/api/reasoning_engine")
@@ -555,6 +630,7 @@ async def reasoning_engine(request: Request) -> dict[str, Any]:
         raise HTTPException(status_code=503, detail="runner not initialized")
 
     body = await request.json()
+    parent_ctx = _extract_body_trace_context(body)
     input_data = body.get("input", body)
     if not isinstance(input_data, dict):
         input_data = {}
@@ -563,18 +639,24 @@ async def reasoning_engine(request: Request) -> dict[str, Any]:
     session_id = input_data.get("session_id")
     message = input_data.get("message", "")
 
-    session = await state.session_manager.get_or_create_session(
-        app_name=APP_NAME, user_id=user_id, session_id=session_id
-    )
-    events = state.runner.run_async(
-        user_id=user_id,
-        session_id=session.id,
-        new_message=UserContent(parts=[Part.from_text(text=message)]),
-    )
+    from opentelemetry import trace as ot_trace
 
-    collected = []
-    async for event in events:
-        collected.append(_event_to_wire(event))
+    tracer = ot_trace.get_tracer("orchestrator.reasoning_engine")
+    # Root the request under the body-carried gateway context (Vertex strips the
+    # header; see _extract_body_trace_context), so this hop stays in one trace.
+    with tracer.start_as_current_span("POST /api/reasoning_engine", context=parent_ctx, kind=ot_trace.SpanKind.SERVER):
+        session = await state.session_manager.get_or_create_session(
+            app_name=APP_NAME, user_id=user_id, session_id=session_id
+        )
+        events = state.runner.run_async(
+            user_id=user_id,
+            session_id=session.id,
+            new_message=UserContent(parts=[Part.from_text(text=message)]),
+        )
+
+        collected = []
+        async for event in events:
+            collected.append(_event_to_wire(event))
     return {"events": collected}
 
 
