@@ -35,7 +35,14 @@ def test_session_manager_in_memory_default():
 def test_session_manager_vertex_ai_services():
     """Verify SessionManager instantiates Agent Platform services when AGENT_ENGINE_ID is set."""
     with (
-        patch.dict(os.environ, {"AGENT_ENGINE_ID": "projects/p/locations/l/agentEngines/test-engine"}),
+        patch.dict(
+            os.environ,
+            {
+                "AGENT_ENGINE_ID": "projects/p/locations/l/agentEngines/test-engine",
+                "PROJECT_ID": "dummy-project",
+                "GOOGLE_CLOUD_PROJECT": "dummy-project",
+            },
+        ),
         patch("orchestrator.session_manager.VertexAiSessionService") as mock_session_cls,
         patch("orchestrator.session_manager.VertexAiMemoryBankService") as mock_memory_cls,
     ):
