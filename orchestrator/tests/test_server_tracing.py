@@ -4,8 +4,16 @@ The Go gateway injects a `traceparent` on its call to the orchestrator (ADR-0019
 `_init_server_tracing` must extract it and open the request's server span as a
 child of that remote context, so the orchestrator's spans share the browser -> Go
 Trace ID rather than starting a fresh trace.
+
+It also verifies the *egress*: the orchestrator's Firestore access is a remote MCP
+call over httpx, so that hop must emit a CLIENT span and inject `traceparent`, or
+the Firestore MCP server starts a fresh trace and its work never correlates.
 """
 
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+import httpx
 from fastapi.testclient import TestClient
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
@@ -119,3 +127,54 @@ def test_build_tracer_provider_carries_service_name_and_exports():
     spans = exporter.get_finished_spans()
     assert [s.name for s in spans] == ["unit-span"]
     assert spans[0].resource.attributes.get("service.name") == "portfolio-copilot-orchestrator"
+
+
+def test_outbound_httpx_emits_client_span_and_injects_traceparent():
+    """The Firestore Remote MCP hop is an outbound httpx call. After
+    ``_instrument_outbound_http`` it must (a) emit a CLIENT span under the active
+    trace and (b) inject ``traceparent`` so the MCP server continues our trace
+    (the regression this suite guards: an uninstrumented client did neither, so
+    the Firestore MCP work never showed up in Cloud Trace)."""
+    exporter = _install_exporter()
+    # Idempotent: httpx is already instrumented at import via _init_server_tracing.
+    server._instrument_outbound_http()
+
+    received: dict[str, str | None] = {}
+
+    class _Handler(BaseHTTPRequestHandler):
+        def do_POST(self):  # noqa: N802 (http.server API)
+            received["traceparent"] = self.headers.get("traceparent")
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b"{}")
+
+        def log_message(self, *_args):
+            pass
+
+    srv = HTTPServer(("127.0.0.1", 0), _Handler)
+    port = srv.server_address[1]
+    thread = threading.Thread(target=srv.serve_forever, daemon=True)
+    thread.start()
+    try:
+        tracer = trace.get_tracer("test")
+        with tracer.start_as_current_span("execute_tool firestore.query") as parent:
+            parent_trace_id = format(parent.get_span_context().trace_id, "032x")
+            with httpx.Client() as client:
+                resp = client.post(f"http://127.0.0.1:{port}/mcp", json={"method": "tools/call"})
+                assert resp.status_code == 200
+    finally:
+        srv.shutdown()
+        thread.join(timeout=5)
+
+    # (a) A CLIENT span for the outbound call, sharing the active trace id.
+    client_spans = [
+        s
+        for s in exporter.get_finished_spans()
+        if s.kind == trace.SpanKind.CLIENT and format(s.context.trace_id, "032x") == parent_trace_id
+    ]
+    assert client_spans, "expected a CLIENT span for the outbound MCP-style httpx call"
+
+    # (b) traceparent injected onto the request, carrying our trace id.
+    traceparent = received.get("traceparent")
+    assert traceparent, "expected traceparent to be injected onto the outbound request"
+    assert traceparent.split("-")[1] == parent_trace_id

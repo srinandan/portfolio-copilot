@@ -10,6 +10,17 @@ once tagged. Nothing has been released yet — see the note under `[Unreleased]`
 
 ### Added
 
+### Fixed
+- Trace the Firestore Remote MCP hop from the orchestrator. Firestore access now
+  goes through the remote MCP server (#309), an outbound `httpx` call the
+  orchestrator never instrumented — so it emitted no CLIENT span (invisible in
+  Cloud Trace) and injected no W3C `traceparent` (the Firestore MCP server started
+  a fresh, uncorrelated trace). `server.py` now instruments outbound httpx
+  (`opentelemetry-instrumentation-httpx` → `HTTPXClientInstrumentor`), the Python
+  analogue of the Go server's `otelhttp` transport (ADR-0019 §1), so the MCP call
+  gets a client span and continues the browser → Go → orchestrator trace. Gated by
+  the existing `OTEL_TRACES_ENABLED`; never fatal.
+
 ## [0.1.0] - 2026-08-14
 
 ### Added

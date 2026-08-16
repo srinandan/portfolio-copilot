@@ -15,6 +15,7 @@ dependencies = [
     "mcp<2",
     "opentelemetry-exporter-gcp-trace>=1.9.0",
     "opentelemetry-instrumentation-fastapi>=0.63b0",
+    "opentelemetry-instrumentation-httpx>=0.63b0",
     "pydantic>=2.13.4",
     "uvicorn>=0.32.0",
 ]

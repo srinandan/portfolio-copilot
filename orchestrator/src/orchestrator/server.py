@@ -236,10 +236,43 @@ def _configure_span_export() -> None:
         logger.exception("Cloud Trace exporter setup failed; orchestrator span export disabled")
 
 
+def _instrument_outbound_http() -> None:
+    """Instrument the outbound ``httpx`` client so calls to the Firestore Remote
+    MCP server participate in the trace.
+
+    The orchestrator's Firestore access is a remote MCP call: the ADK
+    ``McpToolset`` talks to ``https://firestore.googleapis.com/mcp`` over a
+    Streamable-HTTP transport, which the MCP SDK backs with ``httpx``
+    (``data/firestore_mcp.py``). Instrumenting the ingress and exporting spans
+    (above) is not enough for *that* hop. An uninstrumented client does neither of:
+
+    1. **emit a CLIENT span** for the outbound request (so the Firestore MCP
+       call is invisible in Cloud Trace — no latency, no error attribution);
+    2. **inject the W3C ``traceparent``** onto the request (so the Firestore MCP
+       server starts a *fresh* trace instead of continuing ours — its spans never
+       correlate with the browser -> Go -> orchestrator timeline).
+
+    ``HTTPXClientInstrumentor`` patches httpx's transport, so every httpx client
+    the process creates — including the one the MCP SDK builds internally — gets
+    a client span plus header injection via the global W3C propagator. This is
+    the Python analogue of the Go server's ``otelhttp.NewTransport`` on its
+    orchestrator client (ADR-0019 §1), closing the same gap for the MCP hop.
+
+    Never fatal; a telemetry failure must not stop the server from serving.
+    """
+    try:
+        from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
+
+        HTTPXClientInstrumentor().instrument()
+        logger.info("Outbound httpx tracing enabled (client spans + traceparent for Firestore MCP)")
+    except Exception:
+        logger.exception("httpx instrumentation failed; outbound MCP calls will not be traced")
+
+
 def _init_server_tracing(fastapi_app: FastAPI) -> None:
     """Instrument the FastAPI ingress AND export the orchestrator's spans to Cloud Trace.
 
-    Two pieces are needed for the orchestrator to participate in the end-to-end
+    Three pieces are needed for the orchestrator to participate in the end-to-end
     trace (ADR-0019):
 
     1. **Context extraction (ingress).** The Go gateway injects a W3C
@@ -251,6 +284,10 @@ def _init_server_tracing(fastapi_app: FastAPI) -> None:
        ``GOOGLE_CLOUD_AGENT_ENGINE_ENABLE_TELEMETRY`` did not install an exporting
        provider for these SDK spans in-process, so ``_configure_span_export``
        wires a Cloud Trace exporter with a ``service.name`` resource.
+    3. **Outbound propagation (egress).** The orchestrator's Firestore access is a
+       remote MCP call over httpx; ``_instrument_outbound_http`` gives that hop a
+       CLIENT span and injects ``traceparent`` so the Firestore MCP server
+       continues our trace instead of starting a fresh one.
 
     Opt-out via ``OTEL_TRACES_ENABLED=false``; never fatal — a telemetry failure
     must not stop the server from serving.
@@ -276,7 +313,10 @@ def _init_server_tracing(fastapi_app: FastAPI) -> None:
         # Wire the exporter BEFORE instrumenting so the server span is exported.
         _configure_span_export()
         FastAPIInstrumentor.instrument_app(fastapi_app)
-        logger.info("FastAPI server-side tracing enabled (W3C extraction + Cloud Trace export)")
+        # Instrument the egress too, so the Firestore Remote MCP hop is traced and
+        # propagates context (the propagator above governs the injected headers).
+        _instrument_outbound_http()
+        logger.info("FastAPI server-side tracing enabled (W3C extraction + Cloud Trace export + outbound MCP)")
     except Exception:
         logger.exception("FastAPI tracing init failed; continuing without ingress spans")
 

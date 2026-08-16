@@ -94,5 +94,11 @@ spans are skipped (not fatal), and disabled export still propagates context.
 - **Trade-off**: browser spans are captured as trace-correlated logs rather than
   native Cloud Trace spans. They correlate in the trace view via log linkage;
   full OTLP forwarding was deferred to keep the surface small and dependency-free.
+- **Orchestrator egress (follow-up)**: once Firestore access moved to the remote
+  Firestore MCP server (#309), the orchestrator's own outbound hop needed the same
+  treatment the Go server got. `server.py` now instruments outbound `httpx`
+  (`HTTPXClientInstrumentor`) — the Python analogue of §1's `otelhttp` transport —
+  so the MCP call emits a CLIENT span and injects `traceparent`, extending the
+  single Trace ID through the orchestrator → Firestore MCP hop.
 - **Numbering note**: issue #286 referenced "ADR-0022"; this is filed as the
   next sequential number, 0019.
