@@ -222,6 +222,33 @@ def _build_tracer_provider(service_name: str, exporter):
     return provider
 
 
+def _ensure_service_name(provider) -> None:
+    """Stamp our ``service.name`` onto an existing provider's resource when it has
+    none (or the OTel default ``unknown_service``).
+
+    When Agent Runtime already installed a TracerProvider we reuse it — so ADK's
+    GenAI spans keep exporting — and merely attach our Cloud Trace exporter. But
+    that provider's resource carries the default ``service.name=unknown_service``,
+    so its spans show **no service name** in Cloud Trace and are unattributable.
+
+    The SDK captures the resource when each ``Tracer`` is *created* (not per span),
+    and the request-time tracers (FastAPI ingress, ADK) are created after this
+    runs at startup — so merging our ``service.name`` in now reaches them. The
+    resource is immutable, so we replace the provider's ``_resource`` before any
+    span is emitted. Only fills a missing/unknown name; a real name set upstream
+    is left as-is. Never fatal.
+    """
+    from opentelemetry.sdk.resources import SERVICE_NAME, Resource
+
+    try:
+        current_name = provider.resource.attributes.get(SERVICE_NAME, "")
+        if (not current_name) or str(current_name).startswith("unknown_service"):
+            provider._resource = provider.resource.merge(Resource.create({SERVICE_NAME: _service_name()}))
+            logger.info("Stamped service.name=%s onto existing TracerProvider resource", _service_name())
+    except Exception:
+        logger.exception("Could not stamp service.name onto existing TracerProvider")
+
+
 def _configure_span_export() -> None:
     """Ensures the orchestrator's own spans are exported to Cloud Trace.
 
@@ -234,9 +261,11 @@ def _configure_span_export() -> None:
     Cloud Trace.
 
     If a real SDK TracerProvider already exists (e.g. one Agent Runtime installed),
-    the Cloud Trace exporter is attached to it; otherwise a new provider carrying
-    our ``service.name`` is installed. Skips silently when no project is resolvable
-    (local/tests) — trace-context propagation still works.
+    the Cloud Trace exporter is attached to it — and we stamp our ``service.name``
+    onto its resource (``_ensure_service_name``) so the reused-provider spans are
+    still attributable; otherwise a new provider carrying our ``service.name`` is
+    installed. Skips silently when no project is resolvable (local/tests) —
+    trace-context propagation still works.
     """
     project_id = _resolve_project_id()
     if not project_id:
@@ -256,8 +285,13 @@ def _configure_span_export() -> None:
         exporter = CloudTraceSpanExporter(project_id=project_id)
         current = ot_trace.get_tracer_provider()
         if isinstance(current, TracerProvider):
+            _ensure_service_name(current)
             current.add_span_processor(BatchSpanProcessor(exporter))
-            logger.info("Attached Cloud Trace exporter to existing TracerProvider (project=%s)", project_id)
+            logger.info(
+                "Attached Cloud Trace exporter to existing TracerProvider (service=%s, project=%s)",
+                _service_name(),
+                project_id,
+            )
         else:
             ot_trace.set_tracer_provider(_build_tracer_provider(_service_name(), exporter))
             logger.info(

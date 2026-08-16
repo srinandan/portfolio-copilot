@@ -134,6 +134,41 @@ def test_resolve_project_id_falls_back_to_adc(monkeypatch):
     assert server._resolve_project_id() == "adc-resolved-proj"
 
 
+def test_ensure_service_name_fills_unknown_and_reaches_later_spans(monkeypatch):
+    """Reused-provider case (Agent Runtime installed the provider): its resource
+    carries the default ``unknown_service``, so exported spans show no service
+    name. Stamping our name onto the resource before request-time tracers are
+    created must make later spans carry it — the regression behind 'no service
+    name associated with these traces'."""
+    from opentelemetry.sdk.resources import SERVICE_NAME
+    from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+
+    provider = TracerProvider()  # default resource => service.name == "unknown_service"
+    assert str(provider.resource.attributes.get(SERVICE_NAME)).startswith("unknown_service")
+
+    server._ensure_service_name(provider)
+    assert provider.resource.attributes.get(SERVICE_NAME) == "portfolio-copilot-orchestrator"
+
+    # A tracer created AFTER the stamp (as FastAPI/ADK are at request time) must
+    # emit spans carrying the stamped service.name.
+    exporter = InMemorySpanExporter()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    with provider.get_tracer("google.adk").start_as_current_span("invoke_workflow"):
+        pass
+    provider.force_flush()
+    spans = exporter.get_finished_spans()
+    assert spans and spans[0].resource.attributes.get(SERVICE_NAME) == "portfolio-copilot-orchestrator"
+
+
+def test_ensure_service_name_preserves_real_name():
+    """A deliberate upstream service.name must not be overwritten."""
+    from opentelemetry.sdk.resources import SERVICE_NAME, Resource
+
+    provider = TracerProvider(resource=Resource.create({SERVICE_NAME: "upstream-set-name"}))
+    server._ensure_service_name(provider)
+    assert provider.resource.attributes.get(SERVICE_NAME) == "upstream-set-name"
+
+
 def test_build_tracer_provider_carries_service_name_and_exports():
     """The provider we install must (a) tag spans with our service.name resource so
     they are attributable in Cloud Trace, and (b) actually export ended spans."""
