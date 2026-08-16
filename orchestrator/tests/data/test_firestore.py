@@ -463,3 +463,232 @@ def test_set_and_get_user_profile():
         assert client.get_user_profile("nonexistent") is None
 
 
+def test_firestore_client_mcp_path():
+    """Golden path: FirestoreClient executes CRUD via FirestoreMCPClient when use_mcp=True."""
+    mock_mcp = MagicMock()
+    with patch("google.cloud.firestore.Client"):
+        client = FirestoreClient(project="test-project", use_mcp=True)
+        client.mcp_client = mock_mcp
+
+        # Holdings
+        mock_mcp.get_document.return_value = {
+            "user_id": "u1",
+            "as_of": "2026-08-01T00:00:00Z",
+            "total_value_usd": 1000.0,
+            "cash_usd": 100.0,
+            "positions": [],
+        }
+        h = client.get_holdings("u1")
+        assert h is not None
+        assert h.user_id == "u1"
+        mock_mcp.get_document.assert_called_with("holdings", "u1")
+
+        client.set_holdings("u1", h)
+        mock_mcp.set_document.assert_called_with("holdings", "u1", client._dict_factory(h))
+
+        # Liabilities
+        from src.orchestrator.contracts import LiabilitiesSnapshot
+        mock_mcp.get_document.return_value = {
+            "user_id": "u1",
+            "as_of": "2026-08-01T00:00:00Z",
+            "liabilities": [],
+        }
+        liab = client.get_liabilities("u1")
+        assert liab is not None
+        mock_mcp.get_document.assert_called_with("liabilities", "u1")
+
+        client.set_liabilities("u1", liab)
+        mock_mcp.set_document.assert_called_with("liabilities", "u1", client._dict_factory(liab))
+
+        # Proposed Actions
+        from src.orchestrator.contracts import (
+            ActionStatus,
+            ActionType,
+            OrderType,
+            ProposedAction,
+            RelatedIPSVersion,
+            Side,
+            SkillVersionRef,
+        )
+        action = ProposedAction(
+            action_id="act_1",
+            session_id="sess_1",
+            type=ActionType.TRADE,
+            ticker="VTI",
+            side=Side.BUY,
+            quantity=10,
+            order_type=OrderType.MARKET,
+            estimated_price_usd=100.0,
+            estimated_value_usd=1000.0,
+            rationale="Rebalance",
+            status=ActionStatus.DRAFTED,
+            created_at=datetime.now(timezone.utc),
+            proposed_by_skill_version=SkillVersionRef(skill_name="private-action-drafting", skill_version="0.1.0"),
+            ips_version_referenced=RelatedIPSVersion(ips_id="ips1", version=1),
+        )
+        mock_mcp.get_document.return_value = client._dict_factory(action)
+        act = client.get_proposed_action("act_1")
+        assert act is not None
+        assert act.action_id == "act_1"
+
+        client.set_proposed_action(action)
+        mock_mcp.set_document.assert_called_with("proposed_actions", "act_1", client._dict_factory(action))
+
+        client.update_proposed_action_status("act_1", ActionStatus.APPROVED, {"review_passed": True})
+        mock_mcp.update_document.assert_called_with("proposed_actions", "act_1", {"status": "approved", "review_passed": True})
+
+        # Audit Log
+        from src.orchestrator.contracts.audit_log import AuditLogEntry, EventType, ActorType, Actor
+        entry = AuditLogEntry(
+            log_id="log_1",
+            timestamp=datetime.now(timezone.utc),
+            event_type=EventType.ACTION_PROPOSED,
+            actor=Actor(type=ActorType.AGENT, skill_name="private-action-drafting"),
+            user_id="u1",
+            payload={"test": "val"},
+        )
+        client.append_audit_log(entry)
+        mock_mcp.set_document.assert_called_with("audit_log", "log_1", client._dict_factory(entry))
+
+        # IPS
+        ips_data = {
+            "ips_id": "ips_1",
+            "user_id": "u1",
+            "version": 1,
+            "status": "active",
+            "effective_date": "2026-01-01",
+            "risk_tolerance": "moderate",
+            "time_horizon_years": 10,
+            "target_allocation": [{"asset_class": "equity", "target_percent": 60, "min_percent": 50, "max_percent": 70}],
+            "constraints": {"concentration_limit_percent": 15},
+            "created_at": "2026-01-01T00:00:00Z",
+        }
+        mock_mcp.list_documents.return_value = [ips_data]
+        ips = client.get_active_ips("ips_1")
+        assert ips is not None
+        assert ips.ips_id == "ips_1"
+
+        ips_by_user = client.get_active_ips_by_user("u1")
+        assert ips_by_user is not None
+        assert ips_by_user.user_id == "u1"
+
+        # Reports & Profiles
+        mock_mcp.get_document.return_value = {"total_income_usd": 1000}
+        client.set_spending_report("u1", {"total_income_usd": 1000})
+        mock_mcp.set_document.assert_called_with("spending_reports", "u1", {"total_income_usd": 1000})
+        assert client.get_spending_report("u1") == {"total_income_usd": 1000}
+
+        mock_mcp.get_document.return_value = {"drift_detected": False}
+        client.set_drift_report("u1", {"drift_detected": False})
+        mock_mcp.set_document.assert_called_with("drift_reports", "u1", {"drift_detected": False})
+        assert client.get_drift_report("u1") == {"drift_detected": False}
+
+        mock_mcp.get_document.return_value = {"name": "Test User"}
+        client.set_user_profile("u1", {"name": "Test User"})
+        mock_mcp.set_document.assert_called_with("user_profiles", "u1", {"name": "Test User"})
+        assert client.get_user_profile("u1") == {"name": "Test User"}
+
+
+def test_firestore_client_mcp_fallback_on_exception():
+    """Error/resilience path: FirestoreClient catches MCP errors and falls back to direct SDK."""
+    mock_mcp = MagicMock()
+    mock_mcp.get_document.side_effect = RuntimeError("MCP connection timed out")
+    mock_mcp.set_document.side_effect = RuntimeError("MCP connection timed out")
+    mock_mcp.update_document.side_effect = RuntimeError("MCP connection timed out")
+    mock_mcp.list_documents.side_effect = RuntimeError("MCP connection timed out")
+
+    with patch("google.cloud.firestore.Client"):
+        client = FirestoreClient(project="test-project", use_mcp=True)
+        client.mcp_client = mock_mcp
+
+        # Direct SDK mock
+        client._get_holdings_direct = MagicMock(return_value=None)
+        client._set_holdings_direct = MagicMock()
+        client._get_liabilities_direct = MagicMock(return_value=None)
+        client._set_liabilities_direct = MagicMock()
+        client._get_proposed_action_direct = MagicMock(return_value=None)
+        client._set_proposed_action_direct = MagicMock()
+        client._update_proposed_action_status_direct = MagicMock()
+        client._append_audit_log_direct = MagicMock()
+        client._get_active_ips_direct = MagicMock(return_value=None)
+        client._get_active_ips_by_user_direct = MagicMock(return_value=None)
+        client._set_spending_report_direct = MagicMock()
+        client._get_spending_report_direct = MagicMock(return_value=None)
+        client._set_drift_report_direct = MagicMock()
+        client._get_drift_report_direct = MagicMock(return_value=None)
+        client._set_user_profile_direct = MagicMock()
+        client._get_user_profile_direct = MagicMock(return_value=None)
+
+        # Exercise all methods to verify fallback is invoked
+        client.get_holdings("u1")
+        client._get_holdings_direct.assert_called_once_with("u1")
+
+        mock_h = MagicMock()
+        client.set_holdings("u1", mock_h)
+        client._set_holdings_direct.assert_called_once_with("u1", mock_h)
+
+        client.get_liabilities("u1")
+        client._get_liabilities_direct.assert_called_once_with("u1")
+
+        mock_l = MagicMock()
+        client.set_liabilities("u1", mock_l)
+        client._set_liabilities_direct.assert_called_once_with("u1", mock_l)
+
+        client.get_proposed_action("act1")
+        client._get_proposed_action_direct.assert_called_once_with("act1")
+
+        mock_act = MagicMock()
+        mock_act.action_id = "act1"
+        client.set_proposed_action(mock_act)
+        client._set_proposed_action_direct.assert_called_once_with(mock_act)
+
+        from src.orchestrator.contracts import ActionStatus
+        client.update_proposed_action_status("act1", ActionStatus.APPROVED)
+        client._update_proposed_action_status_direct.assert_called_once_with("act1", ActionStatus.APPROVED, None)
+
+        mock_entry = MagicMock()
+        mock_entry.log_id = "log1"
+        client.append_audit_log(mock_entry)
+        client._append_audit_log_direct.assert_called_once_with(mock_entry)
+
+        client.get_active_ips("ips1")
+        client._get_active_ips_direct.assert_called_once_with("ips1")
+
+        client.get_active_ips_by_user("u1")
+        client._get_active_ips_by_user_direct.assert_called_once_with("u1")
+
+        client.set_spending_report("u1", {})
+        client._set_spending_report_direct.assert_called_once_with("u1", {})
+
+        client.get_spending_report("u1")
+        client._get_spending_report_direct.assert_called_once_with("u1")
+
+        client.set_drift_report("u1", {})
+        client._set_drift_report_direct.assert_called_once_with("u1", {})
+
+        client.get_drift_report("u1")
+        client._get_drift_report_direct.assert_called_once_with("u1")
+
+        client.set_user_profile("u1", {})
+        client._set_user_profile_direct.assert_called_once_with("u1", {})
+
+        client.get_user_profile("u1")
+        client._get_user_profile_direct.assert_called_once_with("u1")
+
+
+def test_firestore_client_mcp_ips_invariant_violation():
+    """Invariant check: get_active_ips_by_user raises ValueError if MCP returns multiple active IPS documents."""
+    mock_mcp = MagicMock()
+    mock_mcp.list_documents.return_value = [
+        {"ips_id": "ips1", "user_id": "u1", "status": "active"},
+        {"ips_id": "ips2", "user_id": "u1", "status": "active"},
+    ]
+
+    with patch("google.cloud.firestore.Client"):
+        client = FirestoreClient(project="test-project", use_mcp=True)
+        client.mcp_client = mock_mcp
+        with pytest.raises(ValueError, match="invariant violated"):
+            client.get_active_ips_by_user("u1")
+
+
+
