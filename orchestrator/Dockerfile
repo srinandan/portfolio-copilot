@@ -20,6 +20,11 @@ COPY orchestrator/src/ ./src/
 # Install the project and dependencies into /opt/venv
 RUN uv pip install --no-cache .
 
+# Strip build-time package managers from the runtime layers
+RUN rm -rf /usr/local/lib/python3.12/ensurepip \
+           /usr/local/lib/python3.12/site-packages/pip* \
+           /opt/venv/lib/python3.12/site-packages/pip*
+
 # Stage 2: Distroless hardened minimal runtime
 FROM gcr.io/distroless/cc-debian12:nonroot AS runner
 
