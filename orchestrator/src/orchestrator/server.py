@@ -276,6 +276,10 @@ def _configure_span_export() -> None:
         )
         return
 
+    if os.environ.get("AGENT_ENGINE_ID"):
+        os.environ.setdefault("GOOGLE_CLOUD_AGENT_ENGINE_ID", os.environ["AGENT_ENGINE_ID"])
+    if os.environ.get("GOOGLE_CLOUD_LOCATION"):
+        os.environ.setdefault("GOOGLE_CLOUD_AGENT_ENGINE_LOCATION", os.environ["GOOGLE_CLOUD_LOCATION"])
     os.environ.setdefault("GOOGLE_CLOUD_AGENT_ENGINE_ENABLE_TELEMETRY", "true")
 
     try:

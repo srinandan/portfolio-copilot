@@ -156,12 +156,12 @@ def deploy_agent_engine(project: str | None, location: str, display_name: str, c
             env_vars = {
                 "AGENT_ENGINE_ID": "",
                 "PROJECT_ID": project,
+                "GOOGLE_CLOUD_PROJECT": project,
                 "OTEL_EXPORTER_GCP_TRACE_PROJECT_ID": project,
                 "AGENT_REGISTRY_LOCATION": "global",
                 "GOOGLE_GENAI_USE_ENTERPRISE": "true",
                 "GOOGLE_CLOUD_LOCATION": location,
                 "GOOGLE_API_PREVENT_AGENT_TOKEN_SHARING_FOR_GCP_SERVICES": "false",
-                "GOOGLE_CLOUD_AGENT_ENGINE_ENABLE_TELEMETRY": "true",
                 "OTEL_SEMCONV_STABILITY_OPT_IN": "gen_ai_latest_experimental",
                 "OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT": "EVENT_ONLY",
                 # Names the orchestrator's spans in Cloud Trace (server.py exports
@@ -171,9 +171,6 @@ def deploy_agent_engine(project: str | None, location: str, display_name: str, c
             if existing is not None:
                 engine_id = existing.api_resource.name.split("/")[-1]
                 env_vars["AGENT_ENGINE_ID"] = engine_id
-                env_vars["GOOGLE_CLOUD_AGENT_ENGINE_ID"] = engine_id
-                env_vars["GOOGLE_CLOUD_AGENT_ENGINE_LOCATION"] = location
-                env_vars["GOOGLE_CLOUD_PROJECT"] = project
                 config = {
                     "display_name": display_name,
                     "agent_framework": "google-adk",
@@ -196,9 +193,6 @@ def deploy_agent_engine(project: str | None, location: str, display_name: str, c
                     f"Created Agent Engine: {remote_app.api_resource.name}. Updating with AGENT_ENGINE_ID={engine_id}..."
                 )
                 env_vars["AGENT_ENGINE_ID"] = engine_id
-                env_vars["GOOGLE_CLOUD_AGENT_ENGINE_ID"] = engine_id
-                env_vars["GOOGLE_CLOUD_AGENT_ENGINE_LOCATION"] = location
-                env_vars["GOOGLE_CLOUD_PROJECT"] = project
                 update_config = {
                     "display_name": display_name,
                     "agent_framework": "google-adk",
