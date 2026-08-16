@@ -148,6 +148,22 @@ async def _lifespan(_app: FastAPI):
             state.firestore_mcp_toolset = None
 
 
+def _project_from_adc() -> str:
+    """Best-effort GCP project ID from Application Default Credentials.
+
+    An Agent Runtime container always runs as its Agent Identity, so ADC can
+    resolve the project from the metadata server even when no ``PROJECT_ID``-style
+    env var was injected. Never raises — returns "" if ADC is unavailable
+    (local/tests) so callers can fall through cleanly."""
+    try:
+        import google.auth
+
+        _, project = google.auth.default()
+        return project or ""
+    except Exception:
+        return ""
+
+
 def _resolve_project_id() -> str:
     """Resolves the GCP project ID string for span export.
 
@@ -158,6 +174,11 @@ def _resolve_project_id() -> str:
     In Agent Runtime containers, GOOGLE_CLOUD_PROJECT is often automatically
     populated with the numeric project number, while PROJECT_ID carries the
     user-configured string ID. We prefer non-numeric string IDs.
+
+    Env vars win, but if none yields a usable string ID we fall back to ADC
+    (``_project_from_adc``) — so a container missing ``PROJECT_ID`` /
+    ``OTEL_EXPORTER_GCP_TRACE_PROJECT_ID`` still exports instead of going silently
+    dark. A numeric project number from env is the last resort.
     """
     candidates = []
     for key in (
@@ -170,11 +191,18 @@ def _resolve_project_id() -> str:
         if value:
             candidates.append(value)
 
-    # Prefer non-numeric project ID strings over numeric project numbers
+    # Prefer non-numeric project ID strings over numeric project numbers.
     for c in candidates:
         if not c.isdigit():
             return c
-    return candidates[0] if candidates else ""
+
+    # No usable string ID in env — recover the project from credentials rather
+    # than disabling export (Cloud Trace rejects the numeric number anyway).
+    adc_project = _project_from_adc()
+    if adc_project and not adc_project.isdigit():
+        return adc_project
+
+    return candidates[0] if candidates else adc_project
 
 
 def _service_name() -> str:
@@ -212,7 +240,12 @@ def _configure_span_export() -> None:
     """
     project_id = _resolve_project_id()
     if not project_id:
-        logger.info("No GCP project resolvable; orchestrator span export disabled (propagation still active)")
+        logger.warning(
+            "No GCP project resolvable (checked OTEL_EXPORTER_GCP_TRACE_PROJECT_ID, PROJECT_ID, "
+            "FIRESTORE_PROJECT_ID, GOOGLE_CLOUD_PROJECT, and ADC); orchestrator span export DISABLED "
+            "— no server or ADK/GenAI spans will reach Cloud Trace. Set PROJECT_ID on the deployment "
+            "to fix. (Trace-context propagation stays active.)"
+        )
         return
     try:
         from opentelemetry import trace as ot_trace

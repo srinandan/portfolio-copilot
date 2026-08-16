@@ -11,6 +11,13 @@ once tagged. Nothing has been released yet — see the note under `[Unreleased]`
 ### Added
 
 ### Fixed
+- Stop the orchestrator from going silently dark in Cloud Trace. `_configure_span_export`
+  disables *all* span export (server spans and ADK/GenAI client spans) when no project is
+  resolvable, and `_resolve_project_id` previously only checked env vars — so a container
+  missing `PROJECT_ID` / `OTEL_EXPORTER_GCP_TRACE_PROJECT_ID` emitted no traces at all. It
+  now falls back to the project from Application Default Credentials (the Agent Identity a
+  container always runs as), and the disabled-export path logs at WARNING (was INFO) with
+  the env var to set. Propagation was always active; this restores emission.
 - Trace the Firestore Remote MCP hop from the orchestrator. Firestore access now
   goes through the remote MCP server (#309), an outbound `httpx` call the
   orchestrator never instrumented — so it emitted no CLIENT span (invisible in

@@ -77,6 +77,8 @@ def test_service_name_default_and_override(monkeypatch):
 
 
 def test_resolve_project_id_precedence(monkeypatch):
+    # Neutralize ADC so this test exercises env-var precedence in isolation.
+    monkeypatch.setattr(server, "_project_from_adc", lambda: "")
     for k in (
         "OTEL_EXPORTER_GCP_TRACE_PROJECT_ID",
         "GOOGLE_CLOUD_PROJECT",
@@ -99,6 +101,7 @@ def test_resolve_project_id_rejects_numeric_project_number(monkeypatch):
     When Agent Runtime automatically populates GOOGLE_CLOUD_PROJECT with the
     numeric project number, _resolve_project_id must prefer the string PROJECT_ID.
     """
+    monkeypatch.setattr(server, "_project_from_adc", lambda: "")
     for k in (
         "OTEL_EXPORTER_GCP_TRACE_PROJECT_ID",
         "GOOGLE_CLOUD_PROJECT",
@@ -109,6 +112,26 @@ def test_resolve_project_id_rejects_numeric_project_number(monkeypatch):
     monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "432423772502")
     monkeypatch.setenv("PROJECT_ID", "srinandans-next25-demo")
     assert server._resolve_project_id() == "srinandans-next25-demo"
+
+
+def test_resolve_project_id_falls_back_to_adc(monkeypatch):
+    """With no usable string ID in env, the project must be recovered from ADC so
+    span export is not silently disabled — an Agent Runtime container always has
+    Agent Identity credentials even when PROJECT_ID was not injected."""
+    for k in (
+        "OTEL_EXPORTER_GCP_TRACE_PROJECT_ID",
+        "PROJECT_ID",
+        "FIRESTORE_PROJECT_ID",
+        "GOOGLE_CLOUD_PROJECT",
+    ):
+        monkeypatch.delenv(k, raising=False)
+    monkeypatch.setattr(server, "_project_from_adc", lambda: "adc-resolved-proj")
+    assert server._resolve_project_id() == "adc-resolved-proj"
+
+    # A numeric project *number* in env must not shadow the ADC string ID that
+    # Cloud Trace will actually accept.
+    monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "432423772502")
+    assert server._resolve_project_id() == "adc-resolved-proj"
 
 
 def test_build_tracer_provider_carries_service_name_and_exports():
