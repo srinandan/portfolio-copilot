@@ -10,6 +10,39 @@ once tagged. Nothing has been released yet — see the note under `[Unreleased]`
 
 ### Added
 
+### Fixed
+- Stitch the orchestrator back into the browser → Go trace across the Vertex `:streamQuery`
+  proxy hop. Vertex terminates the gateway's call and re-issues its own request to the
+  container, dropping the injected `traceparent` header — so the orchestrator parented its
+  work under an unexported Vertex span (a "Missing span ID" root, in a separate Trace ID).
+  The gateway now also injects the W3C context into the `:streamQuery` request **body**
+  (`plan.go` → `trace_context`), and the orchestrator roots its `:streamQuery`/`:query`
+  handlers from that body context (`server.py`; those routes excluded from header-based
+  ingress). Direct (`ORCHESTRATOR_URL`) mode keeps normal header ingress on `/v1/*`.
+- Give reused-provider orchestrator spans a `service.name`. When Agent Runtime has already
+  installed a `TracerProvider`, `_configure_span_export` reuses it (so ADK GenAI spans keep
+  exporting) and attaches the Cloud Trace exporter — but that provider's resource carries the
+  OTel default `service.name=unknown_service`, so exported spans (`POST /api/stream_reasoning_engine`,
+  `invoke_workflow`, `invoke_node`, …) showed **no service name**. `_ensure_service_name` now
+  merges `OTEL_SERVICE_NAME` into the reused provider's resource before any span is emitted, so
+  request-time FastAPI/ADK tracers inherit it. A real name set upstream is preserved.
+- Stop the orchestrator from going silently dark in Cloud Trace. `_configure_span_export`
+  disables *all* span export (server spans and ADK/GenAI client spans) when no project is
+  resolvable, and `_resolve_project_id` previously only checked env vars — so a container
+  missing `PROJECT_ID` / `OTEL_EXPORTER_GCP_TRACE_PROJECT_ID` emitted no traces at all. It
+  now falls back to the project from Application Default Credentials (the Agent Identity a
+  container always runs as), and the disabled-export path logs at WARNING (was INFO) with
+  the env var to set. Propagation was always active; this restores emission.
+- Trace the Firestore Remote MCP hop from the orchestrator. Firestore access now
+  goes through the remote MCP server (#309), an outbound `httpx` call the
+  orchestrator never instrumented — so it emitted no CLIENT span (invisible in
+  Cloud Trace) and injected no W3C `traceparent` (the Firestore MCP server started
+  a fresh, uncorrelated trace). `server.py` now instruments outbound httpx
+  (`opentelemetry-instrumentation-httpx` → `HTTPXClientInstrumentor`), the Python
+  analogue of the Go server's `otelhttp` transport (ADR-0019 §1), so the MCP call
+  gets a client span and continues the browser → Go → orchestrator trace. Gated by
+  the existing `OTEL_TRACES_ENABLED`; never fatal.
+
 ## [0.1.0] - 2026-08-14
 
 ### Added

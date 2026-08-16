@@ -148,6 +148,22 @@ async def _lifespan(_app: FastAPI):
             state.firestore_mcp_toolset = None
 
 
+def _project_from_adc() -> str:
+    """Best-effort GCP project ID from Application Default Credentials.
+
+    An Agent Runtime container always runs as its Agent Identity, so ADC can
+    resolve the project from the metadata server even when no ``PROJECT_ID``-style
+    env var was injected. Never raises — returns "" if ADC is unavailable
+    (local/tests) so callers can fall through cleanly."""
+    try:
+        import google.auth
+
+        _, project = google.auth.default()
+        return project or ""
+    except Exception:
+        return ""
+
+
 def _resolve_project_id() -> str:
     """Resolves the GCP project ID string for span export.
 
@@ -158,6 +174,11 @@ def _resolve_project_id() -> str:
     In Agent Runtime containers, GOOGLE_CLOUD_PROJECT is often automatically
     populated with the numeric project number, while PROJECT_ID carries the
     user-configured string ID. We prefer non-numeric string IDs.
+
+    Env vars win, but if none yields a usable string ID we fall back to ADC
+    (``_project_from_adc``) — so a container missing ``PROJECT_ID`` /
+    ``OTEL_EXPORTER_GCP_TRACE_PROJECT_ID`` still exports instead of going silently
+    dark. A numeric project number from env is the last resort.
     """
     candidates = []
     for key in (
@@ -170,11 +191,18 @@ def _resolve_project_id() -> str:
         if value:
             candidates.append(value)
 
-    # Prefer non-numeric project ID strings over numeric project numbers
+    # Prefer non-numeric project ID strings over numeric project numbers.
     for c in candidates:
         if not c.isdigit():
             return c
-    return candidates[0] if candidates else ""
+
+    # No usable string ID in env — recover the project from credentials rather
+    # than disabling export (Cloud Trace rejects the numeric number anyway).
+    adc_project = _project_from_adc()
+    if adc_project and not adc_project.isdigit():
+        return adc_project
+
+    return candidates[0] if candidates else adc_project
 
 
 def _service_name() -> str:
@@ -194,52 +222,178 @@ def _build_tracer_provider(service_name: str, exporter):
     return provider
 
 
+def _ensure_service_name(provider) -> None:
+    """Stamp our ``service.name`` onto an existing provider's resource when it has
+    none (or the OTel default ``unknown_service``).
+
+    When Agent Runtime already installed a TracerProvider we reuse it — so ADK's
+    GenAI spans keep exporting — and merely attach our Cloud Trace exporter. But
+    that provider's resource carries the default ``service.name=unknown_service``,
+    so its spans show **no service name** in Cloud Trace and are unattributable.
+
+    The SDK captures the resource when each ``Tracer`` is *created* (not per span),
+    and the request-time tracers (FastAPI ingress, ADK) are created after this
+    runs at startup — so merging our ``service.name`` in now reaches them. The
+    resource is immutable, so we replace the provider's ``_resource`` before any
+    span is emitted. Only fills a missing/unknown name; a real name set upstream
+    is left as-is. Never fatal.
+    """
+    from opentelemetry.sdk.resources import SERVICE_NAME, Resource
+
+    try:
+        current_name = provider.resource.attributes.get(SERVICE_NAME, "")
+        if (not current_name) or str(current_name).startswith("unknown_service"):
+            provider._resource = provider.resource.merge(Resource.create({SERVICE_NAME: _service_name()}))
+            logger.info("Stamped service.name=%s onto existing TracerProvider resource", _service_name())
+    except Exception:
+        logger.exception("Could not stamp service.name onto existing TracerProvider")
+
+
 def _configure_span_export() -> None:
-    """Ensures the orchestrator's own spans are exported to Cloud Trace.
+    """Ensures the orchestrator's own spans are exported to Cloud Trace / Vertex AI Telemetry.
 
     Ingress instrumentation alone (extracting ``traceparent`` and opening a server
     span) does not *emit* anything — it needs a TracerProvider with an exporter.
-    Nothing in this process configured one for these SDK spans, so the
-    orchestrator emitted no traces (only the frontend did). This wires a Cloud
-    Trace exporter, with a ``service.name`` resource so the spans are attributable,
-    so the server span and the ADK/GenAI spans nesting under it actually reach
-    Cloud Trace.
+    This wires ADK's Google Cloud Telemetry exporter (OTLP to telemetry.googleapis.com)
+    and Cloud Trace exporter, with proper ``cloud.resource_id`` and ``service.name``
+    resources so the spans and ADK/GenAI spans nesting under it reach Cloud Trace and
+    Agent Engine observability.
 
     If a real SDK TracerProvider already exists (e.g. one Agent Runtime installed),
-    the Cloud Trace exporter is attached to it; otherwise a new provider carrying
-    our ``service.name`` is installed. Skips silently when no project is resolvable
-    (local/tests) — trace-context propagation still works.
+    the exporter is attached to it — and we stamp our ``service.name`` onto its
+    resource (``_ensure_service_name``) so the reused-provider spans are still
+    attributable; otherwise a new provider carrying our ``service.name`` is
+    installed. Skips silently when no project is resolvable (local/tests) —
+    trace-context propagation stays active.
     """
     project_id = _resolve_project_id()
     if not project_id:
-        logger.info("No GCP project resolvable; orchestrator span export disabled (propagation still active)")
+        logger.warning(
+            "No GCP project resolvable (checked OTEL_EXPORTER_GCP_TRACE_PROJECT_ID, PROJECT_ID, "
+            "FIRESTORE_PROJECT_ID, GOOGLE_CLOUD_PROJECT, and ADC); orchestrator span export DISABLED "
+            "— no server or ADK/GenAI spans will reach Cloud Trace. Set PROJECT_ID on the deployment "
+            "to fix. (Trace-context propagation stays active.)"
+        )
         return
-    try:
-        from opentelemetry import trace as ot_trace
-        from opentelemetry.exporter.cloud_trace import CloudTraceSpanExporter
-        from opentelemetry.sdk.trace import TracerProvider
-        from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
-        exporter = CloudTraceSpanExporter(project_id=project_id)
+    if project_id:
+        os.environ.setdefault("GOOGLE_CLOUD_PROJECT", project_id)
+    if os.environ.get("AGENT_ENGINE_ID"):
+        os.environ.setdefault("GOOGLE_CLOUD_AGENT_ENGINE_ID", os.environ["AGENT_ENGINE_ID"])
+    if os.environ.get("GOOGLE_CLOUD_LOCATION"):
+        os.environ.setdefault("GOOGLE_CLOUD_AGENT_ENGINE_LOCATION", os.environ["GOOGLE_CLOUD_LOCATION"])
+    os.environ.setdefault("GOOGLE_CLOUD_AGENT_ENGINE_ENABLE_TELEMETRY", "true")
+
+    try:
+        import google.auth
+        from google.adk.telemetry.google_cloud import get_gcp_exporters, get_gcp_resource
+        from google.adk.telemetry.setup import maybe_set_otel_providers
+        from opentelemetry import trace as ot_trace
+        from opentelemetry.sdk.resources import Resource
+        from opentelemetry.sdk.trace import TracerProvider
+
+        try:
+            credentials, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
+        except Exception:
+            credentials = None
+
+        otel_hooks = get_gcp_exporters(
+            enable_cloud_tracing=True,
+            enable_cloud_metrics=False,
+            enable_cloud_logging=False,
+            google_auth=(credentials, project_id) if credentials else None,
+        )
+        otel_resource = get_gcp_resource(project_id)
+        service_name = _service_name()
+        if service_name:
+            otel_resource = otel_resource.merge(Resource.create({"service.name": service_name}))
+
         current = ot_trace.get_tracer_provider()
         if isinstance(current, TracerProvider):
-            current.add_span_processor(BatchSpanProcessor(exporter))
-            logger.info("Attached Cloud Trace exporter to existing TracerProvider (project=%s)", project_id)
-        else:
-            ot_trace.set_tracer_provider(_build_tracer_provider(_service_name(), exporter))
+            _ensure_service_name(current)
+            for proc in otel_hooks.span_processors:
+                current.add_span_processor(proc)
             logger.info(
-                "Installed orchestrator TracerProvider with Cloud Trace exporter (service=%s, project=%s)",
-                _service_name(),
+                "Attached ADK Cloud Trace exporter to existing TracerProvider (service=%s, project=%s)",
+                service_name,
+                project_id,
+            )
+        else:
+            maybe_set_otel_providers(
+                otel_hooks_to_setup=[otel_hooks],
+                otel_resource=otel_resource,
+            )
+            logger.info(
+                "Installed orchestrator TracerProvider with ADK Cloud Trace exporter (service=%s, project=%s)",
+                service_name,
                 project_id,
             )
     except Exception:
-        logger.exception("Cloud Trace exporter setup failed; orchestrator span export disabled")
+        logger.exception("ADK Cloud Trace exporter setup failed; falling back to CloudTraceSpanExporter")
+        try:
+            from opentelemetry import trace as ot_trace
+            from opentelemetry.exporter.cloud_trace import CloudTraceSpanExporter
+            from opentelemetry.sdk.trace import TracerProvider
+            from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
+            exporter = CloudTraceSpanExporter(project_id=project_id)
+            current = ot_trace.get_tracer_provider()
+            if isinstance(current, TracerProvider):
+                _ensure_service_name(current)
+                current.add_span_processor(BatchSpanProcessor(exporter))
+                logger.info(
+                    "Attached fallback Cloud Trace exporter to existing TracerProvider (service=%s, project=%s)",
+                    _service_name(),
+                    project_id,
+                )
+            else:
+                ot_trace.set_tracer_provider(_build_tracer_provider(_service_name(), exporter))
+                logger.info(
+                    "Installed orchestrator TracerProvider with fallback Cloud Trace exporter (service=%s, project=%s)",
+                    _service_name(),
+                    project_id,
+                )
+        except Exception:
+            logger.exception("Fallback Cloud Trace exporter setup failed; orchestrator span export disabled")
+
+
+def _instrument_outbound_http() -> None:
+    """Instrument the outbound ``httpx`` client so calls to the Firestore Remote
+    MCP server participate in the trace.
+
+    The orchestrator's Firestore access is a remote MCP call: the ADK
+    ``McpToolset`` talks to ``https://firestore.googleapis.com/mcp`` over a
+    Streamable-HTTP transport, which the MCP SDK backs with ``httpx``
+    (``data/firestore_mcp.py``). Instrumenting the ingress and exporting spans
+    (above) is not enough for *that* hop. An uninstrumented client does neither of:
+
+    1. **emit a CLIENT span** for the outbound request (so the Firestore MCP
+       call is invisible in Cloud Trace — no latency, no error attribution);
+    2. **inject the W3C ``traceparent``** onto the request (so the Firestore MCP
+       server starts a *fresh* trace instead of continuing ours — its spans never
+       correlate with the browser -> Go -> orchestrator timeline).
+
+    ``HTTPXClientInstrumentor`` patches httpx's transport, so every httpx client
+    the process creates — including the one the MCP SDK builds internally — gets
+    a client span plus header injection via the global W3C propagator. This is
+    the Python analogue of the Go server's ``otelhttp.NewTransport`` on its
+    orchestrator client (ADR-0019 §1), closing the same gap for the MCP hop.
+
+    Never fatal; a telemetry failure must not stop the server from serving.
+    """
+    try:
+        from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
+
+        HTTPXClientInstrumentor().instrument()
+        logger.info("Outbound httpx tracing enabled (client spans + traceparent for Firestore MCP)")
+    except Exception:
+        logger.exception("httpx instrumentation failed; outbound MCP calls will not be traced")
 
 
 def _init_server_tracing(fastapi_app: FastAPI) -> None:
     """Instrument the FastAPI ingress AND export the orchestrator's spans to Cloud Trace.
 
-    Two pieces are needed for the orchestrator to participate in the end-to-end
+    Three pieces are needed for the orchestrator to participate in the end-to-end
     trace (ADR-0019):
 
     1. **Context extraction (ingress).** The Go gateway injects a W3C
@@ -251,14 +405,22 @@ def _init_server_tracing(fastapi_app: FastAPI) -> None:
        ``GOOGLE_CLOUD_AGENT_ENGINE_ENABLE_TELEMETRY`` did not install an exporting
        provider for these SDK spans in-process, so ``_configure_span_export``
        wires a Cloud Trace exporter with a ``service.name`` resource.
+    3. **Outbound propagation (egress).** The orchestrator's Firestore access is a
+       remote MCP call over httpx; ``_instrument_outbound_http`` gives that hop a
+       CLIENT span and injects ``traceparent`` so the Firestore MCP server
+       continues our trace instead of starting a fresh one.
 
     Opt-out via ``OTEL_TRACES_ENABLED=false``; never fatal — a telemetry failure
     must not stop the server from serving.
 
-    Note: in Agent Engine (Vertex ``:streamQuery``) deployments, whether the
-    inbound ``traceparent`` reaches this container is subject to Vertex header
-    forwarding; in direct (``ORCHESTRATOR_URL``) mode it always does. Either way,
-    the orchestrator now emits its own spans.
+    Note: in Agent Engine (Vertex ``:streamQuery``) deployments the inbound
+    ``traceparent`` header is Vertex's own — it terminates the gateway's call and
+    re-issues its own request — so header-based ingress would parent these routes
+    under an unexported Vertex span ("Missing span ID" root). The gateway therefore
+    also passes the real W3C context in the request *body*; the ``:streamQuery``
+    routes are excluded from header-based ingress here and instead rooted from that
+    body context (``_traced_reasoning_stream``). In direct (``ORCHESTRATOR_URL``)
+    mode the header always reaches ``/v1/*``, which keep normal ingress spans.
     """
     if os.environ.get("OTEL_TRACES_ENABLED", "").lower() in ("false", "0"):
         logger.info("FastAPI server-side tracing disabled via OTEL_TRACES_ENABLED")
@@ -275,8 +437,18 @@ def _init_server_tracing(fastapi_app: FastAPI) -> None:
         propagate.set_global_textmap(CompositePropagator([TraceContextTextMapPropagator(), W3CBaggagePropagator()]))
         # Wire the exporter BEFORE instrumenting so the server span is exported.
         _configure_span_export()
-        FastAPIInstrumentor.instrument_app(fastapi_app)
-        logger.info("FastAPI server-side tracing enabled (W3C extraction + Cloud Trace export)")
+        FastAPIInstrumentor.instrument_app(
+            fastapi_app,
+            # The Vertex :streamQuery routes carry Vertex's traceparent, not the
+            # gateway's — we root them from the body-carried context instead
+            # (_traced_reasoning_stream), so skip header-based ingress spans here to
+            # avoid a mis-parented duplicate under the "Missing span" Vertex root.
+            excluded_urls="api/stream_reasoning_engine,api/reasoning_engine",
+        )
+        # Instrument the egress too, so the Firestore Remote MCP hop is traced and
+        # propagates context (the propagator above governs the injected headers).
+        _instrument_outbound_http()
+        logger.info("FastAPI server-side tracing enabled (W3C extraction + Cloud Trace export + outbound MCP)")
     except Exception:
         logger.exception("FastAPI tracing init failed; continuing without ingress spans")
 
@@ -395,6 +567,89 @@ async def _stream_json_lines(events: AsyncIterator[Any]) -> AsyncIterator[bytes]
         yield f"{payload}\n".encode("utf-8")
 
 
+def _extract_body_trace_context(body: Any, request: Optional[Request] = None):
+    """Extract W3C trace context from request headers (Google-Agent-Engine-Traceparent,
+    traceparent) or the Vertex :streamQuery body carrier (trace_context / input.trace_context).
+
+    Vertex terminates the gateway's call and may forward context via the
+    ``Google-Agent-Engine-Traceparent`` header or in the request body under
+    ``trace_context``. Checking headers first with body fallback ensures the
+    orchestrator roots its spans under the browser -> Go span in all deployment
+    modes. Returns an OTel ``Context`` to parent under, or ``None`` when absent.
+    Never raises.
+    """
+    try:
+        from opentelemetry.propagate import extract
+        from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
+
+        propagator = TraceContextTextMapPropagator()
+
+        if request is not None:
+            ae_header = request.headers.get("Google-Agent-Engine-Traceparent")
+            if ae_header:
+                return propagator.extract(carrier={"traceparent": ae_header})
+            tp_header = request.headers.get("traceparent")
+            if tp_header:
+                return propagator.extract(carrier={"traceparent": tp_header})
+
+        carrier = None
+        if isinstance(body, dict):
+            carrier = body.get("trace_context")
+            if not carrier and isinstance(body.get("input"), dict):
+                carrier = body["input"].get("trace_context")
+        if not isinstance(carrier, dict) or not carrier:
+            return None
+
+        return extract({str(k): str(v) for k, v in carrier.items()})
+    except Exception:
+        logger.exception("Failed to extract body trace_context; rooting a fresh trace")
+        return None
+
+
+def _traced_reasoning_stream(
+    inner: AsyncIterator[bytes],
+    parent_ctx: Any = None,
+    span_name: str = "POST /api/stream_reasoning_engine",
+    span: Any = None,
+    token: Any = None,
+) -> AsyncIterator[bytes]:
+    """Wrap a reasoning-engine byte stream in a SERVER span.
+
+    If ``span`` and ``token`` are passed, the span was already started and
+    attached before runner setup so all planner and GenAI operations nest under
+    it; this generator maintains the span across streaming chunks and ends it on
+    completion. If only ``parent_ctx`` is passed, starts and attaches a new span.
+    """
+
+    async def _gen() -> AsyncIterator[bytes]:
+        nonlocal span, token
+        if span is None:
+            try:
+                from opentelemetry import context as otel_context
+                from opentelemetry import trace as ot_trace
+
+                tracer = ot_trace.get_tracer("orchestrator.reasoning_engine")
+                span = tracer.start_span(span_name, context=parent_ctx, kind=ot_trace.SpanKind.SERVER)
+                token = otel_context.attach(ot_trace.set_span_in_context(span))
+            except Exception:
+                logger.exception("reasoning-engine span setup failed; streaming without it")
+        try:
+            async for chunk in inner:
+                yield chunk
+        finally:
+            try:
+                if token is not None:
+                    from opentelemetry import context as otel_context
+
+                    otel_context.detach(token)
+                if span is not None:
+                    span.end()
+            except Exception:
+                logger.exception("reasoning-engine span teardown failed")
+
+    return _gen()
+
+
 @app.post("/api/stream_reasoning_engine")
 async def stream_reasoning_engine(request: Request) -> StreamingResponse:
     """Agent Runtime (Reasoning Engine :streamQuery) endpoint."""
@@ -402,6 +657,7 @@ async def stream_reasoning_engine(request: Request) -> StreamingResponse:
         raise HTTPException(status_code=503, detail="runner not initialized")
 
     body = await request.json()
+    parent_ctx = _extract_body_trace_context(body, request=request)
     class_method = body.get("class_method", "invoke")
     input_data = body.get("input", body)
     if not isinstance(input_data, dict):
@@ -411,34 +667,58 @@ async def stream_reasoning_engine(request: Request) -> StreamingResponse:
     session_id = input_data.get("session_id")
     message = input_data.get("message", "")
 
-    if class_method in ("resume", "stream_query_resume") or "interrupt_id" in input_data:
-        interrupt_id = input_data.get("interrupt_id", "")
-        invocation_id = input_data.get("invocation_id", "")
-        payload = input_data.get("payload", {})
-        response_part = Part.from_function_response(
-            name="adk_request_input",
-            response={"interruptId": interrupt_id, "payload": payload},
-        )
-        if response_part.function_response is not None:
-            response_part.function_response.id = interrupt_id
+    span = None
+    token = None
+    try:
+        from opentelemetry import context as otel_context
+        from opentelemetry import trace as ot_trace
 
-        events = state.runner.run_async(
-            user_id=user_id,
-            session_id=session_id,
-            invocation_id=invocation_id,
-            new_message=UserContent(parts=[response_part]),
-        )
-    else:
-        session = await state.session_manager.get_or_create_session(
-            app_name=APP_NAME, user_id=user_id, session_id=session_id
-        )
-        events = state.runner.run_async(
-            user_id=user_id,
-            session_id=session.id,
-            new_message=UserContent(parts=[Part.from_text(text=message)]),
-        )
+        tracer = ot_trace.get_tracer("orchestrator.reasoning_engine")
+        span = tracer.start_span("POST /api/stream_reasoning_engine", context=parent_ctx, kind=ot_trace.SpanKind.SERVER)
+        token = otel_context.attach(ot_trace.set_span_in_context(span))
+    except Exception:
+        logger.exception("reasoning-engine span setup failed; executing untraced")
 
-    return StreamingResponse(_stream_json_lines(events), media_type="application/x-ndjson")
+    try:
+        if class_method in ("resume", "stream_query_resume") or "interrupt_id" in input_data:
+            interrupt_id = input_data.get("interrupt_id", "")
+            invocation_id = input_data.get("invocation_id", "")
+            payload = input_data.get("payload", {})
+            response_part = Part.from_function_response(
+                name="adk_request_input",
+                response={"interruptId": interrupt_id, "payload": payload},
+            )
+            if response_part.function_response is not None:
+                response_part.function_response.id = interrupt_id
+
+            events = state.runner.run_async(
+                user_id=user_id,
+                session_id=session_id,
+                invocation_id=invocation_id,
+                new_message=UserContent(parts=[response_part]),
+            )
+        else:
+            session = await state.session_manager.get_or_create_session(
+                app_name=APP_NAME, user_id=user_id, session_id=session_id
+            )
+            events = state.runner.run_async(
+                user_id=user_id,
+                session_id=session.id,
+                new_message=UserContent(parts=[Part.from_text(text=message)]),
+            )
+
+        return StreamingResponse(
+            _traced_reasoning_stream(_stream_json_lines(events), span=span, token=token),
+            media_type="application/x-ndjson",
+        )
+    except Exception:
+        if token is not None:
+            from opentelemetry import context as otel_context
+
+            otel_context.detach(token)
+        if span is not None:
+            span.end()
+        raise
 
 
 @app.post("/api/reasoning_engine")
@@ -448,6 +728,7 @@ async def reasoning_engine(request: Request) -> dict[str, Any]:
         raise HTTPException(status_code=503, detail="runner not initialized")
 
     body = await request.json()
+    parent_ctx = _extract_body_trace_context(body, request=request)
     input_data = body.get("input", body)
     if not isinstance(input_data, dict):
         input_data = {}
@@ -456,18 +737,24 @@ async def reasoning_engine(request: Request) -> dict[str, Any]:
     session_id = input_data.get("session_id")
     message = input_data.get("message", "")
 
-    session = await state.session_manager.get_or_create_session(
-        app_name=APP_NAME, user_id=user_id, session_id=session_id
-    )
-    events = state.runner.run_async(
-        user_id=user_id,
-        session_id=session.id,
-        new_message=UserContent(parts=[Part.from_text(text=message)]),
-    )
+    from opentelemetry import trace as ot_trace
 
-    collected = []
-    async for event in events:
-        collected.append(_event_to_wire(event))
+    tracer = ot_trace.get_tracer("orchestrator.reasoning_engine")
+    # Root the request under the body-carried gateway context (Vertex strips the
+    # header; see _extract_body_trace_context), so this hop stays in one trace.
+    with tracer.start_as_current_span("POST /api/reasoning_engine", context=parent_ctx, kind=ot_trace.SpanKind.SERVER):
+        session = await state.session_manager.get_or_create_session(
+            app_name=APP_NAME, user_id=user_id, session_id=session_id
+        )
+        events = state.runner.run_async(
+            user_id=user_id,
+            session_id=session.id,
+            new_message=UserContent(parts=[Part.from_text(text=message)]),
+        )
+
+        collected = []
+        async for event in events:
+            collected.append(_event_to_wire(event))
     return {"events": collected}
 
 
