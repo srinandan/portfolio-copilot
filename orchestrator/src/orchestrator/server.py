@@ -515,7 +515,7 @@ async def _stream_json_lines(events: AsyncIterator[Any]) -> AsyncIterator[bytes]
 
 def _extract_body_trace_context(body: Any):
     """Extract the W3C trace context the gateway passes in a Vertex ``:streamQuery``
-    request *body* under ``trace_context``.
+    request *body* under ``trace_context`` (or ``input.trace_context``).
 
     Vertex re-issues its own request to this container, so the inbound
     ``traceparent`` header is Vertex's, not the gateway's (ADR-0019). The gateway
@@ -525,7 +525,11 @@ def _extract_body_trace_context(body: Any):
     when absent/unusable (then spans root a fresh trace). Never raises.
     """
     try:
-        carrier = body.get("trace_context") if isinstance(body, dict) else None
+        carrier = None
+        if isinstance(body, dict):
+            carrier = body.get("trace_context")
+            if not carrier and isinstance(body.get("input"), dict):
+                carrier = body["input"].get("trace_context")
         if not isinstance(carrier, dict) or not carrier:
             return None
         from opentelemetry.propagate import extract

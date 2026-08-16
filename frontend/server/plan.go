@@ -23,12 +23,13 @@ import (
 // PlanRequest is the body the frontend POSTs to /api/plan and /api/plan/resume.
 // user_id + message start a turn; resume adds session_id + invocation_id + interrupt_id + payload.
 type PlanRequest struct {
-	UserID       string          `json:"user_id"`
-	Message      string          `json:"message,omitempty"`
-	SessionID    string          `json:"session_id,omitempty"`
-	InvocationID string          `json:"invocation_id,omitempty"`
-	InterruptID  string          `json:"interrupt_id,omitempty"`
-	Payload      json.RawMessage `json:"payload,omitempty"`
+	UserID       string            `json:"user_id"`
+	Message      string            `json:"message,omitempty"`
+	SessionID    string            `json:"session_id,omitempty"`
+	InvocationID string            `json:"invocation_id,omitempty"`
+	InterruptID  string            `json:"interrupt_id,omitempty"`
+	Payload      json.RawMessage   `json:"payload,omitempty"`
+	TraceContext map[string]string `json:"trace_context,omitempty"`
 }
 
 // OrchestratorClient talks to the orchestrator. Two modes:
@@ -120,20 +121,21 @@ func (c *OrchestratorClient) invokeAgentEngine(ctx context.Context, body PlanReq
 	if resume {
 		classMethod = "resume"
 	}
-	envelope := map[string]interface{}{
-		"class_method": classMethod,
-		"input":        body,
-	}
 	// Vertex :streamQuery terminates this HTTP call and re-issues its own request
 	// to the orchestrator container, so the W3C `traceparent` otelhttp injects on
 	// *this* request's headers does not survive the proxy hop — the orchestrator
 	// would start a fresh trace (ADR-0019). Carry the trace context in the request
-	// BODY as well, where it does survive, so the orchestrator can continue the
-	// browser → Go → orchestrator trace instead of rooting a disconnected one.
+	// BODY (inside the `input` Struct, which Vertex forwards), where it does survive,
+	// so the orchestrator can continue the browser → Go → orchestrator trace instead
+	// of rooting a disconnected one.
 	carrier := propagation.MapCarrier{}
 	otel.GetTextMapPropagator().Inject(ctx, carrier)
 	if len(carrier) > 0 {
-		envelope["trace_context"] = map[string]string(carrier)
+		body.TraceContext = map[string]string(carrier)
+	}
+	envelope := map[string]interface{}{
+		"class_method": classMethod,
+		"input":        body,
 	}
 	buf, err := json.Marshal(envelope)
 	if err != nil {
