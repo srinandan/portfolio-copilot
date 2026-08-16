@@ -191,7 +191,9 @@ class FirestoreMCPClient:
         self.credentials = credentials
         self.timeout = timeout
 
-    def _call_tool(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    def _call_tool(
+        self, tool_name: str, arguments: Dict[str, Any], check_error: bool = True
+    ) -> Dict[str, Any]:
         """Calls a tool on the Firestore Remote MCP Server via JSON-RPC 2.0."""
         from opentelemetry import trace as ot_trace
 
@@ -222,7 +224,7 @@ class FirestoreMCPClient:
                 if "error" in data:
                     raise RuntimeError(f"MCP error: {data['error']}")
                 result = data.get("result", {})
-                if result.get("isError"):
+                if check_error and result.get("isError"):
                     err_msg = ""
                     content = result.get("content", [])
                     if content and isinstance(content, list) and "text" in content[0]:
@@ -233,12 +235,13 @@ class FirestoreMCPClient:
     def get_document(self, collection: str, doc_id: str) -> Optional[Dict[str, Any]]:
         """Fetches a single document by collection and document ID."""
         doc_name = f"projects/{self.project}/databases/(default)/documents/{collection}/{doc_id}"
-        try:
-            result = self._call_tool("get_document", {"name": doc_name})
-        except Exception as e:
-            if "not found" in str(e).lower():
+        result = self._call_tool("get_document", {"name": doc_name}, check_error=False)
+        if result.get("isError"):
+            content = result.get("content", [])
+            err_msg = content[0].get("text", "") if content and isinstance(content, list) and "text" in content[0] else ""
+            if "not found" in err_msg.lower():
                 return None
-            raise
+            raise RuntimeError(f"MCP tool get_document failed: {err_msg}")
 
         if "structuredContent" in result and "fields" in result["structuredContent"]:
             return firestore_doc_to_dict(result["structuredContent"])
@@ -270,12 +273,13 @@ class FirestoreMCPClient:
     def list_documents(self, collection: str) -> List[Dict[str, Any]]:
         """Lists all documents in a specified top-level collection."""
         parent = f"projects/{self.project}/databases/(default)/documents"
-        try:
-            result = self._call_tool("list_documents", {"parent": parent, "collectionId": collection})
-        except Exception as e:
-            if "not found" in str(e).lower():
+        result = self._call_tool("list_documents", {"parent": parent, "collectionId": collection}, check_error=False)
+        if result.get("isError"):
+            content = result.get("content", [])
+            err_msg = content[0].get("text", "") if content and isinstance(content, list) and "text" in content[0] else ""
+            if "not found" in err_msg.lower():
                 return []
-            raise
+            raise RuntimeError(f"MCP tool list_documents failed: {err_msg}")
 
         raw_docs = []
         if "structuredContent" in result and "documents" in result["structuredContent"]:
@@ -299,9 +303,10 @@ class FirestoreMCPClient:
     def delete_document(self, collection: str, doc_id: str) -> None:
         """Deletes a document by collection and document ID."""
         doc_name = f"projects/{self.project}/databases/(default)/documents/{collection}/{doc_id}"
-        try:
-            self._call_tool("delete_document", {"name": doc_name})
-        except Exception as e:
-            if "not found" in str(e).lower():
+        result = self._call_tool("delete_document", {"name": doc_name}, check_error=False)
+        if result.get("isError"):
+            content = result.get("content", [])
+            err_msg = content[0].get("text", "") if content and isinstance(content, list) and "text" in content[0] else ""
+            if "not found" in err_msg.lower():
                 return
-            raise
+            raise RuntimeError(f"MCP tool delete_document failed: {err_msg}")
