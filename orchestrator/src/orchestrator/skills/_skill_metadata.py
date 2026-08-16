@@ -138,9 +138,9 @@ def read_skill_metadata(skill_dir_name: str) -> SkillMetadata:
 
 
 def verify_all_skills_metadata(skill_names: Optional[list[str]] = None) -> None:
-    """Verifies at startup that SKILL.md files can be found and read for all registered skills.
+    """Verifies that SKILL.md files can be found and read for all registered skills when local files or SKILLS_DIR is configured.
 
-    Raises SkillMetadataError if any skill in PIPELINE_SKILL_ORDER cannot be resolved.
+    If no local SKILL.md files are present and SKILLS_DIR is not set, skills are resolved dynamically from Agent Registry at runtime.
     """
     if skill_names is None:
         from ..planner import PIPELINE_SKILL_ORDER
@@ -148,19 +148,22 @@ def verify_all_skills_metadata(skill_names: Optional[list[str]] = None) -> None:
         skill_names = PIPELINE_SKILL_ORDER
 
     missing: list[str] = []
+    found_any = False
     for name in skill_names:
         clean = _clean_skill_name(name)
         path = _find_skill_md(clean)
         if path is None:
             missing.append(clean)
         else:
+            found_any = True
             try:
                 read_skill_version(clean)
                 read_skill_approval_scope(clean)
             except Exception as e:
                 raise SkillMetadataError(f"Failed reading SKILL.md metadata for {clean}: {e}") from e
 
-    if missing:
+    # If SKILLS_DIR was explicitly set, or if some skills were found locally but others were missing, enforce completeness
+    if missing and ("SKILLS_DIR" in os.environ or found_any):
         unique_missing = sorted(set(missing))
         raise SkillMetadataError(
             f"Startup verification failed: could not locate SKILL.md for skill(s): {', '.join(unique_missing)}. "

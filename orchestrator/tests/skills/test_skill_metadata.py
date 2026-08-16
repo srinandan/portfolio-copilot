@@ -81,3 +81,10 @@ def test_verify_all_skills_metadata_missing_raises(tmp_path, monkeypatch):
     monkeypatch.setenv("SKILLS_DIR", str(empty_dir))
     with pytest.raises(SkillMetadataError, match="Startup verification failed: could not locate SKILL.md"):
         verify_all_skills_metadata(skill_names=["research"])
+
+
+def test_verify_all_skills_metadata_no_local_files_succeeds_for_registry_mode(monkeypatch):
+    monkeypatch.delenv("SKILLS_DIR", raising=False)
+    monkeypatch.setattr("orchestrator.skills._skill_metadata._find_skill_md", lambda name: None)
+    # When deployed in a container without bundled skills and no SKILLS_DIR, verification succeeds (skills load from Agent Registry)
+    verify_all_skills_metadata(skill_names=["research", "reviewer"])

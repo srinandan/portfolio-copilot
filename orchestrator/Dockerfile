@@ -1,48 +1,57 @@
-# Build and runtime stage
-FROM python:3.12-slim
+# Stage 1: Build virtual environment with all dependencies
+FROM python:3.12-slim-bookworm AS builder
 
 WORKDIR /app
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-# Install required system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+# Install and upgrade packaging tools in builder stage
+RUN pip install --no-cache-dir --upgrade "pip>=26.1.2" uv
 
-# Download the specific version (e.g., 1.7.1) and make it executable
-RUN curl -L -o /usr/local/bin/jq https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux64 && \
-    chmod +x /usr/local/bin/jq
+# Create a clean virtual environment
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
-# Install uv for fast Python package management
-RUN pip install --no-cache-dir uv
-
-# Copy project configuration and lock files
+# Copy project configuration files
 COPY orchestrator/pyproject.toml orchestrator/uv.lock orchestrator/README.md ./
-
-# Copy source code and runtime skills
 COPY orchestrator/src/ ./src/
-COPY skills/ ./skills/
 
-ENV SKILLS_DIR=/app/skills
+# Install the project and dependencies into /opt/venv
+RUN uv pip install --no-cache .
+
+# Strip build-time package managers from the runtime layers
+RUN rm -rf /usr/local/lib/python3.12/ensurepip \
+           /usr/local/lib/python3.12/site-packages/pip* \
+           /opt/venv/lib/python3.12/site-packages/pip*
+
+# Stage 2: Distroless hardened minimal runtime
+FROM gcr.io/distroless/cc-debian12:nonroot AS runner
+
+WORKDIR /app
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV PATH="/opt/venv/bin:/usr/local/bin:$PATH"
+ENV PYTHONPATH="/app/src"
 ENV GOOGLE_API_PREVENT_AGENT_TOKEN_SHARING_FOR_GCP_SERVICES=false
 ENV GOOGLE_GENAI_USE_ENTERPRISE=true
 ENV AGENT_REGISTRY_LOCATION=global
 ENV GOOGLE_CLOUD_LOCATION=us-central1
 
-# Install the project and dependencies using uv
-RUN uv pip install --system --no-cache .
+# Copy system shared libraries required by Python C extensions
+COPY --from=builder /lib/x86_64-linux-gnu /lib/x86_64-linux-gnu
+COPY --from=builder /usr/lib/x86_64-linux-gnu /usr/lib/x86_64-linux-gnu
 
-# Create non-root user for security
-RUN useradd -m -u 10001 orchestrator && chown -R orchestrator:orchestrator /app
-USER orchestrator
+# Copy Python 3.12 runtime and virtual environment
+COPY --from=builder /usr/local /usr/local
+COPY --from=builder /opt/venv /opt/venv
+
+# Copy source code
+COPY orchestrator/src/ ./src/
 
 # Expose port 8080 for Agent Platform Agent Runtime custom-container serving.
-# Agent Runtime probes /livez + /readyz and proxies query requests to the container.
 EXPOSE 8080
 
 # Serve the ADK planner over HTTP so Agent Runtime can invoke it.
-# PORT is honored (Agent Runtime may set it); default 8080.
-CMD ["sh", "-c", "uvicorn orchestrator.server:app --host 0.0.0.0 --port ${PORT:-8080}"]
+ENTRYPOINT ["python3", "-m", "uvicorn", "orchestrator.server:app", "--host", "0.0.0.0", "--port", "8080"]
