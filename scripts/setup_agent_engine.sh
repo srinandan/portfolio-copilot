@@ -54,7 +54,12 @@ if [ -n "$PROJECT_NUMBER" ]; then
   fi
 
   echo "Configuring IAM policy bindings for Agent Identities ($PRINCIPAL_SET)..."
-  # Firestore: IPS, holdings, liabilities
+  # Firestore & Remote MCP: IPS, holdings, liabilities, and MCP tool execution
+  gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+    --member="$PRINCIPAL_SET" \
+    --role="roles/mcp.toolUser" \
+    --condition=None \
+    --quiet || echo "Note: MCP Tool User IAM binding on principalSet skipped or already configured"
   gcloud projects add-iam-policy-binding "$PROJECT_ID" \
     --member="$PRINCIPAL_SET" \
     --role="roles/datastore.user" \
