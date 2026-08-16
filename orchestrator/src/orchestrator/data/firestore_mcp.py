@@ -193,6 +193,7 @@ class FirestoreMCPClient:
 
     def _call_tool(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Calls a tool on the Firestore Remote MCP Server via JSON-RPC 2.0."""
+        from opentelemetry import trace as ot_trace
 
         headers = get_firestore_auth_headers(credentials=self.credentials)
         payload = {
@@ -204,20 +205,30 @@ class FirestoreMCPClient:
                 "arguments": arguments,
             },
         }
-        with httpx.Client(timeout=self.timeout) as client:
-            resp = client.post(self.url, headers=headers, json=payload)
-            resp.raise_for_status()
-            data = resp.json()
-            if "error" in data:
-                raise RuntimeError(f"MCP error: {data['error']}")
-            result = data.get("result", {})
-            if result.get("isError"):
-                err_msg = ""
-                content = result.get("content", [])
-                if content and isinstance(content, list) and "text" in content[0]:
-                    err_msg = content[0]["text"]
-                raise RuntimeError(f"MCP tool {tool_name} failed: {err_msg}")
-            return result
+        tracer = ot_trace.get_tracer("orchestrator.data.firestore_mcp")
+        with tracer.start_as_current_span(
+            f"firestore.mcp.{tool_name}",
+            attributes={
+                "db.system": "firestore",
+                "mcp.tool": tool_name,
+                "mcp.server": "firestore-mcp",
+                "net.peer.name": "firestore.googleapis.com",
+            },
+        ):
+            with httpx.Client(timeout=self.timeout) as client:
+                resp = client.post(self.url, headers=headers, json=payload)
+                resp.raise_for_status()
+                data = resp.json()
+                if "error" in data:
+                    raise RuntimeError(f"MCP error: {data['error']}")
+                result = data.get("result", {})
+                if result.get("isError"):
+                    err_msg = ""
+                    content = result.get("content", [])
+                    if content and isinstance(content, list) and "text" in content[0]:
+                        err_msg = content[0]["text"]
+                    raise RuntimeError(f"MCP tool {tool_name} failed: {err_msg}")
+                return result
 
     def get_document(self, collection: str, doc_id: str) -> Optional[Dict[str, Any]]:
         """Fetches a single document by collection and document ID."""
