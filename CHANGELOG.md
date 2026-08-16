@@ -11,6 +11,13 @@ once tagged. Nothing has been released yet — see the note under `[Unreleased]`
 ### Added
 
 ### Fixed
+- Give reused-provider orchestrator spans a `service.name`. When Agent Runtime has already
+  installed a `TracerProvider`, `_configure_span_export` reuses it (so ADK GenAI spans keep
+  exporting) and attaches the Cloud Trace exporter — but that provider's resource carries the
+  OTel default `service.name=unknown_service`, so exported spans (`POST /api/stream_reasoning_engine`,
+  `invoke_workflow`, `invoke_node`, …) showed **no service name**. `_ensure_service_name` now
+  merges `OTEL_SERVICE_NAME` into the reused provider's resource before any span is emitted, so
+  request-time FastAPI/ADK tracers inherit it. A real name set upstream is preserved.
 - Stop the orchestrator from going silently dark in Cloud Trace. `_configure_span_export`
   disables *all* span export (server spans and ADK/GenAI client spans) when no project is
   resolvable, and `_resolve_project_id` previously only checked env vars — so a container
