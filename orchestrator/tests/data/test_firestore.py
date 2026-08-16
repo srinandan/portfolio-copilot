@@ -487,7 +487,6 @@ def test_firestore_client_mcp_path():
         mock_mcp.set_document.assert_called_with("holdings", "u1", client._dict_factory(h))
 
         # Liabilities
-        from src.orchestrator.contracts import LiabilitiesSnapshot
         mock_mcp.get_document.return_value = {
             "user_id": "u1",
             "as_of": "2026-08-01T00:00:00Z",
@@ -510,6 +509,7 @@ def test_firestore_client_mcp_path():
             Side,
             SkillVersionRef,
         )
+
         action = ProposedAction(
             action_id="act_1",
             session_id="sess_1",
@@ -535,10 +535,13 @@ def test_firestore_client_mcp_path():
         mock_mcp.set_document.assert_called_with("proposed_actions", "act_1", client._dict_factory(action))
 
         client.update_proposed_action_status("act_1", ActionStatus.APPROVED, {"review_passed": True})
-        mock_mcp.update_document.assert_called_with("proposed_actions", "act_1", {"status": "approved", "review_passed": True})
+        mock_mcp.update_document.assert_called_with(
+            "proposed_actions", "act_1", {"status": "approved", "review_passed": True}
+        )
 
         # Audit Log
-        from src.orchestrator.contracts.audit_log import AuditLogEntry, EventType, ActorType, Actor
+        from src.orchestrator.contracts.audit_log import Actor, ActorType, AuditLogEntry, EventType
+
         entry = AuditLogEntry(
             log_id="log_1",
             timestamp=datetime.now(timezone.utc),
@@ -559,7 +562,9 @@ def test_firestore_client_mcp_path():
             "effective_date": "2026-01-01",
             "risk_tolerance": "moderate",
             "time_horizon_years": 10,
-            "target_allocation": [{"asset_class": "equity", "target_percent": 60, "min_percent": 50, "max_percent": 70}],
+            "target_allocation": [
+                {"asset_class": "equity", "target_percent": 60, "min_percent": 50, "max_percent": 70}
+            ],
             "constraints": {"concentration_limit_percent": 15},
             "created_at": "2026-01-01T00:00:00Z",
         }
@@ -643,6 +648,7 @@ def test_firestore_client_mcp_fallback_on_exception():
         client._set_proposed_action_direct.assert_called_once_with(mock_act)
 
         from src.orchestrator.contracts import ActionStatus
+
         client.update_proposed_action_status("act1", ActionStatus.APPROVED)
         client._update_proposed_action_status_direct.assert_called_once_with("act1", ActionStatus.APPROVED, None)
 
@@ -689,6 +695,3 @@ def test_firestore_client_mcp_ips_invariant_violation():
         client.mcp_client = mock_mcp
         with pytest.raises(ValueError, match="invariant violated"):
             client.get_active_ips_by_user("u1")
-
-
-

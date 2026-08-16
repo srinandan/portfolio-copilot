@@ -119,9 +119,7 @@ def test_get_firestore_mcp_toolset_from_registry_success(mock_registry_cls):
 
 @patch("src.orchestrator.data.firestore_mcp.create_firestore_mcp_toolset")
 @patch("google.adk.integrations.agent_registry.AgentRegistry")
-def test_get_firestore_mcp_toolset_from_registry_fallback_on_error(
-    mock_registry_cls, mock_create_toolset
-):
+def test_get_firestore_mcp_toolset_from_registry_fallback_on_error(mock_registry_cls, mock_create_toolset):
     """Error path: falls back to direct endpoint when registry raises an exception."""
     mock_registry_instance = MagicMock()
     mock_registry_cls.return_value = mock_registry_instance
@@ -164,9 +162,7 @@ def test_google_auth_header_provider():
 
 @patch("src.orchestrator.data.firestore_mcp.create_firestore_mcp_toolset")
 @patch("src.orchestrator.data.firestore_mcp.google_auth_default", return_value=(MagicMock(), None))
-def test_get_firestore_mcp_toolset_from_registry_no_project_falls_back(
-    mock_auth_default, mock_create_toolset
-):
+def test_get_firestore_mcp_toolset_from_registry_no_project_falls_back(mock_auth_default, mock_create_toolset):
     """Edge path: no project ID available in env or ADC falls back to direct toolset."""
     mock_create_toolset.return_value = MagicMock()
     with patch.dict("os.environ", {}, clear=True):
@@ -192,12 +188,9 @@ def test_get_firestore_mcp_toolset_from_registry_inferred_project(
         )
 
 
-
 @patch("src.orchestrator.data.firestore_mcp.create_firestore_mcp_toolset")
 @patch("src.orchestrator.data.firestore_mcp.google_auth_default", side_effect=Exception("ADC discovery failed"))
-def test_get_firestore_mcp_toolset_from_registry_auth_exception_handled(
-    mock_auth_default, mock_create_toolset
-):
+def test_get_firestore_mcp_toolset_from_registry_auth_exception_handled(mock_auth_default, mock_create_toolset):
     """Edge path: google_auth_default exception handled gracefully and falls back."""
     mock_create_toolset.return_value = MagicMock()
     with patch.dict("os.environ", {}, clear=True):
@@ -225,7 +218,6 @@ def test_value_conversions_roundtrip():
         dict_to_firestore_fields,
         firestore_doc_to_dict,
         firestore_value_to_python,
-        python_to_firestore_value,
     )
 
     data = {
@@ -255,7 +247,10 @@ def test_value_conversions_roundtrip():
 
     # Test edge cases: empty map/array, timestamp, referenceValue
     assert firestore_value_to_python({"timestampValue": "2026-08-01T00:00:00Z"}) == "2026-08-01T00:00:00Z"
-    assert firestore_value_to_python({"referenceValue": "projects/p/databases/(default)/documents/c/d"}) == "projects/p/databases/(default)/documents/c/d"
+    assert (
+        firestore_value_to_python({"referenceValue": "projects/p/databases/(default)/documents/c/d"})
+        == "projects/p/databases/(default)/documents/c/d"
+    )
     assert firestore_value_to_python({"arrayValue": {}}) == []
     assert firestore_value_to_python({"mapValue": {}}) == {}
     assert firestore_value_to_python("not-a-dict") == "not-a-dict"
@@ -280,7 +275,10 @@ def test_firestore_mcp_client_get_document_success():
     }
 
     with (
-        patch("src.orchestrator.data.firestore_mcp.get_firestore_auth_headers", return_value={"Authorization": "Bearer token"}),
+        patch(
+            "src.orchestrator.data.firestore_mcp.get_firestore_auth_headers",
+            return_value={"Authorization": "Bearer token"},
+        ),
         patch("httpx.Client.post", return_value=mock_resp),
     ):
         doc = client.get_document("holdings", "u1")
@@ -289,6 +287,7 @@ def test_firestore_mcp_client_get_document_success():
 
 def test_firestore_mcp_client_get_document_from_text_content():
     import json
+
     from src.orchestrator.data.firestore_mcp import FirestoreMCPClient
 
     client = FirestoreMCPClient(project="test-proj")
@@ -302,13 +301,14 @@ def test_firestore_mcp_client_get_document_from_text_content():
     mock_resp.json.return_value = {
         "id": 1,
         "jsonrpc": "2.0",
-        "result": {
-            "content": [{"type": "text", "text": json.dumps(raw_doc)}]
-        },
+        "result": {"content": [{"type": "text", "text": json.dumps(raw_doc)}]},
     }
 
     with (
-        patch("src.orchestrator.data.firestore_mcp.get_firestore_auth_headers", return_value={"Authorization": "Bearer token"}),
+        patch(
+            "src.orchestrator.data.firestore_mcp.get_firestore_auth_headers",
+            return_value={"Authorization": "Bearer token"},
+        ),
         patch("httpx.Client.post", return_value=mock_resp),
     ):
         doc = client.get_document("holdings", "u2")
@@ -330,7 +330,10 @@ def test_firestore_mcp_client_get_document_not_found():
     }
 
     with (
-        patch("src.orchestrator.data.firestore_mcp.get_firestore_auth_headers", return_value={"Authorization": "Bearer token"}),
+        patch(
+            "src.orchestrator.data.firestore_mcp.get_firestore_auth_headers",
+            return_value={"Authorization": "Bearer token"},
+        ),
         patch("httpx.Client.post", return_value=mock_resp),
     ):
         assert client.get_document("holdings", "missing_user") is None
@@ -343,9 +346,16 @@ def test_firestore_mcp_client_call_tool_errors():
 
     # JSON-RPC level error
     mock_err_resp = MagicMock()
-    mock_err_resp.json.return_value = {"id": 1, "jsonrpc": "2.0", "error": {"code": -32600, "message": "Invalid Request"}}
+    mock_err_resp.json.return_value = {
+        "id": 1,
+        "jsonrpc": "2.0",
+        "error": {"code": -32600, "message": "Invalid Request"},
+    }
     with (
-        patch("src.orchestrator.data.firestore_mcp.get_firestore_auth_headers", return_value={"Authorization": "Bearer token"}),
+        patch(
+            "src.orchestrator.data.firestore_mcp.get_firestore_auth_headers",
+            return_value={"Authorization": "Bearer token"},
+        ),
         patch("httpx.Client.post", return_value=mock_err_resp),
     ):
         with pytest.raises(RuntimeError, match="MCP error"):
@@ -359,7 +369,10 @@ def test_firestore_mcp_client_call_tool_errors():
         "result": {"isError": True, "content": [{"text": "Permission denied"}]},
     }
     with (
-        patch("src.orchestrator.data.firestore_mcp.get_firestore_auth_headers", return_value={"Authorization": "Bearer token"}),
+        patch(
+            "src.orchestrator.data.firestore_mcp.get_firestore_auth_headers",
+            return_value={"Authorization": "Bearer token"},
+        ),
         patch("httpx.Client.post", return_value=mock_tool_err_resp),
     ):
         with pytest.raises(RuntimeError, match="MCP tool get_document failed"):
@@ -374,7 +387,10 @@ def test_firestore_mcp_client_set_and_update_and_delete_document():
     mock_ok_resp.json.return_value = {"id": 1, "jsonrpc": "2.0", "result": {}}
 
     with (
-        patch("src.orchestrator.data.firestore_mcp.get_firestore_auth_headers", return_value={"Authorization": "Bearer token"}),
+        patch(
+            "src.orchestrator.data.firestore_mcp.get_firestore_auth_headers",
+            return_value={"Authorization": "Bearer token"},
+        ),
         patch("httpx.Client.post", return_value=mock_ok_resp) as mock_post,
     ):
         client.set_document("holdings", "u1", {"cash": 100})
@@ -394,6 +410,7 @@ def test_firestore_mcp_client_set_and_update_and_delete_document():
 
 def test_firestore_mcp_client_list_documents():
     import json
+
     from src.orchestrator.data.firestore_mcp import FirestoreMCPClient
 
     client = FirestoreMCPClient(project="test-proj")
@@ -408,7 +425,10 @@ def test_firestore_mcp_client_list_documents():
         "result": {"structuredContent": {"documents": [doc1, doc2]}},
     }
     with (
-        patch("src.orchestrator.data.firestore_mcp.get_firestore_auth_headers", return_value={"Authorization": "Bearer token"}),
+        patch(
+            "src.orchestrator.data.firestore_mcp.get_firestore_auth_headers",
+            return_value={"Authorization": "Bearer token"},
+        ),
         patch("httpx.Client.post", return_value=mock_resp1),
     ):
         docs = client.list_documents("ips")
@@ -423,7 +443,10 @@ def test_firestore_mcp_client_list_documents():
         "result": {"content": [{"type": "text", "text": json.dumps({"documents": [doc1]})}]},
     }
     with (
-        patch("src.orchestrator.data.firestore_mcp.get_firestore_auth_headers", return_value={"Authorization": "Bearer token"}),
+        patch(
+            "src.orchestrator.data.firestore_mcp.get_firestore_auth_headers",
+            return_value={"Authorization": "Bearer token"},
+        ),
         patch("httpx.Client.post", return_value=mock_resp2),
     ):
         docs = client.list_documents("ips")
@@ -438,10 +461,10 @@ def test_firestore_mcp_client_list_documents():
         "result": {"isError": True, "content": [{"text": "Collection not found"}]},
     }
     with (
-        patch("src.orchestrator.data.firestore_mcp.get_firestore_auth_headers", return_value={"Authorization": "Bearer token"}),
+        patch(
+            "src.orchestrator.data.firestore_mcp.get_firestore_auth_headers",
+            return_value={"Authorization": "Bearer token"},
+        ),
         patch("httpx.Client.post", return_value=mock_err_resp),
     ):
         assert client.list_documents("missing_col") == []
-
-
-

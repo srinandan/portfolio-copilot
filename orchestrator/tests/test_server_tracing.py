@@ -207,7 +207,9 @@ def test_reasoning_stream_roots_span_at_body_trace_context():
         yield b'{"x":1}\n'
 
     async def _drain():
-        return [c async for c in server._traced_reasoning_stream(_inner(), parent_ctx, "POST /api/stream_reasoning_engine")]
+        return [
+            c async for c in server._traced_reasoning_stream(_inner(), parent_ctx, "POST /api/stream_reasoning_engine")
+        ]
 
     chunks = asyncio.run(_drain())
     assert chunks == [b'{"x":1}\n']

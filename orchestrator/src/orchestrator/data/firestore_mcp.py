@@ -75,11 +75,7 @@ def get_firestore_mcp_toolset_from_registry(
     credentials: Any = None,
 ) -> "McpToolset":
     """Discovers and constructs the Firestore McpToolset from Agent Registry with fallback."""
-    proj = (
-        project_id
-        or os.environ.get("PROJECT_ID")
-        or os.environ.get("GOOGLE_CLOUD_PROJECT")
-    )
+    proj = project_id or os.environ.get("PROJECT_ID") or os.environ.get("GOOGLE_CLOUD_PROJECT")
     if not proj:
         try:
             _, proj = google_auth_default(scopes=DEFAULT_SCOPES)
@@ -189,10 +185,7 @@ class FirestoreMCPClient:
         timeout: float = 15.0,
     ):
         self.project = (
-            project
-            or os.environ.get("PROJECT_ID")
-            or os.environ.get("GOOGLE_CLOUD_PROJECT")
-            or "test-project"
+            project or os.environ.get("PROJECT_ID") or os.environ.get("GOOGLE_CLOUD_PROJECT") or "test-project"
         )
         self.url = url
         self.credentials = credentials
@@ -200,7 +193,6 @@ class FirestoreMCPClient:
 
     def _call_tool(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Calls a tool on the Firestore Remote MCP Server via JSON-RPC 2.0."""
-        import httpx
 
         headers = get_firestore_auth_headers(credentials=self.credentials)
         payload = {

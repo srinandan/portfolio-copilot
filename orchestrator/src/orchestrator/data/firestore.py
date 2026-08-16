@@ -15,7 +15,6 @@ from ..contracts import (
     LiabilitiesSnapshot,
     ProposedAction,
 )
-
 from ..logger import get_logger
 from .firestore_mcp import FirestoreMCPClient
 
@@ -127,7 +126,9 @@ class FirestoreClient:
                 self.db = firestore.Client(project=self.project, credentials=AnonymousCredentials())
 
         # MCP client instance for remote MCP operations
-        self.mcp_client = FirestoreMCPClient(project=self.project, credentials=self.credentials) if self.use_mcp else None
+        self.mcp_client = (
+            FirestoreMCPClient(project=self.project, credentials=self.credentials) if self.use_mcp else None
+        )
 
     def _dict_factory(self, obj: Any) -> dict[str, Any]:
         """Convert a Pydantic model to a dict, handling dates/enums properly for Firestore."""
@@ -313,10 +314,7 @@ class FirestoreClient:
         if self.use_mcp and self.mcp_client:
             try:
                 docs = self.mcp_client.list_documents(COLLECTION_IPS)
-                matching = [
-                    d for d in docs
-                    if d.get("ips_id") == ips_id and d.get("status") == IPSStatus.ACTIVE.value
-                ]
+                matching = [d for d in docs if d.get("ips_id") == ips_id and d.get("status") == IPSStatus.ACTIVE.value]
                 if matching:
                     return InvestmentPolicyStatement.model_validate(matching[0])
                 return None
@@ -331,8 +329,7 @@ class FirestoreClient:
             try:
                 docs = self.mcp_client.list_documents(COLLECTION_IPS)
                 matching = [
-                    d for d in docs
-                    if d.get("user_id") == user_id and d.get("status") == IPSStatus.ACTIVE.value
+                    d for d in docs if d.get("user_id") == user_id and d.get("status") == IPSStatus.ACTIVE.value
                 ]
                 if len(matching) > 1:
                     raise ValueError(f"invariant violated: found multiple active IPS documents for user_id {user_id}")
@@ -388,7 +385,11 @@ class FirestoreClient:
 
     def set_spending_report(self, user_id: str, report: Any) -> None:
         """Writes a SpendingReport to Firestore, keyed by user_id."""
-        data = self._dict_factory(report) if hasattr(report, "model_dump") else (report if isinstance(report, dict) else dict(report))
+        data = (
+            self._dict_factory(report)
+            if hasattr(report, "model_dump")
+            else (report if isinstance(report, dict) else dict(report))
+        )
         if self.use_mcp and self.mcp_client:
             try:
                 self.mcp_client.set_document(COLLECTION_SPENDING_REPORTS, user_id, data)
@@ -411,7 +412,11 @@ class FirestoreClient:
     # PURPOSEFUL RETENTION: Direct native google-cloud-firestore SDK implementation.
     def _set_spending_report_direct(self, user_id: str, report: Any) -> None:
         doc_ref = self.db.collection(COLLECTION_SPENDING_REPORTS).document(user_id)
-        data = self._dict_factory(report) if hasattr(report, "model_dump") else (report if isinstance(report, dict) else dict(report))
+        data = (
+            self._dict_factory(report)
+            if hasattr(report, "model_dump")
+            else (report if isinstance(report, dict) else dict(report))
+        )
         doc_ref.set(data)
 
     # PURPOSEFUL RETENTION: Direct native google-cloud-firestore SDK implementation.
@@ -428,7 +433,11 @@ class FirestoreClient:
 
     def set_drift_report(self, user_id: str, report: Any) -> None:
         """Writes a DriftReport to Firestore, keyed by user_id."""
-        data = self._dict_factory(report) if hasattr(report, "model_dump") else (report if isinstance(report, dict) else dict(report))
+        data = (
+            self._dict_factory(report)
+            if hasattr(report, "model_dump")
+            else (report if isinstance(report, dict) else dict(report))
+        )
         if self.use_mcp and self.mcp_client:
             try:
                 self.mcp_client.set_document(COLLECTION_DRIFT_REPORTS, user_id, data)
@@ -451,7 +460,11 @@ class FirestoreClient:
     # PURPOSEFUL RETENTION: Direct native google-cloud-firestore SDK implementation.
     def _set_drift_report_direct(self, user_id: str, report: Any) -> None:
         doc_ref = self.db.collection(COLLECTION_DRIFT_REPORTS).document(user_id)
-        data = self._dict_factory(report) if hasattr(report, "model_dump") else (report if isinstance(report, dict) else dict(report))
+        data = (
+            self._dict_factory(report)
+            if hasattr(report, "model_dump")
+            else (report if isinstance(report, dict) else dict(report))
+        )
         doc_ref.set(data)
 
     # PURPOSEFUL RETENTION: Direct native google-cloud-firestore SDK implementation.
@@ -468,7 +481,11 @@ class FirestoreClient:
 
     def set_user_profile(self, user_id: str, profile: Any) -> None:
         """Writes a UserProfile to Firestore, keyed by user_id."""
-        data = self._dict_factory(profile) if hasattr(profile, "model_dump") else (profile if isinstance(profile, dict) else dict(profile))
+        data = (
+            self._dict_factory(profile)
+            if hasattr(profile, "model_dump")
+            else (profile if isinstance(profile, dict) else dict(profile))
+        )
         if self.use_mcp and self.mcp_client:
             try:
                 self.mcp_client.set_document(COLLECTION_USER_PROFILES, user_id, data)
@@ -491,7 +508,11 @@ class FirestoreClient:
     # PURPOSEFUL RETENTION: Direct native google-cloud-firestore SDK implementation.
     def _set_user_profile_direct(self, user_id: str, profile: Any) -> None:
         doc_ref = self.db.collection(COLLECTION_USER_PROFILES).document(user_id)
-        data = self._dict_factory(profile) if hasattr(profile, "model_dump") else (profile if isinstance(profile, dict) else dict(profile))
+        data = (
+            self._dict_factory(profile)
+            if hasattr(profile, "model_dump")
+            else (profile if isinstance(profile, dict) else dict(profile))
+        )
         doc_ref.set(data)
 
     # PURPOSEFUL RETENTION: Direct native google-cloud-firestore SDK implementation.
@@ -501,4 +522,3 @@ class FirestoreClient:
         if doc.exists:
             return doc.to_dict()
         return None
-
