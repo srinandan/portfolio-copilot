@@ -25,27 +25,33 @@ Portfolio Copilot is an experimental personal finance assistant built on Google 
 ## System Architecture
 
 ```text
- ┌─────────────────────────────────────────────────────────┐
- │               Vue 3 + TypeScript Frontend               │
- │    (Dashboard, Portfolio & Drift, Spending, Ingestion)  │
- └────────────────────────────┬────────────────────────────┘
-                              │ HTTP / JSON
- ┌────────────────────────────▼────────────────────────────┐
- │                     Go Backend Host                     │
- │          (Static Asset Serving & API Gateway)           │
- └─────────────┬─────────────────────────────┬─────────────┘
-               │                             │
-    State & Ingestion                 Agent Dispatch
-               │                             │
- ┌─────────────▼─────────────┐ ┌─────────────▼─────────────┐
- │    Google Cloud Store     │ │     Python Orchestrator   │
- │ ───────────────────────── │ │  (Gemini Enterprise ADK)  │
- │ • Firestore: IPS, State   │ │ ───────────────────────── │
- │ • BigQuery: Transactions  │ │ • Dynamic Skill Registry  │
- └───────────────────────────┘ │ • Reviewer / Critic Gate  │
-                               └─────────────┬─────────────┘
-                                             │ Paper Orders
-                               ┌─────────────▼─────────────┐
-                               │   Alpaca API (Sandbox)    │
-                               └───────────────────────────┘
+ ┌────────────────────────────────────────────────────────────────────────┐
+ │                      Vue 3 + TypeScript Frontend                       │
+ │          (Dashboard, Portfolio & Drift, Spending, Ingestion)           │
+ └───────────────────────────────────┬────────────────────────────────────┘
+                                     │ HTTP / JSON & SSE
+ ┌───────────────────────────────────▼────────────────────────────────────┐
+ │                            Go Backend Host                             │
+ │                  (Static Asset Serving & API Gateway)                  │
+ └───────────────────┬────────────────────────────────────┬───────────────┘
+                     │                                    │
+          State & Ingestion                        Agent Dispatch
+                     │                                    │
+ ┌───────────────────▼───────────────────┐ ┌──────────────▼───────────────┐
+ │          Google Cloud Store           │ │      Python Orchestrator     │
+ │ ───────────────────────────────────── │ │   (Gemini Enterprise ADK)    │
+ │ • Firestore: IPS, Holdings, State     │ │ ──────────────────────────── │
+ │ • BigQuery: Chase Transactions        │ │ • Dynamic Runtime Planner    │
+ └───────────────────────────────────────┘ │ • Reviewer / Critic Gate     │
+                                           └───────┬──────────────┬───────┘
+                                                   │              │
+                                Sub-Agent Dispatch │              │ Paper Orders
+                                (Interactions API) │              │
+                                     ┌─────────────▼────────┐ ┌───▼───────────────┐
+                                     │ Worker Managed Agent │ │     Alpaca API    │
+                                     │(Antigravity Sandbox) │ │     (Sandbox)     │
+                                     └──────────────────────┘ └───────────────────┘
 ```
+
+For full architectural diagrams, component contracts, and design trade-offs, see the [Detailed Architecture Specification](docs/spec/02-architecture.md) and [Architecture Decision Records (ADRs)](docs/adr/).
+
