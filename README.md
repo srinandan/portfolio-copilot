@@ -1,11 +1,13 @@
 # Portfolio Copilot
 
 [![CI](https://github.com/srinandan/portfolio-copilot/actions/workflows/ci.yml/badge.svg)](https://github.com/srinandan/portfolio-copilot/actions/workflows/ci.yml)
+[![OSV-Scanner](https://github.com/srinandan/portfolio-copilot/actions/workflows/osv-scanner.yml/badge.svg)](https://github.com/srinandan/portfolio-copilot/actions/workflows/osv-scanner.yml)
+[![CodeQL](https://github.com/srinandan/portfolio-copilot/actions/workflows/codeql.yml/badge.svg)](https://github.com/srinandan/portfolio-copilot/actions/workflows/codeql.yml)
+[![Release](https://img.shields.io/github/v/tag/srinandan/portfolio-copilot?label=version)](https://github.com/srinandan/portfolio-copilot/tags)
 [![License](https://img.shields.io/github/license/srinandan/portfolio-copilot)](./LICENSE)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/srinandan/portfolio-copilot?filename=go.mod)](./go.mod)
 [![Python Version](https://img.shields.io/badge/python-3.12+-blue.svg)](./orchestrator/pyproject.toml)
 [![Node Version](https://img.shields.io/badge/node-20+-green.svg)](./frontend/package.json)
-[![CodeQL](https://github.com/srinandan/portfolio-copilot/actions/workflows/codeql.yml/badge.svg)](https://github.com/srinandan/portfolio-copilot/actions/workflows/codeql.yml)
 
 Portfolio Copilot is an experimental personal finance assistant built on Google Cloud's Gemini Enterprise Agent Platform. It uses dynamic runtime planning rather than static execution graphs: given a user objective, the root agent discovers currently available capabilities, drafts an execution plan, evaluates policy constraints, and requires explicit human approval before executing any trade actions.
 
