@@ -66,7 +66,7 @@ Firestore repository implementing transactional persistence and queries against 
 
 ## 3. `pkg/bigquery`
 
-Manages analytical transaction queries and streaming ingestion against Google Cloud BigQuery (`portfolio_copilot.chase_transactions` / `checking_transactions`).
+Manages analytical transaction queries and streaming ingestion against Google Cloud BigQuery (`portfolio_copilot.checking_transactions`).
 
 ### Key Capabilities
 - **SQL Sandboxing**: `bigquery.WrapUserScopedQuery` ensures queries only execute `SELECT` statements, reject destructive/scripting keywords (`MERGE`, `EXECUTE`, `LOAD`, etc.), and wrap all references in a Common Table Expression (CTE) scoping rows strictly to the authenticated `user_id`.

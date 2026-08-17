@@ -78,7 +78,7 @@ current-state, not versioned.** Added after being referenced informally
 neither the IPS schema nor the Goals & Onboarding interview asked about
 what a user owes, only what they hold and want.
 
-This is deliberately **not derived from Chase transaction data** — a
+This is deliberately **not derived from checking transaction data** — a
 transaction feed shows payments happening, not the interest rate or
 outstanding balance behind them. It has to be self-reported during the
 Goals & Onboarding interview.
@@ -221,7 +221,7 @@ See [`spending-report.schema.json`](../../schemas/spending-report.schema.json).
 ## 10. Account Transaction
 
 Canonical transaction schema representing individual bank or credit account movements.
-Ingested into BigQuery dataset `portfolio_copilot`, table `chase_transactions` or `checking_transactions`.
+Ingested into BigQuery dataset `portfolio_copilot`, table `checking_transactions`.
 
 Notable fields:
 - `user_id` — row-level security identifier for CTE sandboxing

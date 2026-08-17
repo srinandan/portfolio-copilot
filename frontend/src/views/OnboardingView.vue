@@ -146,7 +146,7 @@ const state = reactive<OnboardingState>({
     {
       liability_id: 'liab_001',
       type: 'credit_card',
-      description: 'Chase Sapphire Reserve',
+      description: 'Premium Rewards Card',
       balance_usd: 4850,
       interest_rate_percent: 24.99,
       minimum_payment_usd: 150

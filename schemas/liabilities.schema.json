@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://portfolio-copilot/schemas/liabilities.schema.json",
   "title": "LiabilitiesSnapshot",
-  "description": "Current debts (credit cards, mortgage, other loans). Current-state data, parallel to HoldingsSnapshot — not versioned/append-only like the IPS. Captured during Goals & Onboarding, since it isn't reliably derivable from Chase transaction data alone (a transaction feed shows payments, not balances or interest rates).",
+  "description": "Current debts (credit cards, mortgage, other loans). Current-state data, parallel to HoldingsSnapshot — not versioned/append-only like the IPS. Captured during Goals & Onboarding, since it isn't reliably derivable from checking transaction data alone (a transaction feed shows payments, not balances or interest rates).",
   "type": "object",
   "required": ["user_id", "as_of", "liabilities"],
   "properties": {
@@ -28,13 +28,13 @@
           },
           "description": {
             "type": "string",
-            "description": "e.g. \"Chase Sapphire\", \"Primary residence mortgage\"."
+            "description": "e.g. \"Premium Rewards Card\", \"Primary residence mortgage\"."
           },
           "balance_usd": { "type": "number", "minimum": 0 },
           "interest_rate_percent": {
             "type": "number",
             "minimum": 0,
-            "description": "APR. Notably absent from Chase transaction data — must be self-reported."
+            "description": "APR. Notably absent from checking transaction data — must be self-reported."
           },
           "minimum_payment_usd": { "type": "number", "minimum": 0 }
         }

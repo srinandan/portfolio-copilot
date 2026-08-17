@@ -43,7 +43,7 @@ Portfolio Copilot is an experimental personal finance assistant built on Google 
  │          Google Cloud Store           │ │      Python Orchestrator     │
  │ ───────────────────────────────────── │ │   (Gemini Enterprise ADK)    │
  │ • Firestore: IPS, Holdings, State     │ │ ──────────────────────────── │
- │ • BigQuery: Chase Transactions        │ │ • Dynamic Runtime Planner    │
+ │ • BigQuery: Checking Transactions     │ │ • Dynamic Runtime Planner    │
  └───────────────────────────────────────┘ │ • Reviewer / Critic Gate     │
                                            └───────┬──────────────┬───────┘
                                                    │              │
@@ -71,7 +71,7 @@ Complete the guided onboarding interview, or configure the 5-tab **Profile & Pol
 ### Day to day: checking in (`/dashboard`, `/portfolio`, `/spending`, `/documents`)
 - **Dashboard (`/`)**: Watch real-time agent planning, with a live progress checklist for each analysis stage (discovering skills, analyzing, reviewing), alongside net worth summaries and asset allocations.
 - **Portfolio & Drift (`/portfolio`)**: Inspect current holdings alongside the live **Portfolio Drift Report**, comparing current allocations against your IPS target bands.
-- **Spending Analysis (`/spending`)**: Review 30-day income, outflows, savings rate, reserve months, and dual-condition anomaly detections against Chase transaction history.
+- **Spending Analysis (`/spending`)**: Review 30-day income, outflows, savings rate, reserve months, and dual-condition anomaly detections against checking transaction history.
 - **Document Ingestion (`/documents`)**: Upload bank transaction CSVs (streamed directly into BigQuery with deduplication) and holdings/liabilities JSON snapshots into Firestore.
 
 ### When it wants to act: approving a trade (`<ApprovalCard />`)

@@ -55,7 +55,7 @@
               <input
                 v-model="item.description"
                 type="text"
-                placeholder="e.g. Chase Sapphire, Mortgage"
+                placeholder="e.g. Premium Rewards Card, Mortgage"
                 class="w-full bg-surface-container text-on-surface p-sm rounded-lg border border-outline-variant focus:outline-none focus:ring-2 focus:ring-primary-container font-body-base text-sm"
               />
             </div>
@@ -181,7 +181,7 @@ const liabilities = ref<LiabilityItem[]>(
         {
           liability_id: 'liab_001',
           type: 'credit_card',
-          description: 'Chase Sapphire Reserve',
+          description: 'Premium Rewards Card',
           balance_usd: 4850,
           interest_rate_percent: 24.99,
           minimum_payment_usd: 150

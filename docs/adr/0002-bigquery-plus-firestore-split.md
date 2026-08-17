@@ -4,7 +4,7 @@
 Accepted
 
 ## Context
-Needed somewhere to persist Chase transaction data, portfolio holdings,
+Needed somewhere to persist checking transaction data, portfolio holdings,
 the IPS document, and the approval/audit log. Agent Platform Memory Bank was
 already decided for soft/semantic memory, but isn't built for bulk
 structured data or transactional writes.
@@ -30,7 +30,7 @@ scanned).
 ## Decision
 Split by access pattern, not by convenience:
 
-- **BigQuery** — Chase transaction data only, so Spending Analysis can do
+- **BigQuery** — Checking transaction data only, so Spending Analysis can do
   genuine NL-to-SQL analytics
 - **Firestore** — IPS document, portfolio holdings, approval/audit log:
   everything the agents read/write on every turn

@@ -12,7 +12,7 @@ This directory contains the operational, provisioning, deployment, data loading,
 |---|---|---|
 | [`setup_all.sh`](setup_all.sh) | Runs end-to-end setup across GCP (secrets, BigQuery, Firestore, Cloud Run, Managed Agent, Agent Runtime, and skill registration) in sequence. | `./scripts/setup_all.sh <PROJECT_ID> <REGION>` |
 | [`setup_secrets.sh`](setup_secrets.sh) | Creates Secret Manager secrets (`ALPACA_API_KEY_ID`, `ALPACA_API_SECRET`, `MANAGED_AGENT_ID`) and binds access permissions. | `./scripts/setup_secrets.sh <PROJECT_ID> <REGION>` |
-| [`setup_bigquery.sh`](setup_bigquery.sh) | Creates BigQuery dataset `portfolio_copilot` and `chase_transactions` / `checking_transactions` tables. | `./scripts/setup_bigquery.sh <PROJECT_ID> <REGION>` |
+| [`setup_bigquery.sh`](setup_bigquery.sh) | Creates BigQuery dataset `portfolio_copilot` and `checking_transactions` table. | `./scripts/setup_bigquery.sh <PROJECT_ID> <REGION>` |
 | [`setup_firestore.sh`](setup_firestore.sh) | Provisions the default Firestore database in Native mode. | `./scripts/setup_firestore.sh <PROJECT_ID> <REGION>` |
 | [`setup_cloudrun.sh`](setup_cloudrun.sh) | Deploys the frontend service to Cloud Run with dedicated service account (`portfolio-copilot-frontend-sa`). | `./scripts/setup_cloudrun.sh <PROJECT_ID> <REGION>` |
 | [`setup_managed_agent.sh`](setup_managed_agent.sh) | Provisions the worker Managed Agent (`portfolio-copilot-worker`) and stores its ID in Secret Manager. | `./scripts/setup_managed_agent.sh <PROJECT_ID> <REGION>` |

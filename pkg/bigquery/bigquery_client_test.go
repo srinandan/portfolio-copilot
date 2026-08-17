@@ -18,7 +18,7 @@ func TestSecureSQLRegex(t *testing.T) {
 	}{
 		{
 			name:         "Basic valid query",
-			generatedSQL: "SELECT * FROM chase_transactions",
+			generatedSQL: "SELECT * FROM checking_transactions",
 			checkQuery: func(t *testing.T, secureSQL string) {
 				if !strings.HasSuffix(secureSQL, "LIMIT 100") {
 					t.Errorf("Expected LIMIT 100 at the end, got: %s", secureSQL)
@@ -27,7 +27,7 @@ func TestSecureSQLRegex(t *testing.T) {
 		},
 		{
 			name:         "Query with semicolon",
-			generatedSQL: "SELECT * FROM chase_transactions;",
+			generatedSQL: "SELECT * FROM checking_transactions;",
 			checkQuery: func(t *testing.T, secureSQL string) {
 				if !strings.HasSuffix(secureSQL, "LIMIT 100;") {
 					t.Errorf("Expected LIMIT 100; at the end, got: %s", secureSQL)
@@ -36,7 +36,7 @@ func TestSecureSQLRegex(t *testing.T) {
 		},
 		{
 			name:         "Query with outer LIMIT",
-			generatedSQL: "SELECT * FROM chase_transactions LIMIT 50",
+			generatedSQL: "SELECT * FROM checking_transactions LIMIT 50",
 			checkQuery: func(t *testing.T, secureSQL string) {
 				if strings.Contains(secureSQL, "LIMIT 100") {
 					t.Errorf("Did not expect LIMIT 100 when query already has outer LIMIT, got: %s", secureSQL)
@@ -45,7 +45,7 @@ func TestSecureSQLRegex(t *testing.T) {
 		},
 		{
 			name:         "Query with subquery LIMIT",
-			generatedSQL: "SELECT * FROM (SELECT * FROM chase_transactions LIMIT 10) AS sub",
+			generatedSQL: "SELECT * FROM (SELECT * FROM checking_transactions LIMIT 10) AS sub",
 			checkQuery: func(t *testing.T, secureSQL string) {
 				if !strings.HasSuffix(secureSQL, "LIMIT 100") {
 					t.Errorf("Expected outer LIMIT 100 to be added, got: %s", secureSQL)
@@ -54,7 +54,7 @@ func TestSecureSQLRegex(t *testing.T) {
 		},
 		{
 			name:         "Query with semicolon and whitespace",
-			generatedSQL: "SELECT * FROM chase_transactions ;  ",
+			generatedSQL: "SELECT * FROM checking_transactions ;  ",
 			checkQuery: func(t *testing.T, secureSQL string) {
 				if !strings.HasSuffix(secureSQL, "LIMIT 100;") {
 					t.Errorf("Expected LIMIT 100; at the end, got: %s", secureSQL)

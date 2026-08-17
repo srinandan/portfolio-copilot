@@ -37,7 +37,6 @@ def validate_fixtures() -> None:
         "drift_report.json": "drift-report.schema.json",
         "user_profile.json": "user-profile.schema.json",
         "checking_transactions.json": "account-transaction.schema.json",
-        "chase_transactions.json": "account-transaction.schema.json",
     }
 
     for fixture_name, schema_name in schema_map.items():
@@ -92,10 +91,7 @@ def get_default_project() -> str:
 def seed_bigquery(project_id: str, location: str, dataset_name: str, table_name: str, dry_run: bool) -> None:
     csv_file = TESTDATA_DIR / f"{table_name}.csv"
     if not csv_file.exists():
-        # Fallback to checking_transactions.csv or chase_transactions.csv
         csv_file = TESTDATA_DIR / "checking_transactions.csv"
-        if not csv_file.exists():
-            csv_file = TESTDATA_DIR / "chase_transactions.csv"
     table_id = f"{project_id}.{dataset_name}.{table_name}"
     print(f"\n[BigQuery] Seeding {csv_file.name} -> {table_id} (location: {location})...")
 

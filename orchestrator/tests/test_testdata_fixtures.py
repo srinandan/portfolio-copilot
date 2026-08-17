@@ -115,7 +115,7 @@ def test_fixtures_are_internally_consistent():
     assert poisoned_data["suggested_allocation_percent"] > ips_data["constraints"]["concentration_limit_percent"]
 
 
-@pytest.mark.parametrize("fixture_name", ["checking_transactions.csv", "chase_transactions.csv"])
+@pytest.mark.parametrize("fixture_name", ["checking_transactions.csv"])
 def test_transactions_csv_exercises_dual_condition_anomaly(fixture_name):
     csv_path = TESTDATA_DIR / fixture_name
     if not csv_path.exists():

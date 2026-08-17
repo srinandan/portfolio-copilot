@@ -113,9 +113,9 @@ once tagged. Nothing has been released yet — see the note under `[Unreleased]`
   `APPROVAL_GRANTED`, `APPROVAL_REJECTED`, `ACTION_EXECUTED`, `ACTION_FAILED`,
   `REVIEWER_BYPASSED`. Every entry carries actor identity, skill version,
   registry revision ID, and approval scope.
-- BigQuery Chase transactions sandbox: whitelist requires `SELECT` start,
+- BigQuery checking transactions sandbox: whitelist requires `SELECT` start,
   rejects `MERGE`/`EXPORT`/`LOAD`/`CALL`/`EXECUTE`/multi-statement scripts,
-  wraps every query in a CTE that scopes `chase_transactions` to the caller's
+  wraps every query in a CTE that scopes `checking_transactions` to the caller's
   `user_id`, and strips any qualified prefix so the CTE always shadows.
 - Streaming progress events (ADR-0018): the planner reports each pipeline
   stage (discovery, per-skill, approval, execution) as advisory

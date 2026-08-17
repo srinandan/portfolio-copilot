@@ -15,7 +15,7 @@ def test_validate_and_execute_nl_sql_valid_query(mock_client):
     mock_job.result.return_value = [{"col": 1}]
     client.client.query.return_value = mock_job
 
-    # Should not raise an exception for checking_transactions or chase_transactions
+    # Should not raise an exception for checking_transactions
     result = client.validate_and_execute_nl_sql(
         "user123", "SELECT * FROM checking_transactions WHERE user_id = @user_id"
     )

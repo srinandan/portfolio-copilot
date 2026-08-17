@@ -2,7 +2,7 @@
 name: goals-onboarding
 description: >-
   Interviews the user for risk tolerance, goals, time horizon, and
-  constraints; ingests holdings, liabilities, and Chase spending history;
+  constraints; ingests holdings, liabilities, and checking spending history;
   produces an Investment Policy Statement (IPS) written to long-term
   memory. Use when onboarding a new user with no active IPS, when the
   user reports a life event affecting their goals, or when Portfolio
@@ -17,12 +17,12 @@ metadata:
 ## Purpose
 
 Interviews the user for risk tolerance, goals, time horizon, and
-constraints; ingests current holdings, current liabilities, and Chase
+constraints; ingests current holdings, current liabilities, and checking
 spending history; produces an
 [`InvestmentPolicyStatement`](../../schemas/ips.schema.json) — the
 reference plan every other skill and the Reviewer/Critic reads against —
 and captures a [`LiabilitiesSnapshot`](../../schemas/liabilities.schema.json),
-since debt data isn't derivable from Chase transactions alone.
+since debt data isn't derivable from checking transactions alone.
 
 This is the only skill in this project with no path to financial
 execution. It reads context and writes policy; it never drafts or
@@ -50,7 +50,7 @@ what it does once invoked, per [ADR-0004](../../docs/adr/0004-dynamic-planning-o
 | `existing_ips_ref` | Firestore — active IPS for this user, if any | Required when `trigger != initial` |
 | [`HoldingsSnapshot`](../../schemas/holdings.schema.json) | Firestore, read-only | Yes — informs feasibility discussion (e.g. a goal the current portfolio can't plausibly reach) |
 | Existing [`LiabilitiesSnapshot`](../../schemas/liabilities.schema.json), if any | Firestore, read-only | Required when `trigger != initial` — presented back to the user to confirm/update rather than re-asked from scratch |
-| Chase transaction history | BigQuery, read-only, aggregated | Yes — informs liquidity needs (spending patterns, existing reserve) |
+| Checking transaction history | BigQuery, read-only, aggregated | Yes — informs liquidity needs (spending patterns, existing reserve) |
 | Interview responses | User, gathered interactively during the skill's own multi-turn conversation | Yes |
 
 The interview itself is multi-turn and not turn-by-turn specified here —
@@ -61,7 +61,7 @@ interview content to IPS fields, below.
 
 **Goals.** Free-form goal name, target amount, target date — one or more.
 Each becomes a `goals[]` entry. Reality-check against current holdings +
-savings rate (derived from Chase data); if a goal's target is
+savings rate (derived from checking transaction data); if a goal's target is
 implausible given the timeline, flag it to the user during the interview
 — don't silently accept or silently block.
 
@@ -168,7 +168,7 @@ than starting over, if practical.
 - Managed Agent sandbox: conversational interaction with the user (`RequestInput`)
 - Orchestrator (outside sandbox):
   - Firestore: read `holdings`, read `liabilities`, read/write `ips`, write `liabilities`, write `audit_log`
-  - BigQuery: read `chase_transactions` (aggregate queries only)
+  - BigQuery: read `checking_transactions` (aggregate queries only)
   - Agent Platform Memory Bank: write (summarized preferences)
 - **No** trade-execution tools, no Alpaca access, no write access inside the sandbox.
 
