@@ -1,36 +1,61 @@
 # Portfolio Copilot
 
 [![CI](https://github.com/srinandan/portfolio-copilot/actions/workflows/ci.yml/badge.svg)](https://github.com/srinandan/portfolio-copilot/actions/workflows/ci.yml)
+[![OSV-Scanner](https://github.com/srinandan/portfolio-copilot/actions/workflows/osv-scanner.yml/badge.svg)](https://github.com/srinandan/portfolio-copilot/actions/workflows/osv-scanner.yml)
+[![CodeQL](https://github.com/srinandan/portfolio-copilot/actions/workflows/codeql.yml/badge.svg)](https://github.com/srinandan/portfolio-copilot/actions/workflows/codeql.yml)
+[![Release](https://img.shields.io/github/v/tag/srinandan/portfolio-copilot?label=version)](https://github.com/srinandan/portfolio-copilot/tags)
 [![License](https://img.shields.io/github/license/srinandan/portfolio-copilot)](./LICENSE)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/srinandan/portfolio-copilot?filename=go.mod)](./go.mod)
 [![Python Version](https://img.shields.io/badge/python-3.12+-blue.svg)](./orchestrator/pyproject.toml)
 [![Node Version](https://img.shields.io/badge/node-20+-green.svg)](./frontend/package.json)
-[![CodeQL](https://github.com/srinandan/portfolio-copilot/actions/workflows/codeql.yml/badge.svg)](https://github.com/srinandan/portfolio-copilot/actions/workflows/codeql.yml)
 
-Portfolio Copilot is a personal finance and investing assistant that
-plans its own next move instead of following a fixed script. A single
-agent reads your goal, checks which capabilities it's currently allowed
-to use, and composes a plan at runtime — pulling research, checking your
-portfolio, and drafting a trade when warranted. No trade executes without
-your approval, and every action is traceable to the capability that
-produced it.
+Portfolio Copilot is an experimental personal finance assistant built on Google Cloud's Gemini Enterprise Agent Platform. It uses dynamic runtime planning rather than static execution graphs: given a user objective, the root agent discovers currently available capabilities, drafts an execution plan, evaluates policy constraints, and requires explicit human approval before executing any trade actions.
 
-## Why try it
+> **Disclaimer:** This repository is an educational demo and reference implementation. It does not provide financial advice, and all trade execution is wired strictly to Alpaca's paper trading sandbox.
 
-- **It plans, it doesn't run a script.** The agent decides what to check
-  and do at request time, rather than executing a hardcoded pipeline.
-- **Capabilities can be revoked live, mid-conversation.** Revoke a skill
-  and the agent adapts on its next planning step — no restart, no error.
-- **No trade executes without your approval.** Trades are drafted,
-  checked against your stated investment policy, and executed only after
-  you approve.
-- **Governance is real, not a slide.** Every action is traceable to the
-  exact skill, version, and approval that authorized it.
+---
 
-This is a personal project and demo built on Google Cloud's Gemini
-Enterprise Agent Platform. It is not a product, not investment advice,
-and not connected to a real brokerage (trades run through Alpaca's paper
-trading API).
+## Key Capabilities
+
+- **Dynamic Runtime Planning:** Rather than relying on hardcoded workflows, the planner discovers registered skills at runtime and composes execution plans dynamically.
+- **Hot-Pluggable Capabilities:** Skills can be enabled or revoked mid-session; the planner recalculates its task graph on the subsequent step without restarting.
+- **Human-in-the-Loop Trade Gate:** Proposed actions (`ProposedAction`) undergo deterministic verification against an Investment Policy Statement (IPS) by a Critic agent (`ReviewerVerdict`) before presenting an interactive approval card to the user.
+- **End-to-End Traceability:** State, execution logs, and policy verdicts are persisted with immutable skill version and approval metadata.
+
+---
+
+## System Architecture
+
+```text
+ ┌────────────────────────────────────────────────────────────────────────┐
+ │                      Vue 3 + TypeScript Frontend                       │
+ │          (Dashboard, Portfolio & Drift, Spending, Ingestion)           │
+ └───────────────────────────────────┬────────────────────────────────────┘
+                                     │ HTTP / JSON & SSE
+ ┌───────────────────────────────────▼────────────────────────────────────┐
+ │                            Go Backend Host                             │
+ │                  (Static Asset Serving & API Gateway)                  │
+ └───────────────────┬────────────────────────────────────┬───────────────┘
+                     │                                    │
+          State & Ingestion                        Agent Dispatch
+                     │                                    │
+ ┌───────────────────▼───────────────────┐ ┌──────────────▼───────────────┐
+ │          Google Cloud Store           │ │      Python Orchestrator     │
+ │ ───────────────────────────────────── │ │   (Gemini Enterprise ADK)    │
+ │ • Firestore: IPS, Holdings, State     │ │ ──────────────────────────── │
+ │ • BigQuery: Chase Transactions        │ │ • Dynamic Runtime Planner    │
+ └───────────────────────────────────────┘ │ • Reviewer / Critic Gate     │
+                                           └───────┬──────────────┬───────┘
+                                                   │              │
+                                Sub-Agent Dispatch │              │ Paper Orders
+                                (Interactions API) │              │
+                                     ┌─────────────▼────────┐ ┌───▼───────────────┐
+                                     │ Worker Managed Agent │ │     Alpaca API    │
+                                     │(Antigravity Sandbox) │ │     (Sandbox)     │
+                                     └──────────────────────┘ └───────────────────┘
+```
+
+For full architectural diagrams, component contracts, and design trade-offs, see the [Detailed Architecture Specification](docs/spec/02-architecture.md) and [Architecture Decision Records (ADRs)](docs/adr/).
 
 ## Get started
 
@@ -82,3 +107,4 @@ intended for educational/hobbyist use only.
 ## License
 
 This project is licensed under the terms of the [LICENSE](./LICENSE) file.
+
