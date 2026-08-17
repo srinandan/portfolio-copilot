@@ -1,10 +1,10 @@
 <template>
-  <section class="bg-surface-container rounded-xl p-lg shadow-sm flex flex-col gap-sm relative overflow-hidden border border-outline/10">
+  <section class="bg-surface-container rounded-xl p-lg shadow-sm flex flex-col gap-sm relative overflow-hidden border border-outline/10" data-testid="net-worth-card">
     <div class="flex items-center justify-between relative z-10">
-      <h2 class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">Total Net Worth</h2>
+      <h2 class="font-label-caps text-xs text-on-surface-variant uppercase tracking-wider">Total Net Worth</h2>
     </div>
-    <div class="font-display-lg text-display-lg text-on-surface relative z-10 tabular-nums">
-      <span class="font-body-mono text-[32px]">$</span>{{ formattedNetWorth }}<span class="font-body-mono text-[24px] text-on-surface-variant">.00</span>
+    <div class="font-body-mono text-3xl sm:text-4xl font-bold text-on-surface relative z-10 tabular-nums" data-testid="net-worth-value">
+      ${{ formattedNetWorth }}
     </div>
     <p v-if="formattedAsOf" class="font-body-mono text-xs text-on-surface-variant relative z-10">
       {{ formattedAsOf }}
@@ -27,7 +27,10 @@ const props = withDefaults(
 );
 
 const formattedNetWorth = computed(() => {
-  return props.totalValue.toLocaleString('en-US');
+  return props.totalValue.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
 });
 
 const formattedAsOf = computed(() => {
