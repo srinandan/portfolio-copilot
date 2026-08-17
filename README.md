@@ -7,78 +7,45 @@
 [![Node Version](https://img.shields.io/badge/node-20+-green.svg)](./frontend/package.json)
 [![CodeQL](https://github.com/srinandan/portfolio-copilot/actions/workflows/codeql.yml/badge.svg)](https://github.com/srinandan/portfolio-copilot/actions/workflows/codeql.yml)
 
-Portfolio Copilot is a personal finance and investing assistant that
-plans its own next move instead of following a fixed script. A single
-agent reads your goal, checks which capabilities it's currently allowed
-to use, and composes a plan at runtime — pulling research, checking your
-portfolio, and drafting a trade when warranted. No trade executes without
-your approval, and every action is traceable to the capability that
-produced it.
+Portfolio Copilot is an experimental personal finance assistant built on Google Cloud's Gemini Enterprise Agent Platform. It uses dynamic runtime planning rather than static execution graphs: given a user objective, the root agent discovers currently available capabilities, drafts an execution plan, evaluates policy constraints, and requires explicit human approval before executing any trade actions.
 
-## Why try it
+> **Disclaimer:** This repository is an educational demo and reference implementation. It does not provide financial advice, and all trade execution is wired strictly to Alpaca's paper trading sandbox.
 
-- **It plans, it doesn't run a script.** The agent decides what to check
-  and do at request time, rather than executing a hardcoded pipeline.
-- **Capabilities can be revoked live, mid-conversation.** Revoke a skill
-  and the agent adapts on its next planning step — no restart, no error.
-- **No trade executes without your approval.** Trades are drafted,
-  checked against your stated investment policy, and executed only after
-  you approve.
-- **Governance is real, not a slide.** Every action is traceable to the
-  exact skill, version, and approval that authorized it.
+---
 
-This is a personal project and demo built on Google Cloud's Gemini
-Enterprise Agent Platform. It is not a product, not investment advice,
-and not connected to a real brokerage (trades run through Alpaca's paper
-trading API).
+## Key Capabilities
 
-## Get started
+- **Dynamic Runtime Planning:** Rather than relying on hardcoded workflows, the planner discovers registered skills at runtime and composes execution plans dynamically.
+- **Hot-Pluggable Capabilities:** Skills can be enabled or revoked mid-session; the planner recalculates its task graph on the subsequent step without restarting.
+- **Human-in-the-Loop Trade Gate:** Proposed actions (`ProposedAction`) undergo deterministic verification against an Investment Policy Statement (IPS) by a Critic agent (`ReviewerVerdict`) before presenting an interactive approval card to the user.
+- **End-to-End Traceability:** State, execution logs, and policy verdicts are persisted with immutable skill version and approval metadata.
 
-Setup instructions: [`install/`](install/).
+---
 
-## How to use it
+## System Architecture
 
-Portfolio Copilot provides a standalone Vue 3 + TypeScript web interface connected to the backend server and Python orchestrator:
-
-### First time: onboarding & profile (`/onboarding`, `/profile`)
-Complete the guided onboarding interview, or configure the 5-tab **Profile & Policy Hub** (`/profile`): demographics, family dependents, career and retirement milestones, financial goals, risk tolerance, target allocation bands, liabilities, and policy guardrails. This atomically persists your active Investment Policy Statement (IPS), Liabilities snapshot, and User Profile.
-
-### Day to day: checking in (`/dashboard`, `/portfolio`, `/spending`, `/documents`)
-- **Dashboard (`/`)**: Watch real-time agent planning, with a live progress checklist for each analysis stage (discovering skills, analyzing, reviewing), alongside net worth summaries and asset allocations.
-- **Portfolio & Drift (`/portfolio`)**: Inspect current holdings alongside the live **Portfolio Drift Report**, comparing current allocations against your IPS target bands.
-- **Spending Analysis (`/spending`)**: Review 30-day income, outflows, savings rate, reserve months, and dual-condition anomaly detections against Chase transaction history.
-- **Document Ingestion (`/documents`)**: Upload bank transaction CSVs (streamed directly into BigQuery with deduplication) and holdings/liabilities JSON snapshots into Firestore.
-
-### When it wants to act: approving a trade (`<ApprovalCard />`)
-If rebalancing or an investment trade is warranted:
-1. **Action Drafting** drafts a specific trade proposal (`ProposedAction`).
-2. **Reviewer & Critic** independently verifies the trade against your active IPS, holdings, and concentration limits, generating an itemized Policy Safety Checklist (`ReviewerVerdict`).
-3. **Human-in-the-Loop Gate** presents an interactive card in the conversational UI where you can inspect rule results, edit trade quantities or rationales, and approve or reject before execution via Alpaca's paper trading API.
-
-## Learn more
-
-- **Component Documentation**:
-  - [`orchestrator/README.md`](orchestrator/README.md): Python ADK root planner & dynamic planning workflow
-  - [`frontend/README.md`](frontend/README.md): Standalone Vue 3 + TypeScript SPA & Go backend host
-  - [`pkg/README.md`](pkg/README.md): Shared Go packages (contracts, Firestore repository, BigQuery runner)
-  - [`scripts/README.md`](scripts/README.md): Provisioning, deployment, data loading, and admin scripts
-- **Specifications & Architecture**: see [`docs/spec/`](docs/spec/) and [`docs/adr/`](docs/adr/).
-- **Contributor / Coding-Agent Instructions**: see [`AGENTS.md`](AGENTS.md).
-
-## Status
-
-Foundation, orchestrator skills, Go backend server, and standalone Vue 3 frontend implemented. See [`docs/adr/`](docs/adr/) for the current state of each major decision.
-
-## Contributing
-
-Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for details on how to
-contribute to this project.
-
-## Support
-
-This demo is *NOT* endorsed by Google or Google Cloud. The repo is
-intended for educational/hobbyist use only.
-
-## License
-
-This project is licensed under the terms of the [LICENSE](./LICENSE) file.
+```text
+ ┌─────────────────────────────────────────────────────────┐
+ │               Vue 3 + TypeScript Frontend               │
+ │    (Dashboard, Portfolio & Drift, Spending, Ingestion)  │
+ └────────────────────────────┬────────────────────────────┘
+                              │ HTTP / JSON
+ ┌────────────────────────────▼────────────────────────────┐
+ │                     Go Backend Host                     │
+ │          (Static Asset Serving & API Gateway)           │
+ └─────────────┬─────────────────────────────┬─────────────┘
+               │                             │
+    State & Ingestion                 Agent Dispatch
+               │                             │
+ ┌─────────────▼─────────────┐ ┌─────────────▼─────────────┐
+ │    Google Cloud Store     │ │     Python Orchestrator   │
+ │ ───────────────────────── │ │  (Gemini Enterprise ADK)  │
+ │ • Firestore: IPS, State   │ │ ───────────────────────── │
+ │ • BigQuery: Transactions  │ │ • Dynamic Skill Registry  │
+ └───────────────────────────┘ │ • Reviewer / Critic Gate  │
+                               └─────────────┬─────────────┘
+                                             │ Paper Orders
+                               ┌─────────────▼─────────────┐
+                               │   Alpaca API (Sandbox)    │
+                               └───────────────────────────┘
+```
