@@ -77,7 +77,7 @@ setup-agent-engine:
 	./scripts/setup_agent_engine.sh "$(GOOGLE_CLOUD_PROJECT)" "$(GOOGLE_CLOUD_LOCATION)"
 
 setup-model-armor:
-	./infra/setup_model_armor.sh "$(GOOGLE_CLOUD_PROJECT)"
+	./scripts/setup_model_armor.sh "$(GOOGLE_CLOUD_PROJECT)"
 
 setup-all:
 	./scripts/setup_all.sh "$(GOOGLE_CLOUD_PROJECT)" "$(GOOGLE_CLOUD_LOCATION)"

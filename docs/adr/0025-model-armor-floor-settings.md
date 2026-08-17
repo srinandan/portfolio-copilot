@@ -12,8 +12,8 @@ To protect the agent execution environment against prompt injection, jailbreaks,
 
 ## Decision
 
-1. **Automated Floor Settings Provisioning (`infra/setup_model_armor.sh` & `infra/model_armor_floor_settings.py`):**
-   - Provide an automated, idempotent provisioning script in `infra/setup_model_armor.sh` and Python manager `infra/model_armor_floor_settings.py`.
+1. **Automated Floor Settings Provisioning (`scripts/setup_model_armor.sh` & `scripts/model_armor_floor_settings.py`):**
+   - Provide an automated, idempotent provisioning script in `scripts/setup_model_armor.sh` and Python manager `scripts/model_armor_floor_settings.py`.
    - Enabled by default (`ENABLE_MODEL_ARMOR=true`) in end-to-end infrastructure setup (`scripts/setup_all.sh` and `make setup-model-armor`).
    - Provide user options to enable/disable enforcement (`--enable` / `--disable`) and select enforcement modes (`INSPECT_ONLY` or `INSPECT_AND_BLOCK`).
 

@@ -2,9 +2,9 @@ import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-# Add infra directory to sys.path
-infra_dir = Path(__file__).resolve().parent.parent.parent / "infra"
-sys.path.insert(0, str(infra_dir))
+# Add scripts directory to sys.path
+scripts_dir = Path(__file__).resolve().parent.parent.parent / "scripts"
+sys.path.insert(0, str(scripts_dir))
 
 import model_armor_floor_settings
 

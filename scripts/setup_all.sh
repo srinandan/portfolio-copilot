@@ -40,7 +40,7 @@ bash "$DIR/setup_agent_engine.sh" "$PROJECT_ID" "$REGION"
 
 echo "--- 6. Configuring Model Armor Floor Settings ---"
 ENABLE_MODEL_ARMOR=${ENABLE_MODEL_ARMOR:-true}
-bash "$DIR/../infra/setup_model_armor.sh" "$PROJECT_ID" "$ENABLE_MODEL_ARMOR"
+bash "$DIR/setup_model_armor.sh" "$PROJECT_ID" "$ENABLE_MODEL_ARMOR"
 
 echo "--- 7. Registering Agent Skills ---"
 bash "$DIR/register_all_skills.sh" "$PROJECT_ID" "global"
