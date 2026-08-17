@@ -99,6 +99,8 @@ state = ServerState()
 async def _lifespan(_app: FastAPI):
     from .data.bigquery_mcp import (
         get_bigquery_mcp_toolset_from_registry,
+    )
+    from .data.bigquery_mcp import (
         list_available_mcp_tools as list_available_bq_mcp_tools,
     )
     from .data.firestore_mcp import (

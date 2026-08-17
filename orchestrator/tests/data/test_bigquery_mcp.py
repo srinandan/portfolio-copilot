@@ -494,7 +494,9 @@ def test_bigquery_mcp_client_execute_query():
     ):
         rows = client.execute_query(
             "SELECT * FROM checking_transactions WHERE user_id = @user_id",
-            query_parameters=[{"name": "user_id", "parameterType": {"type": "STRING"}, "parameterValue": {"value": "u1"}}],
+            query_parameters=[
+                {"name": "user_id", "parameterType": {"type": "STRING"}, "parameterValue": {"value": "u1"}}
+            ],
             maximum_bytes_billed=10485760,
         )
         assert rows == [{"total_spend": 120.50}]
@@ -689,4 +691,3 @@ def test_bigquery_mcp_client_tool_errors_and_invalid_json():
         assert client.get_table_schema("dataset1", "table1") == {}
         assert client.execute_query("SELECT 1") == []
         assert client.explain_query("SELECT 1") == {}
-

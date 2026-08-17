@@ -135,9 +135,7 @@ class BigQueryMCPClient:
         self.credentials = credentials
         self.timeout = timeout
 
-    def _call_tool(
-        self, tool_name: str, arguments: Dict[str, Any], check_error: bool = True
-    ) -> Dict[str, Any]:
+    def _call_tool(self, tool_name: str, arguments: Dict[str, Any], check_error: bool = True) -> Dict[str, Any]:
         """Calls a tool on the BigQuery Remote MCP Server via JSON-RPC 2.0."""
         from opentelemetry import trace as ot_trace
 
@@ -182,7 +180,9 @@ class BigQueryMCPClient:
         result = self._call_tool("list_datasets", {"projectId": target_project}, check_error=False)
         if result.get("isError"):
             content = result.get("content", [])
-            err_msg = content[0].get("text", "") if content and isinstance(content, list) and "text" in content[0] else ""
+            err_msg = (
+                content[0].get("text", "") if content and isinstance(content, list) and "text" in content[0] else ""
+            )
             if "not found" in err_msg.lower():
                 return []
             raise RuntimeError(f"MCP tool list_datasets failed: {err_msg}")
@@ -216,7 +216,9 @@ class BigQueryMCPClient:
         )
         if result.get("isError"):
             content = result.get("content", [])
-            err_msg = content[0].get("text", "") if content and isinstance(content, list) and "text" in content[0] else ""
+            err_msg = (
+                content[0].get("text", "") if content and isinstance(content, list) and "text" in content[0] else ""
+            )
             if "not found" in err_msg.lower():
                 return []
             raise RuntimeError(f"MCP tool list_tables failed: {err_msg}")
@@ -240,9 +242,7 @@ class BigQueryMCPClient:
                 pass
         return []
 
-    def get_table_schema(
-        self, dataset_id: str, table_id: str, project_id: Optional[str] = None
-    ) -> Dict[str, Any]:
+    def get_table_schema(self, dataset_id: str, table_id: str, project_id: Optional[str] = None) -> Dict[str, Any]:
         """Fetches schema information (columns, types, descriptions) for a table."""
         target_project = project_id or self.project
         result = self._call_tool(
@@ -252,7 +252,9 @@ class BigQueryMCPClient:
         )
         if result.get("isError"):
             content = result.get("content", [])
-            err_msg = content[0].get("text", "") if content and isinstance(content, list) and "text" in content[0] else ""
+            err_msg = (
+                content[0].get("text", "") if content and isinstance(content, list) and "text" in content[0] else ""
+            )
             if "not found" in err_msg.lower():
                 return {}
             raise RuntimeError(f"MCP tool get_table_schema failed: {err_msg}")

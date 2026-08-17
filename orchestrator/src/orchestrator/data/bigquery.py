@@ -307,9 +307,7 @@ class BigQueryClient:
             sql_query,
             extra={"event": "bigquery_nl_sql_mcp_start", "user_id": user_id, "query": sql_query},
         )
-        query_params = [
-            {"name": "user_id", "parameterType": {"type": "STRING"}, "parameterValue": {"value": user_id}}
-        ]
+        query_params = [{"name": "user_id", "parameterType": {"type": "STRING"}, "parameterValue": {"value": user_id}}]
         assert self._mcp_client is not None
         rows = self._mcp_client.execute_query(
             query=sql_query,
