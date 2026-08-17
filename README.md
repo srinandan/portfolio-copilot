@@ -55,3 +55,54 @@ Portfolio Copilot is an experimental personal finance assistant built on Google 
 
 For full architectural diagrams, component contracts, and design trade-offs, see the [Detailed Architecture Specification](docs/spec/02-architecture.md) and [Architecture Decision Records (ADRs)](docs/adr/).
 
+## Get started
+
+Setup instructions: [`install/`](install/).
+
+## How to use it
+
+Portfolio Copilot provides a standalone Vue 3 + TypeScript web interface connected to the backend server and Python orchestrator:
+
+### First time: onboarding & profile (`/onboarding`, `/profile`)
+Complete the guided onboarding interview, or configure the 5-tab **Profile & Policy Hub** (`/profile`): demographics, family dependents, career and retirement milestones, financial goals, risk tolerance, target allocation bands, liabilities, and policy guardrails. This atomically persists your active Investment Policy Statement (IPS), Liabilities snapshot, and User Profile.
+
+### Day to day: checking in (`/dashboard`, `/portfolio`, `/spending`, `/documents`)
+- **Dashboard (`/`)**: Watch real-time agent planning, with a live progress checklist for each analysis stage (discovering skills, analyzing, reviewing), alongside net worth summaries and asset allocations.
+- **Portfolio & Drift (`/portfolio`)**: Inspect current holdings alongside the live **Portfolio Drift Report**, comparing current allocations against your IPS target bands.
+- **Spending Analysis (`/spending`)**: Review 30-day income, outflows, savings rate, reserve months, and dual-condition anomaly detections against Chase transaction history.
+- **Document Ingestion (`/documents`)**: Upload bank transaction CSVs (streamed directly into BigQuery with deduplication) and holdings/liabilities JSON snapshots into Firestore.
+
+### When it wants to act: approving a trade (`<ApprovalCard />`)
+If rebalancing or an investment trade is warranted:
+1. **Action Drafting** drafts a specific trade proposal (`ProposedAction`).
+2. **Reviewer & Critic** independently verifies the trade against your active IPS, holdings, and concentration limits, generating an itemized Policy Safety Checklist (`ReviewerVerdict`).
+3. **Human-in-the-Loop Gate** presents an interactive card in the conversational UI where you can inspect rule results, edit trade quantities or rationales, and approve or reject before execution via Alpaca's paper trading API.
+
+## Learn more
+
+- **Component Documentation**:
+  - [`orchestrator/README.md`](orchestrator/README.md): Python ADK root planner & dynamic planning workflow
+  - [`frontend/README.md`](frontend/README.md): Standalone Vue 3 + TypeScript SPA & Go backend host
+  - [`pkg/README.md`](pkg/README.md): Shared Go packages (contracts, Firestore repository, BigQuery runner)
+  - [`scripts/README.md`](scripts/README.md): Provisioning, deployment, data loading, and admin scripts
+- **Specifications & Architecture**: see [`docs/spec/`](docs/spec/) and [`docs/adr/`](docs/adr/).
+- **Contributor / Coding-Agent Instructions**: see [`AGENTS.md`](AGENTS.md).
+
+## Status
+
+Foundation, orchestrator skills, Go backend server, and standalone Vue 3 frontend implemented. See [`docs/adr/`](docs/adr/) for the current state of each major decision.
+
+## Contributing
+
+Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for details on how to
+contribute to this project.
+
+## Support
+
+This demo is *NOT* endorsed by Google or Google Cloud. The repo is
+intended for educational/hobbyist use only.
+
+## License
+
+This project is licensed under the terms of the [LICENSE](./LICENSE) file.
+
