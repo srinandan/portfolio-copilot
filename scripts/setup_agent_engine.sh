@@ -77,6 +77,11 @@ if [ -n "$PROJECT_NUMBER" ]; then
     --role="roles/bigquery.user" \
     --condition=None \
     --quiet || echo "Note: BigQuery user IAM binding on principalSet skipped or already configured"
+  gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+    --member="$PRINCIPAL_SET" \
+    --role="roles/bigquery.jobUser" \
+    --condition=None \
+    --quiet || echo "Note: BigQuery jobUser IAM binding on principalSet skipped or already configured"
 
   # Secret Manager: Alpaca API key & MANAGED_AGENT_ID
   gcloud projects add-iam-policy-binding "$PROJECT_ID" \
