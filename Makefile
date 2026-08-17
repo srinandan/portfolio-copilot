@@ -13,7 +13,7 @@ _COMMIT_SHA ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo local)
 # empty --region.
 export GOOGLE_CLOUD_PROJECT GOOGLE_CLOUD_LOCATION AGENT_REGISTRY_LOCATION _COMMIT_SHA
 
-.PHONY: help install deploy deploy-orchestrator deploy-frontend deploy-managed-agent register-skills setup-agent-engine setup-all load-testdata local-orchestrator local-frontend local-server local-ui test test-orchestrator test-go test-frontend lint clean
+.PHONY: help install deploy deploy-orchestrator deploy-frontend deploy-managed-agent register-skills setup-agent-engine setup-model-armor setup-all load-testdata local-orchestrator local-frontend local-server local-ui test test-orchestrator test-go test-frontend lint clean
 
 help:
 	@echo "Portfolio Copilot Makefile"
@@ -37,6 +37,7 @@ help:
 	@echo ""
 	@echo "Infra Provisioning & Test Data:"
 	@echo "  make setup-agent-engine       - Setup Agent Runtime IAM, APIs, and permissions"
+	@echo "  make setup-model-armor        - Configure Google Cloud Model Armor floor settings"
 	@echo "  make setup-all                - End-to-end infra & services setup (setup_all.sh)"
 	@echo "  make load-testdata            - Seed BigQuery and Firestore with canonical test data"
 	@echo ""
@@ -74,6 +75,9 @@ register-skills:
 
 setup-agent-engine:
 	./scripts/setup_agent_engine.sh "$(GOOGLE_CLOUD_PROJECT)" "$(GOOGLE_CLOUD_LOCATION)"
+
+setup-model-armor:
+	./infra/setup_model_armor.sh "$(GOOGLE_CLOUD_PROJECT)"
 
 setup-all:
 	./scripts/setup_all.sh "$(GOOGLE_CLOUD_PROJECT)" "$(GOOGLE_CLOUD_LOCATION)"

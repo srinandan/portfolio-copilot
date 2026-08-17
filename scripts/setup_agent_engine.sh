@@ -12,8 +12,8 @@ fi
 
 echo "Setting up Agent Engine in project $PROJECT_ID ($REGION)..."
 
-# Enable Agent Platform / AI Platform API, Telemetry API, Cloud Trace API, and Logging API
-gcloud services enable aiplatform.googleapis.com telemetry.googleapis.com cloudtrace.googleapis.com logging.googleapis.com --project="$PROJECT_ID"
+# Enable Agent Platform / AI Platform API, Telemetry API, Cloud Trace API, Logging API, and Model Armor API
+gcloud services enable aiplatform.googleapis.com telemetry.googleapis.com cloudtrace.googleapis.com logging.googleapis.com modelarmor.googleapis.com --project="$PROJECT_ID"
 
 # 1. Grant Secret Manager access to Agent Platform Service Agent
 # Per Agent Runtime docs: secrets used as environment variables are fetched during deployment

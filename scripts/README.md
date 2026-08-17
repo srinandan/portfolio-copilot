@@ -16,7 +16,8 @@ This directory contains the operational, provisioning, deployment, data loading,
 | [`setup_firestore.sh`](setup_firestore.sh) | Provisions the default Firestore database in Native mode. | `./scripts/setup_firestore.sh <PROJECT_ID> <REGION>` |
 | [`setup_cloudrun.sh`](setup_cloudrun.sh) | Deploys the frontend service to Cloud Run with dedicated service account (`portfolio-copilot-frontend-sa`). | `./scripts/setup_cloudrun.sh <PROJECT_ID> <REGION>` |
 | [`setup_managed_agent.sh`](setup_managed_agent.sh) | Provisions the worker Managed Agent (`portfolio-copilot-worker`) and stores its ID in Secret Manager. | `./scripts/setup_managed_agent.sh <PROJECT_ID> <REGION>` |
-| [`setup_agent_engine.sh`](setup_agent_engine.sh) | Sets up Agent Runtime IAM roles and Agent Identity permissions. | `./scripts/setup_agent_engine.sh <PROJECT_ID> <REGION>` |
+| [`setup_agent_engine.sh`](setup_agent_engine.sh) | Sets up Agent Runtime IAM roles, APIs (including Model Armor), and Agent Identity permissions. | `./scripts/setup_agent_engine.sh <PROJECT_ID> <REGION>` |
+| [`setup_model_armor.sh`](setup_model_armor.sh) | Configures project-wide Model Armor Floor Settings for MCP tool sanitization, RAI filters, and prompt injection defense. | `./scripts/setup_model_armor.sh [PROJECT_ID] [ENABLE_MODEL_ARMOR] [ENFORCEMENT_MODE]` |
 | [`setup_cloudbuild_triggers.sh`](setup_cloudbuild_triggers.sh) | Configures Developer Connect GitHub connection and tag-triggered Cloud Build pipelines for automatic releases. | `./scripts/setup_cloudbuild_triggers.sh <PROJECT_ID> <REGION>` |
 
 ---
