@@ -114,11 +114,51 @@ async def list_available_mcp_tools(toolset: Any) -> List[str]:
     return tool_names
 
 
+def _decode_bigquery_mcp_rows(data: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Decodes BigQuery REST-format rows (f: [{v: ...}]) into a list of column-name-keyed dicts."""
+    schema_fields = data.get("schema", {}).get("fields", [])
+    raw_rows = data.get("rows", [])
+    if not raw_rows:
+        return []
+
+    # If raw_rows is already list of dicts with normal keys (e.g. from mock), return as is
+    if isinstance(raw_rows[0], dict) and "f" not in raw_rows[0]:
+        return raw_rows
+
+    col_names = [f.get("name", f"col_{i}") for i, f in enumerate(schema_fields)]
+    col_types = [f.get("type", "STRING").upper() for f in schema_fields]
+
+    decoded = []
+    for r in raw_rows:
+        row_dict: Dict[str, Any] = {}
+        f_list = r.get("f", []) if isinstance(r, dict) else []
+        for i, col in enumerate(col_names):
+            if i < len(f_list):
+                val = f_list[i].get("v") if isinstance(f_list[i], dict) else f_list[i]
+                if val is not None and i < len(col_types):
+                    ctype = col_types[i]
+                    if ctype in ("INTEGER", "INT64"):
+                        try:
+                            val = int(val)
+                        except (ValueError, TypeError):
+                            pass
+                    elif ctype in ("FLOAT", "FLOAT64", "NUMERIC", "BIGNUMERIC"):
+                        try:
+                            val = float(val)
+                        except (ValueError, TypeError):
+                            pass
+                    elif ctype in ("BOOLEAN", "BOOL"):
+                        val = str(val).lower() == "true"
+                row_dict[col] = val
+        decoded.append(row_dict)
+    return decoded
+
+
 class BigQueryMCPClient:
     """Synchronous HTTP client for BigQuery Remote Model Context Protocol (MCP) Server.
 
-    Executes JSON-RPC 2.0 tool calls (list_datasets, list_tables, get_table_schema,
-    execute_query, explain_query) over Streamable HTTP against https://bigquery.googleapis.com/mcp.
+    Executes JSON-RPC 2.0 tool calls (list_dataset_ids, list_table_ids, get_table_info,
+    execute_sql_readonly) over Streamable HTTP against https://bigquery.googleapis.com/mcp.
     """
 
     def __init__(
@@ -177,7 +217,7 @@ class BigQueryMCPClient:
     def list_datasets(self, project_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """Lists BigQuery datasets in the GCP project."""
         target_project = project_id or self.project
-        result = self._call_tool("list_datasets", {"projectId": target_project}, check_error=False)
+        result = self._call_tool("list_dataset_ids", {"projectId": target_project}, check_error=False)
         if result.get("isError"):
             content = result.get("content", [])
             err_msg = (
@@ -185,32 +225,44 @@ class BigQueryMCPClient:
             )
             if "not found" in err_msg.lower():
                 return []
-            raise RuntimeError(f"MCP tool list_datasets failed: {err_msg}")
+            raise RuntimeError(f"MCP tool list_dataset_ids failed: {err_msg}")
 
+        datasets = []
         if "structuredContent" in result:
             sc = result["structuredContent"]
             if isinstance(sc, list):
-                return sc
-            if isinstance(sc, dict) and "datasets" in sc:
-                return sc["datasets"]
+                datasets = sc
+            elif isinstance(sc, dict) and "datasets" in sc:
+                datasets = sc["datasets"]
+        else:
+            content = result.get("content", [])
+            if content and isinstance(content, list) and "text" in content[0]:
+                try:
+                    parsed = json.loads(content[0]["text"])
+                    if isinstance(parsed, list):
+                        datasets = parsed
+                    elif isinstance(parsed, dict) and "datasets" in parsed:
+                        datasets = parsed["datasets"]
+                except Exception:
+                    pass
 
-        content = result.get("content", [])
-        if content and isinstance(content, list) and "text" in content[0]:
-            try:
-                parsed = json.loads(content[0]["text"])
-                if isinstance(parsed, list):
-                    return parsed
-                if isinstance(parsed, dict) and "datasets" in parsed:
-                    return parsed["datasets"]
-            except Exception:
-                pass
-        return []
+        normalized = []
+        for d in datasets:
+            if isinstance(d, dict):
+                d_id = d.get("id", "")
+                dataset_name = d_id.split(":")[-1] if ":" in d_id else d_id
+                item = dict(d)
+                item["datasetId"] = item.get("datasetId") or dataset_name
+                normalized.append(item)
+            elif isinstance(d, str):
+                normalized.append({"datasetId": d, "id": d})
+        return normalized
 
     def list_tables(self, dataset_id: str, project_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """Lists tables in a specified BigQuery dataset."""
         target_project = project_id or self.project
         result = self._call_tool(
-            "list_tables",
+            "list_table_ids",
             {"projectId": target_project, "datasetId": dataset_id},
             check_error=False,
         )
@@ -221,32 +273,44 @@ class BigQueryMCPClient:
             )
             if "not found" in err_msg.lower():
                 return []
-            raise RuntimeError(f"MCP tool list_tables failed: {err_msg}")
+            raise RuntimeError(f"MCP tool list_table_ids failed: {err_msg}")
 
+        tables = []
         if "structuredContent" in result:
             sc = result["structuredContent"]
             if isinstance(sc, list):
-                return sc
-            if isinstance(sc, dict) and "tables" in sc:
-                return sc["tables"]
+                tables = sc
+            elif isinstance(sc, dict) and "tables" in sc:
+                tables = sc["tables"]
+        else:
+            content = result.get("content", [])
+            if content and isinstance(content, list) and "text" in content[0]:
+                try:
+                    parsed = json.loads(content[0]["text"])
+                    if isinstance(parsed, list):
+                        tables = parsed
+                    elif isinstance(parsed, dict) and "tables" in parsed:
+                        tables = parsed["tables"]
+                except Exception:
+                    pass
 
-        content = result.get("content", [])
-        if content and isinstance(content, list) and "text" in content[0]:
-            try:
-                parsed = json.loads(content[0]["text"])
-                if isinstance(parsed, list):
-                    return parsed
-                if isinstance(parsed, dict) and "tables" in parsed:
-                    return parsed["tables"]
-            except Exception:
-                pass
-        return []
+        normalized = []
+        for t in tables:
+            if isinstance(t, dict):
+                t_id = t.get("id", "")
+                table_name = t_id.split(".")[-1] if "." in t_id else t_id
+                item = dict(t)
+                item["tableId"] = item.get("tableId") or table_name
+                normalized.append(item)
+            elif isinstance(t, str):
+                normalized.append({"tableId": t, "id": t})
+        return normalized
 
     def get_table_schema(self, dataset_id: str, table_id: str, project_id: Optional[str] = None) -> Dict[str, Any]:
         """Fetches schema information (columns, types, descriptions) for a table."""
         target_project = project_id or self.project
         result = self._call_tool(
-            "get_table_schema",
+            "get_table_info",
             {"projectId": target_project, "datasetId": dataset_id, "tableId": table_id},
             check_error=False,
         )
@@ -257,7 +321,7 @@ class BigQueryMCPClient:
             )
             if "not found" in err_msg.lower():
                 return {}
-            raise RuntimeError(f"MCP tool get_table_schema failed: {err_msg}")
+            raise RuntimeError(f"MCP tool get_table_info failed: {err_msg}")
 
         if "structuredContent" in result:
             sc = result["structuredContent"]
@@ -282,43 +346,59 @@ class BigQueryMCPClient:
         maximum_bytes_billed: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
         """Executes a read-only SQL query via BigQuery Remote MCP Server."""
+        import re
+
         target_project = project_id or self.project
+        resolved_query = query
+        if query_parameters:
+            for p in query_parameters:
+                p_name = p.get("name")
+                p_val = p.get("parameterValue", {}).get("value")
+                if p_name and p_val is not None:
+                    p_type = p.get("parameterType", {}).get("type", "STRING")
+                    if p_type == "STRING":
+                        resolved_query = re.sub(rf"@{p_name}\b", f"'{p_val}'", resolved_query)
+                    else:
+                        resolved_query = re.sub(rf"@{p_name}\b", str(p_val), resolved_query)
+
         args: Dict[str, Any] = {
-            "query": query,
+            "query": resolved_query,
             "projectId": target_project,
         }
-        if query_parameters is not None:
-            args["queryParameters"] = query_parameters
-        if maximum_bytes_billed is not None:
-            args["maximumBytesBilled"] = str(maximum_bytes_billed)
 
-        result = self._call_tool("execute_query", args, check_error=True)
+        result = self._call_tool("execute_sql_readonly", args, check_error=True)
 
+        payload_dict = None
         if "structuredContent" in result:
             sc = result["structuredContent"]
             if isinstance(sc, list):
                 return sc
-            if isinstance(sc, dict) and "rows" in sc:
-                return sc["rows"]
+            if isinstance(sc, dict):
+                payload_dict = sc
 
-        content = result.get("content", [])
-        if content and isinstance(content, list) and "text" in content[0]:
-            try:
-                parsed = json.loads(content[0]["text"])
-                if isinstance(parsed, list):
-                    return parsed
-                if isinstance(parsed, dict) and "rows" in parsed:
-                    return parsed["rows"]
-            except Exception:
-                pass
+        if payload_dict is None:
+            content = result.get("content", [])
+            if content and isinstance(content, list) and "text" in content[0]:
+                try:
+                    parsed = json.loads(content[0]["text"])
+                    if isinstance(parsed, list):
+                        return parsed
+                    if isinstance(parsed, dict):
+                        payload_dict = parsed
+                except Exception:
+                    pass
+
+        if payload_dict is not None:
+            return _decode_bigquery_mcp_rows(payload_dict)
+
         return []
 
     def explain_query(self, query: str, project_id: Optional[str] = None) -> Dict[str, Any]:
         """Validates query syntax and returns execution plan / cost estimate."""
         target_project = project_id or self.project
         result = self._call_tool(
-            "explain_query",
-            {"query": query, "projectId": target_project},
+            "execute_sql_readonly",
+            {"query": query, "projectId": target_project, "dryRun": True},
             check_error=True,
         )
 

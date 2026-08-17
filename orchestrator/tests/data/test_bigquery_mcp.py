@@ -647,7 +647,7 @@ def test_bigquery_mcp_client_tool_errors_and_invalid_json():
         ),
         patch("httpx.Client.post", return_value=mock_err_resp),
     ):
-        with pytest.raises(RuntimeError, match="MCP tool list_datasets failed: Permission denied"):
+        with pytest.raises(RuntimeError, match="MCP tool list_dataset_ids failed: Permission denied"):
             client.list_datasets()
 
     # list_tables generic error raises
@@ -658,7 +658,7 @@ def test_bigquery_mcp_client_tool_errors_and_invalid_json():
         ),
         patch("httpx.Client.post", return_value=mock_err_resp),
     ):
-        with pytest.raises(RuntimeError, match="MCP tool list_tables failed: Permission denied"):
+        with pytest.raises(RuntimeError, match="MCP tool list_table_ids failed: Permission denied"):
             client.list_tables("dataset1")
 
     # get_table_schema generic error raises
@@ -669,7 +669,7 @@ def test_bigquery_mcp_client_tool_errors_and_invalid_json():
         ),
         patch("httpx.Client.post", return_value=mock_err_resp),
     ):
-        with pytest.raises(RuntimeError, match="MCP tool get_table_schema failed: Permission denied"):
+        with pytest.raises(RuntimeError, match="MCP tool get_table_info failed: Permission denied"):
             client.get_table_schema("dataset1", "table1")
 
     # Invalid JSON in content text
@@ -691,3 +691,40 @@ def test_bigquery_mcp_client_tool_errors_and_invalid_json():
         assert client.get_table_schema("dataset1", "table1") == {}
         assert client.execute_query("SELECT 1") == []
         assert client.explain_query("SELECT 1") == {}
+
+
+def test_decode_bigquery_mcp_rows_rest_format():
+    """Golden path: decodes BigQuery REST-format schema and rows into dicts with appropriate types."""
+    from src.orchestrator.data.bigquery_mcp import _decode_bigquery_mcp_rows
+
+    data = {
+        "schema": {
+            "fields": [
+                {"name": "user_id", "type": "STRING"},
+                {"name": "count", "type": "INTEGER"},
+                {"name": "amount", "type": "FLOAT"},
+                {"name": "active", "type": "BOOLEAN"},
+            ]
+        },
+        "rows": [
+            {"f": [{"v": "usr_1"}, {"v": "42"}, {"v": "-120.50"}, {"v": "true"}]},
+            {"f": [{"v": "usr_2"}, {"v": None}, {"v": "0.0"}, {"v": "false"}]},
+        ],
+    }
+
+    decoded = _decode_bigquery_mcp_rows(data)
+    assert len(decoded) == 2
+    assert decoded[0] == {"user_id": "usr_1", "count": 42, "amount": -120.50, "active": True}
+    assert decoded[1] == {"user_id": "usr_2", "count": None, "amount": 0.0, "active": False}
+
+
+def test_decode_bigquery_mcp_rows_empty_and_passthrough():
+    """Edge path: empty rows and direct dict passthrough."""
+    from src.orchestrator.data.bigquery_mcp import _decode_bigquery_mcp_rows
+
+    assert _decode_bigquery_mcp_rows({}) == []
+    assert _decode_bigquery_mcp_rows({"rows": []}) == []
+
+    # Direct dict passthrough
+    mock_rows = [{"user_id": "u1", "amount": 10.0}]
+    assert _decode_bigquery_mcp_rows({"rows": mock_rows}) == mock_rows
