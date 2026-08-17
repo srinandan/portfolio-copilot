@@ -36,9 +36,7 @@ async def async_main(args: argparse.Namespace) -> int:
         return 1
 
     if args.use_registry:
-        print(
-            f"Resolving Firestore MCP toolset via Agent Registry (project={args.project}, location={args.location})..."
-        )
+        print(f"Resolving Firestore MCP toolset via Agent Registry (project={args.project}, location={args.location})...")
         toolset = get_firestore_mcp_toolset_from_registry(
             project_id=args.project,
             location=args.location,

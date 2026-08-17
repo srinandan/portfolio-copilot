@@ -191,7 +191,9 @@ class FirestoreMCPClient:
         self.credentials = credentials
         self.timeout = timeout
 
-    def _call_tool(self, tool_name: str, arguments: Dict[str, Any], check_error: bool = True) -> Dict[str, Any]:
+    def _call_tool(
+        self, tool_name: str, arguments: Dict[str, Any], check_error: bool = True
+    ) -> Dict[str, Any]:
         """Calls a tool on the Firestore Remote MCP Server via JSON-RPC 2.0."""
         from opentelemetry import trace as ot_trace
 
@@ -236,9 +238,7 @@ class FirestoreMCPClient:
         result = self._call_tool("get_document", {"name": doc_name}, check_error=False)
         if result.get("isError"):
             content = result.get("content", [])
-            err_msg = (
-                content[0].get("text", "") if content and isinstance(content, list) and "text" in content[0] else ""
-            )
+            err_msg = content[0].get("text", "") if content and isinstance(content, list) and "text" in content[0] else ""
             if "not found" in err_msg.lower():
                 return None
             raise RuntimeError(f"MCP tool get_document failed: {err_msg}")
@@ -276,9 +276,7 @@ class FirestoreMCPClient:
         result = self._call_tool("list_documents", {"parent": parent, "collectionId": collection}, check_error=False)
         if result.get("isError"):
             content = result.get("content", [])
-            err_msg = (
-                content[0].get("text", "") if content and isinstance(content, list) and "text" in content[0] else ""
-            )
+            err_msg = content[0].get("text", "") if content and isinstance(content, list) and "text" in content[0] else ""
             if "not found" in err_msg.lower():
                 return []
             raise RuntimeError(f"MCP tool list_documents failed: {err_msg}")
@@ -308,9 +306,7 @@ class FirestoreMCPClient:
         result = self._call_tool("delete_document", {"name": doc_name}, check_error=False)
         if result.get("isError"):
             content = result.get("content", [])
-            err_msg = (
-                content[0].get("text", "") if content and isinstance(content, list) and "text" in content[0] else ""
-            )
+            err_msg = content[0].get("text", "") if content and isinstance(content, list) and "text" in content[0] else ""
             if "not found" in err_msg.lower():
                 return
             raise RuntimeError(f"MCP tool delete_document failed: {err_msg}")
