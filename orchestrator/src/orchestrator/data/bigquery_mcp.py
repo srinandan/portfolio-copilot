@@ -114,6 +114,58 @@ async def list_available_mcp_tools(toolset: Any) -> List[str]:
     return tool_names
 
 
+def _decode_field(field_schema: Dict[str, Any], raw_v: Any) -> Any:
+    """Recursively decodes a single BigQuery REST-format field value based on its schema."""
+    if raw_v is None:
+        return None
+    mode = str(field_schema.get("mode", "NULLABLE")).upper()
+    field_type = str(field_schema.get("type", "STRING")).upper()
+    sub_fields = field_schema.get("fields", [])
+
+    if mode == "REPEATED":
+        if not isinstance(raw_v, list):
+            return raw_v
+        scalar_schema = dict(field_schema)
+        scalar_schema["mode"] = "NULLABLE"
+        return [
+            _decode_field(scalar_schema, item.get("v") if isinstance(item, dict) and "v" in item else item)
+            for item in raw_v
+        ]
+
+    if field_type in ("RECORD", "STRUCT") and sub_fields:
+        if isinstance(raw_v, dict) and "f" in raw_v:
+            f_list = raw_v.get("f", [])
+            record_dict = {}
+            for j, sub_f in enumerate(sub_fields):
+                sub_name = sub_f.get("name", f"col_{j}")
+                sub_val = (
+                    f_list[j].get("v")
+                    if j < len(f_list) and isinstance(f_list[j], dict)
+                    else (f_list[j] if j < len(f_list) else None)
+                )
+                record_dict[sub_name] = _decode_field(sub_f, sub_val)
+            return record_dict
+        elif isinstance(raw_v, dict):
+            return raw_v
+
+    if field_type in ("INTEGER", "INT64"):
+        try:
+            return int(raw_v)
+        except (ValueError, TypeError):
+            return raw_v
+    elif field_type in ("FLOAT", "FLOAT64", "NUMERIC", "BIGNUMERIC"):
+        try:
+            return float(raw_v)
+        except (ValueError, TypeError):
+            return raw_v
+    elif field_type in ("BOOLEAN", "BOOL"):
+        if isinstance(raw_v, bool):
+            return raw_v
+        return str(raw_v).lower() == "true"
+
+    return raw_v
+
+
 def _decode_bigquery_mcp_rows(data: Dict[str, Any]) -> List[Dict[str, Any]]:
     """Decodes BigQuery REST-format rows (f: [{v: ...}]) into a list of column-name-keyed dicts."""
     schema_fields = data.get("schema", {}).get("fields", [])
@@ -125,31 +177,17 @@ def _decode_bigquery_mcp_rows(data: Dict[str, Any]) -> List[Dict[str, Any]]:
     if isinstance(raw_rows[0], dict) and "f" not in raw_rows[0]:
         return raw_rows
 
-    col_names = [f.get("name", f"col_{i}") for i, f in enumerate(schema_fields)]
-    col_types = [f.get("type", "STRING").upper() for f in schema_fields]
-
     decoded = []
     for r in raw_rows:
         row_dict: Dict[str, Any] = {}
         f_list = r.get("f", []) if isinstance(r, dict) else []
-        for i, col in enumerate(col_names):
+        for i, field_schema in enumerate(schema_fields):
+            col = field_schema.get("name", f"col_{i}")
             if i < len(f_list):
                 val = f_list[i].get("v") if isinstance(f_list[i], dict) else f_list[i]
-                if val is not None and i < len(col_types):
-                    ctype = col_types[i]
-                    if ctype in ("INTEGER", "INT64"):
-                        try:
-                            val = int(val)
-                        except (ValueError, TypeError):
-                            pass
-                    elif ctype in ("FLOAT", "FLOAT64", "NUMERIC", "BIGNUMERIC"):
-                        try:
-                            val = float(val)
-                        except (ValueError, TypeError):
-                            pass
-                    elif ctype in ("BOOLEAN", "BOOL"):
-                        val = str(val).lower() == "true"
-                row_dict[col] = val
+                row_dict[col] = _decode_field(field_schema, val)
+            else:
+                row_dict[col] = None
         decoded.append(row_dict)
     return decoded
 

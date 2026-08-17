@@ -728,3 +728,57 @@ def test_decode_bigquery_mcp_rows_empty_and_passthrough():
     # Direct dict passthrough
     mock_rows = [{"user_id": "u1", "amount": 10.0}]
     assert _decode_bigquery_mcp_rows({"rows": mock_rows}) == mock_rows
+
+
+def test_decode_bigquery_mcp_rows_nested_records():
+    """Golden path: decodes nested STRUCT/RECORD and REPEATED array fields."""
+    from src.orchestrator.data.bigquery_mcp import _decode_bigquery_mcp_rows
+
+    data = {
+        "schema": {
+            "fields": [
+                {"name": "total_income", "type": "FLOAT"},
+                {"name": "total_outflow", "type": "FLOAT"},
+                {
+                    "name": "category_totals",
+                    "type": "RECORD",
+                    "mode": "REPEATED",
+                    "fields": [
+                        {"name": "normalized_category", "type": "STRING"},
+                        {"name": "current_month_spend", "type": "FLOAT"},
+                        {"name": "trailing_3mo_avg", "type": "FLOAT"},
+                    ],
+                },
+            ]
+        },
+        "rows": [
+            {
+                "f": [
+                    {"v": "18000.0"},
+                    {"v": "8895.5"},
+                    {
+                        "v": [
+                            {"v": {"f": [{"v": "dining"}, {"v": "650.0"}, {"v": "150.0"}]}},
+                            {"v": {"f": [{"v": "housing"}, {"v": "2000.0"}, {"v": "2000.0"}]}},
+                        ]
+                    },
+                ]
+            }
+        ],
+    }
+
+    decoded = _decode_bigquery_mcp_rows(data)
+    assert len(decoded) == 1
+    assert decoded[0]["total_income"] == 18000.0
+    assert decoded[0]["total_outflow"] == 8895.5
+    assert len(decoded[0]["category_totals"]) == 2
+    assert decoded[0]["category_totals"][0] == {
+        "normalized_category": "dining",
+        "current_month_spend": 650.0,
+        "trailing_3mo_avg": 150.0,
+    }
+    assert decoded[0]["category_totals"][1] == {
+        "normalized_category": "housing",
+        "current_month_spend": 2000.0,
+        "trailing_3mo_avg": 2000.0,
+    }

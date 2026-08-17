@@ -22,10 +22,8 @@ We evaluate where and how to adopt the BigQuery Remote MCP Server without sacrif
    - **Sandbox Credential Isolation:** Under [ADR-0014](0014-managed-agents-subagent-execution-layer.md) and [ADR-0015](0015-real-user-data-antigravity-sandbox.md), the worker sandbox runs in an isolated environment without production GCP database credentials or query execution tokens.
    - **Deterministic Preloading:** Under [ADR-0016](0016-deterministic-primitives-in-orchestrator.md), mathematical calculations and baseline spending aggregates happen on the orchestrator plane. The worker Managed Agent acts solely as a reasoner over structured `INPUT DATA`.
 
-3. **Native Python SDK Retained for Deterministic Baseline Preloading:**
-   The Python orchestrator retains the native Google Cloud Python SDK (`google-cloud-bigquery`) for:
-   - **Single-Roundtrip Multi-Metric Queries:** `get_spending_snapshot()`, `get_monthly_spending_totals()`, and `get_trailing_income_and_outflow()` use optimized CTEs combining income, outflow, and category averages into a single job.
-   - **Natural Language SQL Execution with Fallback:** Ad-hoc conversational queries in `validate_and_execute_nl_sql` route via `BigQueryMCPClient.execute_query` with fallback to direct native SDK execution for operational resilience.
+3. **BigQuery Remote MCP Primary for All Orchestrator Queries with Native SDK Fallback:**
+   The Python orchestrator routes spending aggregation queries (`get_spending_snapshot()`, `get_monthly_spending_totals()`, and `get_trailing_income_and_outflow()`) as well as ad-hoc conversational queries (`validate_and_execute_nl_sql()`) through `BigQueryMCPClient.execute_query` (`execute_sql_readonly` tool on `https://bigquery.googleapis.com/mcp`). The native Google Cloud Python SDK (`google-cloud-bigquery`) is retained as an operational fallback for offline/emulator testing and resilience.
 
 4. **Native Go SDK Retained for Web Server & REST Endpoints:**
    The Go web server and shared packages (`pkg/bigquery`) strictly continue using the native Go BigQuery SDK (`cloud.google.com/go/bigquery`). MCP is an LLM reasoning protocol; standard REST handlers require compile-time type safety, static parameterization, and high throughput.
