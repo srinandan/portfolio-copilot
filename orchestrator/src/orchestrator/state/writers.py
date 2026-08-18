@@ -263,6 +263,49 @@ def emit_skill_invoked_audit(
         raise RuntimeError(f"Audit log write failed for skill invocation: {e}") from e
 
 
+def emit_plan_constructed_audit(
+    prompt_hash: str,
+    candidates: list,
+    leaves: list,
+    resolved: list,
+    layers: list,
+    policy_applied: list,
+    db_client: Optional[FirestoreClient] = None,
+) -> None:
+    """Emits a PLAN_CONSTRUCTED audit entry describing how the plan was built
+    (ADR-0022 §6): which candidates were retrieved, which leaves intent selected,
+    what the resolver expanded to, the scheduled layers, and which policy rules
+    fired.
+
+    Best-effort — a plan trace is observability, and the planner must stay
+    resilient (§6 fallback), so a failed write is logged, not raised. This is the
+    deliberate exception to the fail-closed compliance events in this module.
+    """
+    detail = (
+        f"prompt={prompt_hash} candidates={sorted(candidates)} leaves={sorted(leaves)} "
+        f"resolved={sorted(resolved)} layers={[list(layer) for layer in layers]} "
+        f"policy_applied={list(policy_applied)}"
+    )
+    audit_entry = AuditLogEntry(
+        log_id=str(uuid.uuid4()),
+        event_type=EventType.PLAN_CONSTRUCTED,
+        timestamp=datetime.now(timezone.utc),
+        actor=Actor(
+            type=ActorType.AGENT,
+            skill_name="orchestrator-planner",
+            skill_version=get_orchestrator_version(),
+            registry_entry_id=None,
+            approval_scope=None,
+        ),
+        detail=detail,
+    )
+    try:
+        client = db_client or FirestoreClient()
+        client.append_audit_log(audit_entry)
+    except Exception as e:
+        logger.warning("Failed to append PLAN_CONSTRUCTED audit (non-fatal): %s", e)
+
+
 def emit_skill_failed_audit(
     skill_short_name: str,
     error: str,

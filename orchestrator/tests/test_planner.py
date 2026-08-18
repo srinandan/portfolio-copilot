@@ -39,6 +39,11 @@ def _planner_local_manifests(monkeypatch):
         return out
 
     monkeypatch.setattr("src.orchestrator.planner._load_authorized_manifests", fake_loader)
+    # Keep intent classification real, but stub the Firestore state fact and the
+    # best-effort PLAN_CONSTRUCTED audit so planner unit tests do no network I/O.
+    # (has_active_ips defaults False → onboarding kept, matching the pre-3b set.)
+    monkeypatch.setattr("src.orchestrator.planner._has_active_ips", lambda user_id: False)
+    monkeypatch.setattr("src.orchestrator.planner.emit_plan_constructed_audit", lambda **kwargs: None)
 
 
 @node(name="counter_node", rerun_on_resume=False)
@@ -1646,3 +1651,55 @@ async def test_root_planner_legacy_fallback_when_manifests_unavailable():
         # AD still received PA's drift_report via context chaining on the legacy path.
         ad_call = [c for c in mock_dispatch.call_args_list if c[0][0] == "private-action-drafting"][0]
         assert "drift_report" in ad_call[1]["node_input"]
+
+
+@pytest.mark.asyncio
+async def test_root_planner_intent_selection_and_plan_constructed(monkeypatch):
+    """A trade prompt from a user who already has an IPS: onboarding is excluded
+    by policy (state fact), the trade path is included by intent, and a
+    PLAN_CONSTRUCTED audit records the selection."""
+    from unittest.mock import MagicMock
+
+    plan_audit = MagicMock()
+    monkeypatch.setattr("src.orchestrator.planner._has_active_ips", lambda user_id: True)
+    monkeypatch.setattr("src.orchestrator.planner.emit_plan_constructed_audit", plan_audit)
+
+    agent = Workflow(name="test_root", edges=[("START", root_planner)])
+    session_service = InMemorySessionService()
+    runner = Runner(app_name="test_app", agent=agent, session_service=session_service, auto_create_session=True)
+
+    with (
+        patch(
+            "src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock
+        ) as mock_list,
+        patch("src.orchestrator.planner.emit_skill_invoked_audit"),
+        patch("src.orchestrator.planner.dispatch_managed_skill", new_callable=AsyncMock) as mock_dispatch,
+        patch("src.orchestrator.planner.preload_spending_facts", return_value={}),
+        patch("src.orchestrator.planner.write_spending_report"),
+    ):
+        mock_list.return_value = [
+            Skill(name="skills/private-spending-analysis", target_state="TARGET_STATE_ACTIVE", default_revision="v1"),
+            Skill(name="skills/private-goals-onboarding", target_state="TARGET_STATE_ACTIVE", default_revision="v1"),
+        ]
+        mock_dispatch.return_value = {"narrative_summary": "ok"}
+
+        response_stream = runner.run_async(
+            user_id="u",
+            session_id="s",
+            new_message=UserContent(parts=[Part.from_text(text="sell 20 shares of NVDA")]),
+        )
+        [e async for e in response_stream]
+
+    plan_audit.assert_called_once()
+    kw = plan_audit.call_args.kwargs
+    assert set(kw["candidates"]) == {"spending-analysis", "goals-onboarding"}
+    assert "goals-onboarding" not in kw["leaves"]       # onboarding-once (has_active_ips)
+    assert "goals-onboarding" not in kw["resolved"]
+    assert "action-drafting" in kw["leaves"]            # trade-intent-include
+    assert "trade-intent-include" in kw["policy_applied"]
+    assert "onboarding-once" in kw["policy_applied"]
+
+    # goals-onboarding was excluded → never dispatched; spending still ran.
+    dispatched = [c[0][0] for c in mock_dispatch.call_args_list]
+    assert "private-goals-onboarding" not in dispatched
+    assert "private-spending-analysis" in dispatched

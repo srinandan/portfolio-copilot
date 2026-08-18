@@ -20,6 +20,7 @@ from .policy import (
     applied_rules,
     select_leaves,
 )
+from .retrieval import DEFAULT_RETRIEVER, ListAllRetriever, Retriever, SkillCandidate
 from .scheduler import ScheduledPlan, SchedulerError, resolve_and_schedule
 
 __all__ = [
@@ -35,4 +36,8 @@ __all__ = [
     "DEFAULT_POLICY",
     "IntentSignals",
     "classify_intent",
+    "SkillCandidate",
+    "Retriever",
+    "ListAllRetriever",
+    "DEFAULT_RETRIEVER",
 ]

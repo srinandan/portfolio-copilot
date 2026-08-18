@@ -20,6 +20,7 @@ class EventType(str, Enum):
     ACTION_EXECUTED = "action_executed"
     ACTION_FAILED = "action_failed"
     REVIEWER_BYPASSED = "reviewer_bypassed"
+    PLAN_CONSTRUCTED = "plan_constructed"
 
 
 class ActorType(str, Enum):
