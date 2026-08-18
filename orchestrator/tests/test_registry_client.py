@@ -6,7 +6,8 @@ from unittest.mock import MagicMock, patch
 import httpx
 import pytest
 
-from orchestrator.registry_client import AgentRegistryClient, GoogleAuth, Skill
+from orchestrator.registry_client import AgentRegistryClient, GoogleAuth, Skill, clear_manifest_cache
+from orchestrator.skills.manifest import Artifact, SkillManifest, SkillManifestError
 
 
 def create_zip(files: dict[str, str | bytes]) -> bytes:
@@ -583,3 +584,123 @@ Author rationale only.
     assert "Compute math and allocations here." not in stripped
     assert "## Acceptance criteria" not in stripped
     assert "Valid trade." not in stripped
+
+
+# --------------------------------------------------------------------------- #
+# get_skill_manifest                                                          #
+# --------------------------------------------------------------------------- #
+
+_REVIEWER_MANIFEST_JSON = json.dumps(
+    {
+        "id": "reviewer",
+        "summary": "Reviews a drafted ProposedAction against the active IPS.",
+        "applies_when": "A ProposedAction has been drafted.",
+        "requires": ["proposed_action", "active_ips", "holdings"],
+        "produces": ["reviewer_verdict"],
+        "mandatory_if": "proposed_action exists",
+        "parallelizable": False,
+    }
+)
+
+
+@pytest.fixture(autouse=True)
+def _clear_manifest_cache():
+    clear_manifest_cache()
+    yield
+    clear_manifest_cache()
+
+
+def _manifest_handler(zip_files: dict, revision: str = "rev1"):
+    """Build a MockTransport handler that serves a skill's default revision + zip."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if "alt=media" in str(request.url):
+            return httpx.Response(200, content=create_zip(zip_files))
+        return httpx.Response(200, json={"name": "projects/p/locations/l/skills/private-reviewer", "defaultRevision": revision})
+
+    return handler
+
+
+@pytest.mark.asyncio
+async def test_get_skill_manifest_success():
+    client = AgentRegistryClient(
+        project_id="test-project",
+        location="test-location",
+        http_client=httpx.AsyncClient(transport=httpx.MockTransport(_manifest_handler({"manifest.json": _REVIEWER_MANIFEST_JSON}))),
+    )
+    manifest = await client.get_skill_manifest("reviewer")
+    assert isinstance(manifest, SkillManifest)
+    assert manifest.id == "reviewer"
+    assert Artifact.PROPOSED_ACTION in manifest.requires
+    assert manifest.mandatory_if is not None
+    assert manifest.mandatory_if.artifact == Artifact.PROPOSED_ACTION
+
+
+@pytest.mark.asyncio
+async def test_get_skill_manifest_in_subdirectory():
+    client = AgentRegistryClient(
+        project_id="test-project",
+        location="test-location",
+        http_client=httpx.AsyncClient(
+            transport=httpx.MockTransport(
+                _manifest_handler({"reviewer/manifest.json": _REVIEWER_MANIFEST_JSON, "reviewer/SKILL.md": "# doc"})
+            )
+        ),
+    )
+    manifest = await client.get_skill_manifest("private-reviewer")
+    assert manifest.id == "reviewer"
+
+
+@pytest.mark.asyncio
+async def test_get_skill_manifest_missing_raises():
+    client = AgentRegistryClient(
+        project_id="test-project",
+        location="test-location",
+        http_client=httpx.AsyncClient(transport=httpx.MockTransport(_manifest_handler({"SKILL.md": "# doc, no manifest"}))),
+    )
+    with pytest.raises(ValueError, match="manifest.json not found"):
+        await client.get_skill_manifest("reviewer")
+
+
+@pytest.mark.asyncio
+async def test_get_skill_manifest_invalid_json_raises():
+    client = AgentRegistryClient(
+        project_id="test-project",
+        location="test-location",
+        http_client=httpx.AsyncClient(transport=httpx.MockTransport(_manifest_handler({"manifest.json": "{ not json "}))),
+    )
+    with pytest.raises(ValueError, match="not valid JSON"):
+        await client.get_skill_manifest("reviewer")
+
+
+@pytest.mark.asyncio
+async def test_get_skill_manifest_invalid_schema_raises():
+    bad = json.dumps({"id": "reviewer", "summary": "s", "applies_when": "w", "produces": ["not_an_artifact"], "parallelizable": False})
+    client = AgentRegistryClient(
+        project_id="test-project",
+        location="test-location",
+        http_client=httpx.AsyncClient(transport=httpx.MockTransport(_manifest_handler({"manifest.json": bad}))),
+    )
+    with pytest.raises(SkillManifestError, match="invalid manifest.json"):
+        await client.get_skill_manifest("reviewer")
+
+
+@pytest.mark.asyncio
+async def test_get_skill_manifest_cached_by_revision():
+    calls = {"media": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if "alt=media" in str(request.url):
+            calls["media"] += 1
+            return httpx.Response(200, content=create_zip({"manifest.json": _REVIEWER_MANIFEST_JSON}))
+        return httpx.Response(200, json={"name": "n", "defaultRevision": "rev-cached"})
+
+    client = AgentRegistryClient(
+        project_id="p",
+        location="l",
+        http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+    )
+    a = await client.get_skill_manifest("reviewer")
+    b = await client.get_skill_manifest("reviewer")
+    assert a is b  # served from cache
+    assert calls["media"] == 1  # zip fetched only once
