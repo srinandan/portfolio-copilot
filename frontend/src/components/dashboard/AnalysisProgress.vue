@@ -79,6 +79,8 @@ function icon(status: ProgressStatus): string {
       return 'do_not_disturb_on';
     case 'failed':
       return 'error';
+    case 'pending':
+      return 'radio_button_unchecked';
     case 'running':
     default:
       return 'progress_activity';
@@ -93,6 +95,8 @@ function iconClass(status: ProgressStatus): string {
       return 'text-on-tertiary-container';
     case 'failed':
       return 'text-error';
+    // Not started yet: muted, same as a skipped step's dimmed marker.
+    case 'pending':
     case 'skipped':
       return 'text-outline';
     case 'running':

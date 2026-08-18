@@ -84,7 +84,7 @@ export interface ProposedAction {
   status: ActionStatus;
 }
 
-export type ProgressStatus = 'running' | 'done' | 'skipped' | 'failed';
+export type ProgressStatus = 'pending' | 'running' | 'done' | 'skipped' | 'failed';
 
 /**
  * A single pipeline stage surfaced live while an analysis runs. Emitted by the
