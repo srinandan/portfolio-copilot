@@ -43,7 +43,7 @@ Portfolio Copilot is an experimental personal finance assistant built on Google 
  │          Google Cloud Store           │ │      Python Orchestrator     │
  │ ───────────────────────────────────── │ │   (Gemini Enterprise ADK)    │
  │ • Firestore: IPS, Holdings, State     │ │ ──────────────────────────── │
- │ • BigQuery: Checking Transactions     │ │ • Dynamic Runtime Planner    │
+ │ • BigQuery: Checking Transactions     │ │ • Intent-Driven Planner      │
  └───────────────────────────────────────┘ │ • Reviewer / Critic Gate     │
                                            └───────┬──────────────┬───────┘
                                                    │              │
