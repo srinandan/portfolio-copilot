@@ -174,3 +174,66 @@ async def test_root_planner_emits_stage_progress_through_interleave():
     assert progress_by_stage.get("spending-analysis") == ["running", "done"]
     # The final ADK output event (the planner's results list) is still on the stream.
     assert any(i.get("kind") != "progress" for i in items)
+
+
+@pytest.mark.asyncio
+async def test_root_planner_pre_renders_pending_stages_through_interleave(monkeypatch):
+    """With manifests available (the computed schedule path), the planner
+    announces each scheduled stage as 'pending' up front, before it runs
+    (ADR-0022 §6 plan pre-render)."""
+    from src.orchestrator.planner import _clean_skill_name
+    from src.orchestrator.skills.manifest import load_manifest
+
+    async def fake_loader(skills):
+        out = {}
+        for s in skills:
+            clean = _clean_skill_name(s.name if hasattr(s, "name") else str(s))
+            out[clean] = load_manifest(clean)
+        return out
+
+    monkeypatch.setattr("src.orchestrator.planner._load_authorized_manifests", fake_loader)
+    monkeypatch.setattr("src.orchestrator.planner._has_active_ips", lambda user_id: False)
+    monkeypatch.setattr("src.orchestrator.planner.emit_plan_constructed_audit", lambda **kwargs: None)
+
+    agent = Workflow(name="test_root_pending", edges=[("START", root_planner)])
+    runner = Runner(
+        app_name="test_app",
+        agent=agent,
+        session_service=InMemorySessionService(),
+        memory_service=InMemoryMemoryService(),
+        auto_create_session=True,
+    )
+
+    with (
+        patch(
+            "src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock
+        ) as mock_list,
+        patch("src.orchestrator.planner.emit_skill_invoked_audit"),
+        patch("src.orchestrator.planner.dispatch_managed_skill", new_callable=AsyncMock) as mock_dispatch,
+        patch("src.orchestrator.planner.preload_spending_facts", return_value={}),
+        patch("src.orchestrator.planner.write_spending_report"),
+    ):
+        mock_list.return_value = [
+            Skill(
+                name="projects/p/locations/global/skills/private-spending-analysis",
+                target_state="TARGET_STATE_ACTIVE",
+                default_revision="rev1",
+            ),
+        ]
+        mock_dispatch.return_value = {"narrative_summary": "ok"}
+
+        stream = runner.run_async(
+            user_id="u",
+            session_id="s",
+            new_message=UserContent(parts=[Part.from_text(text="how much did I spend?")]),
+        )
+        items = [item async for item in _interleave_progress(stream)]
+
+    statuses = {}
+    for i in items:
+        if i.get("kind") == "progress":
+            statuses.setdefault(i["stage"], []).append(i["status"])
+
+    assert statuses.get("discovery") == ["running", "done"]
+    # 'pending' is announced first, then the stage runs and completes.
+    assert statuses.get("spending-analysis") == ["pending", "running", "done"]

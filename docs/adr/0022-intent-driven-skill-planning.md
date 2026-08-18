@@ -1,7 +1,13 @@
 # ADR-0022: Intent-driven skill planning — semantic search, an in-process planner skill, and self-describing manifests
 
 ## Status
-**Proposed.**
+**Accepted — implemented.** The core pipeline (Retrieve → Plan → Resolve →
+Schedule) ships: self-describing manifests, the deterministic resolver +
+scheduler, registry-sourced manifest retrieval, the in-process policy (structured
+predicates + keyword intent), and the `PLAN_CONSTRUCTED` audit + UI plan
+pre-render. Semantic-search retrieval and the optional LLM prune are deferred
+behind the retrieval/policy interfaces, to enable when catalog size or observed
+over-selection warrant. See the companion design doc §7 for the phase-to-PR map.
 
 Refines [ADR-0004](0004-dynamic-planning-over-fixed-pipeline.md): it makes
 0004's "the planner composes its own plan from what it finds" concrete, and

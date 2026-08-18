@@ -43,6 +43,21 @@ describe('AnalysisProgress.vue', () => {
     expect(icon?.textContent).toContain('progress_activity');
   });
 
+  it('renders a pending (not-yet-started) stage with a static hollow marker', () => {
+    const withPending: ProgressStage[] = [
+      { stage: 'action-drafting', label: 'Drafting proposed action', status: 'pending' }
+    ];
+    render(AnalysisProgress, { props: { stages: withPending } });
+    const row = screen
+      .getAllByTestId('progress-stage')
+      .find((r) => r.getAttribute('data-stage') === 'action-drafting')!;
+    expect(row.getAttribute('data-status')).toBe('pending');
+    const icon = row.querySelector('.material-symbols-outlined');
+    expect(icon?.textContent).toContain('radio_button_unchecked');
+    expect(icon?.classList.contains('animate-spin')).toBe(false);
+    expect(screen.getByText('Drafting proposed action')).toBeDefined();
+  });
+
   it('renders optional per-stage detail text', () => {
     render(AnalysisProgress, { props: { stages } });
     expect(screen.getByText('5 authorized skill(s)')).toBeDefined();
