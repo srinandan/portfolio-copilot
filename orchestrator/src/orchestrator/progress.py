@@ -50,7 +50,9 @@ PROGRESS_CHANNEL: contextvars.ContextVar[Optional["Queue[Any]"]] = contextvars.C
 PROGRESS_KIND = "progress"
 
 # Valid status transitions for a stage row in the frontend stepper.
-PROGRESS_STATUSES = ("running", "done", "skipped", "failed")
+# "pending" is emitted up front (ADR-0022 §6 plan pre-render) so the whole plan
+# renders before each stage starts; it then transitions to running/done/skipped.
+PROGRESS_STATUSES = ("pending", "running", "done", "skipped", "failed")
 
 # Ordered, user-facing labels for every pipeline stage the planner can surface.
 # Stage ids match the short skill name (without the "private-" prefix) plus the

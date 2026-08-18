@@ -34,7 +34,7 @@ from .planning import (
     resolve_and_schedule,
     select_leaves,
 )
-from .progress import STAGE_LABELS, report_progress, report_skill_progress
+from .progress import STAGE_LABELS, report_progress, report_skill_progress, stage_label
 from .registry_client import AgentRegistryClient
 from .skills.manifest import SkillManifest
 from .state import (
@@ -924,6 +924,11 @@ async def root_planner(ctx: Context, node_input: Any):
             )
 
     if plan is not None:
+        # Plan pre-render (ADR-0022 §6): announce every scheduled stage as
+        # "pending" up front so the UI stepper shows the whole plan before each
+        # stage starts; execution then transitions each to running/done/skipped.
+        for clean in plan.flat():
+            report_progress(clean, "pending", stage_label(clean))
         payloads = await _execute_scheduled_layers(plan, skills_by_clean, manifests, user_id, input_dict, context, ctx)
         # Emit results in canonical order (preserving historical output ordering),
         # then any non-canonical skills after, in plan order.
