@@ -1,13 +1,13 @@
 # Architecture
 
-This document describes how the system is built, reflecting the completed Phase 4 architecture including sub-agent execution via Managed Agents and the three-stage Governance layer (Reviewer → HITL Gate → Execution Gate). For what it does, see [`01-functional.md`](01-functional.md). For the reasoning behind each decision below, see the linked ADRs.
+This document describes how the system is built, reflecting the completed Phase 4 architecture including intent-driven plan construction ([ADR-0022](../adr/0022-intent-driven-skill-planning.md)), sub-agent execution via Managed Agents, and the three-stage Governance layer (Reviewer → HITL Gate → Execution Gate). For what it does, see [`01-functional.md`](01-functional.md). For the reasoning behind each decision below, see the linked ADRs.
 
 ## Stack summary
 
 | Layer | Choice | ADR |
 |---|---|---|
 | Agent implementation | **Python**, ADK dynamic workflows | [0008](../adr/0008-python-for-orchestrator.md) (supersedes [0001](../adr/0001-go-over-python-for-agents.md)) |
-| Root orchestration | ADK `DynamicNode` / Workflow orchestrator | [0004](../adr/0004-dynamic-planning-over-fixed-pipeline.md) |
+| Root orchestration | ADK `DynamicNode` / Workflow orchestrator; intent-driven plan construction (Retrieve → Plan → Resolve → Schedule) | [0004](../adr/0004-dynamic-planning-over-fixed-pipeline.md), [0022](../adr/0022-intent-driven-skill-planning.md) |
 | Sub-agent execution layer | Managed Agents API (Antigravity worker agent + per-interaction SKILL.md override) | [0014](../adr/0014-managed-agents-subagent-execution-layer.md) (supersedes [0005](../adr/0005-managed-agents-hybrid-evaluation.md)), [0007](../adr/0007-skill-content-via-input-not-mounting.md), [0009](../adr/0009-managed-agent-native-class.md) |
 | Governance & safety | Reviewer/Critic Managed Agent → HITL Approval Gate (`RequestInput`) → Alpaca Execution Gate | [0014](../adr/0014-managed-agents-subagent-execution-layer.md), [0015](../adr/0015-real-user-data-antigravity-sandbox.md) |
 | Deterministic math & primitives | In-process Python functions under `orchestrator/primitives/` | [0016](../adr/0016-deterministic-primitives-in-orchestrator.md) |
@@ -56,21 +56,25 @@ flowchart TD
     end
 
     subgraph AgentRuntimeLayer ["Agent Platform Agent Runtime (Cloud Custom Container)"]
-        Planner["Root Dynamic Planner<br/><code>orchestrator.planner:root_agent</code><br/><i>(ADK DynamicNode / Workflow)</i>"]
+        Planner["Root Intent-Driven Planner<br/><code>orchestrator.planner:root_agent</code><br/><i>(ADK DynamicNode / Workflow)</i>"]
         
-        subgraph OrchestratorLoop ["Dynamic Planning & Governance Loop"]
-            Discovery["1. Skill Discovery<br/><code>registry_client.py</code>"]
-            Preloader["2. State Preloader<br/><code>state/preloader.py</code>"]
-            Primitives["3. Deterministic Primitives<br/><code>primitives/*.py</code>"]
-            Dispatch["4. Skill Dispatch<br/><code>managed_agents/dispatcher.py</code>"]
-            Reviewer["5. Reviewer Governance Gate<br/><code>reviewer/rules.py</code> + MA"]
-            HITL["6. HITL Approval Gate<br/><code>gates/hitl.py</code> (RequestInput)"]
-            ExecGate["7. Execution Gate<br/><code>gates/execution.py</code>"]
-            Writers["8. Audit & State Writers<br/><code>state/writers.py</code>"]
+        subgraph OrchestratorLoop ["Intent-Driven Planning & Governance Loop"]
+            Discovery["1. Retrieve — skills + manifests<br/><code>registry_client.py</code>, <code>planning/retrieval.py</code>"]
+            PlanStage["2. Plan — intent + policy select leaves<br/><code>planning/intent.py</code>, <code>planning/policy.py</code>"]
+            Schedule["3. Resolve + Schedule — dependency graph → layers<br/><code>planning/scheduler.py</code>"]
+            Preloader["4. State Preloader<br/><code>state/preloader.py</code>"]
+            Primitives["5. Deterministic Primitives<br/><code>primitives/*.py</code>"]
+            Dispatch["6. Skill Dispatch (per layer)<br/><code>managed_agents/dispatcher.py</code>"]
+            Reviewer["7. Reviewer Governance Gate<br/><code>reviewer/rules.py</code> + MA"]
+            HITL["8. HITL Approval Gate<br/><code>gates/hitl.py</code> (RequestInput)"]
+            ExecGate["9. Execution Gate<br/><code>gates/execution.py</code>"]
+            Writers["10. Audit & State Writers<br/><code>state/writers.py</code> (incl. PLAN_CONSTRUCTED)"]
             Progress["Advisory Progress Channel<br/><code>progress.py</code> (SSE Interleaving)"]
         end
 
         Planner --> Discovery
+        Planner --> PlanStage
+        Planner --> Schedule
         Planner --> Preloader
         Planner --> Primitives
         Planner --> Dispatch
@@ -88,7 +92,7 @@ flowchart TD
     end
 
     subgraph GCPInfra ["Google Cloud Services & External APIs"]
-        Registry[("Agent Registry<br/><i>(6 Runtime Skills)</i>")]
+        Registry[("Agent Registry<br/><i>(Runtime Skills + Manifests)</i>")]
         Firestore[("Cloud Firestore<br/><i>(IPS, Holdings, Liabilities, User Profiles, Documents, Reports, Audit Log)</i>")]
         BigQuery[("BigQuery<br/><i>(Checking Transactions)</i>")]
         SessionsStore[("Agent Platform Sessions<br/>& Memory Bank")]
@@ -106,7 +110,7 @@ flowchart TD
     APIProxy -.->|"Export Server Spans"| CloudTrace
 
     %% Orchestrator Cloud Interactions
-    Discovery <-->|"Discover Authorized Skills"| Registry
+    Discovery <-->|"List authorized skills + fetch manifests"| Registry
     Preloader -->|"Fetch Snapshot"| Firestore
     Preloader -->|"Fetch Transactions"| BigQuery
     Dispatch <-->|"Interactions API"| WorkerMA
@@ -126,10 +130,12 @@ Frontend Web Application (Vue SPA + Go server, Cloud Run) — static assets, aut
         │
         ▼
 Root Orchestrator (Python, ADK, Agent Runtime)
-  ├─ queries Agent Registry at runtime
-  ├─ composes plan (sequence of Managed Agent invocations)
+  ├─ queries Agent Registry at runtime (skills + their manifests)
+  ├─ constructs the plan: retrieve candidates → select leaves by intent
+  │    (keyword intent + structured policy) → resolve prerequisites from
+  │    manifests → schedule into dependency layers (parallel within a layer)
   ├─ for each skill:
-  │    ├─ resolves SKILL.md from registry
+  │    ├─ resolves SKILL.md + manifest.json from registry
   │    ├─ pre-fetches state (Firestore reads, BigQuery reads)
   │    ├─ pre-computes derived values via primitives/*.py
   │    └─ invokes worker Managed Agent via ADK ManagedAgent class,
@@ -214,10 +220,13 @@ event/`error`/HITL frames:
  "label": "Analyzing portfolio drift", "detail": "8% over target"}
 ```
 
-`status` is one of `running | done | skipped | failed`. The frontend
-(`AnalysisProgress.vue`) keys a live stepper on `stage`, advancing each row as
-events arrive and clearing the stepper — replacing it with the final output or
-the HITL approval card — once the run completes.
+`status` is one of `pending | running | done | skipped | failed`. Once the plan
+is computed, the planner **pre-renders** it by emitting every scheduled stage as
+`pending` up front (ADR-0022 §6), so the whole plan is visible before any stage
+starts. The frontend (`AnalysisProgress.vue`) keys a live stepper on `stage`,
+advancing each row from `pending` as events arrive and clearing the stepper —
+replacing it with the final output or the HITL approval card — once the run
+completes.
 
 These signals are **advisory only**: they never gate execution and carry no
 governance weight. The authoritative record of what ran is the immutable
