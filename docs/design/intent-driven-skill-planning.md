@@ -230,6 +230,15 @@ def resolve_and_schedule(leaves, manifests, available_artifacts):
 
 ## 7. Phase plan & task breakdown
 
+> **Status: implemented.** Phase-to-PR map — Phase 1 manifests (#329),
+> Phase 2 resolver + scheduler (#330). The Phase 2 planner *wiring* moved to
+> "Phase 3a" (#331) once we found that manifests aren't bundled in the
+> container and must be sourced from the registry at runtime; that PR also added
+> `get_skill_manifest`. Phase 3 shipped as the policy core (#332), intent
+> selection + `PLAN_CONSTRUCTED` (#333), and the UI plan pre-render. Deferred
+> behind the interfaces: semantic-search retrieval and the optional LLM prune,
+> to enable when catalog size / observed over-selection warrant.
+
 ### Phase 1 — Manifests (no behaviour change)
 - [ ] Finalize manifest schema and artifact vocabulary (§2).
 - [ ] Author manifests for the six skills (§3); decide front-matter vs
@@ -258,14 +267,16 @@ def resolve_and_schedule(leaves, manifests, available_artifacts):
 
 ## 8. Open questions
 
-1. **Manifest home** — SKILL.md front-matter (one file, travels with docs)
-   vs sibling `manifest.json` (clean parse, no markdown stripping). Leaning
-   front-matter to keep one source of truth per skill.
-2. **Semantic query** — embed the raw prompt vs a cheap extracted-intent
-   step first (strips pleasantries, improves recall). Decide when semantic
-   retrieval is actually switched on.
-3. **Planner policy schema** — precedence when a rule includes and another
-   excludes the same skill (proposal: explicit `exclude` wins), and how the
-   NL prompt and structured rules compose under the LLM prune.
-4. **Default-floor identity** — reuse `spending-analysis`, or add a
-   purpose-built lightweight "overview" skill as the baseline.
+1. **Manifest home** — *Resolved: sibling `manifest.json`.* Keeps `SKILL.md`
+   clean and standard-compliant; the manifest rides into the registry revision
+   zip (which `register_skill.sh` already builds from the whole skill dir), so
+   it's the runtime source too.
+2. **Semantic query** — *Still open (deferred).* Retrieval ships as `list-all`
+   behind the `Retriever` interface; the raw-prompt-vs-extracted-intent question
+   is settled when semantic retrieval is actually switched on.
+3. **Planner policy schema** — *Resolved: explicit `exclude` wins*, and the
+   default floor is exclude-proof so a plan is never empty. Conditions are
+   structured predicates (field/op/value), not free-form expressions. How the
+   NL prompt composes with the rules is settled with the LLM prune (deferred).
+4. **Default-floor identity** — *Resolved: reuse `spending-analysis`* as the v1
+   cold-start floor.

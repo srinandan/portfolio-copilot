@@ -17,7 +17,7 @@ Portfolio Copilot is an experimental personal finance assistant built on Google 
 
 ## Key Capabilities
 
-- **Dynamic Runtime Planning:** Rather than relying on hardcoded workflows, the planner discovers registered skills at runtime and composes execution plans dynamically.
+- **Intent-Driven Planning:** Rather than relying on hardcoded workflows, the planner discovers registered skills at runtime and constructs each plan through a Retrieve → Plan → Resolve → Schedule pipeline — reading the user's intent to select which skills run, then deriving the execution order from each skill's self-describing manifest (`requires`/`produces`) instead of a fixed phase list. See [ADR-0022](docs/adr/0022-intent-driven-skill-planning.md).
 - **Hot-Pluggable Capabilities:** Skills can be enabled or revoked mid-session; the planner recalculates its task graph on the subsequent step without restarting.
 - **Human-in-the-Loop Trade Gate:** Proposed actions (`ProposedAction`) undergo deterministic verification against an Investment Policy Statement (IPS) by a Critic agent (`ReviewerVerdict`) before presenting an interactive approval card to the user.
 - **End-to-End Traceability:** State, execution logs, and policy verdicts are persisted with immutable skill version and approval metadata.

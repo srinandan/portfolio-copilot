@@ -9,6 +9,17 @@ once tagged. Nothing has been released yet — see the note under `[Unreleased]`
 ## [Unreleased]
 
 ### Added
+- Intent-driven skill planning ([ADR-0022](docs/adr/0022-intent-driven-skill-planning.md)).
+  The orchestrator now constructs each plan through a Retrieve → Plan → Resolve →
+  Schedule pipeline instead of running all authorized skills in three fixed
+  phases: self-describing skill manifests (`manifest.json`) declare each skill's
+  `requires`/`produces`, a deterministic resolver + scheduler derives the
+  execution layers from that dependency graph, manifests are sourced from the
+  Agent Registry at runtime, and an in-process policy (structured predicates +
+  a keyword intent classifier) selects which skills run — recall-biased, with an
+  exclude-proof default floor. Adds a `PLAN_CONSTRUCTED` audit event and a UI
+  plan pre-render (the stepper shows the planned stages up front). Semantic-search
+  retrieval and an optional LLM prune are deferred behind the interfaces.
 
 ### Fixed
 - Stitch the orchestrator back into the browser → Go trace across the Vertex `:streamQuery`
