@@ -10,6 +10,29 @@ hardcoded three-phase block; the front half (retrieval + intent policy) lands
 in Phase 3.
 """
 
+from .intent import IntentSignals, classify_intent
+from .policy import (
+    DEFAULT_POLICY,
+    Op,
+    PlannerPolicy,
+    PolicyRule,
+    Predicate,
+    applied_rules,
+    select_leaves,
+)
 from .scheduler import ScheduledPlan, SchedulerError, resolve_and_schedule
 
-__all__ = ["ScheduledPlan", "SchedulerError", "resolve_and_schedule"]
+__all__ = [
+    "ScheduledPlan",
+    "SchedulerError",
+    "resolve_and_schedule",
+    "Op",
+    "Predicate",
+    "PolicyRule",
+    "PlannerPolicy",
+    "select_leaves",
+    "applied_rules",
+    "DEFAULT_POLICY",
+    "IntentSignals",
+    "classify_intent",
+]
