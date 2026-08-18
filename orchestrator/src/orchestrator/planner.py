@@ -25,8 +25,10 @@ from .data.firestore import FirestoreClient
 from .gates import execution_gate, hitl_approval_gate
 from .logger import get_logger
 from .managed_agents import dispatch_managed_skill
+from .planning import resolve_and_schedule
 from .progress import STAGE_LABELS, report_progress, report_skill_progress
 from .registry_client import AgentRegistryClient
+from .skills.manifest import SkillManifest
 from .state import (
     PreloadDeclinedError,
     emit_review_completed_audit,
@@ -62,6 +64,19 @@ PIPELINE_SKILL_ORDER = [
     "private-reviewer",
 ]
 
+# Canonical clean-name order (no `private-` prefix). Used to tie-break skills
+# within a scheduler layer and to emit results in a stable order, preserving the
+# historical output ordering when the manifest-driven schedule replaces the
+# hardcoded phases (ADR-0022 Phase 3a).
+CANONICAL_SKILL_ORDER = [
+    "spending-analysis",
+    "goals-onboarding",
+    "portfolio-analysis",
+    "research",
+    "action-drafting",
+    "reviewer",
+]
+
 
 @dataclass
 class SkillPlan:
@@ -84,6 +99,12 @@ def _normalize_skill_key(name: str) -> str:
     """Returns normalized skill key with 'private-' prefix for dictionary lookup."""
     short = _short_skill_id(name)
     return short if short.startswith("private-") else f"private-{short}"
+
+
+def _clean_skill_name(name: str) -> str:
+    """Returns the clean skill id (no path, no 'private-' prefix) — the manifest id."""
+    short = _short_skill_id(name)
+    return short[len("private-") :] if short.startswith("private-") else short
 
 
 def _skill_sort_key(skill: Any) -> int:
@@ -440,9 +461,8 @@ SKILL_PLANS: Dict[str, SkillPlan] = {
 }
 
 
-@node(name="get_skills", rerun_on_resume=False)
-async def get_skills_from_registry(ctx: Context, node_input: Any):
-    """Queries the Agent Registry for available skills."""
+def _resolve_project_location() -> tuple[str, str]:
+    """Resolves the GCP project id and Agent Registry location from the environment."""
     project_id = os.environ.get("PROJECT_ID") or os.environ.get("GOOGLE_CLOUD_PROJECT")
     if not project_id:
         try:
@@ -452,6 +472,13 @@ async def get_skills_from_registry(ctx: Context, node_input: Any):
     if not project_id:
         project_id = "dummy-project"
     location = os.environ.get("AGENT_REGISTRY_LOCATION", "global")
+    return project_id, location
+
+
+@node(name="get_skills", rerun_on_resume=False)
+async def get_skills_from_registry(ctx: Context, node_input: Any):
+    """Queries the Agent Registry for available skills."""
+    project_id, location = _resolve_project_location()
     logger.info(f"Goal received: {node_input}, project_id: {project_id}, location: {location}")
     client = AgentRegistryClient(project_id=project_id, location=location)
     skills = await client.list_authorized_skills()
@@ -592,6 +619,171 @@ def _detect_and_audit_revocations(
     ]
 
 
+async def _load_authorized_manifests(skills: list[Any]) -> Optional[Dict[str, SkillManifest]]:
+    """Fetches manifests for the authorized skills from the Agent Registry.
+
+    Returns ``{clean_name: manifest}`` when *every* authorized skill yields a
+    valid manifest, or ``None`` if any is missing or invalid. A ``None`` result
+    tells the caller to fall back to the legacy hardcoded schedule — this keeps
+    the planner working against registry revisions that predate ``manifest.json``
+    (i.e. before the skills are re-registered), so Phase 3a is safe to deploy
+    ahead of a `make register-skills`.
+    """
+    project_id, location = _resolve_project_location()
+    client = AgentRegistryClient(project_id=project_id, location=location)
+
+    async def _one(skill: Any) -> tuple[str, SkillManifest]:
+        name = skill.name if hasattr(skill, "name") else str(skill)
+        clean = _clean_skill_name(name)
+        return clean, await client.get_skill_manifest(clean)
+
+    try:
+        results = await asyncio.gather(*(_one(s) for s in skills), return_exceptions=True)
+    finally:
+        await client.close()
+
+    manifests: Dict[str, SkillManifest] = {}
+    for r in results:
+        if isinstance(r, BaseException):
+            logger.warning("Manifest load failed; falling back to legacy schedule: %s", r)
+            return None
+        clean, manifest = r
+        manifests[clean] = manifest
+    return manifests
+
+
+async def _execute_scheduled_layers(
+    plan: Any,
+    skills_by_clean: Dict[str, Any],
+    manifests: Dict[str, SkillManifest],
+    user_id: str,
+    input_dict: Dict[str, Any],
+    context: Dict[str, Any],
+    ctx: Context,
+) -> Dict[str, Any]:
+    """Executes the computed schedule layer by layer, parallelizing within a layer.
+
+    Returns ``{clean_name: payload}`` for every skill that ran (payload may be
+    ``None`` when a skill self-skips). Layer boundaries guarantee a skill runs
+    only after the producers of the artifacts it consumes, so context threading
+    (drift_report → action-drafting, proposed_action → reviewer) is preserved.
+    """
+    payloads: Dict[str, Any] = {}
+    for layer in plan.layers:
+        runnable: list[tuple[str, SkillPlan, Optional[str]]] = []
+        for clean in layer:
+            skill_plan = SKILL_PLANS.get(_normalize_skill_key(clean))
+            if skill_plan is None:
+                continue
+            skill_obj = skills_by_clean.get(clean)
+            registry_entry_id = getattr(skill_obj, "default_revision", None) if skill_obj is not None else None
+            runnable.append((clean, skill_plan, registry_entry_id))
+        if not runnable:
+            continue
+
+        parallel = len(runnable) > 1 and all(
+            clean in manifests and manifests[clean].parallelizable for clean, _, _ in runnable
+        )
+        if parallel:
+            tasks = [
+                _execute_skill(sp, _normalize_skill_key(clean), user_id, input_dict, context, ctx, registry_entry_id=rid)
+                for clean, sp, rid in runnable
+            ]
+            layer_results = await asyncio.gather(*tasks, return_exceptions=True)
+            errors = [r for r in layer_results if isinstance(r, Exception)]
+            if errors:
+                raise ExceptionGroup("parallel skill dispatch failed", errors)
+            for (clean, _, _), res in zip(runnable, layer_results):
+                payloads[clean] = res
+        else:
+            for clean, sp, rid in runnable:
+                payloads[clean] = await _execute_skill(
+                    sp, _normalize_skill_key(clean), user_id, input_dict, context, ctx, registry_entry_id=rid
+                )
+    return payloads
+
+
+async def _execute_legacy_phases(
+    skills: list[Any],
+    user_id: str,
+    input_dict: Dict[str, Any],
+    context: Dict[str, Any],
+    ctx: Context,
+) -> list[Any]:
+    """Legacy hardcoded three-phase execution (independent → parallel → dependent).
+
+    Retained as the fallback for when manifests are unavailable from the registry
+    (revisions predating ``manifest.json``). Behaviour is identical to the
+    pre-ADR-0022 planner.
+    """
+    results: list[Any] = []
+    independent_first = ("private-spending-analysis", "private-goals-onboarding")
+    parallel_group = ("private-portfolio-analysis", "private-research")
+    dependent_after = ("private-action-drafting", "private-reviewer")
+
+    ordered_skills = sorted(skills, key=_skill_sort_key)
+
+    # 1. Independent first group (sequential)
+    for skill in ordered_skills:
+        skill_name = skill.name if hasattr(skill, "name") else str(skill)
+        short_name = _normalize_skill_key(skill_name)
+        if short_name not in independent_first:
+            continue
+        plan = SKILL_PLANS.get(short_name)
+        if plan is None:
+            continue
+        payload = await _execute_skill(
+            plan, skill_name, user_id, input_dict, context, ctx, registry_entry_id=getattr(skill, "default_revision", None)
+        )
+        if payload is not None:
+            results.append(f"{plan.short_name.replace('private-', '')}_result: {payload}")
+
+    # 2. Parallel group: portfolio-analysis and research concurrent dispatch.
+    # Concurrent context writes are safe (disjoint keys: portfolio_analysis_result / research_briefs).
+    parallel_tasks = []
+    parallel_plans = []
+    for skill in ordered_skills:
+        skill_name = skill.name if hasattr(skill, "name") else str(skill)
+        short_name = _normalize_skill_key(skill_name)
+        if short_name not in parallel_group:
+            continue
+        plan = SKILL_PLANS.get(short_name)
+        if plan is None:
+            continue
+        parallel_plans.append(plan)
+        parallel_tasks.append(
+            _execute_skill(
+                plan, skill_name, user_id, input_dict, context, ctx, registry_entry_id=getattr(skill, "default_revision", None)
+            )
+        )
+
+    if parallel_tasks:
+        parallel_results = await asyncio.gather(*parallel_tasks, return_exceptions=True)
+        errors = [r for r in parallel_results if isinstance(r, Exception)]
+        if errors:
+            raise ExceptionGroup("parallel skill dispatch failed", errors)
+        for plan, r in zip(parallel_plans, parallel_results):
+            if r is not None:
+                results.append(f"{plan.short_name.replace('private-', '')}_result: {r}")
+
+    # 3. Dependent after group (sequential)
+    for skill in ordered_skills:
+        skill_name = skill.name if hasattr(skill, "name") else str(skill)
+        short_name = _normalize_skill_key(skill_name)
+        if short_name not in dependent_after:
+            continue
+        plan = SKILL_PLANS.get(short_name)
+        if plan is None:
+            continue
+        payload = await _execute_skill(
+            plan, skill_name, user_id, input_dict, context, ctx, registry_entry_id=getattr(skill, "default_revision", None)
+        )
+        if payload is not None:
+            results.append(f"{plan.short_name.replace('private-', '')}_result: {payload}")
+
+    return results
+
+
 @node(rerun_on_resume=True)
 async def root_planner(ctx: Context, node_input: Any):
     """Registry-driven dynamic planner. Iterates authorized skills in canonical order,
@@ -651,88 +843,37 @@ async def root_planner(ctx: Context, node_input: Any):
     results: list[Any] = []
     context: Dict[str, Any] = {}
 
-    independent_first = ("private-spending-analysis", "private-goals-onboarding")
-    parallel_group = ("private-portfolio-analysis", "private-research")
-    dependent_after = ("private-action-drafting", "private-reviewer")
-
-    ordered_skills = sorted(skills, key=_skill_sort_key)
-
-    # 1. Independent first group (sequential)
-    for skill in ordered_skills:
-        skill_name = skill.name if hasattr(skill, "name") else str(skill)
-        short_name = _normalize_skill_key(skill_name)
-        if short_name not in independent_first:
-            continue
-        plan = SKILL_PLANS.get(short_name)
-        if plan is None:
-            continue
-        payload = await _execute_skill(
-            plan,
-            skill_name,
-            user_id,
-            input_dict,
-            context,
-            ctx,
-            registry_entry_id=getattr(skill, "default_revision", None),
-        )
-        if payload is not None:
-            results.append(f"{plan.short_name.replace('private-', '')}_result: {payload}")
-
-    # 2. Parallel group: portfolio-analysis and research concurrent dispatch
-    # Note: Concurrent writes into `context` are safe because portfolio-analysis writes
-    # `portfolio_analysis_result` and research writes `research_briefs` (disjoint keys).
-    parallel_tasks = []
-    parallel_plans = []
-    for skill in ordered_skills:
-        skill_name = skill.name if hasattr(skill, "name") else str(skill)
-        short_name = _normalize_skill_key(skill_name)
-        if short_name not in parallel_group:
-            continue
-        plan = SKILL_PLANS.get(short_name)
-        if plan is None:
-            continue
-        parallel_plans.append(plan)
-        parallel_tasks.append(
-            _execute_skill(
-                plan,
-                skill_name,
-                user_id,
-                input_dict,
-                context,
-                ctx,
-                registry_entry_id=getattr(skill, "default_revision", None),
+    # Construct the execution schedule from the skills' manifests (ADR-0022
+    # Phase 3a). The three hardcoded phases become an emergent property of the
+    # dependency graph. If manifests can't be sourced from the registry (e.g. a
+    # revision predating manifest.json), fall back to the legacy phase order so
+    # the planner keeps working — behaviour-preserving in both paths.
+    manifests = await _load_authorized_manifests(skills)
+    plan = None
+    if manifests is not None:
+        skills_by_clean = {_clean_skill_name(s.name if hasattr(s, "name") else str(s)): s for s in skills}
+        leaves = list(skills_by_clean.keys())
+        try:
+            plan = resolve_and_schedule(
+                leaves, manifests, available_artifacts=(), canonical_order=CANONICAL_SKILL_ORDER
             )
-        )
+        except Exception:
+            logger.exception("Schedule computation failed; falling back to legacy phases")
+            plan = None
 
-    if parallel_tasks:
-        parallel_results = await asyncio.gather(*parallel_tasks, return_exceptions=True)
-        errors = [r for r in parallel_results if isinstance(r, Exception)]
-        if errors:
-            raise ExceptionGroup("parallel skill dispatch failed", errors)
-        for plan, r in zip(parallel_plans, parallel_results):
-            if r is not None:
-                results.append(f"{plan.short_name.replace('private-', '')}_result: {r}")
-
-    # 3. Dependent after group (sequential)
-    for skill in ordered_skills:
-        skill_name = skill.name if hasattr(skill, "name") else str(skill)
-        short_name = _normalize_skill_key(skill_name)
-        if short_name not in dependent_after:
-            continue
-        plan = SKILL_PLANS.get(short_name)
-        if plan is None:
-            continue
-        payload = await _execute_skill(
-            plan,
-            skill_name,
-            user_id,
-            input_dict,
-            context,
-            ctx,
-            registry_entry_id=getattr(skill, "default_revision", None),
-        )
-        if payload is not None:
-            results.append(f"{plan.short_name.replace('private-', '')}_result: {payload}")
+    if plan is not None:
+        payloads = await _execute_scheduled_layers(plan, skills_by_clean, manifests, user_id, input_dict, context, ctx)
+        # Emit results in canonical order (preserving historical output ordering),
+        # then any non-canonical skills after, in plan order.
+        for clean in CANONICAL_SKILL_ORDER:
+            payload = payloads.get(clean)
+            if payload is not None:
+                results.append(f"{clean}_result: {payload}")
+        for clean, payload in payloads.items():
+            if clean not in CANONICAL_SKILL_ORDER and payload is not None:
+                results.append(f"{clean}_result: {payload}")
+    else:
+        results = await _execute_legacy_phases(skills, user_id, input_dict, context, ctx)
 
     # HITL approval gate: if action-drafting produced a ProposedAction, gate it before returning
     ad_result = context.get("action_drafting_result")

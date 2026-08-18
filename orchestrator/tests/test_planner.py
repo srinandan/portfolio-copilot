@@ -17,6 +17,30 @@ from src.orchestrator.registry_client import Skill
 execution_count = 0
 
 
+@pytest.fixture(autouse=True)
+def _planner_local_manifests(monkeypatch):
+    """Source manifests from local files instead of the Agent Registry so the
+    planner exercises the ADR-0022 computed schedule without network I/O. A test
+    can re-patch `_load_authorized_manifests` (e.g. to return None) to drive the
+    legacy fallback path instead.
+    """
+    from src.orchestrator.planner import _clean_skill_name
+    from src.orchestrator.skills.manifest import SkillManifestError, load_manifest
+
+    async def fake_loader(skills):
+        out = {}
+        for s in skills:
+            name = s.name if hasattr(s, "name") else str(s)
+            clean = _clean_skill_name(name)
+            try:
+                out[clean] = load_manifest(clean)
+            except SkillManifestError:
+                return None  # incomplete manifest set → legacy fallback
+        return out
+
+    monkeypatch.setattr("src.orchestrator.planner._load_authorized_manifests", fake_loader)
+
+
 @node(name="counter_node", rerun_on_resume=False)
 async def counter_node(ctx: Context, node_input: str):
     global execution_count
@@ -1562,3 +1586,63 @@ async def test_postprocess_goals_onboarding_adds_adk_event_to_memory(mock_write)
     assert hasattr(event, "content")
     assert isinstance(event.content, UserContent)
     assert "User user_test_memory completed goals onboarding" in event.content.parts[0].text
+
+
+@pytest.mark.asyncio
+async def test_root_planner_legacy_fallback_when_manifests_unavailable():
+    """When manifests can't be sourced from the registry (a revision predating
+    manifest.json), the planner falls back to the legacy phase order and still
+    runs skills with identical context threading."""
+    agent = Workflow(name="test_root", edges=[("START", root_planner)])
+    session_service = InMemorySessionService()
+    memory_service = InMemoryMemoryService()
+    runner = Runner(
+        app_name="test_app",
+        agent=agent,
+        session_service=session_service,
+        memory_service=memory_service,
+        auto_create_session=True,
+    )
+
+    with (
+        patch(
+            "src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock
+        ) as mock_list,
+        patch(
+            "src.orchestrator.planner._load_authorized_manifests", new_callable=AsyncMock, return_value=None
+        ) as mock_manifests,
+        patch("src.orchestrator.planner.emit_skill_invoked_audit"),
+        patch("src.orchestrator.planner.dispatch_managed_skill", new_callable=AsyncMock) as mock_dispatch,
+        patch("src.orchestrator.state.preloader.FirestoreClient") as mock_fs_cls,
+    ):
+        mock_list.return_value = [
+            Skill(name="projects/p/locations/l/skills/private-portfolio-analysis", target_state="TARGET_STATE_ACTIVE", default_revision="v1"),
+            Skill(name="projects/p/locations/l/skills/private-action-drafting", target_state="TARGET_STATE_ACTIVE", default_revision="v1"),
+        ]
+        mock_fs = mock_fs_cls.return_value
+        fake_ips = MagicMock(ips_id="ips_1", version=1)
+        fake_ips.model_dump.return_value = {"ips_id": "ips_1", "version": 1}
+        fake_holdings = MagicMock(total_value_usd=100000.0, positions=[], cash_usd=100000.0)
+        fake_holdings.model_dump.return_value = {"total_value_usd": 100000.0, "positions": [], "cash_usd": 100000.0}
+        mock_fs.get_active_ips_by_user.return_value = fake_ips
+        mock_fs.get_holdings.return_value = fake_holdings
+
+        async def fake_dispatch(skill_name, **kwargs):
+            if skill_name == "private-portfolio-analysis":
+                return {"entries": [], "unclassified_value_usd": 0.0, "rebalance_recommended": False}
+            return {}
+
+        mock_dispatch.side_effect = fake_dispatch
+
+        response_stream = runner.run_async(
+            user_id="u", session_id="s", new_message=UserContent(parts=[Part.from_text(text='{"user_id": "u"}')])
+        )
+        events = [e async for e in response_stream]
+        last = events[-1]
+
+        assert mock_manifests.await_count >= 1  # fallback path was taken
+        assert any("portfolio-analysis_result" in str(o) for o in last.output)
+        assert any("action-drafting_result" in str(o) for o in last.output)
+        # AD still received PA's drift_report via context chaining on the legacy path.
+        ad_call = [c for c in mock_dispatch.call_args_list if c[0][0] == "private-action-drafting"][0]
+        assert "drift_report" in ad_call[1]["node_input"]

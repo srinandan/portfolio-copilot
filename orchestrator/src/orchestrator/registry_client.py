@@ -1,12 +1,13 @@
 """Agent Registry REST client."""
 
 import io
+import json
 import os
 import ssl
 import tempfile
 import zipfile
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import httpx
 from google.auth import default as google_auth_default
@@ -15,10 +16,24 @@ from google.auth.transport.requests import Request as GoogleAuthRequest
 
 from .logger import get_logger
 
+if TYPE_CHECKING:
+    from .skills.manifest import SkillManifest
+
 logger = get_logger(__name__)
 
 DEFAULT_BASE_URL = "https://agentregistry.googleapis.com/v1alpha"
 DEFAULT_MTLS_BASE_URL = "https://agentregistry.mtls.googleapis.com/v1alpha"
+
+# Manifests are immutable per skill revision, so cache the parsed SkillManifest
+# keyed by the revision resource name. This dedupes the zip fetch across planning
+# cycles (and across the short-lived AgentRegistryClient instances the planner
+# creates). Cleared by `clear_manifest_cache()` in tests.
+_MANIFEST_CACHE: dict[str, "SkillManifest"] = {}
+
+
+def clear_manifest_cache() -> None:
+    """Drops all cached skill manifests (test hook)."""
+    _MANIFEST_CACHE.clear()
 
 
 @dataclass
@@ -218,15 +233,14 @@ class AgentRegistryClient:
 
         return all_skills
 
-    async def get_skill_content(self, skill_id: str) -> str:
-        """Resolve private-{skill_id} -> defaultRevision -> zip -> SKILL.md text."""
+    async def _resolve_default_revision(self, skill_id: str) -> str:
+        """Resolve private-{skill_id} -> the skill's defaultRevision resource name."""
         client = await self._get_client()
 
         # ADR-0006 specifies: private-{skill}
         formatted_id = skill_id if skill_id.startswith("private-") else f"private-{skill_id}"
         skill_name = f"projects/{self.project_id}/locations/{self.location}/skills/{formatted_id}"
 
-        # 1. Fetch skill metadata to get defaultRevision
         skill_url = f"{self.base_url}/{skill_name}"
         response = await client.get(skill_url)
         if response.status_code != 200:
@@ -242,8 +256,11 @@ class AgentRegistryClient:
         default_revision = skill_data.get("defaultRevision", "")
         if not default_revision:
             raise ValueError(f"skill {skill_name} has no default revision")
+        return default_revision
 
-        # 2. Fetch revision content as ZIP (?alt=media)
+    async def _fetch_revision_zip(self, default_revision: str) -> bytes:
+        """Fetch a revision's content archive (?alt=media) as raw ZIP bytes."""
+        client = await self._get_client()
         rev_url = f"{self.base_url}/{default_revision}"
         rev_response = await client.get(rev_url, params={"alt": "media"})
         if rev_response.status_code != 200:
@@ -254,18 +271,55 @@ class AgentRegistryClient:
                 rev_response.text,
             )
             raise RuntimeError(f"Agent Registry {rev_response.status_code} on GET {rev_url}: {rev_response.text}")
+        return rev_response.content
 
-        # 3. Extract SKILL.md from zip
+    @staticmethod
+    def _extract_zip_member(zip_bytes: bytes, basename: str) -> str:
+        """Return the decoded text of the (possibly nested) `basename` member of a zip."""
         try:
-            with zipfile.ZipFile(io.BytesIO(rev_response.content)) as zf:
+            with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
                 for filename in zf.namelist():
-                    if filename == "SKILL.md" or filename.endswith("/SKILL.md"):
+                    if filename == basename or filename.endswith(f"/{basename}"):
                         with zf.open(filename) as f:
-                            raw_text = f.read().decode("utf-8")
-                            return strip_non_runtime_sections(raw_text)
-                raise ValueError("SKILL.md not found in revision zip")
+                            return f.read().decode("utf-8")
+                raise ValueError(f"{basename} not found in revision zip")
         except zipfile.BadZipFile as e:
             raise ValueError(f"failed to read zip archive: {e}") from e
+
+    async def get_skill_content(self, skill_id: str) -> str:
+        """Resolve private-{skill_id} -> defaultRevision -> zip -> SKILL.md text."""
+        default_revision = await self._resolve_default_revision(skill_id)
+        zip_bytes = await self._fetch_revision_zip(default_revision)
+        return strip_non_runtime_sections(self._extract_zip_member(zip_bytes, "SKILL.md"))
+
+    async def get_skill_manifest(self, skill_id: str) -> "SkillManifest":
+        """Resolve private-{skill_id} -> defaultRevision -> zip -> manifest.json -> SkillManifest.
+
+        The parsed manifest is cached by revision resource name (immutable per
+        revision), so repeated planning cycles don't re-download the archive.
+        Raises ValueError if the revision has no manifest.json, and
+        SkillManifestError if the manifest is present but invalid.
+        """
+        from .skills.manifest import SkillManifest, SkillManifestError
+
+        default_revision = await self._resolve_default_revision(skill_id)
+        cached = _MANIFEST_CACHE.get(default_revision)
+        if cached is not None:
+            return cached
+
+        zip_bytes = await self._fetch_revision_zip(default_revision)
+        raw_text = self._extract_zip_member(zip_bytes, "manifest.json")
+        try:
+            raw = json.loads(raw_text)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"manifest.json for {skill_id!r} is not valid JSON: {e}") from e
+        try:
+            manifest = SkillManifest.model_validate(raw)
+        except Exception as e:
+            raise SkillManifestError(f"invalid manifest.json for {skill_id!r}: {e}") from e
+
+        _MANIFEST_CACHE[default_revision] = manifest
+        return manifest
 
     async def revoke_skill(self, skill_id: str) -> None:
         """Patches a skill's targetState to TARGET_STATE_DISABLED.
