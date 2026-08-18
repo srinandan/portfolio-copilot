@@ -9,17 +9,6 @@ description: >-
 metadata:
   version: "0.1.0"
   status: draft
-manifest:
-  id: portfolio-analysis
-  summary: >-
-    Measures current holdings against the active IPS target allocation and
-    reports drift.
-  applies_when: >-
-    The user asks about portfolio health or drift, or a current drift signal
-    is needed before considering a rebalance.
-  requires: [active_ips, holdings]
-  produces: [drift_report]
-  parallelizable: true
 ---
 
 # portfolio-analysis

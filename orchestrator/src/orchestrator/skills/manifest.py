@@ -1,33 +1,36 @@
 """Self-describing skill manifests (ADR-0022, Phase 1).
 
-Each skill ships a machine-readable manifest — carried in the ``manifest:``
-block of its ``SKILL.md`` front-matter — declaring the artifacts it
-``requires`` / ``produces``, whether it may run in parallel, and any
-structural compliance trigger. **Structure** (a skill's dependencies) lives
-here, with the skill; **policy** (intent-based routing) lives with the
-planner. Keeping dependencies with the skill is what lets the catalog grow
-without editing the orchestrator. See
-``docs/adr/0022-intent-driven-skill-planning.md`` and
+Each skill ships a machine-readable manifest — a sibling ``manifest.json``
+file next to its ``SKILL.md`` — declaring the artifacts it ``requires`` /
+``produces``, whether it may run in parallel, and any structural compliance
+trigger. **Structure** (a skill's dependencies) lives here, with the skill;
+**policy** (intent-based routing) lives with the planner. Keeping dependencies
+with the skill is what lets the catalog grow without editing the orchestrator.
+See ``docs/adr/0022-intent-driven-skill-planning.md`` and
 ``docs/design/intent-driven-skill-planning.md``.
 
 Phase 1 is schema + loader + validation only — there is **no behaviour
 change**. Nothing here is wired into planning yet; the deterministic
 resolver/scheduler that consumes these manifests lands in Phase 2.
 
-Open question #1 in the design doc (manifest home: front-matter vs a sibling
-``manifest.json``) is resolved here in favour of ``SKILL.md`` front-matter, to
-keep a single source of truth per skill.
+Open question #1 in the design doc (manifest home: ``SKILL.md`` front-matter
+vs a sibling ``manifest.json``) is resolved here in favour of a sibling
+``manifest.json``, to keep ``SKILL.md`` clean and standard-compliant — the
+manifest is portfolio-copilot orchestrator metadata, not part of the Agent
+Skills format.
 """
 
 from __future__ import annotations
 
+import json
 import re
 from enum import Enum
+from pathlib import Path
 from typing import Iterable, Optional
 
 from pydantic import BaseModel, ConfigDict, ValidationError, field_validator, model_validator
 
-from ._skill_metadata import _clean_skill_name, _find_skill_md, _parse_frontmatter
+from ._skill_metadata import _clean_skill_name, _find_skill_md
 
 
 class SkillManifestError(RuntimeError):
@@ -165,32 +168,54 @@ DEFAULT_MANIFEST_SKILLS: tuple[str, ...] = (
 )
 
 
-def load_manifest(skill_dir_name: str) -> SkillManifest:
-    """Loads and validates the manifest from a skill's ``SKILL.md`` front-matter.
+def _find_manifest_json(skill_dir_name: str) -> Optional[Path]:
+    """Locates a skill's sibling ``manifest.json``.
 
-    Raises :class:`SkillManifestError` if the SKILL.md cannot be located, has
-    no ``manifest:`` block, or the block fails schema validation.
+    The manifest lives next to ``SKILL.md``, so we reuse ``_find_skill_md``'s
+    multi-layout discovery (dev tree, installed package, container, and the
+    ``SKILLS_DIR`` override) and look for ``manifest.json`` in the same
+    directory. Returns None if the skill dir cannot be located; distinguishing
+    a missing manifest from a missing skill is left to :func:`load_manifest`.
+    """
+    skill_md = _find_skill_md(skill_dir_name)
+    if skill_md is None:
+        return None
+    candidate = skill_md.parent / "manifest.json"
+    return candidate if candidate.exists() else None
+
+
+def load_manifest(skill_dir_name: str) -> SkillManifest:
+    """Loads and validates a skill's sibling ``manifest.json``.
+
+    Raises :class:`SkillManifestError` if the skill directory cannot be
+    located, has no ``manifest.json``, or the file fails schema validation.
     """
     clean = _clean_skill_name(skill_dir_name)
-    path = _find_skill_md(clean)
-    if path is None:
+    skill_md = _find_skill_md(clean)
+    if skill_md is None:
         raise SkillManifestError(f"Could not locate SKILL.md for skill {clean!r}")
 
-    frontmatter = _parse_frontmatter(path)
-    raw = frontmatter.get("manifest")
-    if raw is None:
-        raise SkillManifestError(f"SKILL.md for {clean!r} has no 'manifest:' front-matter block ({path})")
+    manifest_path = skill_md.parent / "manifest.json"
+    if not manifest_path.exists():
+        raise SkillManifestError(f"No manifest.json found for skill {clean!r} (expected {manifest_path})")
+
+    try:
+        raw = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        raise SkillManifestError(f"manifest.json for {clean!r} is not valid JSON ({manifest_path}): {e}") from e
     if not isinstance(raw, dict):
-        raise SkillManifestError(f"'manifest:' block for {clean!r} must be a mapping, got {type(raw).__name__} ({path})")
+        raise SkillManifestError(
+            f"manifest.json for {clean!r} must be a JSON object, got {type(raw).__name__} ({manifest_path})"
+        )
 
     try:
         manifest = SkillManifest.model_validate(raw)
     except ValidationError as e:
-        raise SkillManifestError(f"Invalid manifest for {clean!r} ({path}): {e}") from e
+        raise SkillManifestError(f"Invalid manifest for {clean!r} ({manifest_path}): {e}") from e
 
     if manifest.id != clean:
         raise SkillManifestError(
-            f"manifest id {manifest.id!r} does not match skill directory {clean!r} ({path})"
+            f"manifest id {manifest.id!r} does not match skill directory {clean!r} ({manifest_path})"
         )
     return manifest
 

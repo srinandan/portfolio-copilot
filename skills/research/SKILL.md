@@ -9,17 +9,6 @@ description: >-
 metadata:
   version: "0.1.0"
   status: draft
-manifest:
-  id: research
-  summary: >-
-    Gathers external market and news context to inform a candidate action.
-    Read-only; never reads the user's private financial data.
-  applies_when: >-
-    A proposed or candidate action needs supporting evidence, or the user asks
-    about market conditions for a specific holding.
-  requires: [research_question]
-  produces: [research_briefs]
-  parallelizable: true
 ---
 
 # research

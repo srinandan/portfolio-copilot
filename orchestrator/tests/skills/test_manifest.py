@@ -1,8 +1,9 @@
 """Tests for self-describing skill manifests (ADR-0022, Phase 1).
 
-Covers: every shipped manifest parses; requires/produces reference the known
-artifact vocabulary; the six manifests reproduce the documented DAG (design
-§3); mandatory_if grammar; and the loader/validation failure modes.
+Covers: every shipped manifest (a sibling ``manifest.json``) parses;
+requires/produces reference the known artifact vocabulary; the six manifests
+reproduce the documented DAG (design §3); mandatory_if grammar; and the
+loader/validation failure modes.
 """
 
 import pytest
@@ -223,7 +224,8 @@ def test_verify_all_manifests_success():
     verify_all_manifests()
 
 
-def test_verify_all_manifests_missing_block_raises(tmp_path, monkeypatch):
+def test_verify_all_manifests_missing_json_raises(tmp_path, monkeypatch):
+    # SKILL.md present but no sibling manifest.json.
     skill_dir = tmp_path / "brokenskill"
     skill_dir.mkdir()
     (skill_dir / "SKILL.md").write_text(
@@ -231,7 +233,20 @@ def test_verify_all_manifests_missing_block_raises(tmp_path, monkeypatch):
         encoding="utf-8",
     )
     monkeypatch.setenv("SKILLS_DIR", str(tmp_path))
-    with pytest.raises(SkillManifestError, match="no 'manifest:' front-matter block"):
+    with pytest.raises(SkillManifestError, match="No manifest.json found"):
+        verify_all_manifests(skill_names=["brokenskill"])
+
+
+def test_verify_all_manifests_invalid_json_raises(tmp_path, monkeypatch):
+    skill_dir = tmp_path / "brokenskill"
+    skill_dir.mkdir()
+    (skill_dir / "SKILL.md").write_text(
+        "---\nname: brokenskill\nmetadata:\n  version: '0.1.0'\n---\n# body\n",
+        encoding="utf-8",
+    )
+    (skill_dir / "manifest.json").write_text("{ not valid json ", encoding="utf-8")
+    monkeypatch.setenv("SKILLS_DIR", str(tmp_path))
+    with pytest.raises(SkillManifestError, match="not valid JSON"):
         verify_all_manifests(skill_names=["brokenskill"])
 
 

@@ -10,17 +10,6 @@ description: >-
 metadata:
   version: "0.2.0"
   status: draft
-manifest:
-  id: goals-onboarding
-  summary: >-
-    Interviews the user for goals, risk tolerance, time horizon, and
-    constraints and produces an Investment Policy Statement.
-  applies_when: >-
-    The user has no active IPS, reports a life event affecting their goals, or
-    Portfolio Analysis recommends a drift-triggered policy review.
-  requires: []
-  produces: [active_ips]
-  parallelizable: true
 ---
 
 # goals-onboarding
