@@ -2,7 +2,11 @@
 
 ## Status
 Accepted — this is the architectural pivot the rest of the project hangs
-off of.
+off of. Refined by [ADR-0022](0022-intent-driven-skill-planning.md), which
+makes "the planner composes its own plan" concrete (intent-driven selection
+via semantic search + an in-process planner skill) and moves the
+Reviewer/human-approval gates from planner discretion to deterministic,
+artifact-triggered gating.
 
 ## Context
 The original design was a fixed pipeline: Goals & Onboarding → Orchestrator
