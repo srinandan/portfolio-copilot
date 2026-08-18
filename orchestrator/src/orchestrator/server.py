@@ -487,7 +487,7 @@ def _init_server_tracing(fastapi_app: FastAPI) -> None:
         logger.exception("FastAPI tracing init failed; continuing without ingress spans")
 
 
-app = FastAPI(title="Portfolio Copilot Orchestrator", version="0.1.0", lifespan=_lifespan)
+app = FastAPI(title="Portfolio Copilot Orchestrator", version="0.2.0", lifespan=_lifespan)
 _init_server_tracing(app)
 
 

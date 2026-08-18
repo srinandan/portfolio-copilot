@@ -8,6 +8,8 @@ once tagged. Nothing has been released yet — see the note under `[Unreleased]`
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-18
+
 ### Added
 - Intent-driven skill planning ([ADR-0022](docs/adr/0022-intent-driven-skill-planning.md)).
   The orchestrator now constructs each plan through a Retrieve → Plan → Resolve →
@@ -18,8 +20,16 @@ once tagged. Nothing has been released yet — see the note under `[Unreleased]`
   Agent Registry at runtime, and an in-process policy (structured predicates +
   a keyword intent classifier) selects which skills run — recall-biased, with an
   exclude-proof default floor. Adds a `PLAN_CONSTRUCTED` audit event and a UI
-  plan pre-render (the stepper shows the planned stages up front). Semantic-search
-  retrieval and an optional LLM prune are deferred behind the interfaces.
+  plan pre-render (the stepper shows the planned stages up front).
+- Remote MCP integration for BigQuery and Firestore ([ADR-0023](docs/adr/0023-firestore-mcp-orchestrator.md)):
+  The orchestrator now interacts with Firestore and BigQuery via remote Model Context
+  Protocol (MCP) servers with dynamic tool discovery via the Agent Registry.
+- Google Cloud Model Armor security configuration:
+  Configured Model Armor floor settings to enforce safety guardrails across MCP tool calls.
+
+### Changed
+- Generalized checking transaction data models: replaced legacy bank-specific naming with generic account transaction schemas.
+- Container image hardening: updated orchestrator container with multi-stage build optimizations and security updates.
 
 ### Fixed
 - Stitch the orchestrator back into the browser → Go trace across the Vertex `:streamQuery`
@@ -53,6 +63,7 @@ once tagged. Nothing has been released yet — see the note under `[Unreleased]`
   analogue of the Go server's `otelhttp` transport (ADR-0019 §1), so the MCP call
   gets a client span and continues the browser → Go → orchestrator trace. Gated by
   the existing `OTEL_TRACES_ENABLED`; never fatal.
+- Normalized landing page Net Worth typography and UI consistency in frontend.
 
 ## [0.1.0] - 2026-08-14
 
