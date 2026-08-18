@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import json
 import os
 import time
@@ -25,12 +26,20 @@ from .data.firestore import FirestoreClient
 from .gates import execution_gate, hitl_approval_gate
 from .logger import get_logger
 from .managed_agents import dispatch_managed_skill
-from .planning import resolve_and_schedule
+from .planning import (
+    DEFAULT_POLICY,
+    DEFAULT_RETRIEVER,
+    applied_rules,
+    classify_intent,
+    resolve_and_schedule,
+    select_leaves,
+)
 from .progress import STAGE_LABELS, report_progress, report_skill_progress
 from .registry_client import AgentRegistryClient
 from .skills.manifest import SkillManifest
 from .state import (
     PreloadDeclinedError,
+    emit_plan_constructed_audit,
     emit_review_completed_audit,
     emit_skill_failed_audit,
     emit_skill_invoked_audit,
@@ -105,6 +114,42 @@ def _clean_skill_name(name: str) -> str:
     """Returns the clean skill id (no path, no 'private-' prefix) — the manifest id."""
     short = _short_skill_id(name)
     return short[len("private-") :] if short.startswith("private-") else short
+
+
+def _extract_prompt(node_input: Any) -> str:
+    """Best-effort extraction of the user's natural-language prompt for intent
+    classification (ADR-0022 Phase 3b). Never raises; returns "" when no text is
+    available (in which case intent is simply 'unknown' — the safe default)."""
+    if isinstance(node_input, str):
+        return node_input
+    if isinstance(node_input, dict):
+        for key in ("message", "query", "prompt", "goal", "text"):
+            val = node_input.get(key)
+            if isinstance(val, str) and val.strip():
+                return val
+        return ""
+    parts = getattr(node_input, "parts", None)
+    if parts:
+        return " ".join(t for t in (getattr(p, "text", None) for p in parts) if isinstance(t, str))
+    return ""
+
+
+def _has_active_ips(user_id: str) -> bool:
+    """True if the user has an active IPS. Resilient — a Firestore hiccup returns
+    False (recall-biased: onboarding is then kept, and self-skips if unneeded)."""
+    try:
+        return FirestoreClient().get_active_ips_by_user(user_id) is not None
+    except Exception:
+        logger.warning("Could not determine active IPS for %s; assuming none", user_id, exc_info=True)
+        return False
+
+
+def _build_decision_context(user_id: str, prompt: str) -> Dict[str, Any]:
+    """Assembles the planner's decision context: deterministic state facts
+    (`has_active_ips`) plus prompt-derived intent (`requested_trade`, `intent`)."""
+    context: Dict[str, Any] = dict(classify_intent(prompt).as_context())
+    context["has_active_ips"] = _has_active_ips(user_id)
+    return context
 
 
 def _skill_sort_key(skill: Any) -> int:
@@ -852,14 +897,31 @@ async def root_planner(ctx: Context, node_input: Any):
     plan = None
     if manifests is not None:
         skills_by_clean = {_clean_skill_name(s.name if hasattr(s, "name") else str(s)): s for s in skills}
-        leaves = list(skills_by_clean.keys())
+        # PLAN (ADR-0022 Phase 3b): read the user's intent and select the leaves.
+        # v1 retrieval is list-all; the structured policy (rules + default floor)
+        # narrows and augments it, recall-biased. The deterministic resolver then
+        # adds prerequisites and gates. Unauthorized leaves (e.g. a floor skill
+        # that isn't authorized) are dropped by resolve_and_schedule.
+        prompt = _extract_prompt(node_input)
+        decision_context = _build_decision_context(user_id, prompt)
+        candidates = [c.id for c in DEFAULT_RETRIEVER.retrieve(prompt, manifests)]
+        leaves = select_leaves(candidates, decision_context, DEFAULT_POLICY)
         try:
             plan = resolve_and_schedule(
-                leaves, manifests, available_artifacts=(), canonical_order=CANONICAL_SKILL_ORDER
+                sorted(leaves), manifests, available_artifacts=(), canonical_order=CANONICAL_SKILL_ORDER
             )
         except Exception:
             logger.exception("Schedule computation failed; falling back to legacy phases")
             plan = None
+        if plan is not None:
+            emit_plan_constructed_audit(
+                prompt_hash=hashlib.sha256(prompt.encode("utf-8")).hexdigest()[:12],
+                candidates=candidates,
+                leaves=list(leaves),
+                resolved=list(plan.selected),
+                layers=list(plan.layers),
+                policy_applied=applied_rules(decision_context, DEFAULT_POLICY),
+            )
 
     if plan is not None:
         payloads = await _execute_scheduled_layers(plan, skills_by_clean, manifests, user_id, input_dict, context, ctx)
