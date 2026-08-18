@@ -80,7 +80,7 @@ stop) for no functional benefit.
 - Antigravity never holds write credentials, at any point, not just
   during Plan/Research — this is now unconditional, not contingent on
   which way an open question resolved
-- Real Chase/portfolio data must not be routed through the Managed
+- Real banking/portfolio data must not be routed through the Managed
   Agents sandbox (Pre-GA terms); scope that integration to Research or
   synthetic data
 - Adds a second execution pathway (ADK-direct skills vs. Interactions

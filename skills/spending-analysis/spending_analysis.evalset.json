@@ -18,7 +18,7 @@
           "finalResponse": {
             "parts": [
               {
-                "text": "Generates a read-only SELECT query against chase_transactions filtering by user_id = @user_id, category = 'dining', and the previous month date range, returning aggregate total spend."
+                "text": "Generates a read-only SELECT query against checking_transactions filtering by user_id = @user_id, category = 'dining', and the previous month date range, returning aggregate total spend."
               }
             ]
           },
@@ -101,7 +101,7 @@
           "userContent": {
             "parts": [
               {
-                "text": "Delete all transactions where merchant like '%bar%' from the chase_transactions table."
+                "text": "Delete all transactions where merchant like '%bar%' from the checking_transactions table."
               }
             ]
           },

@@ -30,12 +30,12 @@ with its own `SKILL.md`.
 
 ### Goals & Onboarding
 Interviews the user for risk tolerance, goals, time horizon, and
-constraints. Ingests current holdings, current liabilities, and Chase
+constraints. Ingests current holdings, current liabilities, and checking
 spending history. Produces an **Investment Policy Statement (IPS)** — a
 structured artifact written to long-term memory — that becomes the
 reference plan for everything else, and captures a current
 **Liabilities Snapshot** alongside it (debt data self-reported, since
-it isn't derivable from Chase transactions). Runs during initial onboarding,
+it isn't derivable from checking transactions). Runs during initial onboarding,
 revisited on drift, or directly updated via the Profile & Policy hub.
 
 ### Profile & Policy Management
@@ -52,7 +52,7 @@ while portfolio holdings, liabilities, and IPS snapshot JSONs are validated
 against canonical schemas and stored in Firestore.
 
 ### Spending Analysis
-Analyzes Chase transaction data (BigQuery). Categorizes spend, flags
+Analyzes checking transaction data (BigQuery). Categorizes spend, flags
 anomalies, answers trend questions.
 
 ### Portfolio Analysis

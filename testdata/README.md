@@ -8,7 +8,7 @@ There are **two input shapes**, because the data lands in two stores:
 
 | Input | Format | Loaded into | Fixture(s) here |
 |---|---|---|---|
-| **Account transactions** | **CSV** | BigQuery (`portfolio_copilot.<table>`) | `chase_transactions.csv`, `checking_transactions.csv` |
+| **Account transactions** | **CSV** | BigQuery (`portfolio_copilot.<table>`) | `checking_transactions.csv` |
 | **Holdings** | JSON | Firestore (`holdings/<user_id>`) | `holdings.json` |
 | **Liabilities** | JSON | Firestore (`liabilities/<user_id>`) | `liabilities.json` |
 | **Investment Policy Statement (IPS)** | JSON | Firestore (`ips/<ips_id>_v<version>`) | `ips.json` |
@@ -42,10 +42,10 @@ Analysis skill can run NL-to-SQL queries over it; every query is scoped to the
 caller's `user_id`.
 
 **Where it goes:** BigQuery dataset `portfolio_copilot`, table
-`checking_transactions` (default) or `chase_transactions`. `setup_bigquery.sh`
-creates both tables; `load_test_data.py` loads a CSV with `WRITE_TRUNCATE`
-(replace) using an explicit schema — the CSV is **not** autodetected, so column
-order and the header row matter.
+`checking_transactions` (default). `setup_bigquery.sh` creates the table;
+`load_test_data.py` loads a CSV with `WRITE_TRUNCATE` (replace) using an
+explicit schema — the CSV is **not** autodetected, so column order and the
+header row matter.
 
 **File rules:**
 - UTF-8, comma-separated, **one header row** (it is skipped on load).
@@ -64,8 +64,8 @@ order and the header row matter.
 
 > `account_type` appears in [`account-transaction.schema.json`](../schemas/account-transaction.schema.json)
 > but is **not** a column of the BigQuery transactions table — pick the table
-> (`checking_transactions` vs `chase_transactions`) to represent the account
-> instead. Keep the CSV to the six columns above.
+> (`checking_transactions`) to represent the account instead. Keep the CSV to
+> the six columns above.
 
 **Normalized category taxonomy.** `normalized_category` is stored as a free
 string, but Spending Analysis expects the app's standard set. Use `income` for
@@ -77,7 +77,7 @@ entertainment · subscriptions · healthcare · travel · shopping ·
 transfers · fees · other
 ```
 
-**Example** (`chase_transactions.csv`):
+**Example** (`checking_transactions.csv`):
 
 ```csv
 user_id,transaction_date,amount,description,raw_category,normalized_category
@@ -107,7 +107,7 @@ payments, not balances or APRs), captured during onboarding. Stored at Firestore
 |---|---|---|
 | `liability_id` | string | Stable id, e.g. `liab_cc_001`. |
 | `type` | enum | `credit_card` · `mortgage` · `auto_loan` · `student_loan` · `heloc` · `other`. |
-| `description` | string | e.g. `"Chase Sapphire Reserve"`. |
+| `description` | string | e.g. `"Premium Rewards Card"`. |
 | `balance_usd` | number ≥ 0 | Outstanding balance. |
 | `interest_rate_percent` | number ≥ 0 | APR. Absent from transaction data — must be self-reported. |
 | `minimum_payment_usd` | number ≥ 0 | Minimum monthly payment. |
@@ -120,7 +120,7 @@ payments, not balances or APRs), captured during onboarding. Stored at Firestore
     {
       "liability_id": "liab_cc_001",
       "type": "credit_card",
-      "description": "Chase Sapphire Reserve",
+      "description": "Premium Rewards Card",
       "balance_usd": 4500,
       "interest_rate_percent": 24.99,
       "minimum_payment_usd": 150

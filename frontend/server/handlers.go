@@ -361,8 +361,8 @@ func (s *Server) HandleUploadDocument(c *gin.Context) {
 		if docItem.TargetTable == "" {
 			docItem.TargetTable = "checking_transactions"
 		}
-		if docItem.TargetTable != "checking_transactions" && docItem.TargetTable != "chase_transactions" {
-			errMsg := fmt.Sprintf("invalid target_table: %s (must be checking_transactions or chase_transactions)", docItem.TargetTable)
+		if docItem.TargetTable != "checking_transactions" {
+			errMsg := fmt.Sprintf("invalid target_table: %s (must be checking_transactions)", docItem.TargetTable)
 			docItem.Status = "FAILED"
 			docItem.ErrorMessage = &errMsg
 			_ = s.Store.SetDocument(ctx, &docItem)

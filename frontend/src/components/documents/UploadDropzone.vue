@@ -31,7 +31,6 @@
             data-testid="target-table-select"
           >
             <option value="checking_transactions">checking_transactions</option>
-            <option value="chase_transactions">chase_transactions</option>
           </select>
         </div>
       </div>
@@ -97,7 +96,7 @@ const isDragging = ref(false);
 const selectedFile = ref<File | null>(null);
 const fileInputRef = ref<HTMLInputElement | null>(null);
 const documentType = ref<'transactions' | 'holdings' | 'liabilities' | 'ips'>('transactions');
-const targetTable = ref<'checking_transactions' | 'chase_transactions'>('checking_transactions');
+const targetTable = ref<'checking_transactions'>('checking_transactions');
 
 const acceptedExtensions = computed(() => {
   return documentType.value === 'transactions' ? '.csv' : '.json';

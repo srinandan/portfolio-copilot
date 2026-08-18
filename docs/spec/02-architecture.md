@@ -11,7 +11,7 @@ This document describes how the system is built, reflecting the completed Phase 
 | Sub-agent execution layer | Managed Agents API (Antigravity worker agent + per-interaction SKILL.md override) | [0014](../adr/0014-managed-agents-subagent-execution-layer.md) (supersedes [0005](../adr/0005-managed-agents-hybrid-evaluation.md)), [0007](../adr/0007-skill-content-via-input-not-mounting.md), [0009](../adr/0009-managed-agent-native-class.md) |
 | Governance & safety | Reviewer/Critic Managed Agent → HITL Approval Gate (`RequestInput`) → Alpaca Execution Gate | [0014](../adr/0014-managed-agents-subagent-execution-layer.md), [0015](../adr/0015-real-user-data-antigravity-sandbox.md) |
 | Deterministic math & primitives | In-process Python functions under `orchestrator/primitives/` | [0016](../adr/0016-deterministic-primitives-in-orchestrator.md) |
-| Analytical data | BigQuery (Chase transactions) | [0002](../adr/0002-bigquery-plus-firestore-split.md), [0015](../adr/0015-real-user-data-antigravity-sandbox.md) |
+| Analytical data | BigQuery (Checking transactions) | [0002](../adr/0002-bigquery-plus-firestore-split.md), [0015](../adr/0015-real-user-data-antigravity-sandbox.md) |
 | Transactional data | Firestore (IPS, holdings, liabilities, audit log) — separate Go and Python clients | [0002](../adr/0002-bigquery-plus-firestore-split.md), [0008](../adr/0008-python-for-orchestrator.md) |
 | Session state | Agent Platform Sessions | — |
 | Long-term memory | Agent Platform Memory Bank | — |
@@ -22,7 +22,7 @@ This document describes how the system is built, reflecting the completed Phase 
 
 ## Data layer
 
-**BigQuery** — Chase transaction data only. Chosen specifically so Spending
+**BigQuery** — Checking transaction data only. Chosen specifically so Spending
 Analysis can showcase NL-to-SQL analytics (trend/aggregation questions),
 which Firestore's point-read model doesn't support well.
 
@@ -90,7 +90,7 @@ flowchart TD
     subgraph GCPInfra ["Google Cloud Services & External APIs"]
         Registry[("Agent Registry<br/><i>(6 Runtime Skills)</i>")]
         Firestore[("Cloud Firestore<br/><i>(IPS, Holdings, Liabilities, User Profiles, Documents, Reports, Audit Log)</i>")]
-        BigQuery[("BigQuery<br/><i>(Chase Transactions)</i>")]
+        BigQuery[("BigQuery<br/><i>(Checking Transactions)</i>")]
         SessionsStore[("Agent Platform Sessions<br/>& Memory Bank")]
         SecretMgr[("Secret Manager<br/><i>(Alpaca Keys, MA ID)</i>")]
         AlpacaAPI[("Alpaca Trading API<br/><i>(Paper Brokerage)</i>")]

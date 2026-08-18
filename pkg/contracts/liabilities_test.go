@@ -26,7 +26,7 @@ func TestLiabilitiesSnapshotRoundTripAndValidation(t *testing.T) {
 					{
 						LiabilityID:         "liab_01",
 						Type:                contracts.LiabilityTypeCreditCard,
-						Description:         ptrString("Chase Sapphire Preferred"),
+						Description:         ptrString("Premium Rewards Card"),
 						BalanceUSD:          1250.45,
 						InterestRatePercent: ptrFloat64(22.99),
 						MinimumPaymentUSD:   40,

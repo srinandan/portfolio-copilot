@@ -19,7 +19,7 @@ make setup-all
 This runs, in sequence:
 
 1. `setup_secrets.sh`, creates `ALPACA_API_KEY_ID`, `ALPACA_API_SECRET`, and `MANAGED_AGENT_ID` secrets (placeholder values, replace Alpaca keys with real paper-trading credentials afterward), granting the Agent Platform Service Agent access to fetch them during deployment.
-2. `setup_bigquery.sh`, creates the `portfolio_copilot.chase_transactions` dataset and table.
+2. `setup_bigquery.sh`, creates the `portfolio_copilot.checking_transactions` dataset and table.
 3. `setup_firestore.sh`, provisions the Firestore database.
 4. `setup_cloudrun.sh`, deploys `frontend` (unified web host and backend API server) to Cloud Run with its own dedicated, least-privilege service account, not the default compute service account.
 5. `setup_managed_agent.sh`, provisions and deploys the worker Managed Agent (`scripts/deploy_managed_agent.py`) and stores its resource ID in Secret Manager as `MANAGED_AGENT_ID`.
@@ -82,7 +82,7 @@ python3 scripts/load_test_data.py --dry-run
 ```
 
 This populates:
-- **BigQuery (`portfolio_copilot.chase_transactions`)**: 4 months of transaction history exercising the dual-condition spending anomaly rule.
+- **BigQuery (`portfolio_copilot.checking_transactions`)**: 4 months of transaction history exercising the dual-condition spending anomaly rule.
 - **Firestore (`ips/ips_demo_001_v1`, `holdings/demo_user`, `liabilities/demo_user`, `user_profiles/demo_user`, `drift_reports/demo_user`, `spending_reports/demo_user`)**: Canonical active IPS reference policy, multi-asset class holdings (with out-of-band equity drift and unclassified crypto asset class), credit liabilities, user profile demographic data, and canonical baseline reports.
 
 ## Verify installation
