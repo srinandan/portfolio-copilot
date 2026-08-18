@@ -60,12 +60,14 @@ def test_lifespan_runs_startup_verifications():
 
     with (
         patch("src.orchestrator.skills._skill_metadata.verify_all_skills_metadata") as mock_verify_skills,
+        patch("src.orchestrator.skills.manifest.verify_all_manifests") as mock_verify_manifests,
         patch("src.orchestrator.managed_agents.secret_loader.verify_required_secrets") as mock_verify_secrets,
         patch("src.orchestrator.server.SessionManager"),
         patch("src.orchestrator.server.Runner"),
     ):
         with TestClient(server.app):
             mock_verify_skills.assert_called_once()
+            mock_verify_manifests.assert_called_once()
             mock_verify_secrets.assert_called_once()
 
 
@@ -77,6 +79,7 @@ def test_lifespan_initializes_and_closes_firestore_mcp_toolset():
 
     with (
         patch("src.orchestrator.skills._skill_metadata.verify_all_skills_metadata"),
+        patch("src.orchestrator.skills.manifest.verify_all_manifests"),
         patch("src.orchestrator.managed_agents.secret_loader.verify_required_secrets"),
         patch(
             "src.orchestrator.data.firestore_mcp.get_firestore_mcp_toolset_from_registry",
@@ -103,6 +106,7 @@ def test_lifespan_firestore_mcp_discovery_failure_handled_gracefully():
 
     with (
         patch("src.orchestrator.skills._skill_metadata.verify_all_skills_metadata"),
+        patch("src.orchestrator.skills.manifest.verify_all_manifests"),
         patch("src.orchestrator.managed_agents.secret_loader.verify_required_secrets"),
         patch(
             "src.orchestrator.data.firestore_mcp.get_firestore_mcp_toolset_from_registry",
@@ -126,6 +130,7 @@ def test_lifespan_firestore_mcp_timeout_handled_gracefully():
 
     with (
         patch("src.orchestrator.skills._skill_metadata.verify_all_skills_metadata"),
+        patch("src.orchestrator.skills.manifest.verify_all_manifests"),
         patch("src.orchestrator.managed_agents.secret_loader.verify_required_secrets"),
         patch(
             "src.orchestrator.data.firestore_mcp.get_firestore_mcp_toolset_from_registry",
@@ -153,6 +158,7 @@ def test_lifespan_initializes_and_closes_bigquery_mcp_toolset():
 
     with (
         patch("src.orchestrator.skills._skill_metadata.verify_all_skills_metadata"),
+        patch("src.orchestrator.skills.manifest.verify_all_manifests"),
         patch("src.orchestrator.managed_agents.secret_loader.verify_required_secrets"),
         patch(
             "src.orchestrator.data.bigquery_mcp.get_bigquery_mcp_toolset_from_registry",
@@ -179,6 +185,7 @@ def test_lifespan_bigquery_mcp_discovery_failure_handled_gracefully():
 
     with (
         patch("src.orchestrator.skills._skill_metadata.verify_all_skills_metadata"),
+        patch("src.orchestrator.skills.manifest.verify_all_manifests"),
         patch("src.orchestrator.managed_agents.secret_loader.verify_required_secrets"),
         patch(
             "src.orchestrator.data.bigquery_mcp.get_bigquery_mcp_toolset_from_registry",
@@ -202,6 +209,7 @@ def test_lifespan_bigquery_mcp_timeout_handled_gracefully():
 
     with (
         patch("src.orchestrator.skills._skill_metadata.verify_all_skills_metadata"),
+        patch("src.orchestrator.skills.manifest.verify_all_manifests"),
         patch("src.orchestrator.managed_agents.secret_loader.verify_required_secrets"),
         patch(
             "src.orchestrator.data.bigquery_mcp.get_bigquery_mcp_toolset_from_registry",

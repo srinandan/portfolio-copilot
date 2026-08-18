@@ -13,6 +13,35 @@ This directory contains the runtime skills for **Portfolio Copilot**, discovered
 | [`research/`](research/) | Gathers external market context with strict data isolation via Google Search grounding. | [`research.evalset.json`](research/research.evalset.json) |
 | [`reviewer/`](reviewer/) | Independently verifies proposed trades against active IPS, holdings, and concentration limits. | [`reviewer.evalset.json`](reviewer/reviewer.evalset.json) |
 
+## Skill Manifests
+
+Each skill ships a sibling **`manifest.json`** next to its `SKILL.md` — machine-readable
+metadata describing the artifacts the skill `requires` / `produces`, whether it is
+`parallelizable`, and any structural compliance trigger (`mandatory_if`). This is the
+data the planner uses to route by intent and resolve dependencies, per
+[ADR-0022](../docs/adr/0022-intent-driven-skill-planning.md). **Structure**
+(dependencies) lives here with the skill; **policy** (intent routing) lives with the
+planner.
+
+The manifest is kept out of `SKILL.md` on purpose: `SKILL.md` stays clean and
+standard-compliant (it carries only the Agent Skills fields), while `manifest.json`
+holds the orchestrator-specific routing metadata. The schema, loader, and validation
+live in
+[`orchestrator/src/orchestrator/skills/manifest.py`](../orchestrator/src/orchestrator/skills/manifest.py);
+manifests are graph-validated at orchestrator startup.
+
+```json
+{
+  "id": "action-drafting",
+  "summary": "Drafts a single compliant rebalancing trade from portfolio drift and the active policy.",
+  "applies_when": "The user asks to rebalance, trade, buy, sell, or act on portfolio drift.",
+  "requires": ["drift_report", "active_ips", "holdings"],
+  "optional": ["research_briefs"],
+  "produces": ["proposed_action"],
+  "parallelizable": false
+}
+```
+
 ## Skill Evaluation with Native ADK
 
 Skills are evaluated using Google's native **Agent Development Kit (ADK)** evaluation framework. Each skill folder contains an `.evalset.json` file defining golden cases, boundary conditions, and guardrail validations adhering to ADK's `EvalSet` schema.
