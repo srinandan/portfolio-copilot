@@ -8,6 +8,17 @@ description: >-
 metadata:
   version: "0.2.0"
   status: draft
+manifest:
+  id: spending-analysis
+  summary: >-
+    Synthesizes spending insights, savings rate, and reserve estimates from
+    preloaded account transaction facts.
+  applies_when: >-
+    The user asks about spending, budget categories, savings rate, or cash
+    reserves, or a savings/reserve figure is needed for goals onboarding.
+  requires: []
+  produces: [spending_report]
+  parallelizable: true
 ---
 
 # spending-analysis

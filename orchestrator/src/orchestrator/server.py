@@ -109,8 +109,10 @@ async def _lifespan(_app: FastAPI):
     )
     from .managed_agents.secret_loader import verify_required_secrets
     from .skills._skill_metadata import verify_all_skills_metadata
+    from .skills.manifest import verify_all_manifests
 
     verify_all_skills_metadata()
+    verify_all_manifests()
     verify_required_secrets()
 
     try:

@@ -8,6 +8,18 @@ description: >-
 metadata:
   version: "0.1.0"
   status: draft
+manifest:
+  id: reviewer
+  summary: >-
+    Reviews a drafted ProposedAction against the active IPS and rules,
+    producing a ReviewerVerdict with per-rule pass/fail results.
+  applies_when: >-
+    A ProposedAction has been drafted and must be checked before human
+    approval. Added automatically by the structural gate; never user-requested.
+  requires: [proposed_action, active_ips, holdings]
+  produces: [reviewer_verdict]
+  mandatory_if: proposed_action exists
+  parallelizable: false
 ---
 
 # reviewer

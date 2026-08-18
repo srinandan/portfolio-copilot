@@ -9,6 +9,17 @@ description: >-
 metadata:
   version: "0.1.0"
   status: draft
+manifest:
+  id: action-drafting
+  summary: >-
+    Drafts a single compliant rebalancing trade from portfolio drift and the
+    active policy.
+  applies_when: >-
+    The user asks to rebalance, trade, buy, sell, or act on portfolio drift.
+  requires: [drift_report, active_ips, holdings]
+  optional: [research_briefs]
+  produces: [proposed_action]
+  parallelizable: false
 ---
 
 # action-drafting
