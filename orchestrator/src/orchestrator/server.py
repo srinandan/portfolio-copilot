@@ -88,6 +88,7 @@ class ServerState:
     session_manager: Optional[SessionManager] = None
     runner: Optional[Runner] = None
     firestore_mcp_toolset: Optional[Any] = None
+    bigquery_mcp_toolset: Optional[Any] = None
     ready: bool = False
 
 
@@ -96,6 +97,12 @@ state = ServerState()
 
 @asynccontextmanager
 async def _lifespan(_app: FastAPI):
+    from .data.bigquery_mcp import (
+        get_bigquery_mcp_toolset_from_registry,
+    )
+    from .data.bigquery_mcp import (
+        list_available_mcp_tools as list_available_bq_mcp_tools,
+    )
     from .data.firestore_mcp import (
         get_firestore_mcp_toolset_from_registry,
         list_available_mcp_tools,
@@ -124,6 +131,24 @@ async def _lifespan(_app: FastAPI):
     except Exception as e:
         logger.warning("Firestore Remote MCP startup check deferred: %s", e)
 
+    try:
+        bq_toolset = get_bigquery_mcp_toolset_from_registry()
+        try:
+            bq_tools = await asyncio.wait_for(list_available_bq_mcp_tools(bq_toolset), timeout=10.0)
+            state.bigquery_mcp_toolset = bq_toolset
+            logger.info(
+                "BigQuery Remote MCP Server toolset initialized successfully on startup (tools=%d).",
+                len(bq_tools),
+            )
+        except Exception:
+            try:
+                await bq_toolset.close()
+            except Exception:
+                pass
+            raise
+    except Exception as e:
+        logger.warning("BigQuery Remote MCP startup check deferred: %s", e)
+
     state.session_manager = SessionManager()
 
     state.runner = Runner(
@@ -146,6 +171,13 @@ async def _lifespan(_app: FastAPI):
             except Exception as e:
                 logger.warning("Failed to close Firestore Remote MCP toolset on shutdown: %s", e)
             state.firestore_mcp_toolset = None
+        if state.bigquery_mcp_toolset is not None:
+            try:
+                await state.bigquery_mcp_toolset.close()
+                logger.info("BigQuery Remote MCP toolset closed successfully.")
+            except Exception as e:
+                logger.warning("Failed to close BigQuery Remote MCP toolset on shutdown: %s", e)
+            state.bigquery_mcp_toolset = None
 
 
 def _project_from_adc() -> str:

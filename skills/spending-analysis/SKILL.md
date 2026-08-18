@@ -94,8 +94,8 @@ persists the resulting SpendingReport.
 
 - Managed Agent sandbox: conversational reasoning over preloaded context
 - Orchestrator (outside sandbox):
-  - BigQuery: read `checking_transactions` (aggregate/`SELECT` only, user-scoped)
-  - Firestore: read `holdings` (cash balance only, for reserve estimate)
+  - BigQuery: read `checking_transactions` (aggregate/`SELECT` only, user-scoped via Native SDK and BigQuery Remote MCP Server `https://bigquery.googleapis.com/mcp`)
+  - Firestore: read `holdings` (cash balance only, for reserve estimate via Firestore Remote MCP Server)
 - **No** direct database execution tools inside the Managed Agent sandbox.
 
 ## Registry metadata
