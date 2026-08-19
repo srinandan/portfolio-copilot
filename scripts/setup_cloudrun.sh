@@ -34,6 +34,16 @@ fi
 # - Agent Platform (roles/aiplatform.user): invokes ReasoningEngine / Agent Engine /api/plan streamQuery
 # - Cloud Trace (roles/cloudtrace.agent): exports OpenTelemetry spans to Cloud Trace (ADR-0019)
 # Note: Frontend does NOT need Secret Manager access (Alpaca access is orchestrator-only per ADR-0005).
+#
+# Tracing export transport (ADR-0019, #313): by default the server exports spans
+# with the native Cloud Trace exporter (the roles/cloudtrace.agent binding above).
+# To forward over OTLP to an OpenTelemetry Collector instead, set OTEL_EXPORTER_OTLP_ENDPOINT
+# (or OTEL_TRACES_EXPORTER=otlp) on the frontend service at deploy time, e.g.:
+#   gcloud run services update portfolio-copilot-frontend --region="$REGION" \
+#     --update-env-vars=OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+# Either transport also re-emits the SPA's browser spans as real spans (not just
+# trace-correlated logs). Set OTEL_TRACES_ENABLED=false to disable span export
+# entirely (trace-context propagation stays on).
 echo "Configuring IAM policy bindings for portfolio-copilot-frontend-sa..."
 for ROLE in roles/datastore.user roles/bigquery.dataViewer roles/aiplatform.user roles/cloudtrace.agent; do
   gcloud projects add-iam-policy-binding "$PROJECT_ID" \

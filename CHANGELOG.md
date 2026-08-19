@@ -8,6 +8,18 @@ once tagged. Nothing has been released yet — see the note under `[Unreleased]`
 
 ## [Unreleased]
 
+### Added
+- OTLP trace forwarding for the Go server and browser spans ([ADR-0019](docs/adr/0019-distributed-tracing-frontend-and-server.md), #313).
+  The frontend server's span exporter is now selectable: OTLP (`otlptracehttp`)
+  when an OTLP endpoint is configured (`OTEL_EXPORTER_OTLP_ENDPOINT`,
+  `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`, or `OTEL_TRACES_EXPORTER=otlp`), otherwise
+  the native Cloud Trace exporter (unchanged default). Browser spans posted by the
+  SPA are now **re-emitted as real spans** — preserving the SPA-supplied
+  trace/span/parent ids so the server request span attaches to a real parent —
+  instead of only correlating via trace-linked logs; the log path remains as the
+  fallback when span export is disabled. No SPA changes and no new browser
+  dependencies. See `scripts/setup_cloudrun.sh` for the opt-in env var.
+
 ## [0.2.0] - 2026-08-18
 
 ### Added
