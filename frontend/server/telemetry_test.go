@@ -17,16 +17,21 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
+	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
 func TestInitTracing_DisabledIsNoopButPropagates(t *testing.T) {
 	t.Setenv("OTEL_TRACES_ENABLED", "false")
-	shutdown, err := InitTracing(context.Background())
+	shutdown, replayTP, err := InitTracing(context.Background())
 	if err != nil {
 		t.Fatalf("InitTracing returned error: %v", err)
 	}
 	if shutdown == nil {
 		t.Fatal("InitTracing returned nil shutdown")
+	}
+	if replayTP != nil {
+		t.Error("expected nil replay provider when export is disabled")
 	}
 	if err := shutdown(context.Background()); err != nil {
 		t.Errorf("noop shutdown returned error: %v", err)
@@ -37,6 +42,117 @@ func TestInitTracing_DisabledIsNoopButPropagates(t *testing.T) {
 	if !slices.Contains(fields, "traceparent") {
 		t.Errorf("expected 'traceparent' in propagator fields, got %v", fields)
 	}
+}
+
+func TestOTLPExportConfigured(t *testing.T) {
+	cases := []struct {
+		name string
+		env  map[string]string
+		want bool
+	}{
+		{"none", map[string]string{}, false},
+		{"general endpoint", map[string]string{"OTEL_EXPORTER_OTLP_ENDPOINT": "http://collector:4318"}, true},
+		{"traces endpoint", map[string]string{"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT": "http://collector:4318/v1/traces"}, true},
+		{"exporter selector", map[string]string{"OTEL_TRACES_EXPORTER": "otlp"}, true},
+		{"exporter selector cased", map[string]string{"OTEL_TRACES_EXPORTER": "OTLP"}, true},
+		{"exporter selector other", map[string]string{"OTEL_TRACES_EXPORTER": "console"}, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Clear all OTLP-selecting vars, then set the case's.
+			for _, k := range []string{"OTEL_EXPORTER_OTLP_ENDPOINT", "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "OTEL_TRACES_EXPORTER"} {
+				t.Setenv(k, "")
+			}
+			for k, v := range tc.env {
+				t.Setenv(k, v)
+			}
+			if got := otlpExportConfigured(); got != tc.want {
+				t.Errorf("otlpExportConfigured() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestReplaySpan_PreservesIDs is the core #313 guarantee: a browser span
+// forwarded through the replay tracer is exported as a real span that keeps the
+// SPA-supplied trace id, span id, and parent span id — so the server request
+// span (parented to the browser client span via the propagated traceparent)
+// attaches to a real parent instead of an orphan.
+func TestReplaySpan_PreservesIDs(t *testing.T) {
+	inmem := tracetest.NewInMemoryExporter()
+	tp := sdktrace.NewTracerProvider(
+		sdktrace.WithSyncer(inmem),
+		sdktrace.WithSampler(sdktrace.AlwaysSample()),
+		sdktrace.WithIDGenerator(seededIDGenerator{}),
+	)
+	t.Cleanup(func() { _ = tp.Shutdown(context.Background()) })
+
+	ti := &TelemetryIngest{projectID: "test-project", tracer: tp.Tracer("browser-spa")}
+	r := gin.New()
+	r.POST("/api/telemetry/v1/traces", ti.HandleIngestTraces)
+
+	const traceID = "0af7651916cd43dd8448eb211c80319c"
+	const parentID = "b7ad6b7169203331" // browser root (user-action) span
+	const childID = "00f067aa0ba902b7"  // browser client span, child of the root
+	body := `{"spans":[
+		{"traceId":"` + traceID + `","spanId":"` + parentID + `","name":"planning_turn_triggered","kind":"internal","startTimeUnixMs":1000,"endTimeUnixMs":2000,"attributes":{"user_id":"demo_user"}},
+		{"traceId":"` + traceID + `","spanId":"` + childID + `","parentSpanId":"` + parentID + `","name":"POST /api/plan","kind":"client","startTimeUnixMs":1100,"endTimeUnixMs":1400,"attributes":{"http.status_code":200}}
+	]}`
+	req := httptest.NewRequest(http.MethodPost, "/api/telemetry/v1/traces", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusAccepted {
+		t.Fatalf("expected 202, got %d: %s", w.Code, w.Body.String())
+	}
+
+	spans := inmem.GetSpans()
+	if len(spans) != 2 {
+		t.Fatalf("expected 2 exported spans, got %d", len(spans))
+	}
+	byID := map[string]tracetest.SpanStub{}
+	for _, s := range spans {
+		if s.SpanContext.TraceID().String() != traceID {
+			t.Errorf("span %q has trace id %s, want %s", s.Name, s.SpanContext.TraceID(), traceID)
+		}
+		byID[s.SpanContext.SpanID().String()] = s
+	}
+
+	root, ok := byID[parentID]
+	if !ok {
+		t.Fatalf("root span id %s not preserved; got ids %v", parentID, keysOf(byID))
+	}
+	if root.Parent.IsValid() {
+		t.Errorf("root span should have no valid parent, got %s", root.Parent.SpanID())
+	}
+	if root.SpanKind != oteltrace.SpanKindInternal {
+		t.Errorf("root span kind = %v, want internal", root.SpanKind)
+	}
+
+	child, ok := byID[childID]
+	if !ok {
+		t.Fatalf("child span id %s not preserved; got ids %v", childID, keysOf(byID))
+	}
+	if child.Parent.SpanID().String() != parentID {
+		t.Errorf("child parent span id = %s, want %s", child.Parent.SpanID(), parentID)
+	}
+	if child.SpanKind != oteltrace.SpanKindClient {
+		t.Errorf("child span kind = %v, want client", child.SpanKind)
+	}
+	// Timestamps come from the SPA (unix ms), not wall clock.
+	if child.StartTime.UnixMilli() != 1100 || child.EndTime.UnixMilli() != 1400 {
+		t.Errorf("child span timing = [%d,%d]ms, want [1100,1400]ms",
+			child.StartTime.UnixMilli(), child.EndTime.UnixMilli())
+	}
+}
+
+func keysOf(m map[string]tracetest.SpanStub) []string {
+	ks := make([]string, 0, len(m))
+	for k := range m {
+		ks = append(ks, k)
+	}
+	return ks
 }
 
 func newIngestRouter() *gin.Engine {

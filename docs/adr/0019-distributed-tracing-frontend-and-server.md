@@ -32,10 +32,14 @@ Two design tensions shaped this ADR:
 ## Decision
 
 ### 1. Go server (`frontend/server`, `pkg/`) — full OpenTelemetry
-- **TracerProvider + Cloud Trace exporter** in `telemetry.go`
-  (`InitTracing`), using the Google Cloud Trace exporter. Export is **gated**:
-  enabled when a GCP project is resolvable and not disabled via
-  `OTEL_TRACES_ENABLED=false`; otherwise a no-op provider is installed.
+- **TracerProvider + selectable exporter** in `telemetry.go`
+  (`InitTracing`). The transport is chosen at startup: **OTLP** (`otlptracehttp`)
+  when an OTLP endpoint is configured (`OTEL_EXPORTER_OTLP_ENDPOINT`,
+  `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`, or `OTEL_TRACES_EXPORTER=otlp`),
+  otherwise the **Google Cloud Trace exporter** (the zero-config default).
+  Export is **gated**: enabled when a destination exists (an OTLP endpoint or a
+  resolvable GCP project) and not disabled via `OTEL_TRACES_ENABLED=false`;
+  otherwise a no-op provider is installed.
 - **The W3C propagator is installed unconditionally** — even when span export is
   off — so trace context keeps flowing across services in every environment.
 - **Server spans** via `otelgin.Middleware`, which extracts the incoming
@@ -64,16 +68,25 @@ user-action and client spans, and OTLP-JSON batch export. It deliberately does
 User actions (`planning_turn_triggered`, `hitl_decision_submitted`) are recorded
 as spans; the API client spans for the requests they trigger nest under them.
 
-### 3. Browser span sink — trace-correlated logs on the Go server
-The SPA batches spans to `POST /api/telemetry/v1/traces`. The Go handler
-(`TelemetryIngest`) records each valid span as a structured log entry carrying
-the Cloud Logging trace-correlation fields (`logging.googleapis.com/trace`,
-`logging.googleapis.com/spanId`). Because the server continues the SPA's trace
-via the propagated `traceparent`, these client spans surface in the **same Cloud
-Trace timeline** as the server and orchestrator spans (tension #2), reusing the
-existing structured-logging pipeline rather than standing up an OTLP receiver.
-Forwarding the raw OTLP to Cloud Trace's OTLP endpoint is a possible future
-extension; the ingest endpoint is the seam for it.
+### 3. Browser span sink — real spans re-emitted on the Go server
+The SPA batches spans to `POST /api/telemetry/v1/traces` (its own dependency-free
+JSON shape — tension #1 keeps the browser off the web SDK). When span export is
+enabled, the Go handler (`TelemetryIngest`) **re-emits each valid span as a real
+span** through a dedicated replay `TracerProvider`, preserving the SPA-supplied
+`traceId`/`spanId`/`parentSpanId` via a seeded `IDGenerator`. Preserving the ids
+matters: the server request span is already parented (via the propagated
+`traceparent`) to the browser **client** span's id, so re-emitting that client
+span with its original id gives the server span a real parent instead of an
+orphan — a complete browser→server→orchestrator tree in **one** Cloud Trace
+timeline (tension #2). The server does the OTLP construction so the browser stays
+dependency-free.
+
+The original design forwarded browser spans as trace-correlated **logs**
+(`logging.googleapis.com/trace` + `spanId`) rather than real spans; that path is
+retained as the **fallback** when span export is disabled (local dev / no
+destination), so client spans still correlate by log linkage there. Upgrading the
+ingest to real spans — over whichever transport §1 selected, including OTLP
+forwarding to a collector — is #313; the ingest endpoint was the seam for it.
 
 ### Telemetry is advisory
 As with progress events (ADR-0018), tracing must never break the page or a
@@ -91,9 +104,13 @@ spans are skipped (not fatal), and disabled export still propagates context.
 - **Streaming stays safe**: header-only injection on the client and an
   unbuffered `otelhttp` transport on the server keep the SSE path intact
   (verified by the existing SSE proxy/stream tests).
-- **Trade-off**: browser spans are captured as trace-correlated logs rather than
-  native Cloud Trace spans. They correlate in the trace view via log linkage;
-  full OTLP forwarding was deferred to keep the surface small and dependency-free.
+- **Browser spans are native spans (#313)**: when export is enabled, browser
+  spans are re-emitted as real spans (ids preserved) over the selected transport —
+  OTLP to a collector, or the Cloud Trace exporter — rather than correlating only
+  via log linkage. The log-linkage path remains as the no-export fallback. The SPA
+  is still dependency-free; the OTLP construction happens server-side. Originally
+  deferred to keep the surface small; the ingest endpoint was left as the seam and
+  is where this landed.
 - **Orchestrator egress (follow-up)**: once Firestore access moved to the remote
   Firestore MCP server (#309), the orchestrator's own outbound hop needed the same
   treatment the Go server got. `server.py` now instruments outbound `httpx`

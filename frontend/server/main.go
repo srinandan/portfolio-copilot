@@ -14,9 +14,11 @@ func main() {
 	InitLogger()
 
 	// Initialize OpenTelemetry: installs the W3C propagator (always) and, when a
-	// project is configured, a Cloud Trace exporter. Shutdown flushes on exit.
+	// destination is configured, a TracerProvider backed by the OTLP exporter
+	// (OTEL_EXPORTER_OTLP_ENDPOINT) or the Cloud Trace exporter. replayTP re-emits
+	// browser spans as real spans; nil when export is disabled. Shutdown flushes.
 	ctx := context.Background()
-	shutdownTracing, err := InitTracing(ctx)
+	shutdownTracing, replayTP, err := InitTracing(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx, "tracing init failed; continuing without span export", "error", err)
 	}
@@ -29,7 +31,7 @@ func main() {
 
 	srv := NewServer()
 	oc := NewOrchestratorClient()
-	ti := NewTelemetryIngest()
+	ti := NewTelemetryIngest(replayTP)
 
 	// Health check endpoint for Cloud Run
 	r.GET("/health", func(c *gin.Context) {
