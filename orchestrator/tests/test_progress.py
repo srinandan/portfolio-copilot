@@ -144,6 +144,7 @@ async def test_root_planner_emits_stage_progress_through_interleave():
         patch(
             "src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock
         ) as mock_list,
+        patch("src.orchestrator.planner._load_authorized_manifests", new_callable=AsyncMock, return_value=None),
         patch("src.orchestrator.planner.emit_skill_invoked_audit"),
         patch("src.orchestrator.planner.dispatch_managed_skill", new_callable=AsyncMock) as mock_dispatch,
         patch("src.orchestrator.planner.preload_spending_facts") as mock_preload,
@@ -171,7 +172,7 @@ async def test_root_planner_emits_stage_progress_through_interleave():
             progress_by_stage.setdefault(i["stage"], []).append(i["status"])
 
     assert progress_by_stage.get("discovery") == ["running", "done"]
-    assert progress_by_stage.get("spending-analysis") == ["pending", "running", "done"]
+    assert progress_by_stage.get("spending-analysis") == ["running", "done"]
     # The final ADK output event (the planner's results list) is still on the stream.
     assert any(i.get("kind") != "progress" for i in items)
 
