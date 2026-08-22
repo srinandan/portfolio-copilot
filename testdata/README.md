@@ -240,10 +240,11 @@ Document AI or served by the mock in tests/dev.
 
 | W-2 box | Field | Value |
 |---|---|---|
+| — | Tax year | `2025` |
 | a | Employee SSN | `123-45-4589` (stored masked as `***-**-4589`) |
-| b | Employer EIN | `94-3289634` |
-| c | Employer | Alphabet Inc., 1600 Amphitheatre Pkwy, Mountain View, CA 94043 |
-| e/f | Employee | Alex Mercer, 742 Evergreen Terrace, Springfield, OR 97477 |
+| b | Employer EIN | `12-3456789` |
+| c | Employer | Acme Corporation, 500 Roadrunner Way, San Jose, CA 95110 |
+| e/f | Employee | Alex Mercer, 1024 Mission Street, San Francisco, CA 94103 |
 | 1 | Wages, tips, other comp. | `220,000.00` |
 | 2 | Federal income tax withheld | `38,450.00` |
 | 3 / 4 | Social security wages / tax | `168,600.00` / `10,453.20` |

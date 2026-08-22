@@ -38,7 +38,7 @@ func (m *MockW2Parser) ParseW2(ctx context.Context, fileBytes []byte, mimeType s
 
 	nowStr := time.Now().UTC().Format(time.RFC3339)
 	docID := fmt.Sprintf("w2-%d", time.Now().UnixNano())
-	taxYear := ParseTaxYear(filename, 2024)
+	taxYear := ParseTaxYear(filename, 2025)
 
 	fedTax := 38450.0
 	ssWages := 168600.0
@@ -58,14 +58,14 @@ func (m *MockW2Parser) ParseW2(ctx context.Context, fileBytes []byte, mimeType s
 		ConfidenceScore: &conf,
 		Status:          contracts.W2StatusSuccess,
 		Employer: &contracts.W2Employer{
-			Name:    "Alphabet Inc.",
-			EIN:     "94-3289634",
-			Address: "1600 Amphitheatre Pkwy, Mountain View, CA 94043",
+			Name:    "Acme Corporation",
+			EIN:     "12-3456789",
+			Address: "500 Roadrunner Way, San Jose, CA 95110",
 		},
 		Employee: &contracts.W2Employee{
 			Name:      "Alex Mercer",
 			SSNMasked: "***-**-4589",
-			Address:   "742 Evergreen Terrace, Springfield, OR 97477",
+			Address:   "1024 Mission Street, San Francisco, CA 94103",
 		},
 		WagesAndCompensation: contracts.W2Wages{
 			Box1WagesTipsOtherCompUSD: 220000.0,
@@ -94,7 +94,7 @@ func (m *MockW2Parser) ParseW2(ctx context.Context, fileBytes []byte, mimeType s
 		RawEntities: map[string]string{
 			"w2_box1_wages": "220000.00",
 			"w2_box2_tax":   "38450.00",
-			"employer_name": "Alphabet Inc.",
+			"employer_name": "Acme Corporation",
 		},
 	}, nil
 }

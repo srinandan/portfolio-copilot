@@ -25,16 +25,17 @@ from reportlab.lib.units import inch  # noqa: F401 (kept for readability of coor
 PAGE_W, PAGE_H = letter  # 612 x 792 points
 
 # --- Fixture data (matches pkg/documentai/mock.go MockW2Parser) -----------------
-TAX_YEAR = "2024"
+TAX_YEAR = "2025"
 SSN = "123-45-4589"          # fictitious; last 4 (4589) matches SSNMasked "***-**-4589"
-EIN = "94-3289634"           # fictitious
+EIN = "12-3456789"           # fictitious
 CONTROL_NUMBER = "W2-DEMO-0001"
 
-EMPLOYER_NAME = "Alphabet Inc."
-EMPLOYER_ADDR = ["1600 Amphitheatre Pkwy", "Mountain View, CA 94043"]
+EMPLOYER_NAME = "Acme Corporation"
+EMPLOYER_ADDR = ["500 Roadrunner Way", "San Jose, CA 95110"]
 
 EMPLOYEE_NAME = "Alex Mercer"
-EMPLOYEE_ADDR = ["742 Evergreen Terrace", "Springfield, OR 97477"]
+# California address — matches the CA state withholding (boxes 15-17) and SF locality (box 20).
+EMPLOYEE_ADDR = ["1024 Mission Street", "San Francisco, CA 94103"]
 
 BOX1_WAGES = "220,000.00"
 BOX2_FED_TAX = "38,450.00"
