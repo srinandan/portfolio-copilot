@@ -3,6 +3,7 @@ package documentai
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -101,10 +102,17 @@ func (p *GCPW2Parser) ParseW2(ctx context.Context, fileBytes []byte, mimeType st
 		RawEntities: make(map[string]string),
 	}
 
+	entities := document.GetEntities()
+	slog.InfoContext(ctx, "Document AI response received",
+		"entity_count", len(entities),
+		"processor", p.processorID,
+		"filename", filename,
+	)
+
 	var totalConfidence float64
 	var entityCount int
 
-	for _, entity := range document.GetEntities() {
+	for _, entity := range entities {
 		entityType := strings.ToLower(strings.TrimSpace(entity.GetType()))
 		textVal := strings.TrimSpace(entity.GetMentionText())
 		confidence := float64(entity.GetConfidence())
@@ -112,6 +120,12 @@ func (p *GCPW2Parser) ParseW2(ctx context.Context, fileBytes []byte, mimeType st
 		if strings.Contains(entityType, "ssn") || strings.Contains(entityType, "social_security_number") {
 			textVal = MaskSSN(textVal)
 		}
+
+		slog.InfoContext(ctx, "Document AI entity extracted",
+			"type", entityType,
+			"mention_text", textVal,
+			"confidence", confidence,
+		)
 
 		if textVal != "" {
 			w2.RawEntities[entityType] = textVal
@@ -266,6 +280,20 @@ func (p *GCPW2Parser) ParseW2(ctx context.Context, fileBytes []byte, mimeType st
 		avgConfidence := totalConfidence / float64(entityCount)
 		w2.ConfidenceScore = &avgConfidence
 	}
+
+	slog.InfoContext(ctx, "W-2 normalization complete",
+		"doc_id", w2.ID,
+		"employer_name", w2.Employer.Name,
+		"employer_ein", w2.Employer.EIN,
+		"employer_address", w2.Employer.Address,
+		"employee_name", w2.Employee.Name,
+		"employee_address", w2.Employee.Address,
+		"wages_box1_usd", w2.WagesAndCompensation.Box1WagesTipsOtherCompUSD,
+		"tax_year", w2.TaxYear,
+		"box12_items_count", len(w2.Box12Items),
+		"state_taxes_count", len(w2.StateTaxes),
+		"local_taxes_count", len(w2.LocalTaxes),
+	)
 
 	return w2, nil
 }
