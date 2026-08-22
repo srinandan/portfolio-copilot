@@ -1,9 +1,12 @@
 package store
 
 import (
-	"cloud.google.com/go/firestore"
 	"context"
 	"fmt"
+
+	"cloud.google.com/go/firestore"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"portfolio-copilot/pkg/contracts"
 )
 
@@ -236,7 +239,7 @@ func (c *Client) DeleteW2Document(ctx context.Context, userID string, docID stri
 		return fmt.Errorf("failed to parse existing w2 document: %w", err)
 	}
 	if w2.UserID != userID {
-		return fmt.Errorf("permission denied: w2 document does not belong to user %s", userID)
+		return status.Error(codes.NotFound, fmt.Sprintf("w2 document %s not found", docID))
 	}
 
 	_, err = docRef.Delete(ctx)

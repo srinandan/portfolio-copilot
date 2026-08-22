@@ -268,7 +268,7 @@ func (c *Client) GetW2Document(ctx context.Context, userID string, docID string)
 	}
 
 	if item.UserID != userID {
-		return nil, fmt.Errorf("permission denied: w2 document does not belong to user %s", userID)
+		return nil, status.Error(codes.NotFound, fmt.Sprintf("w2 document %s not found", docID))
 	}
 
 	return &item, nil

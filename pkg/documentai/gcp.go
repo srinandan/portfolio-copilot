@@ -109,6 +109,10 @@ func (p *GCPW2Parser) ParseW2(ctx context.Context, fileBytes []byte, mimeType st
 		textVal := strings.TrimSpace(entity.GetMentionText())
 		confidence := float64(entity.GetConfidence())
 
+		if strings.Contains(entityType, "ssn") || strings.Contains(entityType, "social_security_number") {
+			textVal = MaskSSN(textVal)
+		}
+
 		if textVal != "" {
 			w2.RawEntities[entityType] = textVal
 			totalConfidence += confidence
@@ -142,7 +146,7 @@ func (p *GCPW2Parser) ParseW2(ctx context.Context, fileBytes []byte, mimeType st
 		case strings.Contains(entityType, "employee_name") || entityType == "w2_employee_name":
 			w2.Employee.Name = textVal
 		case strings.Contains(entityType, "ssn") || strings.Contains(entityType, "social_security_number") || entityType == "w2_employee_ssn":
-			w2.Employee.SSNMasked = MaskSSN(textVal)
+			w2.Employee.SSNMasked = textVal
 		case strings.Contains(entityType, "employee_address") || entityType == "w2_employee_address":
 			w2.Employee.Address = textVal
 		case strings.Contains(entityType, "tax_year") || entityType == "w2_tax_year":
@@ -166,12 +170,12 @@ func (p *GCPW2Parser) ParseW2(ctx context.Context, fileBytes []byte, mimeType st
 }
 
 func parseBox12Entity(entity *documentaipb.Document_Entity) contracts.W2Box12Item {
-	text := entity.GetMentionText()
-	// Box 12 entities often have properties like code and amount, or mention text like "D 22500"
+	text := strings.TrimSpace(entity.GetMentionText())
 	item := contracts.W2Box12Item{
-		Code:      "D",
-		AmountUSD: ParseCurrency(text),
+		Code:      "",
+		AmountUSD: 0,
 	}
+
 	for _, prop := range entity.GetProperties() {
 		pType := strings.ToLower(prop.GetType())
 		pText := strings.TrimSpace(prop.GetMentionText())
@@ -181,17 +185,44 @@ func parseBox12Entity(entity *documentaipb.Document_Entity) contracts.W2Box12Ite
 			item.AmountUSD = ParseCurrency(pText)
 		}
 	}
+
+	// If code was not extracted via sub-properties, parse from mention text e.g. "D 23000" or "W $4,150"
+	if item.Code == "" && text != "" {
+		fields := strings.Fields(text)
+		if len(fields) >= 1 && len(fields[0]) <= 2 {
+			item.Code = strings.ToUpper(fields[0])
+			if len(fields) >= 2 && item.AmountUSD == 0 {
+				item.AmountUSD = ParseCurrency(fields[1])
+			}
+		}
+	}
+	if item.AmountUSD == 0 && text != "" {
+		item.AmountUSD = ParseCurrency(text)
+	}
+
 	switch item.Code {
 	case "D":
 		item.Description = "401(k) elective deferral"
-	case "W":
-		item.Description = "Employer HSA contribution"
-	case "AA":
-		item.Description = "Roth 401(k) contribution"
 	case "E":
 		item.Description = "403(b) elective deferral"
 	case "G":
 		item.Description = "457(b) elective deferral"
+	case "W":
+		item.Description = "Employer HSA contribution"
+	case "AA":
+		item.Description = "Roth 401(k) contribution"
+	case "BB":
+		item.Description = "Roth 403(b) contribution"
+	case "DD":
+		item.Description = "Cost of employer-sponsored health coverage"
+	case "C":
+		item.Description = "Taxable group-term life insurance over $50k"
+	case "V":
+		item.Description = "Income from nonstatutory stock options"
+	case "Y":
+		item.Description = "Section 409A deferrals"
+	case "Z":
+		item.Description = "Section 409A income"
 	}
 	return item
 }

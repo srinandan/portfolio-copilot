@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"cloud.google.com/go/documentai/apiv1/documentaipb"
 	"portfolio-copilot/pkg/contracts"
 )
 
@@ -141,4 +142,29 @@ func TestIsAffirmative(t *testing.T) {
 		}
 	}
 }
+
+func TestParseBox12Entity(t *testing.T) {
+	tests := []struct {
+		mentionText string
+		wantCode    string
+		wantDesc    string
+		wantAmt     float64
+	}{
+		{"D 23000.00", "D", "401(k) elective deferral", 23000.00},
+		{"DD 8500.00", "DD", "Cost of employer-sponsored health coverage", 8500.00},
+		{"W 4150", "W", "Employer HSA contribution", 4150.00},
+		{"AA $10,000", "AA", "Roth 401(k) contribution", 10000.00},
+	}
+
+	for _, tt := range tests {
+		entity := &documentaipb.Document_Entity{
+			MentionText: tt.mentionText,
+		}
+		got := parseBox12Entity(entity)
+		if got.Code != tt.wantCode || got.Description != tt.wantDesc || got.AmountUSD != tt.wantAmt {
+			t.Errorf("parseBox12Entity(%q) = %+v, want Code: %s, Desc: %s, Amt: %v", tt.mentionText, got, tt.wantCode, tt.wantDesc, tt.wantAmt)
+		}
+	}
+}
+
 

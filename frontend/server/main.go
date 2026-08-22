@@ -30,6 +30,7 @@ func main() {
 	r.Use(otelgin.Middleware(serviceName()), StructuredLogMiddleware(), gin.Recovery())
 
 	srv := NewServer()
+	defer func() { _ = srv.Close() }()
 	oc := NewOrchestratorClient()
 	ti := NewTelemetryIngest(replayTP)
 

@@ -944,4 +944,88 @@ func TestW2Handlers_ValidationErrors(t *testing.T) {
 	}
 }
 
+func TestW2Handlers_ProfilePreservation(t *testing.T) {
+	mock := newMockStore()
+	mockParser := documentai.NewMockW2Parser()
+	srv := &Server{
+		Store:       mock,
+		DocAIParser: mockParser,
+	}
+	r := setupTestRouterWithServer(srv)
+
+	// Pre-seed an existing profile for user_custom
+	existingProfile := &contracts.UserProfile{
+		UserID:              "user_custom",
+		FullName:            "Custom User",
+		Occupation:          "Senior Architect",
+		AnnualIncomeUSD:     120000.0,
+		TargetRetirementAge: 62,
+		RiskToleranceNotes:  "Moderate risk with 30-year horizon",
+	}
+	_ = mock.SetUserProfile(context.Background(), "user_custom", existingProfile)
+
+	// Upload a W-2
+	uploadReq, _ := createW2MultipartUpload("w2_2024.pdf", "user_custom", []byte("%PDF-fake-content"))
+	uploadW := httptest.NewRecorder()
+	r.ServeHTTP(uploadW, uploadReq)
+	var uploadedDoc contracts.W2Document
+	_ = json.Unmarshal(uploadW.Body.Bytes(), &uploadedDoc)
+
+	// Apply W-2
+	applyReq, _ := http.NewRequest(http.MethodPost, fmt.Sprintf("/api/profile/w2/%s/apply?user_id=user_custom", uploadedDoc.ID), nil)
+	applyW := httptest.NewRecorder()
+	r.ServeHTTP(applyW, applyReq)
+
+	if applyW.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK, got %d: %s", applyW.Code, applyW.Body.String())
+	}
+
+	// Verify profile retained existing fields and only updated income (occupation not overwritten since already non-empty)
+	updated, _ := mock.GetUserProfile(context.Background(), "user_custom")
+	if updated.FullName != "Custom User" {
+		t.Errorf("expected FullName preserved, got %s", updated.FullName)
+	}
+	if updated.Occupation != "Senior Architect" {
+		t.Errorf("expected Occupation preserved, got %s", updated.Occupation)
+	}
+	if updated.AnnualIncomeUSD != 220000.0 {
+		t.Errorf("expected AnnualIncomeUSD updated to 220000, got %v", updated.AnnualIncomeUSD)
+	}
+	if updated.RiskToleranceNotes != "Moderate risk with 30-year horizon" {
+		t.Errorf("expected RiskToleranceNotes preserved, got %s", updated.RiskToleranceNotes)
+	}
+}
+
+func TestW2Handlers_FallbackMode_UnknownIDReturns404(t *testing.T) {
+	srv := &Server{Store: nil, BQRunner: nil}
+	r := setupTestRouterWithServer(srv)
+
+	// Apply unknown ID
+	req1, _ := http.NewRequest(http.MethodPost, "/api/profile/w2/invalid-id/apply?user_id=demo_user", nil)
+	w1 := httptest.NewRecorder()
+	r.ServeHTTP(w1, req1)
+	if w1.Code != http.StatusNotFound {
+		t.Errorf("expected 404 Not Found for invalid ID in fallback mode, got %d", w1.Code)
+	}
+
+	// Delete unknown ID
+	req2, _ := http.NewRequest(http.MethodDelete, "/api/profile/w2/invalid-id?user_id=demo_user", nil)
+	w2 := httptest.NewRecorder()
+	r.ServeHTTP(w2, req2)
+	if w2.Code != http.StatusNotFound {
+		t.Errorf("expected 404 Not Found for invalid ID in fallback mode, got %d", w2.Code)
+	}
+}
+
+func TestServer_Close(t *testing.T) {
+	srv := &Server{
+		Store:       nil,
+		DocAIParser: documentai.NewMockW2Parser(),
+	}
+	if err := srv.Close(); err != nil {
+		t.Errorf("expected srv.Close() to succeed, got %v", err)
+	}
+}
+
+
 

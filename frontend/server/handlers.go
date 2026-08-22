@@ -99,6 +99,25 @@ func NewServer() *Server {
 	}
 }
 
+// Close gracefully closes external client connections held by Server.
+func (s *Server) Close() error {
+	var errs []string
+	if closer, ok := s.DocAIParser.(io.Closer); ok && closer != nil {
+		if err := closer.Close(); err != nil {
+			errs = append(errs, fmt.Sprintf("docai: %v", err))
+		}
+	}
+	if closer, ok := s.Store.(io.Closer); ok && closer != nil {
+		if err := closer.Close(); err != nil {
+			errs = append(errs, fmt.Sprintf("store: %v", err))
+		}
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("server close errors: %s", strings.Join(errs, "; "))
+	}
+	return nil
+}
+
 func (s *Server) HandleGetHoldings(c *gin.Context) {
 	userID := c.DefaultQuery("user_id", "demo_user")
 	if s.Store == nil {
@@ -688,6 +707,10 @@ func (s *Server) HandleDeleteW2Document(c *gin.Context) {
 	}
 
 	if s.Store == nil {
+		if docID != "w2-demo-1" && !strings.HasPrefix(docID, "w2-") {
+			c.JSON(http.StatusNotFound, gin.H{"error": "w2 document not found"})
+			return
+		}
 		c.JSON(http.StatusOK, gin.H{"status": "deleted", "id": docID})
 		return
 	}
@@ -714,6 +737,10 @@ func (s *Server) HandleApplyW2ToProfile(c *gin.Context) {
 	}
 
 	if s.Store == nil {
+		if docID != "w2-demo-1" && !strings.HasPrefix(docID, "w2-") {
+			c.JSON(http.StatusNotFound, gin.H{"error": "w2 document not found"})
+			return
+		}
 		profile := defaultUserProfile()
 		profile.AnnualIncomeUSD = 220000.0
 		profile.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
@@ -733,14 +760,27 @@ func (s *Server) HandleApplyW2ToProfile(c *gin.Context) {
 	}
 
 	profile, err := s.Store.GetUserProfile(ctx, userID)
-	if err != nil || profile == nil {
-		profile = defaultUserProfile()
-		profile.UserID = userID
+	if err != nil {
+		if store.IsNotFound(err) {
+			profile = &contracts.UserProfile{
+				UserID:   userID,
+				FullName: userID,
+			}
+		} else {
+			slog.ErrorContext(ctx, "Failed to retrieve user profile for W-2 apply", "user_id", userID, "error", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve user profile"})
+			return
+		}
+	} else if profile == nil {
+		profile = &contracts.UserProfile{
+			UserID:   userID,
+			FullName: userID,
+		}
 	}
 
 	profile.AnnualIncomeUSD = w2.WagesAndCompensation.Box1WagesTipsOtherCompUSD
-	if w2.Employer != nil && w2.Employer.Name != "" && (profile.Occupation == "" || profile.Occupation == "Staff Systems Engineer") {
-		profile.Occupation = fmt.Sprintf("Engineer at %s", w2.Employer.Name)
+	if w2.Employer != nil && w2.Employer.Name != "" && profile.Occupation == "" {
+		profile.Occupation = fmt.Sprintf("Employee at %s", w2.Employer.Name)
 	}
 	profile.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
 
