@@ -15,6 +15,7 @@ There are **two input shapes**, because the data lands in two stores:
 | **User Profile** | JSON | Firestore (`user_profiles/<user_id>`) | `user_profile.json` |
 | **Drift Report** | JSON | Firestore (`drift_reports/<user_id>`) | `drift_report.json` |
 | **Spending Report** | JSON | Firestore (`spending_reports/<user_id>`) | `spending_report.json` |
+| **Form W-2** | **PDF** | Document AI → Firestore (`w2_documents/<doc_id>`) | `w2_alex_mercer.pdf` |
 
 > Only **transactions** use CSV. Holdings, liabilities, user profiles, reports, and the IPS are JSON
 > documents (Firestore stores documents, not tabular rows). The JSON files here
@@ -219,6 +220,48 @@ Key fields: `user_id`, `full_name`, `email`, `date_of_birth`, `age`,
   "updated_at": "2026-08-01T00:00:00Z"
 }
 ```
+
+---
+
+## 6. Form W-2 — PDF
+
+A sample Form W-2 (Wage and Tax Statement) used to exercise **W-2 income ingestion**
+via Google Cloud Document AI (see [ADR-0026](../docs/adr/0026-w2-document-ai-ingestion-and-profile-sync.md)).
+Unlike the other fixtures, the input is a **PDF** (not JSON): it is uploaded through
+`POST /api/profile/w2/upload`, parsed by the pre-trained US W-2 Tax Processor, masked
+(the SSN is stored only as `***-**-XXXX`), and persisted to Firestore `w2_documents/<doc_id>`.
+
+**File:** `w2_alex_mercer.pdf` — all values are **fictitious test data** (fake SSN/EIN,
+fictional employer/employee) and the page is marked as a sample. It is **not** a real
+tax document. The numbers mirror the deterministic offline `MockW2Parser`
+([`pkg/documentai/mock.go`](../pkg/documentai/mock.go)) for the demo persona
+**Alex Mercer** (`demo_user`), so the same figures appear whether the PDF is parsed by
+Document AI or served by the mock in tests/dev.
+
+| W-2 box | Field | Value |
+|---|---|---|
+| a | Employee SSN | `123-45-4589` (stored masked as `***-**-4589`) |
+| b | Employer EIN | `94-3289634` |
+| c | Employer | Alphabet Inc., 1600 Amphitheatre Pkwy, Mountain View, CA 94043 |
+| e/f | Employee | Alex Mercer, 742 Evergreen Terrace, Springfield, OR 97477 |
+| 1 | Wages, tips, other comp. | `220,000.00` |
+| 2 | Federal income tax withheld | `38,450.00` |
+| 3 / 4 | Social security wages / tax | `168,600.00` / `10,453.20` |
+| 5 / 6 | Medicare wages / tax | `220,000.00` / `3,190.00` |
+| 12a / 12b | Code D (401k) / Code W (HSA) | `23,000.00` / `4,150.00` |
+| 13 | Retirement plan | checked |
+| 14 | Other (CA SDI) | `1,378.48` |
+| 15–17 | State (CA) wages / tax | `220,000.00` / `18,250.00` |
+| 18–20 | Local (San Francisco) wages / tax | `220,000.00` / `0.00` |
+
+**Regenerate** the PDF (e.g. to tweak values) with:
+
+```bash
+python3 scripts/generate_w2_sample.py   # requires: pip install reportlab
+```
+
+Keep the generator and `pkg/documentai/mock.go` in sync so the fixture and the offline
+parser agree.
 
 ---
 
