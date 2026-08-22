@@ -19,8 +19,8 @@ import sys
 from pathlib import Path
 
 from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
 from reportlab.lib.units import inch  # noqa: F401 (kept for readability of coordinates)
+from reportlab.pdfgen import canvas
 
 PAGE_W, PAGE_H = letter  # 612 x 792 points
 
@@ -152,15 +152,40 @@ def main(out_path: str) -> None:
         cell(right_x + col_w, yt, col_w, row_h, label=l2, value=v2, value_dx=6)
 
     ry = top
-    money_pair(ry, "1  Wages, tips, other comp.", BOX1_WAGES,
-               "2  Federal income tax withheld", BOX2_FED_TAX); ry += row_h
-    money_pair(ry, "3  Social security wages", BOX3_SS_WAGES,
-               "4  Social security tax withheld", BOX4_SS_TAX); ry += row_h
-    money_pair(ry, "5  Medicare wages and tips", BOX5_MEDICARE_WAGES,
-               "6  Medicare tax withheld", BOX6_MEDICARE_TAX); ry += row_h
-    money_pair(ry, "7  Social security tips", BOX7_SS_TIPS,
-               "8  Allocated tips", BOX8_ALLOCATED_TIPS); ry += row_h
-    money_pair(ry, "9", "", "10  Dependent care benefits", BOX10_DEP_CARE); ry += row_h
+    money_pair(
+        ry,
+        "1  Wages, tips, other comp.",
+        BOX1_WAGES,
+        "2  Federal income tax withheld",
+        BOX2_FED_TAX,
+    )
+    ry += row_h
+    money_pair(
+        ry,
+        "3  Social security wages",
+        BOX3_SS_WAGES,
+        "4  Social security tax withheld",
+        BOX4_SS_TAX,
+    )
+    ry += row_h
+    money_pair(
+        ry,
+        "5  Medicare wages and tips",
+        BOX5_MEDICARE_WAGES,
+        "6  Medicare tax withheld",
+        BOX6_MEDICARE_TAX,
+    )
+    ry += row_h
+    money_pair(
+        ry,
+        "7  Social security tips",
+        BOX7_SS_TIPS,
+        "8  Allocated tips",
+        BOX8_ALLOCATED_TIPS,
+    )
+    ry += row_h
+    money_pair(ry, "9", "", "10  Dependent care benefits", BOX10_DEP_CARE)
+    ry += row_h
 
     # Box 11 + Box 12a
     cell(right_x, ry, col_w, row_h, label="11  Nonqualified plans", value=BOX11_NONQUAL)
