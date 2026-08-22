@@ -137,17 +137,17 @@ func (p *GCPW2Parser) ParseW2(ctx context.Context, fileBytes []byte, mimeType st
 		case strings.Contains(entityType, "medicaretaxwithheld") || strings.Contains(entityType, "box6_medicare_tax") || entityType == "w2_box6":
 			amt := ParseCurrency(textVal)
 			w2.WagesAndCompensation.Box6MedicareTaxWithheldUSD = &amt
-		case strings.Contains(entityType, "employername") || strings.Contains(entityType, "employer_name") || entityType == "w2_employer_name":
+		case entityType == "employername" || entityType == "employer_name" || entityType == "w2_employer_name":
 			w2.Employer.Name = textVal
 		case entityType == "ein" || strings.Contains(entityType, "employer_id") || entityType == "w2_employer_ein":
 			w2.Employer.EIN = textVal
-		case strings.Contains(entityType, "employer_address") || entityType == "w2_employer_address":
+		case entityType == "employeraddress" || entityType == "employer_address" || entityType == "w2_employer_address":
 			w2.Employer.Address = textVal
-		case strings.Contains(entityType, "employeename") || strings.Contains(entityType, "employee_name") || entityType == "w2_employee_name":
+		case entityType == "employeename" || entityType == "employee_name" || entityType == "w2_employee_name":
 			w2.Employee.Name = textVal
 		case entityType == "ssn" || strings.Contains(entityType, "social_security_number") || entityType == "w2_employee_ssn":
 			w2.Employee.SSNMasked = textVal
-		case strings.Contains(entityType, "employee_address") || entityType == "w2_employee_address":
+		case entityType == "employeeaddress" || entityType == "employee_address" || entityType == "w2_employee_address":
 			w2.Employee.Address = textVal
 		case strings.Contains(entityType, "formyear") || strings.Contains(entityType, "tax_year") || entityType == "w2_tax_year":
 			w2.TaxYear = ParseTaxYear(textVal, w2.TaxYear)
