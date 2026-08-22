@@ -560,8 +560,8 @@ describe('Frontend Views', () => {
       tax_year: 2024,
       status: 'SUCCESS' as const,
       employer: {
-        name: 'Alphabet Inc.',
-        ein: '94-3289634'
+        name: 'Acme Corporation',
+        ein: '12-3456789'
       },
       employee: {
         name: 'Alex Mercer',
@@ -591,7 +591,7 @@ describe('Frontend Views', () => {
       profile: {
         ...mockProfile,
         annual_income_usd: 245000,
-        occupation: 'Engineer at Alphabet Inc.'
+        occupation: 'Employee at Acme Corporation'
       }
     });
 
@@ -609,7 +609,7 @@ describe('Frontend Views', () => {
     // Verify W-2 card is rendered
     await waitFor(() => {
       expect(screen.getByText('Tax Year 2024')).toBeDefined();
-      expect(screen.getByText('Alphabet Inc.')).toBeDefined();
+      expect(screen.getByText('Acme Corporation')).toBeDefined();
       expect(screen.getByTestId('w2-box1-wages').textContent).toContain('$245,000');
     });
 

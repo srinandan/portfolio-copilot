@@ -25,9 +25,9 @@ func TestW2Document_JSONRoundtrip(t *testing.T) {
 		ConfidenceScore: &conf,
 		Status:     W2StatusSuccess,
 		Employer: &W2Employer{
-			Name:    "Alphabet Inc.",
+			Name:    "Acme Corporation",
 			EIN:     "12-3456789",
-			Address: "1600 Amphitheatre Pkwy, Mountain View, CA 94043",
+			Address: "500 Roadrunner Way, San Jose, CA 95110",
 		},
 		Employee: &W2Employee{
 			Name:      "Alex Mercer",
