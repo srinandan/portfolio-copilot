@@ -8,13 +8,22 @@ substitutions:
   _DOCUMENT_AI_LOCATION: "us"
 
 steps:
-  # Build the unified container image (Vue SPA + Go backend server)
+  # 1. Pull previous image from Artifact Registry to use as build layer cache
+  - name: 'gcr.io/cloud-builders/docker'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - 'docker pull ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:latest || true'
+
+  # 2. Build the unified container image with cache
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'build'
       - '-t'
       - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:${_COMMIT_SHA}'
       - '-t'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:latest'
+      - '--cache-from'
       - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:latest'
       - '-f'
       - 'frontend/Dockerfile'
