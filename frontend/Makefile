@@ -35,6 +35,9 @@ test-server:
 
 test: test-ui test-server
 
+DOCUMENT_AI_LOCATION ?= us
+DOCUMENT_AI_PROCESSOR_ID ?= $(shell cd .. && go run ./scripts/setup_processor.go -project="$(GOOGLE_CLOUD_PROJECT)" -location="$(DOCUMENT_AI_LOCATION)" 2>/dev/null | tail -n1)
+
 deploy:
 	export _COMMIT_SHA=${_COMMIT_SHA} ;\
 	export REGION=${GOOGLE_CLOUD_LOCATION} ;\
@@ -43,7 +46,7 @@ deploy:
 	cd .. && gcloud builds submit \
 	  --config=frontend/cloudbuild.yaml \
 	  --region=${GOOGLE_CLOUD_LOCATION} \
-	  --substitutions=_COMMIT_SHA=${_COMMIT_SHA},_REGION=${GOOGLE_CLOUD_LOCATION}
+	  --substitutions=_COMMIT_SHA=${_COMMIT_SHA},_REGION=${GOOGLE_CLOUD_LOCATION},_DOCUMENT_AI_PROCESSOR_ID=${DOCUMENT_AI_PROCESSOR_ID},_DOCUMENT_AI_LOCATION=${DOCUMENT_AI_LOCATION}
 
 clean:
 	rm -rf dist node_modules

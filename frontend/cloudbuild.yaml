@@ -4,15 +4,26 @@ substitutions:
   _SERVICE: portfolio-copilot-frontend
   _AR_REPO: portfolio-copilot
   _AGENT_DISPLAY_NAME: portfolio-copilot-agent
+  _DOCUMENT_AI_PROCESSOR_ID: ""
+  _DOCUMENT_AI_LOCATION: "us"
 
 steps:
-  # Build the unified container image (Vue SPA + Go backend server)
+  # 1. Pull previous image from Artifact Registry to use as build layer cache
+  - name: 'gcr.io/cloud-builders/docker'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - 'docker pull ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:latest || true'
+
+  # 2. Build the unified container image with cache
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'build'
       - '-t'
       - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:${_COMMIT_SHA}'
       - '-t'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:latest'
+      - '--cache-from'
       - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:latest'
       - '-f'
       - 'frontend/Dockerfile'
@@ -42,6 +53,14 @@ steps:
           | jq -r --arg name "${_AGENT_DISPLAY_NAME}" '.reasoningEngines[]? | select(.displayName == $name) | .name // empty' \
           | head -n1 || echo "")
 
+        DOCUMENT_AI_PROCESSOR_ID="${_DOCUMENT_AI_PROCESSOR_ID}"
+        if [ -z "$${DOCUMENT_AI_PROCESSOR_ID}" ]; then
+          DOCUMENT_AI_PROCESSOR_ID=$(curl -s -H "Authorization: Bearer $${TOKEN}" \
+            "https://${_DOCUMENT_AI_LOCATION}-documentai.googleapis.com/v1/projects/${PROJECT_ID}/locations/${_DOCUMENT_AI_LOCATION}/processors" \
+            | jq -r '.processors[]? | select(.type == "FORM_W2_PROCESSOR" and .state == "ENABLED") | .name // empty' \
+            | head -n1 | awk -F'/' '{print $$NF}' || echo "")
+        fi
+
         DEPLOY_ARGS=(
           run deploy ${_SERVICE}
           --image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:${_COMMIT_SHA}
@@ -59,6 +78,10 @@ steps:
         else
           echo "WARN: no Agent Engine found with displayName=${_AGENT_DISPLAY_NAME} in ${_REGION};"
           echo "      /api/plan will return 503 until an orchestrator is deployed."
+        fi
+        if [ -n "$${DOCUMENT_AI_PROCESSOR_ID}" ]; then
+          echo "Deploying ${_SERVICE} with DOCUMENT_AI_PROCESSOR_ID=$${DOCUMENT_AI_PROCESSOR_ID} (location: ${_DOCUMENT_AI_LOCATION})"
+          ENV_VARS="$${ENV_VARS},DOCUMENT_AI_PROCESSOR_ID=$${DOCUMENT_AI_PROCESSOR_ID},DOCUMENT_AI_LOCATION=${_DOCUMENT_AI_LOCATION}"
         fi
         DEPLOY_ARGS+=(--set-env-vars="$${ENV_VARS}")
 
