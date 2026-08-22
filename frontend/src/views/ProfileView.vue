@@ -928,6 +928,221 @@
         </div>
       </div>
 
+      <!-- TAB 6: Income & Tax Documents -->
+      <div v-show="activeTab === 'income'" class="flex flex-col gap-lg" data-testid="section-income">
+        <!-- W-2 Upload & Document AI Processing Card -->
+        <div class="bg-surface-container rounded-lg p-lg border border-outline-variant/50 flex flex-col gap-md">
+          <div class="flex items-center justify-between border-b border-outline-variant/30 pb-sm">
+            <div class="flex items-center gap-sm">
+              <span class="material-symbols-outlined text-primary text-[20px]">document_scanner</span>
+              <h2 class="font-title-sm text-on-surface font-semibold">IRS Form W-2 Statement Ingestion</h2>
+            </div>
+            <span class="text-xs text-on-surface-variant font-mono bg-surface-container-high px-2 py-0.5 rounded">
+              Powered by Google Cloud Document AI
+            </span>
+          </div>
+
+          <p class="text-xs text-on-surface-variant">
+            Upload your official IRS Form W-2 (Wage and Tax Statement) in PDF, PNG, or JPG formats (max 10MB).
+            Document AI will automatically extract gross compensation, federal/state withholdings, and Box 12 retirement deferrals.
+          </p>
+
+          <!-- Upload Dropzone -->
+          <div
+            class="border-2 border-dashed rounded-lg p-lg flex flex-col items-center justify-center text-center cursor-pointer transition-colors"
+            :class="[
+              isDraggingW2
+                ? 'border-primary bg-primary/5'
+                : 'border-outline-variant hover:border-primary/60 hover:bg-surface-container-high/40'
+            ]"
+            data-testid="w2-dropzone"
+            @dragover.prevent="isDraggingW2 = true"
+            @dragleave.prevent="isDraggingW2 = false"
+            @drop.prevent="onW2FileDrop"
+            @click="triggerW2FileInput"
+          >
+            <input
+              ref="w2FileInput"
+              type="file"
+              accept=".pdf,.png,.jpg,.jpeg"
+              class="hidden"
+              data-testid="input-w2-file"
+              @change="onW2FileSelected"
+            />
+
+            <div v-if="isUploadingW2" class="flex flex-col items-center gap-sm py-md">
+              <span class="material-symbols-outlined text-primary text-[32px] animate-spin">progress_activity</span>
+              <span class="text-sm font-medium text-on-surface">Parsing W-2 with Google Cloud Document AI...</span>
+              <span class="text-xs text-on-surface-variant">Extracting Boxes 1–20 and verifying employer records</span>
+            </div>
+
+            <div v-else class="flex flex-col items-center gap-xs py-sm">
+              <span class="material-symbols-outlined text-primary text-[36px]">upload_file</span>
+              <span class="text-sm font-medium text-on-surface">
+                Drag &amp; drop your W-2 here, or <span class="text-primary underline">browse files</span>
+              </span>
+              <span class="text-xs text-on-surface-variant">
+                Supported formats: PDF, PNG, JPG (up to 10MB)
+              </span>
+            </div>
+          </div>
+
+          <!-- Status Banners for W-2 -->
+          <div
+            v-if="w2UploadSuccess"
+            class="p-sm rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 flex items-center justify-between text-xs"
+            data-testid="w2-upload-success"
+          >
+            <div class="flex items-center gap-xs">
+              <span class="material-symbols-outlined text-[16px]">check_circle</span>
+              <span>{{ w2UploadSuccess }}</span>
+            </div>
+            <button type="button" class="underline hover:opacity-80" @click="w2UploadSuccess = null">Dismiss</button>
+          </div>
+
+          <div
+            v-if="w2UploadError"
+            class="p-sm rounded-md bg-red-500/10 border border-red-500/30 text-red-600 flex items-center justify-between text-xs"
+            data-testid="w2-upload-error"
+          >
+            <div class="flex items-center gap-xs">
+              <span class="material-symbols-outlined text-[16px]">error</span>
+              <span>{{ w2UploadError }}</span>
+            </div>
+            <button type="button" class="underline hover:opacity-80" @click="w2UploadError = null">Dismiss</button>
+          </div>
+        </div>
+
+        <!-- Ingested W-2 Statements List & Breakdowns -->
+        <div class="bg-surface-container rounded-lg p-lg border border-outline-variant/50 flex flex-col gap-md">
+          <div class="flex items-center justify-between border-b border-outline-variant/30 pb-sm">
+            <div class="flex items-center gap-sm">
+              <span class="material-symbols-outlined text-primary text-[20px]">receipt_long</span>
+              <h2 class="font-title-sm text-on-surface font-semibold">Verified Tax Statements History</h2>
+            </div>
+            <button
+              type="button"
+              class="text-xs text-primary hover:underline flex items-center gap-xs"
+              data-testid="btn-refresh-w2"
+              @click="loadW2Documents"
+            >
+              <span class="material-symbols-outlined text-[14px]">refresh</span>
+              Refresh
+            </button>
+          </div>
+
+          <div v-if="loadingW2" class="p-lg text-center text-sm text-on-surface-variant">
+            Loading verified statements...
+          </div>
+
+          <div v-else-if="w2Documents.length === 0" class="p-lg text-center text-sm text-on-surface-variant flex flex-col items-center gap-xs">
+            <span class="material-symbols-outlined text-outline text-[32px]">folder_open</span>
+            <span>No W-2 statements uploaded yet. Upload a tax statement above to verify your income.</span>
+          </div>
+
+          <div v-else class="flex flex-col gap-md">
+            <div
+              v-for="w2 in w2Documents"
+              :key="w2.id"
+              class="border border-outline-variant/60 rounded-lg p-md bg-surface flex flex-col gap-sm shadow-xs"
+              data-testid="w2-card"
+            >
+              <!-- Card Header -->
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-sm border-b border-outline-variant/30 pb-xs">
+                <div class="flex items-center gap-sm">
+                  <span class="px-2 py-0.5 rounded text-xs font-mono font-bold bg-primary-container text-on-primary">
+                    Tax Year {{ w2.tax_year }}
+                  </span>
+                  <span class="font-semibold text-sm text-on-surface">{{ w2.employer?.name || 'Employer' }}</span>
+                  <span v-if="w2.employer?.ein" class="text-xs text-on-surface-variant font-mono">
+                    EIN: {{ w2.employer.ein }}
+                  </span>
+                </div>
+
+                <div class="flex items-center gap-xs">
+                  <button
+                    type="button"
+                    class="px-sm py-1 rounded bg-primary/10 hover:bg-primary/20 text-primary text-xs font-medium transition flex items-center gap-1"
+                    data-testid="btn-apply-w2"
+                    :disabled="applyingW2Id === w2.id"
+                    @click="handleApplyW2(w2)"
+                  >
+                    <span class="material-symbols-outlined text-[14px]">sync_alt</span>
+                    {{ applyingW2Id === w2.id ? 'Applying...' : 'Apply to Profile Income' }}
+                  </button>
+
+                  <button
+                    type="button"
+                    class="p-1 rounded text-on-surface-variant hover:text-red-600 hover:bg-surface-container transition"
+                    title="Delete W-2"
+                    data-testid="btn-delete-w2"
+                    @click="handleDeleteW2(w2.id)"
+                  >
+                    <span class="material-symbols-outlined text-[16px]">delete</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Main Financial Metrics Grid -->
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-sm pt-xs">
+                <div class="flex flex-col bg-surface-container/60 p-xs rounded">
+                  <span class="text-[10px] uppercase font-label-caps text-on-surface-variant">Box 1: Wages &amp; Tips</span>
+                  <span class="text-sm font-bold font-mono text-on-surface" data-testid="w2-box1-wages">
+                    ${{ (w2.wages_and_compensation?.box1_wages_tips_other_comp_usd ?? 0).toLocaleString() }}
+                  </span>
+                </div>
+
+                <div class="flex flex-col bg-surface-container/60 p-xs rounded">
+                  <span class="text-[10px] uppercase font-label-caps text-on-surface-variant">Box 2: Federal Tax</span>
+                  <span class="text-sm font-mono text-on-surface">
+                    ${{ (w2.wages_and_compensation?.box2_federal_income_tax_withheld_usd ?? 0).toLocaleString() }}
+                  </span>
+                </div>
+
+                <div class="flex flex-col bg-surface-container/60 p-xs rounded">
+                  <span class="text-[10px] uppercase font-label-caps text-on-surface-variant">Box 3: SS Wages</span>
+                  <span class="text-sm font-mono text-on-surface">
+                    ${{ (w2.wages_and_compensation?.box3_social_security_wages_usd ?? 0).toLocaleString() }}
+                  </span>
+                </div>
+
+                <div class="flex flex-col bg-surface-container/60 p-xs rounded">
+                  <span class="text-[10px] uppercase font-label-caps text-on-surface-variant">Box 5: Medicare Wages</span>
+                  <span class="text-sm font-mono text-on-surface">
+                    ${{ (w2.wages_and_compensation?.box5_medicare_wages_and_tips_usd ?? 0).toLocaleString() }}
+                  </span>
+                </div>
+              </div>
+
+              <!-- Box 12 Items (e.g. 401(k), HSA) if present -->
+              <div v-if="w2.box12_items && w2.box12_items.length > 0" class="flex flex-wrap items-center gap-xs pt-xs">
+                <span class="text-[10px] uppercase font-label-caps text-on-surface-variant mr-1">Box 12 Benefits:</span>
+                <span
+                  v-for="(item, idx) in w2.box12_items"
+                  :key="idx"
+                  class="px-2 py-0.5 rounded-full text-xs font-mono bg-surface-container-high border border-outline-variant/40"
+                >
+                  Code {{ item.code }}: ${{ item.amount_usd.toLocaleString() }}
+                  <span v-if="item.description" class="text-[10px] text-on-surface-variant font-sans">({{ item.description }})</span>
+                </span>
+              </div>
+
+              <!-- State Taxes if present -->
+              <div v-if="w2.state_taxes && w2.state_taxes.length > 0" class="flex flex-wrap items-center gap-xs pt-xs">
+                <span class="text-[10px] uppercase font-label-caps text-on-surface-variant mr-1">State Taxes:</span>
+                <span
+                  v-for="(st, sIdx) in w2.state_taxes"
+                  :key="sIdx"
+                  class="px-2 py-0.5 rounded text-xs font-mono bg-surface-container-high"
+                >
+                  {{ st.state }}: Wages ${{ st.state_wages_usd.toLocaleString() }}, Tax ${{ st.state_income_tax_usd.toLocaleString() }}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Action Footer -->
       <div class="flex items-center justify-between pt-sm border-t border-outline-variant/40">
         <button
@@ -967,7 +1182,8 @@ import type {
   RiskToleranceTier,
   DrawdownReaction,
   AllocationBand,
-  OnboardingProfile
+  OnboardingProfile,
+  W2Document
 } from '../types';
 import { apiService } from '../services/api';
 import { deriveRiskTolerance, getDefaultAllocationBands } from '../services/onboarding';
@@ -980,7 +1196,7 @@ interface ReactionOption {
   description: string;
 }
 
-type TabId = 'personal' | 'goals' | 'risk' | 'liabilities' | 'policy';
+type TabId = 'personal' | 'goals' | 'risk' | 'liabilities' | 'policy' | 'income';
 
 const activeTab = ref<TabId>('personal');
 const isSaving = ref(false);
@@ -995,7 +1211,8 @@ const tabs: { id: TabId; label: string; icon: string }[] = [
   { id: 'goals', label: 'Goals & Timeline', icon: 'flag' },
   { id: 'risk', label: 'Risk & Allocation', icon: 'pie_chart' },
   { id: 'liabilities', label: 'Liabilities & Debt', icon: 'credit_card' },
-  { id: 'policy', label: 'Policy Guardrails', icon: 'gavel' }
+  { id: 'policy', label: 'Policy Guardrails', icon: 'gavel' },
+  { id: 'income', label: 'Income & Tax', icon: 'receipt_long' }
 ];
 
 // 1. Personal & Family State
@@ -1290,8 +1507,104 @@ async function loadData() {
       initialOnboardingSnapshot.value = JSON.parse(JSON.stringify(onboardingData));
       populateOnboardingProfile(onboardingData);
     }
+    await loadW2Documents();
   } catch (err: any) {
     saveError.value = 'Failed to load initial settings.';
+  }
+}
+
+// 6. Income & Tax (W-2) State & Handlers
+const w2Documents = ref<W2Document[]>([]);
+const loadingW2 = ref(false);
+const isUploadingW2 = ref(false);
+const isDraggingW2 = ref(false);
+const w2UploadSuccess = ref<string | null>(null);
+const w2UploadError = ref<string | null>(null);
+const applyingW2Id = ref<string | null>(null);
+const w2FileInput = ref<HTMLInputElement | null>(null);
+
+function triggerW2FileInput() {
+  if (w2FileInput.value) {
+    w2FileInput.value.click();
+  }
+}
+
+async function loadW2Documents() {
+  loadingW2.value = true;
+  try {
+    const list = await apiService.getW2Documents(userProfile.user_id || 'demo_user');
+    w2Documents.value = list || [];
+  } catch (err: any) {
+    w2UploadError.value = err?.message || 'Failed to load W-2 documents';
+  } finally {
+    loadingW2.value = false;
+  }
+}
+
+async function uploadW2File(file: File) {
+  isUploadingW2.value = true;
+  w2UploadError.value = null;
+  w2UploadSuccess.value = null;
+
+  try {
+    const doc = await apiService.uploadW2(file, userProfile.user_id || 'demo_user');
+    w2UploadSuccess.value = `Successfully parsed Form W-2 (${doc.tax_year}) for ${doc.employer?.name || 'employer'} with Document AI! Box 1 Wages: $${doc.wages_and_compensation.box1_wages_tips_other_comp_usd.toLocaleString()}`;
+    await loadW2Documents();
+  } catch (err: any) {
+    w2UploadError.value = err?.message || 'Failed to upload and parse W-2';
+  } finally {
+    isUploadingW2.value = false;
+  }
+}
+
+function onW2FileSelected(event: Event) {
+  const target = event.target as HTMLInputElement;
+  if (target.files && target.files.length > 0) {
+    const file = target.files[0];
+    uploadW2File(file);
+    target.value = '';
+  }
+}
+
+function onW2FileDrop(event: DragEvent) {
+  isDraggingW2.value = false;
+  if (event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files.length > 0) {
+    const file = event.dataTransfer.files[0];
+    uploadW2File(file);
+  }
+}
+
+async function handleApplyW2(doc: W2Document) {
+  applyingW2Id.value = doc.id;
+  w2UploadError.value = null;
+  w2UploadSuccess.value = null;
+
+  try {
+    const res = await apiService.applyW2ToProfile(doc.id, userProfile.user_id || 'demo_user');
+    if (res?.profile) {
+      userProfile.annual_income_usd = res.profile.annual_income_usd;
+      if (res.profile.occupation) {
+        userProfile.occupation = res.profile.occupation;
+      }
+      w2UploadSuccess.value = `Successfully synchronized Box 1 wages ($${doc.wages_and_compensation.box1_wages_tips_other_comp_usd.toLocaleString()}) to Profile Annual Income!`;
+    }
+  } catch (err: any) {
+    w2UploadError.value = err?.message || 'Failed to apply W-2 income to profile';
+  } finally {
+    applyingW2Id.value = null;
+  }
+}
+
+async function handleDeleteW2(id: string) {
+  if (!confirm('Are you sure you want to delete this W-2 tax statement?')) {
+    return;
+  }
+  try {
+    await apiService.deleteW2Document(id, userProfile.user_id || 'demo_user');
+    w2UploadSuccess.value = 'W-2 statement deleted successfully.';
+    await loadW2Documents();
+  } catch (err: any) {
+    w2UploadError.value = err?.message || 'Failed to delete W-2 statement';
   }
 }
 

@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "W2Document",
+  "description": "Structured IRS Form W-2 parsed by GCP Document AI and stored in Firestore",
+  "type": "object",
+  "required": [
+    "id",
+    "user_id",
+    "tax_year",
+    "wages_and_compensation",
+    "status",
+    "uploaded_at"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "pattern": "^w2-[0-9a-zA-Z_-]+$" },
+    "user_id": { "type": "string", "minLength": 1 },
+    "tax_year": { "type": "integer", "minimum": 1990, "maximum": 2100 },
+    "document_id": { "type": "string" },
+    "filename": { "type": "string" },
+    "size_bytes": { "type": "integer", "minimum": 0 },
+    "uploaded_at": { "type": "string" },
+    "parsed_at": { "type": "string" },
+    "confidence_score": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+    "status": { "type": "string", "enum": ["SUCCESS", "FAILED", "PENDING_REVIEW"] },
+    "error_message": { "type": "string" },
+    "employer": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "ein": { "type": "string" },
+        "address": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "employee": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "ssn_masked": { "type": "string" },
+        "address": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "wages_and_compensation": {
+      "type": "object",
+      "required": ["box1_wages_tips_other_comp_usd"],
+      "properties": {
+        "box1_wages_tips_other_comp_usd": { "type": "number", "minimum": 0 },
+        "box2_federal_income_tax_withheld_usd": { "type": "number", "minimum": 0 },
+        "box3_social_security_wages_usd": { "type": "number", "minimum": 0 },
+        "box4_social_security_tax_withheld_usd": { "type": "number", "minimum": 0 },
+        "box5_medicare_wages_and_tips_usd": { "type": "number", "minimum": 0 },
+        "box6_medicare_tax_withheld_usd": { "type": "number", "minimum": 0 },
+        "box7_social_security_tips_usd": { "type": "number", "minimum": 0 },
+        "box8_allocated_tips_usd": { "type": "number", "minimum": 0 },
+        "box10_dependent_care_benefits_usd": { "type": "number", "minimum": 0 },
+        "box11_nonqualified_plans_usd": { "type": "number", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "box12_items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["code", "amount_usd"],
+        "properties": {
+          "code": { "type": "string" },
+          "description": { "type": "string" },
+          "amount_usd": { "type": "number", "minimum": 0 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "box13_checkboxes": {
+      "type": "object",
+      "properties": {
+        "statutory_employee": { "type": "boolean" },
+        "retirement_plan": { "type": "boolean" },
+        "third_party_sick_pay": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "box14_other": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["label", "amount_usd"],
+        "properties": {
+          "label": { "type": "string" },
+          "amount_usd": { "type": "number" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "state_taxes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["state", "state_wages_usd", "state_income_tax_usd"],
+        "properties": {
+          "state": { "type": "string" },
+          "employer_state_id": { "type": "string" },
+          "state_wages_usd": { "type": "number", "minimum": 0 },
+          "state_income_tax_usd": { "type": "number", "minimum": 0 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "local_taxes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["locality_name", "local_wages_usd", "local_income_tax_usd"],
+        "properties": {
+          "locality_name": { "type": "string" },
+          "local_wages_usd": { "type": "number", "minimum": 0 },
+          "local_income_tax_usd": { "type": "number", "minimum": 0 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "raw_entities": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    }
+  }
+}

@@ -34,7 +34,7 @@ def test_read_skill_version():
 
 
 def test_read_skill_approval_scope_all_registered_skills():
-    assert read_skill_approval_scope("goals-onboarding") == "read:holdings,read:liabilities,read:spending,read:ips"
+    assert read_skill_approval_scope("goals-onboarding") == "read:holdings,read:liabilities,read:spending,read:ips,read:w2"
     assert read_skill_approval_scope("action-drafting") == "read:holdings,read:ips,read:market_data_quote"
     assert read_skill_approval_scope("portfolio-analysis") == "read:holdings,read:ips"
     assert read_skill_approval_scope("research") == "read:external_market_data"

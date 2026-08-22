@@ -542,5 +542,95 @@ describe('Frontend Views', () => {
       expect(screen.getByTestId('profile-save-success')).toBeDefined();
     });
   });
+
+  it('ProfileView handles Income & Tax (W-2) tab with Document AI upload and 1-click sync', async () => {
+    const ProfileView = (await import('../views/ProfileView.vue')).default;
+    const { router } = await import('../router');
+    const mockProfile = {
+      user_id: 'demo_user',
+      full_name: 'Alex Mercer',
+      email: 'alex.mercer@example.com',
+      annual_income_usd: 180000,
+      updated_at: '2026-08-01T00:00:00Z'
+    };
+
+    const mockW2 = {
+      id: 'w2-test-999',
+      user_id: 'demo_user',
+      tax_year: 2024,
+      status: 'SUCCESS' as const,
+      employer: {
+        name: 'Alphabet Inc.',
+        ein: '94-3289634'
+      },
+      employee: {
+        name: 'Alex Mercer',
+        ssn_masked: '***-**-4589'
+      },
+      wages_and_compensation: {
+        box1_wages_tips_other_comp_usd: 245000,
+        box2_federal_income_tax_withheld_usd: 42000,
+        box3_social_security_wages_usd: 168600,
+        box5_medicare_wages_and_tips_usd: 245000
+      },
+      box12_items: [
+        { code: 'D', description: '401(k) elective deferral', amount_usd: 23000 }
+      ],
+      uploaded_at: '2026-08-22T00:00:00Z'
+    };
+
+    vi.spyOn(apiService, 'getUserProfile').mockResolvedValue(mockProfile);
+    vi.spyOn(apiService, 'getOnboarding').mockResolvedValue({
+      has_active_ips: false,
+      user_id: 'demo_user'
+    });
+    vi.spyOn(apiService, 'getW2Documents').mockResolvedValue([mockW2]);
+    const uploadW2Spy = vi.spyOn(apiService, 'uploadW2').mockResolvedValue(mockW2);
+    const applyW2Spy = vi.spyOn(apiService, 'applyW2ToProfile').mockResolvedValue({
+      status: 'applied',
+      profile: {
+        ...mockProfile,
+        annual_income_usd: 245000,
+        occupation: 'Engineer at Alphabet Inc.'
+      }
+    });
+
+    render(ProfileView, {
+      global: {
+        plugins: [router]
+      }
+    });
+
+    // Switch to Income & Tax tab
+    const incomeTabBtn = screen.getByTestId('tab-income');
+    await fireEvent.click(incomeTabBtn);
+    expect(screen.getByTestId('section-income')).toBeDefined();
+
+    // Verify W-2 card is rendered
+    await waitFor(() => {
+      expect(screen.getByText('Tax Year 2024')).toBeDefined();
+      expect(screen.getByText('Alphabet Inc.')).toBeDefined();
+      expect(screen.getByTestId('w2-box1-wages').textContent).toContain('$245,000');
+    });
+
+    // Test 1-click sync to profile
+    const applyBtn = screen.getByTestId('btn-apply-w2');
+    await fireEvent.click(applyBtn);
+
+    await waitFor(() => {
+      expect(applyW2Spy).toHaveBeenCalledWith('w2-test-999', 'demo_user');
+      expect(screen.getByTestId('w2-upload-success').textContent).toContain('Successfully synchronized Box 1 wages');
+    });
+
+    // Test W-2 File Upload
+    const file = new File(['%PDF-1.4 mock content'], 'w2_2024.pdf', { type: 'application/pdf' });
+    const fileInput = screen.getByTestId('input-w2-file');
+    await fireEvent.change(fileInput, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(uploadW2Spy).toHaveBeenCalled();
+    });
+  });
 });
+
 

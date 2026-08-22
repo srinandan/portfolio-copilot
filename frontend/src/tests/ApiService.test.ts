@@ -355,4 +355,89 @@ describe('ApiService', () => {
       'invalid file extension'
     );
   });
+
+  it('uploadW2 sends multipart FormData and returns W2Document', async () => {
+    const mockW2 = {
+      id: 'w2-123',
+      user_id: 'demo_user',
+      tax_year: 2024,
+      status: 'SUCCESS',
+      wages_and_compensation: {
+        box1_wages_tips_other_comp_usd: 220000
+      }
+    };
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(mockW2)
+    });
+
+    const file = new File(['dummy pdf bytes'], 'w2_2024.pdf', { type: 'application/pdf' });
+    const result = await service.uploadW2(file, 'demo_user');
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      'http://localhost:8080/api/profile/w2/upload',
+      withTraceparent({
+        method: 'POST',
+        body: expect.any(FormData)
+      })
+    );
+    expect(result).toEqual(mockW2);
+  });
+
+  it('getW2Documents retrieves list of W2Documents', async () => {
+    const mockW2List = [
+      {
+        id: 'w2-123',
+        user_id: 'demo_user',
+        tax_year: 2024,
+        status: 'SUCCESS',
+        wages_and_compensation: { box1_wages_tips_other_comp_usd: 220000 }
+      }
+    ];
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(mockW2List)
+    });
+
+    const result = await service.getW2Documents('demo_user');
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      'http://localhost:8080/api/profile/w2?user_id=demo_user',
+      withTraceparent()
+    );
+    expect(result).toEqual(mockW2List);
+  });
+
+  it('deleteW2Document sends DELETE request', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ status: 'deleted' })
+    });
+
+    await service.deleteW2Document('w2-123', 'demo_user');
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      'http://localhost:8080/api/profile/w2/w2-123?user_id=demo_user',
+      withTraceparent({ method: 'DELETE' })
+    );
+  });
+
+  it('applyW2ToProfile sends POST request and updates profile income', async () => {
+    const mockAppliedRes = {
+      status: 'applied',
+      profile: {
+        user_id: 'demo_user',
+        annual_income_usd: 220000
+      }
+    };
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(mockAppliedRes)
+    });
+
+    const result = await service.applyW2ToProfile('w2-123', 'demo_user');
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      'http://localhost:8080/api/profile/w2/w2-123/apply?user_id=demo_user',
+      withTraceparent({ method: 'POST' })
+    );
+    expect(result).toEqual(mockAppliedRes);
+  });
 });
+

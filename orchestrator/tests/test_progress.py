@@ -171,7 +171,7 @@ async def test_root_planner_emits_stage_progress_through_interleave():
             progress_by_stage.setdefault(i["stage"], []).append(i["status"])
 
     assert progress_by_stage.get("discovery") == ["running", "done"]
-    assert progress_by_stage.get("spending-analysis") == ["running", "done"]
+    assert progress_by_stage.get("spending-analysis") == ["pending", "running", "done"]
     # The final ADK output event (the planner's results list) is still on the stream.
     assert any(i.get("kind") != "progress" for i in items)
 

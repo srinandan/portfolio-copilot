@@ -48,6 +48,10 @@ func main() {
 	r.POST("/api/documents", srv.HandleUploadDocument)
 	r.GET("/api/profile", srv.HandleGetUserProfile)
 	r.POST("/api/profile", srv.HandleSetUserProfile)
+	r.POST("/api/profile/w2/upload", srv.HandleUploadW2)
+	r.GET("/api/profile/w2", srv.HandleGetW2Documents)
+	r.DELETE("/api/profile/w2/:id", srv.HandleDeleteW2Document)
+	r.POST("/api/profile/w2/:id/apply", srv.HandleApplyW2ToProfile)
 	r.GET("/api/onboarding", srv.HandleGetOnboarding)
 
 	// Orchestrator bridge: streams ADK planner events back to the frontend as SSE.

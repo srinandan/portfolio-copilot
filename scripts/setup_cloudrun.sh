@@ -45,7 +45,7 @@ fi
 # trace-correlated logs). Set OTEL_TRACES_ENABLED=false to disable span export
 # entirely (trace-context propagation stays on).
 echo "Configuring IAM policy bindings for portfolio-copilot-frontend-sa..."
-for ROLE in roles/datastore.user roles/bigquery.dataViewer roles/aiplatform.user roles/cloudtrace.agent; do
+for ROLE in roles/datastore.user roles/bigquery.dataViewer roles/aiplatform.user roles/cloudtrace.agent roles/documentai.apiUser; do
   gcloud projects add-iam-policy-binding "$PROJECT_ID" \
     --member="serviceAccount:$FRONTEND_SA" \
     --role="$ROLE" \

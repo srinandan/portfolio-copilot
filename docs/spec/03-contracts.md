@@ -231,6 +231,26 @@ Notable fields:
 
 See [`account-transaction.schema.json`](../../schemas/account-transaction.schema.json).
 
+## 11. W-2 Document
+
+Structured IRS Form W-2 Wage and Tax Statement parsed by Google Cloud Document AI
+and persisted to Firestore collection `w2_documents`.
+
+Notable fields:
+- `id` — unique identifier for the parsed statement (`w2-{uuid}`)
+- `user_id` — user scoping identifier
+- `tax_year` — reporting tax year (e.g. 2024)
+- `employer` — `name`, `ein`, and `address`
+- `employee` — `name`, masked SSN (`***-**-XXXX`), and `address`
+- `wages_and_compensation` — Box 1 wages, Box 2 federal tax withheld, Boxes 3-6 Social Security & Medicare taxes
+- `box12_items[]` — elective deferrals and benefits (`code`, `description`, `amount_usd`, e.g. 401(k), HSA)
+- `box13_checkboxes` — statutory employee, retirement plan, third party sick pay
+- `state_taxes[]` / `local_taxes[]` — state and local wage and tax withholding allocations
+- `confidence_score` — average Document AI entity confidence score (0.0 to 1.0)
+- `status` — ingestion status (`SUCCESS`, `FAILED`, `PENDING_REVIEW`)
+
+See [`w2-document.schema.json`](../../schemas/w2-document.schema.json).
+
 ## Changing these contracts
 
 Additive changes (new optional field) are fine as a normal PR. A breaking
