@@ -33,8 +33,13 @@ for ROLE in roles/documentai.apiUser roles/documentai.viewer; do
     --quiet || echo "Warning: could not bind $ROLE to $FRONTEND_SA (service account might not exist yet; run setup_cloudrun.sh first)"
 done
 
+# 3. Create or retrieve Form W-2 Processor
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+echo "Ensuring Form W-2 Processor exists in $PROJECT_ID ($LOCATION)..."
+PROCESSOR_ID=$(cd "$DIR/.." && go run ./scripts/setup_processor.go -project="$PROJECT_ID" -location="$LOCATION" | tail -n1)
+
+echo "========================================"
 echo "Document AI setup complete."
-echo "To configure a pre-trained US W-2 Tax Processor:"
-echo "1. Visit https://console.cloud.google.com/ai/document-ai/processors?project=$PROJECT_ID"
-echo "2. Create a 'Form W-2 Processor' (type: FORM_W2_PROCESSOR)"
-echo "3. Export the Processor ID: export DOCUMENT_AI_PROCESSOR_ID=\"<your-processor-id>\""
+echo "Processor ID: $PROCESSOR_ID"
+echo "Location:     $LOCATION"
+echo "========================================"

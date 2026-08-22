@@ -4,6 +4,8 @@ ifeq ($(GOOGLE_CLOUD_LOCATION),)
   GOOGLE_CLOUD_LOCATION := us-central1
 endif
 AGENT_REGISTRY_LOCATION ?= global
+DOCUMENT_AI_LOCATION ?= us
+DOCUMENT_AI_PROCESSOR_ID ?= $(shell go run ./scripts/setup_processor.go -project="$(GOOGLE_CLOUD_PROJECT)" -location="$(DOCUMENT_AI_LOCATION)" 2>/dev/null | tail -n1)
 _COMMIT_SHA ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo local)
 
 # Propagate these to the delegated per-service Makefiles (orchestrator/, frontend/)
@@ -11,7 +13,7 @@ _COMMIT_SHA ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo local)
 # fallback and _COMMIT_SHA — instead of each sub-make recomputing them. Without
 # this a delegated deploy with no gcloud compute/region configured would get an
 # empty --region.
-export GOOGLE_CLOUD_PROJECT GOOGLE_CLOUD_LOCATION AGENT_REGISTRY_LOCATION _COMMIT_SHA
+export GOOGLE_CLOUD_PROJECT GOOGLE_CLOUD_LOCATION AGENT_REGISTRY_LOCATION DOCUMENT_AI_LOCATION DOCUMENT_AI_PROCESSOR_ID _COMMIT_SHA
 
 .PHONY: help install deploy deploy-orchestrator deploy-frontend deploy-managed-agent register-skills setup-agent-engine setup-model-armor setup-all load-testdata local-orchestrator local-frontend local-server local-ui test test-orchestrator test-go test-frontend lint clean
 
@@ -77,7 +79,7 @@ setup-agent-engine:
 	./scripts/setup_agent_engine.sh "$(GOOGLE_CLOUD_PROJECT)" "$(GOOGLE_CLOUD_LOCATION)"
 
 setup-documentai:
-	./scripts/setup_documentai.sh "$(GOOGLE_CLOUD_PROJECT)" "$${DOCUMENT_AI_LOCATION:-us}"
+	./scripts/setup_documentai.sh "$(GOOGLE_CLOUD_PROJECT)" "$(DOCUMENT_AI_LOCATION)"
 
 setup-model-armor:
 	./scripts/setup_model_armor.sh "$(GOOGLE_CLOUD_PROJECT)"
