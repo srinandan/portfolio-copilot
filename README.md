@@ -21,6 +21,7 @@ Portfolio Copilot is an experimental personal finance assistant built on Google 
 - **Hot-Pluggable Capabilities:** Skills can be enabled or revoked mid-session; the planner recalculates its task graph on the subsequent step without restarting.
 - **Human-in-the-Loop Trade Gate:** Proposed actions (`ProposedAction`) undergo deterministic verification against an Investment Policy Statement (IPS) by a Critic agent (`ReviewerVerdict`) before presenting an interactive approval card to the user.
 - **End-to-End Traceability:** State, execution logs, and policy verdicts are persisted with immutable skill version and approval metadata.
+- **Typed Document Ingestion:** Bank transaction CSVs and holdings/liabilities JSON snapshots load into BigQuery/Firestore, and IRS Form W-2 tax statements (PDF/PNG/JPEG) are parsed by Google Cloud Document AI — with the SSN masked — and persisted as `W2Document`, with 1-click sync to profile income. See [ADR-0026](docs/adr/0026-w2-document-ai-ingestion-and-profile-sync.md).
 
 ---
 
@@ -66,7 +67,7 @@ Setup instructions: [`install/`](install/).
 Portfolio Copilot provides a standalone Vue 3 + TypeScript web interface connected to the backend server and Python orchestrator:
 
 ### First time: onboarding & profile (`/onboarding`, `/profile`)
-Complete the guided onboarding interview, or configure the 5-tab **Profile & Policy Hub** (`/profile`): demographics, family dependents, career and retirement milestones, financial goals, risk tolerance, target allocation bands, liabilities, and policy guardrails. This atomically persists your active Investment Policy Statement (IPS), Liabilities snapshot, and User Profile.
+Complete the guided onboarding interview, or configure the 6-tab **Profile & Policy Hub** (`/profile`): demographics, family dependents, career and retirement milestones, financial goals, risk tolerance, target allocation bands, liabilities, policy guardrails, and income & tax — upload an IRS Form W-2 (parsed via Google Cloud Document AI) with 1-click sync to your profile income. This atomically persists your active Investment Policy Statement (IPS), Liabilities snapshot, User Profile, and parsed W-2 statements (`W2Document`).
 
 ### Day to day: checking in (`/dashboard`, `/portfolio`, `/spending`, `/documents`)
 - **Dashboard (`/`)**: Watch real-time agent planning, with a live progress checklist for each analysis stage (discovering skills, analyzing, reviewing), alongside net worth summaries and asset allocations.
