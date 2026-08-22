@@ -18,16 +18,18 @@ import (
 	"github.com/gin-gonic/gin"
 	"portfolio-copilot/pkg/bigquery"
 	"portfolio-copilot/pkg/contracts"
+	"portfolio-copilot/pkg/documentai"
 	"portfolio-copilot/pkg/store"
 )
 
 // Server holds dependencies for HTTP handlers, using interfaces for testability.
 type Server struct {
-	Store    store.Store
-	BQRunner bigquery.Runner
+	Store       store.Store
+	BQRunner    bigquery.Runner
+	DocAIParser documentai.Parser
 }
 
-// NewServer initializes a Server, attempting to connect to Firestore and BigQuery if configured.
+// NewServer initializes a Server, attempting to connect to Firestore, BigQuery, and Document AI if configured.
 func NewServer() *Server {
 	ctx := context.Background()
 	projectID := os.Getenv("FIRESTORE_PROJECT_ID")
@@ -39,6 +41,8 @@ func NewServer() *Server {
 	}
 	var storeClient store.Store
 	var bqRunner bigquery.Runner
+	var docAIParser documentai.Parser
+
 	if projectID != "" {
 		// store.NewClient reads PROJECT_ID from the environment; set it once at server initialization
 		// if not already present.
@@ -63,10 +67,55 @@ func NewServer() *Server {
 	} else {
 		slog.Info("No PROJECT_ID set; server running in fallback mode")
 	}
-	return &Server{
-		Store:    storeClient,
-		BQRunner: bqRunner,
+
+	docAIProcessorID := os.Getenv("DOCUMENT_AI_PROCESSOR_ID")
+	docAILocation := os.Getenv("DOCUMENT_AI_LOCATION")
+	if docAILocation == "" {
+		docAILocation = "us"
 	}
+	docAIProjectID := os.Getenv("DOCUMENT_AI_PROJECT_ID")
+	if docAIProjectID == "" {
+		docAIProjectID = projectID
+	}
+
+	if docAIProcessorID != "" && docAIProjectID != "" {
+		gcpParser, err := documentai.NewGCPW2Parser(ctx, docAIProjectID, docAILocation, docAIProcessorID)
+		if err != nil {
+			slog.Warn("Failed to initialize GCP Document AI client; falling back to MockW2Parser", "error", err)
+			docAIParser = documentai.NewMockW2Parser()
+		} else {
+			docAIParser = gcpParser
+			slog.Info("Connected to GCP Document AI client", "project_id", docAIProjectID, "processor_id", docAIProcessorID)
+		}
+	} else {
+		slog.Info("No DOCUMENT_AI_PROCESSOR_ID configured; using MockW2Parser for dev/test")
+		docAIParser = documentai.NewMockW2Parser()
+	}
+
+	return &Server{
+		Store:       storeClient,
+		BQRunner:    bqRunner,
+		DocAIParser: docAIParser,
+	}
+}
+
+// Close gracefully closes external client connections held by Server.
+func (s *Server) Close() error {
+	var errs []string
+	if closer, ok := s.DocAIParser.(io.Closer); ok && closer != nil {
+		if err := closer.Close(); err != nil {
+			errs = append(errs, fmt.Sprintf("docai: %v", err))
+		}
+	}
+	if closer, ok := s.Store.(io.Closer); ok && closer != nil {
+		if err := closer.Close(); err != nil {
+			errs = append(errs, fmt.Sprintf("store: %v", err))
+		}
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("server close errors: %s", strings.Join(errs, "; "))
+	}
+	return nil
 }
 
 func (s *Server) HandleGetHoldings(c *gin.Context) {
@@ -548,6 +597,200 @@ func (s *Server) HandleUploadDocument(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, docItem)
+}
+
+func (s *Server) HandleUploadW2(c *gin.Context) {
+	userID := c.DefaultPostForm("user_id", "demo_user")
+
+	if s.DocAIParser == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Document AI parsing is unavailable"})
+		return
+	}
+
+	fileHeader, err := c.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("file is required: %v", err)})
+		return
+	}
+
+	if fileHeader.Size > (10 << 20) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "file exceeds maximum allowed size of 10MB"})
+		return
+	}
+
+	ext := strings.ToLower(filepath.Ext(fileHeader.Filename))
+	var mimeType string
+	switch ext {
+	case ".pdf":
+		mimeType = "application/pdf"
+	case ".png":
+		mimeType = "image/png"
+	case ".jpg", ".jpeg":
+		mimeType = "image/jpeg"
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("unsupported file extension %q; expected .pdf, .png, or .jpg/.jpeg", ext)})
+		return
+	}
+
+	file, err := fileHeader.Open()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to open uploaded file: %v", err)})
+		return
+	}
+	defer file.Close()
+
+	fileBytes, err := io.ReadAll(file)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to read uploaded file: %v", err)})
+		return
+	}
+
+	ctx := c.Request.Context()
+	w2Doc, err := s.DocAIParser.ParseW2(ctx, fileBytes, mimeType, fileHeader.Filename, userID)
+	if err != nil {
+		slog.ErrorContext(ctx, "Document AI W-2 extraction failed", "user_id", userID, "error", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("failed to extract W-2 data: %v", err)})
+		return
+	}
+
+	w2Doc.UserID = userID
+	w2Doc.Filename = fileHeader.Filename
+	w2Doc.SizeBytes = fileHeader.Size
+
+	if s.Store != nil {
+		if err := s.Store.SetW2Document(ctx, w2Doc); err != nil {
+			slog.ErrorContext(ctx, "Failed to persist W-2 document to Firestore", "doc_id", w2Doc.ID, "error", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to persist W-2 document"})
+			return
+		}
+
+		docItem := contracts.DocumentItem{
+			ID:           w2Doc.ID,
+			UserID:       userID,
+			Filename:     fileHeader.Filename,
+			DocumentType: "w2",
+			AccountType:  "tax",
+			SizeBytes:    fileHeader.Size,
+			UploadedAt:   w2Doc.UploadedAt,
+			Status:       string(w2Doc.Status),
+		}
+		_ = s.Store.SetDocument(ctx, &docItem)
+	}
+
+	c.JSON(http.StatusOK, w2Doc)
+}
+
+func (s *Server) HandleGetW2Documents(c *gin.Context) {
+	userID := c.DefaultQuery("user_id", "demo_user")
+	if s.Store == nil {
+		c.JSON(http.StatusOK, []contracts.W2Document{})
+		return
+	}
+	docs, err := s.Store.GetW2Documents(c.Request.Context(), userID)
+	if err != nil {
+		slog.ErrorContext(c.Request.Context(), "Error reading W-2 documents from Firestore", "user_id", userID, "error", err)
+		c.JSON(http.StatusBadGateway, gin.H{"error": "upstream data unavailable"})
+		return
+	}
+	if docs == nil {
+		docs = []contracts.W2Document{}
+	}
+	c.JSON(http.StatusOK, docs)
+}
+
+func (s *Server) HandleDeleteW2Document(c *gin.Context) {
+	userID := c.DefaultQuery("user_id", "demo_user")
+	docID := c.Param("id")
+	if docID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id parameter is required"})
+		return
+	}
+
+	if s.Store == nil {
+		if docID != "w2-demo-1" && !strings.HasPrefix(docID, "w2-") {
+			c.JSON(http.StatusNotFound, gin.H{"error": "w2 document not found"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"status": "deleted", "id": docID})
+		return
+	}
+
+	if err := s.Store.DeleteW2Document(c.Request.Context(), userID, docID); err != nil {
+		if store.IsNotFound(err) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "w2 document not found"})
+			return
+		}
+		slog.ErrorContext(c.Request.Context(), "Error deleting W-2 document from Firestore", "user_id", userID, "doc_id", docID, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete w2 document"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": "deleted", "id": docID})
+}
+
+func (s *Server) HandleApplyW2ToProfile(c *gin.Context) {
+	userID := c.DefaultQuery("user_id", "demo_user")
+	docID := c.Param("id")
+	if docID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id parameter is required"})
+		return
+	}
+
+	if s.Store == nil {
+		if docID != "w2-demo-1" && !strings.HasPrefix(docID, "w2-") {
+			c.JSON(http.StatusNotFound, gin.H{"error": "w2 document not found"})
+			return
+		}
+		profile := defaultUserProfile()
+		profile.AnnualIncomeUSD = 220000.0
+		profile.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+		c.JSON(http.StatusOK, gin.H{"status": "applied", "profile": profile})
+		return
+	}
+
+	ctx := c.Request.Context()
+	w2, err := s.Store.GetW2Document(ctx, userID, docID)
+	if err != nil {
+		if store.IsNotFound(err) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "w2 document not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to retrieve w2 document: %v", err)})
+		return
+	}
+
+	profile, err := s.Store.GetUserProfile(ctx, userID)
+	if err != nil {
+		if store.IsNotFound(err) {
+			profile = &contracts.UserProfile{
+				UserID:   userID,
+				FullName: userID,
+			}
+		} else {
+			slog.ErrorContext(ctx, "Failed to retrieve user profile for W-2 apply", "user_id", userID, "error", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve user profile"})
+			return
+		}
+	} else if profile == nil {
+		profile = &contracts.UserProfile{
+			UserID:   userID,
+			FullName: userID,
+		}
+	}
+
+	profile.AnnualIncomeUSD = w2.WagesAndCompensation.Box1WagesTipsOtherCompUSD
+	if w2.Employer != nil && w2.Employer.Name != "" && profile.Occupation == "" {
+		profile.Occupation = fmt.Sprintf("Employee at %s", w2.Employer.Name)
+	}
+	profile.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+
+	if err := s.Store.SetUserProfile(ctx, userID, profile); err != nil {
+		slog.ErrorContext(ctx, "Failed to update user profile with W-2 income", "user_id", userID, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to persist updated profile"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": "applied", "profile": profile})
 }
 
 func ptrInt(i int) *int {

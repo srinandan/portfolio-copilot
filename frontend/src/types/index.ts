@@ -267,4 +267,83 @@ export interface OnboardingProfile {
   liabilities?: LiabilityItem[];
 }
 
+export interface W2Employer {
+  name?: string;
+  ein?: string;
+  address?: string;
+}
+
+export interface W2Employee {
+  name?: string;
+  ssn_masked?: string;
+  address?: string;
+}
+
+export interface W2Wages {
+  box1_wages_tips_other_comp_usd: number;
+  box2_federal_income_tax_withheld_usd?: number;
+  box3_social_security_wages_usd?: number;
+  box4_social_security_tax_withheld_usd?: number;
+  box5_medicare_wages_and_tips_usd?: number;
+  box6_medicare_tax_withheld_usd?: number;
+  box7_social_security_tips_usd?: number;
+  box8_allocated_tips_usd?: number;
+  box10_dependent_care_benefits_usd?: number;
+  box11_nonqualified_plans_usd?: number;
+}
+
+export interface W2Box12Item {
+  code: string;
+  description?: string;
+  amount_usd: number;
+}
+
+export interface W2Box13Checkboxes {
+  statutory_employee?: boolean;
+  retirement_plan?: boolean;
+  third_party_sick_pay?: boolean;
+}
+
+export interface W2OtherItem {
+  label: string;
+  amount_usd: number;
+}
+
+export interface W2StateTax {
+  state: string;
+  employer_state_id?: string;
+  state_wages_usd: number;
+  state_income_tax_usd: number;
+}
+
+export interface W2LocalTax {
+  locality_name: string;
+  local_wages_usd: number;
+  local_income_tax_usd: number;
+}
+
+export interface W2Document {
+  id: string;
+  user_id: string;
+  tax_year: number;
+  document_id?: string;
+  filename?: string;
+  size_bytes?: number;
+  uploaded_at: string;
+  parsed_at?: string;
+  confidence_score?: number;
+  status: 'SUCCESS' | 'FAILED' | 'PENDING_REVIEW';
+  error_message?: string;
+  employer?: W2Employer;
+  employee?: W2Employee;
+  wages_and_compensation: W2Wages;
+  box12_items?: W2Box12Item[];
+  box13_checkboxes?: W2Box13Checkboxes;
+  box14_other?: W2OtherItem[];
+  state_taxes?: W2StateTax[];
+  local_taxes?: W2LocalTax[];
+  raw_entities?: Record<string, string>;
+}
+
+
 

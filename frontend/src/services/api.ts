@@ -5,7 +5,8 @@ import type {
   SpendingReport,
   DriftReport,
   UserProfile,
-  OnboardingProfile
+  OnboardingProfile,
+  W2Document
 } from '../types';
 import { traceRequest } from './tracing';
 
@@ -86,6 +87,58 @@ export class ApiService {
     if (!res.ok) {
       const errJson = await res.json().catch(() => ({}));
       throw new Error(errJson.error || `Upload document failed with status ${res.status}`);
+    }
+    return res.json();
+  }
+
+  async uploadW2(file: File, userId = 'demo_user'): Promise<W2Document> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('user_id', userId);
+
+    const res = await this.tracedFetch('POST /api/profile/w2/upload', `${this.baseUrl}/api/profile/w2/upload`, {
+      method: 'POST',
+      body: formData
+    });
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => ({}));
+      throw new Error(errJson.error || `Upload W-2 failed with status ${res.status}`);
+    }
+    return res.json();
+  }
+
+  async getW2Documents(userId = 'demo_user'): Promise<W2Document[]> {
+    const res = await this.tracedFetch(
+      'GET /api/profile/w2',
+      `${this.baseUrl}/api/profile/w2?user_id=${encodeURIComponent(userId)}`
+    );
+    if (!res.ok) {
+      throw new Error(`Get W-2 documents failed with status ${res.status}`);
+    }
+    return res.json();
+  }
+
+  async deleteW2Document(id: string, userId = 'demo_user'): Promise<void> {
+    const res = await this.tracedFetch(
+      'DELETE /api/profile/w2/:id',
+      `${this.baseUrl}/api/profile/w2/${encodeURIComponent(id)}?user_id=${encodeURIComponent(userId)}`,
+      { method: 'DELETE' }
+    );
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => ({}));
+      throw new Error(errJson.error || `Delete W-2 failed with status ${res.status}`);
+    }
+  }
+
+  async applyW2ToProfile(id: string, userId = 'demo_user'): Promise<{ status: string; profile: UserProfile }> {
+    const res = await this.tracedFetch(
+      'POST /api/profile/w2/:id/apply',
+      `${this.baseUrl}/api/profile/w2/${encodeURIComponent(id)}/apply?user_id=${encodeURIComponent(userId)}`,
+      { method: 'POST' }
+    );
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => ({}));
+      throw new Error(errJson.error || `Apply W-2 to profile failed with status ${res.status}`);
     }
     return res.json();
   }

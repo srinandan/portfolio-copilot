@@ -35,6 +35,10 @@ type Store interface {
 	GetDriftReport(ctx context.Context, userID string) (*contracts.DriftReport, error)
 	GetDocuments(ctx context.Context, userID string) ([]contracts.DocumentItem, error)
 	SetDocument(ctx context.Context, item *contracts.DocumentItem) error
+	SetW2Document(ctx context.Context, doc *contracts.W2Document) error
+	GetW2Documents(ctx context.Context, userID string) ([]contracts.W2Document, error)
+	GetW2Document(ctx context.Context, userID string, docID string) (*contracts.W2Document, error)
+	DeleteW2Document(ctx context.Context, userID string, docID string) error
 }
 
 // Client wraps a real Firestore client.
@@ -47,6 +51,7 @@ type Client struct {
 	liabilitiesSchema *gojsonschema.Schema
 	auditLogSchema    *gojsonschema.Schema
 	userProfileSchema *gojsonschema.Schema
+	w2Schema          *gojsonschema.Schema
 }
 
 // NewClient initializes a new Client using ADC and the PROJECT_ID env var.
@@ -79,6 +84,7 @@ func (c *Client) loadSchemas() error {
 		"schemas/liabilities.schema.json":     &c.liabilitiesSchema,
 		"schemas/audit-log-entry.schema.json": &c.auditLogSchema,
 		"schemas/user-profile.schema.json":    &c.userProfileSchema,
+		"schemas/w2-document.schema.json":     &c.w2Schema,
 	}
 
 	for path, schemaPtr := range loaders {

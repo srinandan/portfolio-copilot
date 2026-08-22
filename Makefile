@@ -76,6 +76,9 @@ register-skills:
 setup-agent-engine:
 	./scripts/setup_agent_engine.sh "$(GOOGLE_CLOUD_PROJECT)" "$(GOOGLE_CLOUD_LOCATION)"
 
+setup-documentai:
+	./scripts/setup_documentai.sh "$(GOOGLE_CLOUD_PROJECT)" "$${DOCUMENT_AI_LOCATION:-us}"
+
 setup-model-armor:
 	./scripts/setup_model_armor.sh "$(GOOGLE_CLOUD_PROJECT)"
 

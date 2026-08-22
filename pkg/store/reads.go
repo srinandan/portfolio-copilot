@@ -213,3 +213,64 @@ func (c *Client) GetUserProfile(ctx context.Context, userID string) (*contracts.
 	}
 	return &profile, nil
 }
+
+// GetW2Documents reads all W-2 documents for a given user from Firestore.
+func (c *Client) GetW2Documents(ctx context.Context, userID string) ([]contracts.W2Document, error) {
+	ctx, span := tracer.Start(ctx, "store.GetW2Documents", trace.WithAttributes(attribute.String("user_id", userID)))
+	defer span.End()
+
+	query := c.fs.Collection(collectionW2Documents).Where("user_id", "==", userID).Limit(50)
+	docs, err := query.Documents(ctx).GetAll()
+	if err != nil {
+		span.RecordError(err)
+		return nil, err
+	}
+
+	items := make([]contracts.W2Document, 0, len(docs))
+	for _, doc := range docs {
+		var item contracts.W2Document
+		if err := doc.DataTo(&item); err == nil {
+			items = append(items, item)
+		} else {
+			dataBytes, jsonErr := json.Marshal(doc.Data())
+			if jsonErr == nil && json.Unmarshal(dataBytes, &item) == nil {
+				items = append(items, item)
+			}
+		}
+	}
+	return items, nil
+}
+
+// GetW2Document reads a single W-2 document by docID for a user from Firestore.
+func (c *Client) GetW2Document(ctx context.Context, userID string, docID string) (*contracts.W2Document, error) {
+	ctx, span := tracer.Start(ctx, "store.GetW2Document", trace.WithAttributes(
+		attribute.String("user_id", userID),
+		attribute.String("doc_id", docID),
+	))
+	defer span.End()
+
+	docRef := c.fs.Collection(collectionW2Documents).Doc(docID)
+	doc, err := docRef.Get(ctx)
+	if err != nil {
+		span.RecordError(err)
+		return nil, err
+	}
+
+	var item contracts.W2Document
+	if err := doc.DataTo(&item); err != nil {
+		dataBytes, jsonErr := json.Marshal(doc.Data())
+		if jsonErr != nil {
+			return nil, fmt.Errorf("failed to parse w2 document: %w", err)
+		}
+		if jsonErr := json.Unmarshal(dataBytes, &item); jsonErr != nil {
+			return nil, fmt.Errorf("failed to parse w2 document: %w", err)
+		}
+	}
+
+	if item.UserID != userID {
+		return nil, status.Error(codes.NotFound, fmt.Sprintf("w2 document %s not found", docID))
+	}
+
+	return &item, nil
+}
+

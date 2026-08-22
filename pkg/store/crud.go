@@ -1,9 +1,12 @@
 package store
 
 import (
-	"cloud.google.com/go/firestore"
 	"context"
 	"fmt"
+
+	"cloud.google.com/go/firestore"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"portfolio-copilot/pkg/contracts"
 )
 
@@ -12,6 +15,7 @@ const (
 	collectionLiabilities = "liabilities"
 	collectionAuditLog    = "audit_log"
 	collectionIPS         = "ips"
+	collectionW2Documents = "w2_documents"
 )
 
 // SetHoldings overwrites the holdings snapshot for a given user.
@@ -191,3 +195,57 @@ func (c *Client) SetDocument(ctx context.Context, item *contracts.DocumentItem) 
 
 	return nil
 }
+
+// SetW2Document saves a validated W2Document to Firestore.
+func (c *Client) SetW2Document(ctx context.Context, doc *contracts.W2Document) error {
+	if doc == nil {
+		return fmt.Errorf("w2 document is nil")
+	}
+	if doc.ID == "" {
+		return fmt.Errorf("w2 document ID is empty")
+	}
+	if doc.UserID == "" {
+		return fmt.Errorf("w2 document UserID is empty")
+	}
+
+	if c.w2Schema != nil {
+		if err := validate(c.w2Schema, doc); err != nil {
+			return fmt.Errorf("invalid w2 document: %w", err)
+		}
+	}
+
+	_, err := c.fs.Collection(collectionW2Documents).Doc(doc.ID).Set(ctx, doc)
+	if err != nil {
+		return fmt.Errorf("failed to set w2 document in firestore: %w", err)
+	}
+
+	return nil
+}
+
+// DeleteW2Document deletes a W2 document for a given user from Firestore.
+func (c *Client) DeleteW2Document(ctx context.Context, userID string, docID string) error {
+	if userID == "" || docID == "" {
+		return fmt.Errorf("userID and docID must not be empty")
+	}
+
+	docRef := c.fs.Collection(collectionW2Documents).Doc(docID)
+	doc, err := docRef.Get(ctx)
+	if err != nil {
+		return err
+	}
+
+	var w2 contracts.W2Document
+	if err := doc.DataTo(&w2); err != nil {
+		return fmt.Errorf("failed to parse existing w2 document: %w", err)
+	}
+	if w2.UserID != userID {
+		return status.Error(codes.NotFound, fmt.Sprintf("w2 document %s not found", docID))
+	}
+
+	_, err = docRef.Delete(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to delete w2 document from firestore: %w", err)
+	}
+	return nil
+}
+

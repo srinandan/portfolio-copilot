@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -17,6 +18,7 @@ import (
 	"google.golang.org/grpc/status"
 	"portfolio-copilot/pkg/bigquery"
 	"portfolio-copilot/pkg/contracts"
+	"portfolio-copilot/pkg/documentai"
 	"portfolio-copilot/pkg/store"
 )
 
@@ -34,6 +36,7 @@ type mockStore struct {
 	profiles        map[string]*contracts.UserProfile
 	spendingReports map[string]*contracts.SpendingReport
 	driftReports    map[string]*contracts.DriftReport
+	w2Docs          map[string]contracts.W2Document
 	failAll         bool
 }
 
@@ -46,6 +49,7 @@ func newMockStore() *mockStore {
 		profiles:        make(map[string]*contracts.UserProfile),
 		spendingReports: make(map[string]*contracts.SpendingReport),
 		driftReports:    make(map[string]*contracts.DriftReport),
+		w2Docs:          make(map[string]contracts.W2Document),
 	}
 }
 
@@ -175,6 +179,56 @@ func (m *mockStore) AppendAuditLog(ctx context.Context, entry *contracts.AuditLo
 	return nil
 }
 
+func (m *mockStore) SetW2Document(ctx context.Context, doc *contracts.W2Document) error {
+	if m.failAll {
+		return errors.New("mock upstream error")
+	}
+	m.w2Docs[doc.ID] = *doc
+	return nil
+}
+
+func (m *mockStore) GetW2Documents(ctx context.Context, userID string) ([]contracts.W2Document, error) {
+	if m.failAll {
+		return nil, errors.New("mock upstream error")
+	}
+	var res []contracts.W2Document
+	for _, doc := range m.w2Docs {
+		if doc.UserID == userID {
+			res = append(res, doc)
+		}
+	}
+	return res, nil
+}
+
+func (m *mockStore) GetW2Document(ctx context.Context, userID string, docID string) (*contracts.W2Document, error) {
+	if m.failAll {
+		return nil, errors.New("mock upstream error")
+	}
+	doc, ok := m.w2Docs[docID]
+	if !ok {
+		return nil, errMockNotFound
+	}
+	if doc.UserID != userID {
+		return nil, errors.New("permission denied")
+	}
+	return &doc, nil
+}
+
+func (m *mockStore) DeleteW2Document(ctx context.Context, userID string, docID string) error {
+	if m.failAll {
+		return errors.New("mock upstream error")
+	}
+	doc, ok := m.w2Docs[docID]
+	if !ok {
+		return errMockNotFound
+	}
+	if doc.UserID != userID {
+		return errors.New("permission denied")
+	}
+	delete(m.w2Docs, docID)
+	return nil
+}
+
 // mockBQRunner implements bigquery.Runner for unit tests.
 type mockBQRunner struct {
 	insertedRows []bigquery.TransactionRecord
@@ -207,6 +261,10 @@ func setupTestRouterWithServer(srv *Server) *gin.Engine {
 	r.POST("/api/documents", srv.HandleUploadDocument)
 	r.GET("/api/profile", srv.HandleGetUserProfile)
 	r.POST("/api/profile", srv.HandleSetUserProfile)
+	r.POST("/api/profile/w2/upload", srv.HandleUploadW2)
+	r.GET("/api/profile/w2", srv.HandleGetW2Documents)
+	r.DELETE("/api/profile/w2/:id", srv.HandleDeleteW2Document)
+	r.POST("/api/profile/w2/:id/apply", srv.HandleApplyW2ToProfile)
 	r.GET("/api/onboarding", srv.HandleGetOnboarding)
 	return r
 }
@@ -725,6 +783,7 @@ func TestHandlers_NilStoreReturnsFallback(t *testing.T) {
 		{http.MethodGet, "/api/drift_report?user_id=usr_test"},
 		{http.MethodGet, "/api/documents?user_id=usr_test"},
 		{http.MethodGet, "/api/profile?user_id=usr_test"},
+		{http.MethodGet, "/api/profile/w2?user_id=usr_test"},
 		{http.MethodGet, "/api/onboarding?user_id=usr_test"},
 	}
 
@@ -737,4 +796,236 @@ func TestHandlers_NilStoreReturnsFallback(t *testing.T) {
 		}
 	}
 }
+
+func createW2MultipartUpload(filename, userID string, content []byte) (*http.Request, error) {
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	if userID != "" {
+		_ = writer.WriteField("user_id", userID)
+	}
+	part, err := writer.CreateFormFile("file", filename)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := part.Write(content); err != nil {
+		return nil, err
+	}
+	if err := writer.Close(); err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, "/api/profile/w2/upload", body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	return req, nil
+}
+
+func TestW2Handlers_EndToEnd(t *testing.T) {
+	mock := newMockStore()
+	mockParser := documentai.NewMockW2Parser()
+	srv := &Server{
+		Store:       mock,
+		DocAIParser: mockParser,
+	}
+	r := setupTestRouterWithServer(srv)
+
+	// 1. Upload valid W-2 PDF
+	req, err := createW2MultipartUpload("w2_2024.pdf", "user_abc", []byte("%PDF-1.4 test document"))
+	if err != nil {
+		t.Fatalf("failed to create upload request: %v", err)
+	}
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for W-2 upload, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var uploadedDoc contracts.W2Document
+	if err := json.Unmarshal(w.Body.Bytes(), &uploadedDoc); err != nil {
+		t.Fatalf("failed to parse upload response: %v", err)
+	}
+	if uploadedDoc.UserID != "user_abc" || uploadedDoc.TaxYear != 2024 {
+		t.Errorf("unexpected doc metadata: %+v", uploadedDoc)
+	}
+	if uploadedDoc.WagesAndCompensation.Box1WagesTipsOtherCompUSD != 220000.0 {
+		t.Errorf("unexpected Box 1 wages: %v", uploadedDoc.WagesAndCompensation.Box1WagesTipsOtherCompUSD)
+	}
+
+	// 2. Query W-2 documents for user
+	getReq, _ := http.NewRequest(http.MethodGet, "/api/profile/w2?user_id=user_abc", nil)
+	getW := httptest.NewRecorder()
+	r.ServeHTTP(getW, getReq)
+
+	if getW.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for get W-2s, got %d", getW.Code)
+	}
+	var docList []contracts.W2Document
+	if err := json.Unmarshal(getW.Body.Bytes(), &docList); err != nil {
+		t.Fatalf("failed to unmarshal W-2 list: %v", err)
+	}
+	if len(docList) != 1 || docList[0].ID != uploadedDoc.ID {
+		t.Fatalf("expected 1 document with ID %s, got %d documents", uploadedDoc.ID, len(docList))
+	}
+
+	// 3. Apply W-2 to Profile
+	applyReq, _ := http.NewRequest(http.MethodPost, fmt.Sprintf("/api/profile/w2/%s/apply?user_id=user_abc", uploadedDoc.ID), nil)
+	applyW := httptest.NewRecorder()
+	r.ServeHTTP(applyW, applyReq)
+
+	if applyW.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for apply W-2, got %d: %s", applyW.Code, applyW.Body.String())
+	}
+
+	profileReq, _ := http.NewRequest(http.MethodGet, "/api/profile?user_id=user_abc", nil)
+	profileW := httptest.NewRecorder()
+	r.ServeHTTP(profileW, profileReq)
+	var updatedProfile contracts.UserProfile
+	if err := json.Unmarshal(profileW.Body.Bytes(), &updatedProfile); err != nil {
+		t.Fatalf("failed to parse profile response: %v", err)
+	}
+	if updatedProfile.AnnualIncomeUSD != 220000.0 {
+		t.Errorf("expected AnnualIncomeUSD = 220000, got %v", updatedProfile.AnnualIncomeUSD)
+	}
+
+	// 4. Delete W-2 document
+	delReq, _ := http.NewRequest(http.MethodDelete, fmt.Sprintf("/api/profile/w2/%s?user_id=user_abc", uploadedDoc.ID), nil)
+	delW := httptest.NewRecorder()
+	r.ServeHTTP(delW, delReq)
+
+	if delW.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for delete W-2, got %d", delW.Code)
+	}
+
+	// Verify deleted
+	getReq2, _ := http.NewRequest(http.MethodGet, "/api/profile/w2?user_id=user_abc", nil)
+	getW2 := httptest.NewRecorder()
+	r.ServeHTTP(getW2, getReq2)
+	var docList2 []contracts.W2Document
+	_ = json.Unmarshal(getW2.Body.Bytes(), &docList2)
+	if len(docList2) != 0 {
+		t.Errorf("expected 0 documents after delete, got %d", len(docList2))
+	}
+}
+
+func TestW2Handlers_ValidationErrors(t *testing.T) {
+	mock := newMockStore()
+	mockParser := documentai.NewMockW2Parser()
+	srv := &Server{
+		Store:       mock,
+		DocAIParser: mockParser,
+	}
+	r := setupTestRouterWithServer(srv)
+
+	// Unsupported extension (.txt)
+	req1, _ := createW2MultipartUpload("w2.txt", "user1", []byte("hello"))
+	w1 := httptest.NewRecorder()
+	r.ServeHTTP(w1, req1)
+	if w1.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 Bad Request for .txt file, got %d", w1.Code)
+	}
+
+	// Delete non-existent ID
+	delReq, _ := http.NewRequest(http.MethodDelete, "/api/profile/w2/non-existent-id?user_id=user1", nil)
+	delW := httptest.NewRecorder()
+	r.ServeHTTP(delW, delReq)
+	if delW.Code != http.StatusNotFound {
+		t.Errorf("expected 404 Not Found for deleting non-existent W-2, got %d", delW.Code)
+	}
+
+	// Apply non-existent ID
+	applyReq, _ := http.NewRequest(http.MethodPost, "/api/profile/w2/non-existent-id/apply?user_id=user1", nil)
+	applyW := httptest.NewRecorder()
+	r.ServeHTTP(applyW, applyReq)
+	if applyW.Code != http.StatusNotFound {
+		t.Errorf("expected 404 Not Found for applying non-existent W-2, got %d", applyW.Code)
+	}
+}
+
+func TestW2Handlers_ProfilePreservation(t *testing.T) {
+	mock := newMockStore()
+	mockParser := documentai.NewMockW2Parser()
+	srv := &Server{
+		Store:       mock,
+		DocAIParser: mockParser,
+	}
+	r := setupTestRouterWithServer(srv)
+
+	// Pre-seed an existing profile for user_custom
+	existingProfile := &contracts.UserProfile{
+		UserID:              "user_custom",
+		FullName:            "Custom User",
+		Occupation:          "Senior Architect",
+		AnnualIncomeUSD:     120000.0,
+		TargetRetirementAge: 62,
+		RiskToleranceNotes:  "Moderate risk with 30-year horizon",
+	}
+	_ = mock.SetUserProfile(context.Background(), "user_custom", existingProfile)
+
+	// Upload a W-2
+	uploadReq, _ := createW2MultipartUpload("w2_2024.pdf", "user_custom", []byte("%PDF-fake-content"))
+	uploadW := httptest.NewRecorder()
+	r.ServeHTTP(uploadW, uploadReq)
+	var uploadedDoc contracts.W2Document
+	_ = json.Unmarshal(uploadW.Body.Bytes(), &uploadedDoc)
+
+	// Apply W-2
+	applyReq, _ := http.NewRequest(http.MethodPost, fmt.Sprintf("/api/profile/w2/%s/apply?user_id=user_custom", uploadedDoc.ID), nil)
+	applyW := httptest.NewRecorder()
+	r.ServeHTTP(applyW, applyReq)
+
+	if applyW.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK, got %d: %s", applyW.Code, applyW.Body.String())
+	}
+
+	// Verify profile retained existing fields and only updated income (occupation not overwritten since already non-empty)
+	updated, _ := mock.GetUserProfile(context.Background(), "user_custom")
+	if updated.FullName != "Custom User" {
+		t.Errorf("expected FullName preserved, got %s", updated.FullName)
+	}
+	if updated.Occupation != "Senior Architect" {
+		t.Errorf("expected Occupation preserved, got %s", updated.Occupation)
+	}
+	if updated.AnnualIncomeUSD != 220000.0 {
+		t.Errorf("expected AnnualIncomeUSD updated to 220000, got %v", updated.AnnualIncomeUSD)
+	}
+	if updated.RiskToleranceNotes != "Moderate risk with 30-year horizon" {
+		t.Errorf("expected RiskToleranceNotes preserved, got %s", updated.RiskToleranceNotes)
+	}
+}
+
+func TestW2Handlers_FallbackMode_UnknownIDReturns404(t *testing.T) {
+	srv := &Server{Store: nil, BQRunner: nil}
+	r := setupTestRouterWithServer(srv)
+
+	// Apply unknown ID
+	req1, _ := http.NewRequest(http.MethodPost, "/api/profile/w2/invalid-id/apply?user_id=demo_user", nil)
+	w1 := httptest.NewRecorder()
+	r.ServeHTTP(w1, req1)
+	if w1.Code != http.StatusNotFound {
+		t.Errorf("expected 404 Not Found for invalid ID in fallback mode, got %d", w1.Code)
+	}
+
+	// Delete unknown ID
+	req2, _ := http.NewRequest(http.MethodDelete, "/api/profile/w2/invalid-id?user_id=demo_user", nil)
+	w2 := httptest.NewRecorder()
+	r.ServeHTTP(w2, req2)
+	if w2.Code != http.StatusNotFound {
+		t.Errorf("expected 404 Not Found for invalid ID in fallback mode, got %d", w2.Code)
+	}
+}
+
+func TestServer_Close(t *testing.T) {
+	srv := &Server{
+		Store:       nil,
+		DocAIParser: documentai.NewMockW2Parser(),
+	}
+	if err := srv.Close(); err != nil {
+		t.Errorf("expected srv.Close() to succeed, got %v", err)
+	}
+}
+
+
 

@@ -144,6 +144,7 @@ async def test_root_planner_emits_stage_progress_through_interleave():
         patch(
             "src.orchestrator.planner.AgentRegistryClient.list_authorized_skills", new_callable=AsyncMock
         ) as mock_list,
+        patch("src.orchestrator.planner._load_authorized_manifests", new_callable=AsyncMock, return_value=None),
         patch("src.orchestrator.planner.emit_skill_invoked_audit"),
         patch("src.orchestrator.planner.dispatch_managed_skill", new_callable=AsyncMock) as mock_dispatch,
         patch("src.orchestrator.planner.preload_spending_facts") as mock_preload,

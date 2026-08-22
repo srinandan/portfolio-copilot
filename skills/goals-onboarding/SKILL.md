@@ -51,6 +51,7 @@ what it does once invoked, per [ADR-0004](../../docs/adr/0004-dynamic-planning-o
 | [`HoldingsSnapshot`](../../schemas/holdings.schema.json) | Firestore, read-only | Yes — informs feasibility discussion (e.g. a goal the current portfolio can't plausibly reach) |
 | Existing [`LiabilitiesSnapshot`](../../schemas/liabilities.schema.json), if any | Firestore, read-only | Required when `trigger != initial` — presented back to the user to confirm/update rather than re-asked from scratch |
 | Checking transaction history | BigQuery, read-only, aggregated | Yes — informs liquidity needs (spending patterns, existing reserve) |
+| [`W2Document`](../../schemas/w2-document.schema.json), if any | Firestore, read-only | Optional — informs income verification and retirement deferral capacity (Box 12 401(k)) |
 | Interview responses | User, gathered interactively during the skill's own multi-turn conversation | Yes |
 
 The interview itself is multi-turn and not turn-by-turn specified here —
@@ -167,7 +168,7 @@ than starting over, if practical.
 
 - Managed Agent sandbox: conversational interaction with the user (`RequestInput`)
 - Orchestrator (outside sandbox):
-  - Firestore: read `holdings`, read `liabilities`, read/write `ips`, write `liabilities`, write `audit_log`
+  - Firestore: read `holdings`, read `liabilities`, read `w2_documents`, read/write `ips`, write `liabilities`, write `audit_log`
   - BigQuery: read `checking_transactions` (aggregate queries only)
   - Agent Platform Memory Bank: write (summarized preferences)
 - **No** trade-execution tools, no Alpaca access, no write access inside the sandbox.
@@ -178,7 +179,7 @@ than starting over, if practical.
   (self-registered skills are namespaced under the `private-` publisher
   prefix — see [ADR-0006](../../docs/adr/0006-agent-registry-api-alignment.md))
 - Skill revision: 0.2.0 (draft — not yet registered)
-- Approval scope: `read:holdings,read:liabilities,read:spending,read:ips`
+- Approval scope: `read:holdings,read:liabilities,read:spending,read:ips,read:w2`
 
 ## Acceptance criteria
 

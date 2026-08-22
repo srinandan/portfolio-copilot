@@ -133,3 +133,104 @@ func TestHoldingsValidation(t *testing.T) {
 		})
 	}
 }
+
+func TestW2DocumentValidation(t *testing.T) {
+	c := getTestClient(t)
+
+	tests := []struct {
+		name    string
+		w2      *contracts.W2Document
+		wantErr bool
+	}{
+		{
+			name: "valid W2 golden path",
+			w2: &contracts.W2Document{
+				ID:         "w2-2024-test",
+				UserID:     "user123",
+				TaxYear:    2024,
+				Status:     contracts.W2StatusSuccess,
+				UploadedAt: "2026-08-01T12:00:00Z",
+				Employer: &contracts.W2Employer{
+					Name: "Acme Corp",
+					EIN:  "12-3456789",
+				},
+				WagesAndCompensation: contracts.W2Wages{
+					Box1WagesTipsOtherCompUSD: 150000.0,
+					Box2FederalIncomeTaxUSD:   ptrFloat64(25000.0),
+				},
+				Box12Items: []contracts.W2Box12Item{
+					{Code: "D", Description: "401(k)", AmountUSD: 22500.0},
+				},
+				StateTaxes: []contracts.W2StateTax{
+					{State: "CA", StateWagesUSD: 150000.0, StateIncomeTaxUSD: 12000.0},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "negative box1 wages",
+			w2: &contracts.W2Document{
+				ID:         "w2-2024-test",
+				UserID:     "user123",
+				TaxYear:    2024,
+				Status:     contracts.W2StatusSuccess,
+				UploadedAt: "2026-08-01T12:00:00Z",
+				WagesAndCompensation: contracts.W2Wages{
+					Box1WagesTipsOtherCompUSD: -500.0,
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "missing required UserID",
+			w2: &contracts.W2Document{
+				ID:         "w2-2024-test",
+				TaxYear:    2024,
+				Status:     contracts.W2StatusSuccess,
+				UploadedAt: "2026-08-01T12:00:00Z",
+				WagesAndCompensation: contracts.W2Wages{
+					Box1WagesTipsOtherCompUSD: 100000.0,
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid tax year out of range",
+			w2: &contracts.W2Document{
+				ID:         "w2-2024-test",
+				UserID:     "user123",
+				TaxYear:    1850,
+				Status:     contracts.W2StatusSuccess,
+				UploadedAt: "2026-08-01T12:00:00Z",
+				WagesAndCompensation: contracts.W2Wages{
+					Box1WagesTipsOtherCompUSD: 100000.0,
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid status enum",
+			w2: &contracts.W2Document{
+				ID:         "w2-2024-test",
+				UserID:     "user123",
+				TaxYear:    2024,
+				Status:     "INVALID_STATUS",
+				UploadedAt: "2026-08-01T12:00:00Z",
+				WagesAndCompensation: contracts.W2Wages{
+					Box1WagesTipsOtherCompUSD: 100000.0,
+				},
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validate(c.w2Schema, tt.w2)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+

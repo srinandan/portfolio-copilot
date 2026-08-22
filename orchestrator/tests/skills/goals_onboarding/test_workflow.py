@@ -68,7 +68,7 @@ def test_write_ips_initial_trigger_creates_v1(sample_interview_result):
     audit_entry = mock_client.append_audit_log.call_args[0][0]
     assert audit_entry.event_type == EventType.IPS_CREATED
     assert audit_entry.actor.skill_version == read_skill_version("goals-onboarding")
-    assert audit_entry.actor.approval_scope == "read:holdings,read:liabilities,read:spending,read:ips"
+    assert audit_entry.actor.approval_scope == "read:holdings,read:liabilities,read:spending,read:ips,read:w2"
 
 
 def test_write_ips_carries_registry_entry_id_and_approval_scope(sample_interview_result):
@@ -85,7 +85,7 @@ def test_write_ips_carries_registry_entry_id_and_approval_scope(sample_interview
 
     audit_entry = mock_client.append_audit_log.call_args[0][0]
     assert audit_entry.actor.registry_entry_id == "projects/test/revisions/rev-goals-1"
-    assert audit_entry.actor.approval_scope == "read:holdings,read:liabilities,read:spending,read:ips"
+    assert audit_entry.actor.approval_scope == "read:holdings,read:liabilities,read:spending,read:ips,read:w2"
 
 
 def test_write_ips_dynamic_skill_version_from_frontmatter(sample_interview_result, monkeypatch):
