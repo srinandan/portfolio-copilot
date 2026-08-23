@@ -65,6 +65,9 @@ func main() {
 	// IPS directly via the same writer the LLM path uses. See onboarding.go.
 	r.POST("/api/onboarding", oc.HandleApplyOnboarding)
 
+	// Synchronous advisory equity analysis (deterministic DCF + suitability).
+	r.POST("/api/analysis/equity", oc.HandleAnalyzeEquity)
+
 	// Browser telemetry sink: the SPA posts its client spans here so they
 	// correlate with server/orchestrator spans of the same trace. See telemetry.go.
 	r.POST("/api/telemetry/v1/traces", ti.HandleIngestTraces)

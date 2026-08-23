@@ -3,9 +3,11 @@
 from .preloader import (
     PreloadDeclinedError,
     preload_for_action_drafting,
+    preload_for_equity_research,
     preload_for_portfolio_analysis,
     preload_for_research,
     preload_for_reviewer,
+    preload_for_suitability,
 )
 from .spending import preload_spending_facts
 from .writers import (
@@ -29,9 +31,11 @@ from .writers import (
 __all__ = [
     "PreloadDeclinedError",
     "preload_for_action_drafting",
+    "preload_for_equity_research",
     "preload_for_portfolio_analysis",
     "preload_for_research",
     "preload_for_reviewer",
+    "preload_for_suitability",
     "preload_spending_facts",
     "emit_action_executed_audit",
     "emit_action_failed_audit",

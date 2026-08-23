@@ -1,0 +1,9 @@
+{
+  "id": "suitability",
+  "summary": "Combines a standalone equity assessment with the user's IPS, holdings, and drift to produce an advisory buy/add/hold/trim/avoid recommendation. Advisory only; never drafts or executes a trade.",
+  "applies_when": "An equity assessment exists and the user asked whether a specific stock is worth buying or selling for them.",
+  "requires": ["equity_assessment", "active_ips", "holdings"],
+  "optional": ["drift_report"],
+  "produces": ["equity_recommendation"],
+  "parallelizable": false
+}

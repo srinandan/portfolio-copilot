@@ -62,6 +62,9 @@
 
     <!-- Top Holdings Table -->
     <TopHoldingsTable :positions="holdings.positions" />
+
+    <!-- Advisory equity research (issue #344) -->
+    <EquityAnalyzer />
   </div>
 </template>
 
@@ -71,6 +74,7 @@ import type { HoldingsSnapshot, DriftReport } from '../types';
 import { apiService } from '../services/api';
 import TopHoldingsTable from '../components/portfolio/TopHoldingsTable.vue';
 import DriftReportCard from '../components/portfolio/DriftReportCard.vue';
+import EquityAnalyzer from '../components/portfolio/EquityAnalyzer.vue';
 
 interface AllocationItem {
   assetClass: string;

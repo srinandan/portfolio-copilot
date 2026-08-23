@@ -2,6 +2,7 @@ import asyncio
 import hashlib
 import json
 import os
+import re
 import time
 import uuid
 from dataclasses import dataclass
@@ -45,9 +46,11 @@ from .state import (
     emit_skill_invoked_audit,
     emit_skill_revoked_audit,
     preload_for_action_drafting,
+    preload_for_equity_research,
     preload_for_portfolio_analysis,
     preload_for_research,
     preload_for_reviewer,
+    preload_for_suitability,
     preload_spending_facts,
     write_drift_report,
     write_ips_from_interview_result,
@@ -71,6 +74,10 @@ PIPELINE_SKILL_ORDER = [
     "private-action-drafting",
     "reviewer",
     "private-reviewer",
+    "equity-research",
+    "private-equity-research",
+    "suitability",
+    "private-suitability",
 ]
 
 # Canonical clean-name order (no `private-` prefix). Used to tie-break skills
@@ -84,6 +91,8 @@ CANONICAL_SKILL_ORDER = [
     "research",
     "action-drafting",
     "reviewer",
+    "equity-research",
+    "suitability",
 ]
 
 
@@ -472,6 +481,90 @@ async def _postprocess_reviewer(user_id, result, ctx, input_dict, registry_entry
     return payload, ctx_update
 
 
+# ---------- equity-research + suitability (advisory path, issue #344) ----------
+
+_CASHTAG_RE = re.compile(r"\$([A-Za-z]{1,5})\b")
+_UPPER_TICKER_RE = re.compile(r"\b([A-Z]{2,5})\b")
+# Uppercase tokens that look like tickers but are common finance acronyms.
+_TICKER_STOPWORDS = frozenset(
+    {"IPS", "DCF", "ETF", "CEO", "CFO", "USD", "AI", "FAQ", "PDF", "API", "US", "IRA", "SEC", "IPO", "ROE", "EPS"}
+)
+
+
+def _extract_ticker(prompt: str, input_dict: Dict[str, Any]) -> Optional[str]:
+    """Best-effort ticker extraction for the equity-research path.
+
+    Prefers an explicit ``ticker`` field, then a ``$CASHTAG``, then a lone
+    uppercase 2-5 letter token that is not a common finance acronym. Returns
+    None when nothing ticker-like is present (the skill then self-skips); a
+    wrong guess is caught downstream when fundamentals can't be retrieved.
+    """
+    explicit = input_dict.get("ticker")
+    if isinstance(explicit, str) and explicit.strip():
+        return explicit.strip().upper()
+    text = prompt or ""
+    m = _CASHTAG_RE.search(text)
+    if m:
+        return m.group(1).upper()
+    for m in _UPPER_TICKER_RE.finditer(text):
+        tok = m.group(1).upper()
+        if tok not in _TICKER_STOPWORDS:
+            return tok
+    return None
+
+
+def _build_equity_research_input(user_id, input_dict, context):
+    prompt = (
+        input_dict.get("prompt")
+        or input_dict.get("message")
+        or _extract_prompt(input_dict)
+        or _extract_prompt(context)
+    )
+    ticker = _extract_ticker(prompt, input_dict)
+    if not ticker:
+        return None  # no identifiable ticker — skip cleanly
+    node_input = preload_for_equity_research(user_id=user_id, ticker=ticker)
+    # Stash the deterministic assessment so postprocess can treat it as authoritative.
+    input_dict["_equity_assessment"] = node_input.get("assessment")
+    return node_input
+
+
+async def _postprocess_equity_research(user_id, result, ctx, input_dict, registry_entry_id=None):
+    assessment = input_dict.get("_equity_assessment")
+    if assessment is None:
+        assessment = result.model_dump() if hasattr(result, "model_dump") else result
+    payload = dict(assessment) if isinstance(assessment, dict) else assessment
+    # Attach the MA's optional narrative without polluting the threaded contract.
+    summary = result.get("summary") or result.get("narrative_summary") if isinstance(result, dict) else None
+    if summary and isinstance(payload, dict):
+        payload = {**payload, "narrative_summary": summary}
+    return payload, {"equity_assessment": assessment, "equity_research_result": payload}
+
+
+def _build_suitability_input(user_id, input_dict, context):
+    assessment = context.get("equity_assessment") or input_dict.get("_equity_assessment")
+    if not assessment:
+        return None  # nothing to assess — skip (equity-research produced nothing)
+    node_input = preload_for_suitability(
+        user_id=user_id,
+        assessment=assessment,
+        drift_report=context.get("drift_report") or input_dict.get("drift_report"),
+    )
+    input_dict["_equity_recommendation"] = node_input.get("recommendation")
+    return node_input
+
+
+async def _postprocess_suitability(user_id, result, ctx, input_dict, registry_entry_id=None):
+    recommendation = input_dict.get("_equity_recommendation")
+    if recommendation is None:
+        recommendation = result.model_dump() if hasattr(result, "model_dump") else result
+    payload = dict(recommendation) if isinstance(recommendation, dict) else recommendation
+    summary = result.get("summary") or result.get("rationale") if isinstance(result, dict) else None
+    if summary and isinstance(payload, dict) and not payload.get("rationale"):
+        payload = {**payload, "rationale": summary}
+    return payload, {"equity_recommendation": recommendation, "suitability_result": payload}
+
+
 SKILL_PLANS: Dict[str, SkillPlan] = {
     "private-spending-analysis": SkillPlan(
         short_name="private-spending-analysis",
@@ -502,6 +595,16 @@ SKILL_PLANS: Dict[str, SkillPlan] = {
         short_name="private-reviewer",
         build_input=_build_reviewer_input,
         postprocess=_postprocess_reviewer,
+    ),
+    "private-equity-research": SkillPlan(
+        short_name="private-equity-research",
+        build_input=_build_equity_research_input,
+        postprocess=_postprocess_equity_research,
+    ),
+    "private-suitability": SkillPlan(
+        short_name="private-suitability",
+        build_input=_build_suitability_input,
+        postprocess=_postprocess_suitability,
     ),
 }
 
@@ -903,6 +1006,9 @@ async def root_planner(ctx: Context, node_input: Any):
         # adds prerequisites and gates. Unauthorized leaves (e.g. a floor skill
         # that isn't authorized) are dropped by resolve_and_schedule.
         prompt = _extract_prompt(node_input)
+        if prompt:
+            input_dict.setdefault("prompt", prompt)
+            input_dict.setdefault("message", prompt)
         decision_context = _build_decision_context(user_id, prompt)
         candidates = [c.id for c in DEFAULT_RETRIEVER.retrieve(prompt, manifests)]
         leaves = select_leaves(candidates, decision_context, DEFAULT_POLICY)

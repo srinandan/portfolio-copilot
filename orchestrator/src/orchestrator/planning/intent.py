@@ -45,32 +45,60 @@ _QUESTION_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Advice-shaped questions about a *specific stock* — route to the equity-research
+# advisory path (issue #344) in addition to the trade path. High-precision:
+# an advice frame ("should I ...", "is it worth ...") plus a single-name action
+# verb (buy/sell/add/invest), or an explicit valuation cue. Portfolio-level verbs
+# (trim/rebalance/reallocate) are deliberately excluded so rebalancing questions
+# stay on the trade path, not the single-name analysis path.
+_ADVICE_FRAME_RE = re.compile(r"\b(should|is|are|would|could|worth|do you think)\b", re.IGNORECASE)
+_EQUITY_ACTION_RE = re.compile(r"\b(buy|buying|sell|selling|add|adding|invest|investing)\b", re.IGNORECASE)
+_VALUATION_CUE_RE = re.compile(
+    r"\b(under\s?valued|over\s?valued|intrinsic value|fair value|valuation|good buy)\b",
+    re.IGNORECASE,
+)
+
 
 @dataclass(frozen=True)
 class IntentSignals:
     """Prompt-derived fields for the planner's decision context.
 
-    ``requested_trade`` drives the trade-intent include rule. ``intent`` is a
-    coarse label ("action" / "informational" / "unknown") kept as metadata for
-    the PLAN_CONSTRUCTED audit; it does not gate any exclude in v1.
+    ``requested_trade`` drives the trade-intent include rule. ``requested_equity_analysis``
+    drives the advisory equity-research include rule (issue #344) and is
+    independent of ``requested_trade`` (an advice-shaped "should I buy AAPL?"
+    sets both — recall-biased). ``intent`` is a coarse label ("action" /
+    "informational" / "unknown") kept as metadata for the PLAN_CONSTRUCTED
+    audit; it does not gate any exclude in v1.
     """
 
     requested_trade: bool
     intent: str
+    requested_equity_analysis: bool = False
 
     def as_context(self) -> dict:
         """The prompt-intent slice of the decision context, ready to merge with state facts."""
-        return {"requested_trade": self.requested_trade, "intent": self.intent}
+        return {
+            "requested_trade": self.requested_trade,
+            "intent": self.intent,
+            "requested_equity_analysis": self.requested_equity_analysis,
+        }
 
 
 def classify_intent(prompt: str) -> IntentSignals:
-    """Classifies a prompt's trade intent with the narrow keyword heuristic."""
+    """Classifies a prompt's trade and equity-analysis intent with narrow keyword heuristics."""
     text = prompt or ""
     requested_trade = bool(_TRADE_VERB_RE.search(text))
+    requested_equity_analysis = bool(
+        (_ADVICE_FRAME_RE.search(text) and _EQUITY_ACTION_RE.search(text)) or _VALUATION_CUE_RE.search(text)
+    )
     if requested_trade:
         intent = "action"
     elif _QUESTION_RE.search(text.strip()):
         intent = "informational"
     else:
         intent = "unknown"
-    return IntentSignals(requested_trade=requested_trade, intent=intent)
+    return IntentSignals(
+        requested_trade=requested_trade,
+        intent=intent,
+        requested_equity_analysis=requested_equity_analysis,
+    )

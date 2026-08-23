@@ -55,6 +55,10 @@ class Artifact(str, Enum):
     REVIEWER_VERDICT = "reviewer_verdict"
     HITL_DECISION = "hitl_decision"
     EXECUTION_RESULT = "execution_result"
+    # Equity-research advisory path (issue #344).
+    EQUITY_QUERY = "equity_query"  # the ticker + advisory intent, derived from the prompt
+    EQUITY_ASSESSMENT = "equity_assessment"  # standalone, user-independent valuation
+    EQUITY_RECOMMENDATION = "equity_recommendation"  # suitability-adjusted advisory lean
 
 
 # Artifacts that enter the graph from outside the skill set — preloaded facts
@@ -67,6 +71,7 @@ PRELOADED_ARTIFACTS: frozenset[Artifact] = frozenset(
     {
         Artifact.HOLDINGS,
         Artifact.RESEARCH_QUESTION,
+        Artifact.EQUITY_QUERY,
     }
 )
 

@@ -1,0 +1,8 @@
+{
+  "id": "equity-research",
+  "summary": "Assesses whether a single equity is attractive on its own merits — DCF intrinsic value, quality ratios, and trading multiples from free public data. Read-only; never drafts or executes a trade.",
+  "applies_when": "The user asks whether a specific stock is worth buying or selling, or asks to analyze or value a specific ticker.",
+  "requires": ["equity_query"],
+  "produces": ["equity_assessment"],
+  "parallelizable": true
+}

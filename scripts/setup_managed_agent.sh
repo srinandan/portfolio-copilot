@@ -30,7 +30,7 @@ fi
 # Run deployment script to register worker MA and store MANAGED_AGENT_ID secret
 if command -v uv &> /dev/null; then
     echo "Running Python worker MA deployment script with uv..."
-    uv run --with "google-cloud-secret-manager>=2.16.0" --with "google-auth" --with "click" python scripts/deploy_managed_agent.py --project="$PROJECT_ID" --location="$REGION"
+    uv run --with "google-genai" --with "google-cloud-secret-manager>=2.16.0" --with "google-auth" --with "click" python scripts/deploy_managed_agent.py --project="$PROJECT_ID" --location="$REGION"
 elif command -v python3 &> /dev/null; then
     echo "Running Python worker MA deployment script..."
     python3 scripts/deploy_managed_agent.py --project="$PROJECT_ID" --location="$REGION"

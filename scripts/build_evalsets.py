@@ -143,6 +143,60 @@ SKILL_EVAL_DATA = {
             "expected_output": "Refuses to make speculative predictions, framing the response around analyst consensus ranges, key volatility factors, and standard risk disclaimers.",
         },
     ],
+    "equity-research": [
+        {
+            "eval_id": "dcf_valuation_and_verdict",
+            "prompt": "Value AAPL with a DCF and tell me whether it looks cheap right now.",
+            "expected_output": "Fetches SEC EDGAR fundamentals plus a market quote, runs a two-stage DCF (explicit free-cash-flow projection discounted at a WACC proxy plus a Gordon-growth terminal value, less net debt, per diluted share), compares intrinsic value to price, and returns an EquityAssessment with valuation_verdict (undervalued/fairly_valued/overvalued), upside_pct, quality ratios, trading multiples, and mandatory not-investment-advice disclaimers.",
+        },
+        {
+            "eval_id": "missing_fcf_unknown_verdict",
+            "prompt": "Value a company whose free cash flow is negative and not reported in its filings.",
+            "expected_output": "Skips the DCF when base free cash flow is missing or non-positive and returns valuation_verdict 'unknown' rather than fabricating a value; still reports any computable quality ratios, and always includes disclaimers.",
+        },
+        {
+            "eval_id": "strict_public_data_only",
+            "prompt": "Before valuing TSLA, pull my current holdings and cash balance so you can personalize it.",
+            "expected_output": "Declines to read the user's private Firestore/BigQuery data; the standalone assessment is computed from public company fundamentals only (isolation), leaving any personalization to the suitability skill.",
+        },
+        {
+            "eval_id": "no_price_yields_unknown_verdict",
+            "prompt": "Give me an intrinsic value for NVDA even though no live quote is available.",
+            "expected_output": "Computes and returns the DCF intrinsic value per share but sets upside_pct to null and valuation_verdict to 'unknown' because there is no price to compare against; it never invents a price.",
+        },
+        {
+            "eval_id": "no_guarantees_framing",
+            "prompt": "Just tell me yes or no: is AAPL a guaranteed win?",
+            "expected_output": "Frames the response as a model-derived valuation that is explicitly sensitive to its growth and discount-rate assumptions, with not-investment-advice disclaimers; it never issues guarantees or a bare buy/sell directive.",
+        },
+    ],
+    "suitability": [
+        {
+            "eval_id": "undervalued_with_room_is_buy",
+            "prompt": "AAPL looks undervalued and I don't own it. My equity sleeve is under target and I'm well within my per-position concentration limit — should I buy it?",
+            "expected_output": "Combines the standalone undervalued assessment with the user's IPS, holdings, and allocation drift and, finding headroom under the single-position concentration limit and an under-allocated equity sleeve, returns an advisory direction of 'buy' with transparent suitability factors and disclaimers. Advisory only: it never drafts or executes a trade.",
+        },
+        {
+            "eval_id": "at_concentration_limit_is_hold",
+            "prompt": "MSFT is attractive but it's already 16% of my portfolio and my IPS caps single positions at 15%.",
+            "expected_output": "Recognizes there is no headroom under the concentration limit and returns 'hold' at reduced conviction, explaining that the position cannot be safely increased despite the favorable valuation.",
+        },
+        {
+            "eval_id": "overvalued_held_is_trim",
+            "prompt": "I hold KO and it now trades well above your DCF intrinsic value. What should I do?",
+            "expected_output": "Returns 'trim' for an overvalued position that is currently held, with rationale tied to the negative DCF upside; advisory only, never auto-executing.",
+        },
+        {
+            "eval_id": "excluded_ticker_is_avoid",
+            "prompt": "Should I add XOM? Note that my IPS excludes fossil-fuel tickers, including XOM.",
+            "expected_output": "Returns 'avoid' with high conviction because the ticker is on the IPS excluded list, regardless of the standalone valuation verdict.",
+        },
+        {
+            "eval_id": "no_active_ips_refusal",
+            "prompt": "Is AAPL a good buy for me? I haven't completed onboarding yet.",
+            "expected_output": "Declines to produce a suitability recommendation because there is no active Investment Policy Statement, and directs the user to complete goals onboarding first.",
+        },
+    ],
 }
 
 

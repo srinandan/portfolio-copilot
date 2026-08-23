@@ -47,7 +47,12 @@ from .logger import get_logger
 from .planner import root_agent
 from .progress import PROGRESS_CHANNEL
 from .session_manager import SessionManager
-from .state import write_ips_from_interview_result
+from .state import (
+    PreloadDeclinedError,
+    preload_for_equity_research,
+    preload_for_suitability,
+    write_ips_from_interview_result,
+)
 
 logger = get_logger(__name__)
 
@@ -82,6 +87,13 @@ class ApplyOnboardingRequest(BaseModel):
     trigger: str = "initial"
     approval_required_above_usd: Optional[float] = None
     approval_required_above_percent: Optional[float] = None
+
+
+class EquityAnalysisRequest(BaseModel):
+    """Request for a synchronous, deterministic single-equity advisory analysis."""
+
+    ticker: str
+    user_id: str = "demo_user"
 
 
 class ServerState:
@@ -831,6 +843,35 @@ async def apply_onboarding(req: ApplyOnboardingRequest) -> dict[str, Any]:
         "ips_id": new_ips.ips_id,
         "version": new_ips.version,
         "liabilities_count": len(liab.liabilities),
+    }
+
+
+@app.post("/v1/analysis/equity")
+async def analyze_equity(req: EquityAnalysisRequest) -> dict[str, Any]:
+    """Synchronous, deterministic single-equity advisory analysis (no LLM).
+
+    Runs the equity-research valuation (DCF/quality/multiples) and the
+    suitability recommendation directly via the deterministic primitives — the
+    same core the planner skills use — so the UI gets a fast, reliable advisory
+    card without a streaming planner turn. Advisory only: it never drafts or
+    executes a trade.
+    """
+    ticker = (req.ticker or "").strip()
+    if not ticker:
+        raise HTTPException(status_code=400, detail="ticker is required")
+    try:
+        research = preload_for_equity_research(user_id=req.user_id, ticker=ticker)
+        suitability = preload_for_suitability(user_id=req.user_id, assessment=research["assessment"])
+    except PreloadDeclinedError as e:
+        # No ticker match, unknown symbol, or missing IPS/holdings — a client-actionable state.
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    except Exception as e:
+        logger.exception("equity analysis failed for user %s / ticker %s", req.user_id, ticker)
+        raise HTTPException(status_code=500, detail=f"analysis_failed: {e}") from e
+    return {
+        "ticker": research["ticker"],
+        "assessment": research["assessment"],
+        "recommendation": suitability["recommendation"],
     }
 
 

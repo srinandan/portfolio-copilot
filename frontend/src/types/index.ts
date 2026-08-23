@@ -345,5 +345,72 @@ export interface W2Document {
   raw_entities?: Record<string, string>;
 }
 
+// ---- Equity research + suitability (advisory analysis, issue #344) ----
+
+export type ValuationVerdict = 'undervalued' | 'fairly_valued' | 'overvalued' | 'unknown';
+export type ConfidenceLevel = 'high' | 'medium' | 'low';
+export type RecommendationDirection = 'buy' | 'add' | 'hold' | 'trim' | 'avoid';
+
+export interface DcfResult {
+  intrinsic_value_per_share_usd?: number | null;
+  current_price_usd?: number | null;
+  upside_pct?: number | null;
+  discount_rate: number;
+  terminal_growth_rate: number;
+  fcf_growth_rate: number;
+  projection_years: number;
+}
+
+export interface QualityMetrics {
+  net_margin_pct?: number | null;
+  fcf_margin_pct?: number | null;
+  revenue_cagr_pct?: number | null;
+  return_on_equity_pct?: number | null;
+  debt_to_equity?: number | null;
+}
+
+export interface EquityAssessment {
+  ticker: string;
+  company_name?: string | null;
+  data_source: string;
+  dcf?: DcfResult | null;
+  quality?: QualityMetrics | null;
+  valuation_verdict: ValuationVerdict;
+  confidence: ConfidenceLevel;
+  key_drivers: string[];
+  key_risks: string[];
+  disclaimers: string[];
+  narrative_summary?: string;
+}
+
+export interface SuitabilityFactor {
+  name: string;
+  detail: string;
+  favorable?: boolean | null;
+}
+
+export interface EquityRecommendation {
+  ticker: string;
+  direction: RecommendationDirection;
+  conviction: ConfidenceLevel;
+  rationale: string;
+  valuation_verdict: ValuationVerdict;
+  upside_pct?: number | null;
+  assessment_confidence: ConfidenceLevel;
+  already_held: boolean;
+  current_weight_pct: number;
+  concentration_limit_pct?: number | null;
+  headroom_pct?: number | null;
+  suitability_factors: SuitabilityFactor[];
+  key_risks: string[];
+  disclaimers: string[];
+}
+
+export interface EquityAnalysisResult {
+  ticker: string;
+  assessment: EquityAssessment;
+  recommendation: EquityRecommendation;
+}
+
 
 

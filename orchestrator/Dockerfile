@@ -38,6 +38,7 @@ ENV GOOGLE_API_PREVENT_AGENT_TOKEN_SHARING_FOR_GCP_SERVICES=false
 ENV GOOGLE_GENAI_USE_ENTERPRISE=true
 ENV AGENT_REGISTRY_LOCATION=global
 ENV GOOGLE_CLOUD_LOCATION=us-central1
+ENV SEC_EDGAR_USER_AGENT="PortfolioCopilot/1.0 (portfolio-copilot@google.com)"
 
 # Copy system shared libraries required by Python C extensions
 COPY --from=builder /lib/x86_64-linux-gnu /lib/x86_64-linux-gnu

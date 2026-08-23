@@ -146,6 +146,10 @@ def applied_rules(context: Mapping[str, Any], policy: PlannerPolicy) -> list[str
 #   - the cold-start floor is `spending-analysis`;                            #
 #   - an explicit trade intent pulls in the trade path (include-only, so a    #
 #     false positive is harmless — action-drafting self-skips with no drift); #
+#   - an equity-advice intent pulls in the advisory analysis path             #
+#     (equity-research -> suitability); include-only and recall-biased. Until  #
+#     those skills are in the schedulable manifest set, the scheduler drops    #
+#     the leaves, so this rule is inert on the live planner (issue #344);      #
 #   - onboarding is skipped once the user already has an active IPS.          #
 # Intent-driven *excludes* are deliberately deferred until the LLM/semantic   #
 # pass can classify intent reliably (recall-bias).                            #
@@ -157,6 +161,11 @@ DEFAULT_POLICY = PlannerPolicy(
             name="trade-intent-include",
             when=Predicate("requested_trade", Op.TRUTHY),
             include=("action-drafting",),
+        ),
+        PolicyRule(
+            name="equity-analysis-include",
+            when=Predicate("requested_equity_analysis", Op.TRUTHY),
+            include=("equity-research", "suitability"),
         ),
         PolicyRule(
             name="onboarding-once",

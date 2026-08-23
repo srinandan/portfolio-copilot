@@ -1,6 +1,7 @@
 # --- Go (frontend/server, pkg/) ---
 frontend/bin/
 bin/
+/server
 *.exe
 *.test
 *.out

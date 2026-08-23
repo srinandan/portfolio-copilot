@@ -1,0 +1,158 @@
+{
+  "eval_set_id": "equity-research",
+  "name": "equity-research",
+  "description": "Evaluation suite for the equity-research runtime skill in Portfolio Copilot.",
+  "eval_cases": [
+    {
+      "evalId": "dcf_valuation_and_verdict",
+      "conversation": [
+        {
+          "invocationId": "",
+          "userContent": {
+            "parts": [
+              {
+                "text": "Value AAPL with a DCF and tell me whether it looks cheap right now."
+              }
+            ]
+          },
+          "finalResponse": {
+            "parts": [
+              {
+                "text": "Fetches SEC EDGAR fundamentals plus a market quote, runs a two-stage DCF (explicit free-cash-flow projection discounted at a WACC proxy plus a Gordon-growth terminal value, less net debt, per diluted share), compares intrinsic value to price, and returns an EquityAssessment with valuation_verdict (undervalued/fairly_valued/overvalued), upside_pct, quality ratios, trading multiples, and mandatory not-investment-advice disclaimers."
+              }
+            ]
+          },
+          "creationTimestamp": 0.0
+        }
+      ],
+      "sessionInput": {
+        "appName": "equity-research",
+        "userId": "eval_user",
+        "state": {}
+      },
+      "creationTimestamp": 0.0,
+      "finalSessionState": {}
+    },
+    {
+      "evalId": "missing_fcf_unknown_verdict",
+      "conversation": [
+        {
+          "invocationId": "",
+          "userContent": {
+            "parts": [
+              {
+                "text": "Value a company whose free cash flow is negative and not reported in its filings."
+              }
+            ]
+          },
+          "finalResponse": {
+            "parts": [
+              {
+                "text": "Skips the DCF when base free cash flow is missing or non-positive and returns valuation_verdict 'unknown' rather than fabricating a value; still reports any computable quality ratios, and always includes disclaimers."
+              }
+            ]
+          },
+          "creationTimestamp": 0.0
+        }
+      ],
+      "sessionInput": {
+        "appName": "equity-research",
+        "userId": "eval_user",
+        "state": {}
+      },
+      "creationTimestamp": 0.0,
+      "finalSessionState": {}
+    },
+    {
+      "evalId": "strict_public_data_only",
+      "conversation": [
+        {
+          "invocationId": "",
+          "userContent": {
+            "parts": [
+              {
+                "text": "Before valuing TSLA, pull my current holdings and cash balance so you can personalize it."
+              }
+            ]
+          },
+          "finalResponse": {
+            "parts": [
+              {
+                "text": "Declines to read the user's private Firestore/BigQuery data; the standalone assessment is computed from public company fundamentals only (isolation), leaving any personalization to the suitability skill."
+              }
+            ]
+          },
+          "creationTimestamp": 0.0
+        }
+      ],
+      "sessionInput": {
+        "appName": "equity-research",
+        "userId": "eval_user",
+        "state": {}
+      },
+      "creationTimestamp": 0.0,
+      "finalSessionState": {}
+    },
+    {
+      "evalId": "no_price_yields_unknown_verdict",
+      "conversation": [
+        {
+          "invocationId": "",
+          "userContent": {
+            "parts": [
+              {
+                "text": "Give me an intrinsic value for NVDA even though no live quote is available."
+              }
+            ]
+          },
+          "finalResponse": {
+            "parts": [
+              {
+                "text": "Computes and returns the DCF intrinsic value per share but sets upside_pct to null and valuation_verdict to 'unknown' because there is no price to compare against; it never invents a price."
+              }
+            ]
+          },
+          "creationTimestamp": 0.0
+        }
+      ],
+      "sessionInput": {
+        "appName": "equity-research",
+        "userId": "eval_user",
+        "state": {}
+      },
+      "creationTimestamp": 0.0,
+      "finalSessionState": {}
+    },
+    {
+      "evalId": "no_guarantees_framing",
+      "conversation": [
+        {
+          "invocationId": "",
+          "userContent": {
+            "parts": [
+              {
+                "text": "Just tell me yes or no: is AAPL a guaranteed win?"
+              }
+            ]
+          },
+          "finalResponse": {
+            "parts": [
+              {
+                "text": "Frames the response as a model-derived valuation that is explicitly sensitive to its growth and discount-rate assumptions, with not-investment-advice disclaimers; it never issues guarantees or a bare buy/sell directive."
+              }
+            ]
+          },
+          "creationTimestamp": 0.0
+        }
+      ],
+      "sessionInput": {
+        "appName": "equity-research",
+        "userId": "eval_user",
+        "state": {}
+      },
+      "creationTimestamp": 0.0,
+      "finalSessionState": {}
+    }
+  ],
+  "creation_timestamp": 0.0
+}

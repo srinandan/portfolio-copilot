@@ -184,14 +184,21 @@ def provision_managed_agent(
     try:
         from google.genai import Client
 
-        client = Client(enterprise=True, location=location)
-        try:
-            agent = client.agents.get(id=display_name)
-            if agent and hasattr(agent, "name") and agent.name:
-                logger.info(f"Found existing Managed Agent via genai SDK: {agent.name}")
-                return agent.name
-        except Exception:
-            pass
+        client = None
+        for loc in [location, "global"] if location != "global" else ["global"]:
+            try:
+                c = Client(enterprise=True, location=loc)
+                agent = c.agents.get(id=display_name)
+                if agent and hasattr(agent, "name") and agent.name:
+                    logger.info(f"Found existing Managed Agent via genai SDK ({loc}): {agent.name}")
+                    return agent.name
+                client = c
+                break
+            except Exception:
+                continue
+
+        if client is None:
+            client = Client(enterprise=True, location="global")
 
         logger.info(f"Creating Managed Agent '{display_name}' via genai SDK...")
         client.agents.create(
@@ -203,7 +210,7 @@ def provision_managed_agent(
         if agent and hasattr(agent, "name") and agent.name:
             logger.info(f"Successfully created Managed Agent: {agent.name}")
             return agent.name
-        return f"projects/{project}/locations/{location}/agents/{display_name}"
+        return f"projects/{project}/locations/global/agents/{display_name}"
     except Exception as e:
         logger.info(f"genai SDK provisioning skipped/failed ({e}); trying gcloud fallback...")
 

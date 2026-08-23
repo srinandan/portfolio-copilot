@@ -128,3 +128,19 @@ def test_default_policy_trade_prompt_new_user():
 
 def test_default_policy_floor_is_spending_analysis():
     assert DEFAULT_POLICY.default_floor == "spending-analysis"
+
+
+def test_equity_analysis_include_rule():
+    # Equity-advice intent pulls in the advisory analysis path.
+    ctx = {"requested_equity_analysis": True, "has_active_ips": True}
+    leaves = select_leaves(["spending-analysis"], ctx, DEFAULT_POLICY)
+    assert {"equity-research", "suitability"} <= leaves
+
+    # It does not fire without the signal.
+    assert "equity-research" not in select_leaves(["spending-analysis"], {"requested_equity_analysis": False}, DEFAULT_POLICY)
+
+
+def test_equity_analysis_rule_named_in_applied_rules():
+    ctx = {"requested_equity_analysis": True}
+    assert "equity-analysis-include" in applied_rules(ctx, DEFAULT_POLICY)
+    assert "equity-analysis-include" not in applied_rules({"requested_trade": True}, DEFAULT_POLICY)

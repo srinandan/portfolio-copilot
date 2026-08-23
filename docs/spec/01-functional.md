@@ -69,6 +69,20 @@ Given research and portfolio state, drafts a specific proposed action
 (e.g. "sell N shares of X, buy N shares of Y") via the Alpaca paper
 trading API's *drafting* surface — no execution capability at this stage.
 
+### Equity Research & Suitability
+For a single-name question ("should I buy/sell X?"), two chained skills answer it.
+**Equity Research** produces a standalone, user-independent assessment — a
+DCF intrinsic value, quality ratios, and trading multiples computed from free
+public data (SEC EDGAR fundamentals + market quotes) — and a valuation verdict
+(`undervalued`/`fairly_valued`/`overvalued`/`unknown`). **Suitability** then
+combines that assessment with the user's IPS (risk tolerance, concentration
+limit, exclusions), holdings, and allocation drift into an advisory
+`buy`/`add`/`hold`/`trim`/`avoid` recommendation. **Advisory only** — it is
+displayed with disclaimers and never drafts or executes a trade; the numbers are
+deterministic and the LLM only narrates them. Also exposed synchronously at
+`POST /api/analysis/equity` for the Portfolio-view "Research a stock" panel. See
+[ADR-0028](../adr/0028-equity-research-and-suitability-advisory-analysis.md).
+
 ## Reviewer/Critic
 
 Validates a proposed action against the IPS's policy and risk rules before
