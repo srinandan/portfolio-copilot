@@ -1,4 +1,4 @@
-from .bigquery import BigQueryClient
+from .bigquery import BigQueryClient, prepare_secure_sql
 from .firestore import FirestoreClient
 
-__all__ = ["FirestoreClient", "BigQueryClient"]
+__all__ = ["FirestoreClient", "BigQueryClient", "prepare_secure_sql"]

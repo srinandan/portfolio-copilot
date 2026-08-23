@@ -2,7 +2,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.orchestrator.data.bigquery import BigQueryClient
+from src.orchestrator.data.bigquery import BigQueryClient, prepare_secure_sql
 
 
 @patch("google.cloud.bigquery.Client")
@@ -17,6 +17,9 @@ def test_validate_and_execute_nl_sql_valid_query_mcp(mock_client):
     )
     assert result == [{"col": 1}]
     mock_mcp.execute_query.assert_called_once()
+    call_kwargs = mock_mcp.execute_query.call_args[1]
+    assert "WITH checking_transactions AS" in call_kwargs["query"]
+    assert "@user_id" in call_kwargs["query"]
 
 
 @patch("google.cloud.bigquery.Client")
@@ -36,6 +39,8 @@ def test_validate_and_execute_nl_sql_fallback_to_direct_on_mcp_failure(mock_clie
     )
     assert result == [{"col": 2}]
     client.client.query.assert_called_once()
+    call_args = client.client.query.call_args[0]
+    assert "WITH checking_transactions AS" in call_args[0]
 
 
 @patch("google.cloud.bigquery.Client")
@@ -52,15 +57,24 @@ def test_validate_and_execute_nl_sql_direct_mode(mock_client):
         "user123", "SELECT * FROM checking_transactions WHERE user_id = @user_id"
     )
     assert result == [{"col": 3}]
+    call_args = client.client.query.call_args[0]
+    assert "WITH checking_transactions AS" in call_args[0]
 
 
 @pytest.mark.parametrize(
     "query, error_msg",
     [
-        ("UPDATE checking_transactions SET amount = 0 WHERE user_id = @user_id", "Write-intent SQL refused"),
-        ("DELETE FROM checking_transactions WHERE user_id = @user_id", "Write-intent SQL refused"),
+        ("", "Query cannot be empty"),
+        ("UPDATE checking_transactions SET amount = 0 WHERE user_id = @user_id", "Read-only queries only"),
+        ("DELETE FROM checking_transactions WHERE user_id = @user_id", "Read-only queries only"),
+        ("DROP TABLE checking_transactions", "Read-only queries only"),
+        ("INSERT INTO checking_transactions VALUES (1)", "Read-only queries only"),
+        ("SELECT * FROM (UPDATE checking_transactions)", "Write-intent SQL refused: UPDATE"),
+        ("SELECT * FROM (DELETE FROM checking_transactions)", "Write-intent SQL refused: DELETE"),
+        ("SELECT * FROM (MERGE checking_transactions)", "Write-intent SQL refused: MERGE"),
+        ("SELECT * FROM checking_transactions; SELECT * FROM other", "Multi-statement queries are not permitted"),
         ("SELECT * FROM some_other_table WHERE user_id = @user_id", "must target a transactions table"),
-        ("SELECT * FROM checking_transactions WHERE amount > 0", "must include @user_id parameter"),
+        ("SELECT * FROM INFORMATION_SCHEMA.TABLES JOIN checking_transactions", "INFORMATION_SCHEMA"),
     ],
 )
 @patch("google.cloud.bigquery.Client")
@@ -71,6 +85,31 @@ def test_validate_and_execute_nl_sql_invalid_queries(mock_client, query, error_m
         client.validate_and_execute_nl_sql("user123", query)
 
     assert error_msg in str(excinfo.value)
+
+
+def test_prepare_secure_sql_wrapping_and_scoping():
+    sql = "SELECT * FROM `custom-proj.portfolio_copilot.checking_transactions` WHERE amount > 100"
+    secure_sql, params = prepare_secure_sql(sql, "user_xyz", "custom-proj")
+
+    assert "WITH checking_transactions AS (" in secure_sql
+    assert "SELECT * FROM `custom-proj.portfolio_copilot.checking_transactions` WHERE user_id = @user_id" in secure_sql
+    assert "SELECT * FROM checking_transactions WHERE amount > 100 LIMIT 100" in secure_sql
+    assert params == [{"name": "user_id", "parameterType": {"type": "STRING"}, "parameterValue": {"value": "user_xyz"}}]
+
+
+def test_prepare_secure_sql_preserves_existing_limit():
+    sql = "SELECT normalized_category, sum(amount) FROM checking_transactions GROUP BY 1 LIMIT 10;"
+    secure_sql, _ = prepare_secure_sql(sql, "user_xyz", "proj")
+    assert secure_sql.endswith("LIMIT 10;")
+    assert "LIMIT 100" not in secure_sql
+
+
+def test_prepare_secure_sql_strips_comments():
+    sql = "/* leading comment */ SELECT * FROM checking_transactions -- trailing comment"
+    secure_sql, _ = prepare_secure_sql(sql, "user_xyz", "proj")
+    assert "leading comment" not in secure_sql
+    assert "trailing comment" not in secure_sql
+    assert "LIMIT 100" in secure_sql
 
 
 @pytest.mark.parametrize("window", [3, 6])

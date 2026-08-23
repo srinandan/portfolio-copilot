@@ -10,6 +10,83 @@ from ..logger import get_logger
 logger = get_logger(__name__)
 
 
+_BLOCK_COMMENT_RE = re.compile(r"/\*[\s\S]*?\*/")
+_LINE_COMMENT_RE = re.compile(r"(--|#)[^\n]*")
+_SELECT_START_RE = re.compile(r"^SELECT\b", re.IGNORECASE)
+_TRANSACTION_TABLE_RE = re.compile(r"\b([a-zA-Z0-9_]+_transactions)\b", re.IGNORECASE)
+_QUALIFIED_TRANSACTION_BACKTICK_RE = re.compile(r"`[^`]*\b([a-zA-Z0-9_]+_transactions)`", re.IGNORECASE)
+_QUALIFIED_TRANSACTION_BARE_RE = re.compile(r"\b(?:[A-Za-z_][\w-]*\.)+([a-zA-Z0-9_]+_transactions)\b", re.IGNORECASE)
+_LIMIT_RE = re.compile(r"\blimit\s+\d+\s*;?\s*$", re.IGNORECASE)
+_RESTRICTED_RE = re.compile(
+    r"\b(INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|TRUNCATE|MERGE|EXPORT|LOAD|CALL|EXECUTE)\b",
+    re.IGNORECASE,
+)
+_INFORMATION_SCHEMA_RE = re.compile(r"\bINFORMATION_SCHEMA\b", re.IGNORECASE)
+
+
+def strip_comments_and_space(sql: str) -> str:
+    cleaned = _BLOCK_COMMENT_RE.sub(" ", sql)
+    cleaned = _LINE_COMMENT_RE.sub(" ", cleaned)
+    return cleaned.strip()
+
+
+def prepare_secure_sql(
+    generated_sql: str, user_id: str, project_id: str = "test-project"
+) -> tuple[str, list[dict[str, Any]]]:
+    """Validates, sanitizes, and row-scopes a natural language SQL query with a shadowing CTE."""
+    trimmed = strip_comments_and_space(generated_sql)
+    if not trimmed:
+        raise ValueError("Query cannot be empty.")
+
+    # 1. Whitelist: Must start with SELECT
+    if not _SELECT_START_RE.search(trimmed):
+        raise ValueError("Read-only queries only: only SELECT queries are allowed.")
+
+    # 2. Disallow multi-statement queries
+    had_trailing_semicolon = trimmed.endswith(";")
+    sql_without_trailing_semicolon = trimmed.rstrip("; \t\n")
+    if ";" in sql_without_trailing_semicolon:
+        raise ValueError("Multi-statement queries are not permitted.")
+
+    # 3. Reject any restricted write/DDL/execution keywords anywhere in query
+    match = _RESTRICTED_RE.search(sql_without_trailing_semicolon)
+    if match:
+        raise ValueError(f"Write-intent SQL refused: {match.group(1).upper()} is not allowed.")
+
+    if _INFORMATION_SCHEMA_RE.search(sql_without_trailing_semicolon):
+        raise ValueError("Access to INFORMATION_SCHEMA or system metadata tables is forbidden.")
+
+    # 4. Target checking: Must target a transactions table (e.g. checking_transactions)
+    table_matches = _TRANSACTION_TABLE_RE.findall(sql_without_trailing_semicolon)
+    if not table_matches:
+        raise ValueError("Query must target a transactions table (e.g. checking_transactions).")
+    target_table = table_matches[0].lower()
+
+    # 5. CTE-based row-level user scoping.
+    # Strip ANY qualifier prefix from the transactions table so the CTE below shadows
+    # every reference. BigQuery CTEs only shadow unqualified names — a query using
+    # `project.dataset.checking_transactions` would otherwise skip user_id scoping.
+    clean_user_sql = _QUALIFIED_TRANSACTION_BACKTICK_RE.sub(r"\1", sql_without_trailing_semicolon)
+    clean_user_sql = _QUALIFIED_TRANSACTION_BARE_RE.sub(r"\1", clean_user_sql)
+
+    # 6. Ensure LIMIT safeguard
+    if not _LIMIT_RE.search(clean_user_sql):
+        clean_user_sql = f"{clean_user_sql} LIMIT 100;" if had_trailing_semicolon else f"{clean_user_sql} LIMIT 100"
+    elif had_trailing_semicolon and not clean_user_sql.endswith(";"):
+        clean_user_sql = f"{clean_user_sql};"
+
+    secure_sql = (
+        f"WITH {target_table} AS (\n"
+        f"  SELECT * FROM `{project_id}.portfolio_copilot.{target_table}` WHERE user_id = @user_id\n"
+        f")\n"
+        f"{clean_user_sql}"
+    )
+
+    query_params = [{"name": "user_id", "parameterType": {"type": "STRING"}, "parameterValue": {"value": user_id}}]
+
+    return secure_sql, query_params
+
+
 class BigQueryClient:
     def __init__(
         self,
@@ -572,30 +649,18 @@ class BigQueryClient:
         return {"total_income": float(total_income), "total_outflow": float(total_outflow)}
 
     def validate_and_execute_nl_sql(self, user_id: str, sql_query: str) -> List[Dict[str, Any]]:
-        sql_upper = sql_query.upper()
-
-        forbidden_keywords = ["INSERT", "UPDATE", "DELETE", "DROP", "CREATE", "ALTER", "TRUNCATE", "MERGE"]
-        for kw in forbidden_keywords:
-            if re.search(r"\b" + kw + r"\b", sql_upper):
-                raise ValueError(f"Write-intent SQL refused: {kw} is not allowed.")
-
-        if "FROM" in sql_upper:
-            if not re.search(r"\b[A-Z0-9_]+_TRANSACTIONS\b", sql_upper):
-                raise ValueError("Query must target a transactions table (e.g. checking_transactions).")
-
-        if "@user_id" not in sql_query:
-            raise ValueError("Query must include @user_id parameter for scoping.")
+        secure_sql, _ = prepare_secure_sql(sql_query, user_id=user_id, project_id=self.project)
 
         if self._mcp_client is not None:
             try:
-                return self._execute_nl_sql_mcp(user_id, sql_query)
+                return self._execute_nl_sql_mcp(user_id, secure_sql)
             except Exception as e:
                 logger.warning(
                     "BigQuery Remote MCP execution failed (%s), falling back to direct SDK",
                     e,
                 )
 
-        return self._execute_nl_sql_direct(user_id, sql_query)
+        return self._execute_nl_sql_direct(user_id, secure_sql)
 
     def _execute_nl_sql_mcp(self, user_id: str, sql_query: str) -> List[Dict[str, Any]]:
         t0 = time.monotonic()
