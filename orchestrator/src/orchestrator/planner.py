@@ -489,15 +489,6 @@ _UPPER_TICKER_RE = re.compile(r"\b([A-Z]{2,5})\b")
 _TICKER_STOPWORDS = frozenset(
     {"IPS", "DCF", "ETF", "CEO", "CFO", "USD", "AI", "FAQ", "PDF", "API", "US", "IRA", "SEC", "IPO", "ROE", "EPS"}
 )
-_COMMON_WORD_STOPWORDS = frozenset(
-    {
-        "WHAT", "HOW", "WHY", "WHEN", "WHERE", "WHICH", "WHO", "IS", "ARE", "DO", "DOES", "DID",
-        "CAN", "COULD", "SHOULD", "WOULD", "THE", "AND", "OR", "BUY", "SELL", "HOLD", "TRIM",
-        "GOOD", "WORTH", "ABOUT", "STOCK", "SHARE", "SHARES", "NOW", "RIGHT", "FOR", "YOU",
-        "THINK", "TELL", "SHOW", "FAIR", "VALUE", "MORE", "LESS", "MY", "YOUR", "OUR", "THIS",
-        "THAT", "SOME", "ANY", "VIEW", "LOOK", "MUCH", "MANY", "VERY", "LIKE", "WANT", "NEED",
-    }
-)
 
 
 def _extract_ticker(prompt: str, input_dict: Dict[str, Any]) -> Optional[str]:
@@ -519,11 +510,6 @@ def _extract_ticker(prompt: str, input_dict: Dict[str, Any]) -> Optional[str]:
         tok = m.group(1).upper()
         if tok not in _TICKER_STOPWORDS:
             return tok
-    # Fallback for lowercase ticker mentions (e.g. "is aapl a good buy?")
-    for tok in re.findall(r"\b[A-Za-z]{2,5}\b", text):
-        tok_u = tok.upper()
-        if tok_u not in _TICKER_STOPWORDS and tok_u not in _COMMON_WORD_STOPWORDS:
-            return tok_u
     return None
 
 
