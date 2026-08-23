@@ -6,7 +6,8 @@ import type {
   DriftReport,
   UserProfile,
   OnboardingProfile,
-  W2Document
+  W2Document,
+  EquityAnalysisResult
 } from '../types';
 import { traceRequest } from './tracing';
 
@@ -139,6 +140,24 @@ export class ApiService {
     if (!res.ok) {
       const errJson = await res.json().catch(() => ({}));
       throw new Error(errJson.error || `Apply W-2 to profile failed with status ${res.status}`);
+    }
+    return res.json();
+  }
+
+  /**
+   * Synchronous advisory equity analysis: DCF valuation + suitability against
+   * the user's IPS/holdings. Advisory only — never drafts or executes a trade.
+   * Proxies to the orchestrator's deterministic /v1/analysis/equity endpoint.
+   */
+  async analyzeEquity(ticker: string, userId = 'demo_user'): Promise<EquityAnalysisResult> {
+    const res = await this.tracedFetch('POST /api/analysis/equity', `${this.baseUrl}/api/analysis/equity`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ticker, user_id: userId })
+    });
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => ({}));
+      throw new Error(errJson.detail || errJson.error || `Equity analysis failed with status ${res.status}`);
     }
     return res.json();
   }
