@@ -272,7 +272,7 @@ are not stored.
   not-investment-advice `disclaimers`. Advisory only — never a drafted or executed
   trade.
 
-See [ADR-0027](../adr/0027-equity-research-and-suitability-advisory-analysis.md).
+See [ADR-0028](../adr/0028-equity-research-and-suitability-advisory-analysis.md).
 
 ## Changing these contracts
 

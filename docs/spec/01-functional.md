@@ -81,7 +81,7 @@ limit, exclusions), holdings, and allocation drift into an advisory
 displayed with disclaimers and never drafts or executes a trade; the numbers are
 deterministic and the LLM only narrates them. Also exposed synchronously at
 `POST /api/analysis/equity` for the Portfolio-view "Research a stock" panel. See
-[ADR-0027](../adr/0027-equity-research-and-suitability-advisory-analysis.md).
+[ADR-0028](../adr/0028-equity-research-and-suitability-advisory-analysis.md).
 
 ## Reviewer/Critic
 

@@ -1,4 +1,4 @@
-# ADR-0027: Advisory Equity Research & Suitability (Single-Name Buy/Sell Analysis)
+# ADR-0028: Advisory Equity Research & Suitability (Single-Name Buy/Sell Analysis)
 
 ## Status
 
