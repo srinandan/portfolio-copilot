@@ -52,6 +52,12 @@ class Constraints(BaseModel):
     tax_loss_harvesting_enabled: bool = False
     account_type: AccountType | None = None
 
+    @model_validator(mode="after")
+    def sanitize_constraints(self) -> "Constraints":
+        self.excluded_tickers = [t.strip().upper() for t in self.excluded_tickers if t and t.strip()]
+        self.excluded_sectors = [s.strip() for s in self.excluded_sectors if s and s.strip()]
+        return self
+
 
 class TriggerType(str, Enum):
     THRESHOLD = "threshold"

@@ -15,7 +15,9 @@ class GoalsOnboardingResult(BaseModel):
     primary_goal: Optional[Goal] = Field(default=None, description="Primary financial goal synthesized from interview.")
     additional_goals: List[Goal] = Field(default_factory=list, description="Additional financial goals.")
     risk_tolerance: RiskTolerance = Field(description="Synthesized risk tolerance tier.")
-    time_horizon_years: int = Field(description="Investment time horizon in years.")
+    time_horizon_years: int = Field(
+        default=10, ge=0, le=100, description="Investment time horizon in years."
+    )
     target_allocation: List[TargetAllocation] = Field(description="Target asset class allocation bands.")
     constraints: Optional[Constraints] = Field(
         default=None, description="Investment constraints (e.g. excluded sectors/tickers)."
