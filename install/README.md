@@ -9,7 +9,7 @@
 
 ## First-time setup
 
-Provisions Secret Manager, BigQuery, Firestore, Cloud Run, Managed Agent workers, and Agent Runtime, in the order each depends on the last:
+Provisions Secret Manager, BigQuery, Firestore, Cloud Run, Managed Agent workers, Agent Runtime, and Document AI, in the order each depends on the last:
 
 ```bash
 make setup-all
@@ -24,10 +24,18 @@ This runs, in sequence:
 4. `setup_cloudrun.sh`, deploys `frontend` (unified web host and backend API server) to Cloud Run with its own dedicated, least-privilege service account, not the default compute service account.
 5. `setup_managed_agent.sh`, provisions and deploys the worker Managed Agent (`scripts/deploy_managed_agent.py`) and stores its resource ID in Secret Manager as `MANAGED_AGENT_ID`.
 6. `setup_agent_engine.sh`, provisions Agent Runtime for the orchestrator (`scripts/deploy_agent_engine.py`), including least-privilege Agent Identity IAM roles.
-7. `register_all_skills.sh`, registers all 6 runtime skills (`goals-onboarding`, `spending-analysis`, `portfolio-analysis`, `research`, `action-drafting`, `reviewer`) in the Agent Registry.
+7. `setup_documentai.sh`, enables the Document AI API, grants the frontend service account Document AI roles, and creates or reuses the pre-trained US Form W-2 processor (`scripts/setup_processor.go`, which prints the processor ID). Used to parse uploaded W-2 income statements.
+8. `register_all_skills.sh`, registers all 6 runtime skills (`goals-onboarding`, `spending-analysis`, `portfolio-analysis`, `research`, `action-drafting`, `reviewer`) in the Agent Registry.
 
 Each script also runs standalone if you only need to redo one step:
 `./scripts/setup_bigquery.sh <PROJECT_ID>`, etc.
+
+> **Document AI env vars.** The frontend reads `DOCUMENT_AI_PROCESSOR_ID`,
+> `DOCUMENT_AI_LOCATION` (default `us`), and `DOCUMENT_AI_PROJECT_ID` (defaults to
+> the Firestore project) at startup. The Makefile deploy targets resolve and pass
+> the processor ID (via `scripts/setup_processor.go`) to Cloud Run automatically;
+> when these are unset — e.g. local dev — the server falls back to an offline mock
+> W-2 parser, so W-2 upload still works with deterministic sample data.
 
 ### Replace the placeholder Alpaca keys
 

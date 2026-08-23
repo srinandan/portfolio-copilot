@@ -10,13 +10,15 @@ This directory contains the operational, provisioning, deployment, data loading,
 
 | Script | Description | Usage |
 |---|---|---|
-| [`setup_all.sh`](setup_all.sh) | Runs end-to-end setup across GCP (secrets, BigQuery, Firestore, Cloud Run, Managed Agent, Agent Runtime, and skill registration) in sequence. | `./scripts/setup_all.sh <PROJECT_ID> <REGION>` |
+| [`setup_all.sh`](setup_all.sh) | Runs end-to-end setup across GCP (secrets, BigQuery, Firestore, Cloud Run, Managed Agent, Agent Runtime, Document AI, and skill registration) in sequence. | `./scripts/setup_all.sh <PROJECT_ID> <REGION>` |
 | [`setup_secrets.sh`](setup_secrets.sh) | Creates Secret Manager secrets (`ALPACA_API_KEY_ID`, `ALPACA_API_SECRET`, `MANAGED_AGENT_ID`) and binds access permissions. | `./scripts/setup_secrets.sh <PROJECT_ID> <REGION>` |
 | [`setup_bigquery.sh`](setup_bigquery.sh) | Creates BigQuery dataset `portfolio_copilot` and `checking_transactions` table. | `./scripts/setup_bigquery.sh <PROJECT_ID> <REGION>` |
 | [`setup_firestore.sh`](setup_firestore.sh) | Provisions the default Firestore database in Native mode. | `./scripts/setup_firestore.sh <PROJECT_ID> <REGION>` |
 | [`setup_cloudrun.sh`](setup_cloudrun.sh) | Deploys the frontend service to Cloud Run with dedicated service account (`portfolio-copilot-frontend-sa`). | `./scripts/setup_cloudrun.sh <PROJECT_ID> <REGION>` |
 | [`setup_managed_agent.sh`](setup_managed_agent.sh) | Provisions the worker Managed Agent (`portfolio-copilot-worker`) and stores its ID in Secret Manager. | `./scripts/setup_managed_agent.sh <PROJECT_ID> <REGION>` |
 | [`setup_agent_engine.sh`](setup_agent_engine.sh) | Sets up Agent Runtime IAM roles, APIs (including Model Armor), and Agent Identity permissions. | `./scripts/setup_agent_engine.sh <PROJECT_ID> <REGION>` |
+| [`setup_documentai.sh`](setup_documentai.sh) | Enables the Document AI API, grants the frontend service account Document AI roles, and creates/reuses the pre-trained US Form W-2 processor (used to parse uploaded W-2 income statements). | `./scripts/setup_documentai.sh <PROJECT_ID> <LOCATION>` |
+| [`setup_processor.go`](setup_processor.go) | Go helper that creates (or reuses) the US Form W-2 Document AI processor and prints its processor ID; invoked by `setup_documentai.sh` and the Makefile to resolve `DOCUMENT_AI_PROCESSOR_ID`. | `go run ./scripts/setup_processor.go -project=<PROJECT_ID> -location=<LOCATION>` |
 | [`setup_model_armor.sh`](setup_model_armor.sh) | Configures project-wide Model Armor Floor Settings for MCP tool sanitization, RAI filters, and prompt injection defense. | `./scripts/setup_model_armor.sh [PROJECT_ID] [ENABLE_MODEL_ARMOR] [ENFORCEMENT_MODE]` |
 | [`setup_cloudbuild_triggers.sh`](setup_cloudbuild_triggers.sh) | Configures Developer Connect GitHub connection and tag-triggered Cloud Build pipelines for automatic releases. | `./scripts/setup_cloudbuild_triggers.sh <PROJECT_ID> <REGION>` |
 

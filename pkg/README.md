@@ -18,11 +18,16 @@ pkg/
 │   ├── profile.go          # UserProfile, FamilyDependent, OnboardingProfile
 │   ├── proposed_action.go  # ProposedAction, ActionType, ActionSide, ActionStatus
 │   ├── reports.go          # DriftReport, SpendingReport, DocumentItem
-│   └── reviewer_verdict.go # ReviewerVerdict, RuleResult, RuleStatus
+│   ├── reviewer_verdict.go # ReviewerVerdict, RuleResult, RuleStatus
+│   └── w2.go               # W2Document, W2Wages, W2Box12Item, W2Employer/Employee
+├── documentai/         # Form W-2 parsing via Google Cloud Document AI (+ offline mock)
+│   ├── parser.go           # Parser interface, SSN masking, currency/tax-year helpers
+│   ├── gcp.go              # GCPW2Parser: US W-2 processor client + entity normalization
+│   └── mock.go             # MockW2Parser: deterministic offline parser for dev/tests
 ├── store/              # Firestore data client, transactional CRUD, and read operations
 │   ├── client.go           # Store interface and Firestore client initialization
-│   ├── crud.go             # Transactional mutations (SetHoldings, UpdateIPS, SetUserProfile, etc.)
-│   └── reads.go            # Queries (GetHoldings, GetActiveIPS, GetUserProfile, GetDocuments, etc.)
+│   ├── crud.go             # Transactional mutations (SetHoldings, UpdateIPS, SetUserProfile, SetW2Document, etc.)
+│   └── reads.go            # Queries (GetHoldings, GetActiveIPS, GetUserProfile, GetW2Documents, etc.)
 └── bigquery/           # BigQuery transaction runner and streaming inserter
     ├── bigquery.go         # Runner interface, SQL sandboxing with user-scoped CTE wrapping
     └── bigquery_client.go  # Live BigQuery client and streaming transaction insertion (StructSaver)
@@ -42,6 +47,7 @@ Typed Go struct definitions matching the project's canonical JSON schemas under 
 - **`contracts.ReviewerVerdict`**: Itemized policy compliance and risk evaluations.
 - **`contracts.AuditLogEntry`**: Immutable governance ledger events with skill versions and approval scopes.
 - **`contracts.DocumentItem`**: Audit metadata for user-uploaded statement documents.
+- **`contracts.W2Document`**: Parsed IRS Form W-2 (wages, withholdings, Box 12 codes, state/local taxes) with the employee SSN stored masked.
 - **`contracts.OnboardingProfile`**: Unified payload used by `/api/onboarding` and `/api/profile` to view and update user policy settings.
 
 Schema synchronization is verified in CI via [`scripts/sync-schemas.sh`](../scripts/sync-schemas.sh).
@@ -59,6 +65,7 @@ Firestore repository implementing transactional persistence and queries against 
   - **Liabilities**: `GetLiabilities(ctx, userID)`, `SetLiabilities(ctx, liabilities)`
   - **User Profile**: `GetUserProfile(ctx, userID)`, `SetUserProfile(ctx, profile)`
   - **Documents**: `GetDocuments(ctx, userID)`, `SetDocument(ctx, doc)`
+  - **W-2 Documents**: `GetW2Documents(ctx, userID)`, `GetW2Document(ctx, userID, docID)`, `SetW2Document(ctx, doc)`, `DeleteW2Document(ctx, userID, docID)` (owner-scoped; cross-user access returns NotFound)
   - **Audit Log**: `GetAuditLogs(ctx, userID, limit)`, `WriteAuditLog(ctx, entry)`
   - **Reports**: `GetSpendingReport(ctx, userID)`, `GetDriftReport(ctx, userID)`
 
@@ -71,6 +78,17 @@ Manages analytical transaction queries and streaming ingestion against Google Cl
 ### Key Capabilities
 - **SQL Sandboxing**: `bigquery.WrapUserScopedQuery` ensures queries only execute `SELECT` statements, reject destructive/scripting keywords (`MERGE`, `EXECUTE`, `LOAD`, etc.), and wrap all references in a Common Table Expression (CTE) scoping rows strictly to the authenticated `user_id`.
 - **Streaming Ingestion**: `bigquery.InsertTransactions` streams CSV transaction rows directly into BigQuery using `bigquery.StructSaver` with deterministic SHA-256 insert IDs for 1-minute streaming deduplication.
+
+---
+
+## 4. `pkg/documentai`
+
+Parses uploaded IRS Form W-2 income statements. Defines the `Parser` interface with two implementations, selected at startup based on configuration:
+
+- **`GCPW2Parser`**: Calls the Google Cloud Document AI pre-trained US W-2 processor and normalizes the extracted entities into a `contracts.W2Document`.
+- **`MockW2Parser`**: A deterministic offline parser used for local development and CI when `DOCUMENT_AI_PROCESSOR_ID` is unset.
+
+Employee SSNs are masked in-memory (`***-**-XXXX`) before the document is persisted or returned in an API response. See [ADR-0026](../docs/adr/0026-w2-document-ai-ingestion-and-profile-sync.md).
 
 ---
 
