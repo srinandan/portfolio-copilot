@@ -73,3 +73,9 @@ Transient (not persisted). Key fields: `direction`, `conviction`, `rationale`,
   policy (consistent with `portfolio-analysis`).
 - **`unknown` valuation verdict** → returns `hold` at low conviction and says so;
   it never manufactures a lean from missing data.
+
+## Registry metadata
+
+- Registered as: `projects/{project}/locations/{location}/skills/private-suitability`
+- Skill revision: 0.1.0 (draft — not yet registered)
+- Approval scope: `read:ips,read:holdings`

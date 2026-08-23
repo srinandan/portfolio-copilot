@@ -58,4 +58,34 @@ def test_empty_prompt_is_safe():
 
 def test_as_context_shape():
     ctx = classify_intent("sell NVDA").as_context()
-    assert ctx == {"requested_trade": True, "intent": "action"}
+    assert ctx == {"requested_trade": True, "intent": "action", "requested_equity_analysis": False}
+
+
+# --- Equity-advice intent (issue #344) ------------------------------------- #
+
+EQUITY_ADVICE_PROMPTS = [
+    "should I buy more AAPL now?",
+    "is AAPL a good buy?",
+    "is it worth buying TSLA?",
+    "should I invest in NVDA?",
+    "what's AAPL's valuation?",
+    "do you think I should sell my MSFT?",
+]
+
+NON_EQUITY_ADVICE_PROMPTS = [
+    "should I trim my tech exposure?",  # portfolio-level, not single-name
+    "sell my NVDA position",  # imperative command, not advice-shaped
+    "how is my portfolio doing?",
+    "what did I spend on dining last month?",
+    "rebalance my portfolio",
+]
+
+
+@pytest.mark.parametrize("prompt", EQUITY_ADVICE_PROMPTS)
+def test_equity_advice_prompts_flag_analysis(prompt):
+    assert classify_intent(prompt).requested_equity_analysis is True
+
+
+@pytest.mark.parametrize("prompt", NON_EQUITY_ADVICE_PROMPTS)
+def test_non_equity_advice_prompts_do_not_flag_analysis(prompt):
+    assert classify_intent(prompt).requested_equity_analysis is False

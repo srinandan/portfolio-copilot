@@ -12,6 +12,10 @@ This directory contains the runtime skills for **Portfolio Copilot**, discovered
 | [`spending-analysis/`](spending-analysis/) | Translates spending questions into read-only, user-scoped BigQuery SQL queries and detects anomalies. | [`spending_analysis.evalset.json`](spending-analysis/spending_analysis.evalset.json) |
 | [`research/`](research/) | Gathers external market context with strict data isolation via Google Search grounding. | [`research.evalset.json`](research/research.evalset.json) |
 | [`reviewer/`](reviewer/) | Independently verifies proposed trades against active IPS, holdings, and concentration limits. | [`reviewer.evalset.json`](reviewer/reviewer.evalset.json) |
+| [`equity-research/`](equity-research/) † | Standalone assessment of whether a single equity is attractive on its own merits (DCF, quality ratios, multiples from SEC EDGAR + market quotes). Read-only. | _pending_ |
+| [`suitability/`](suitability/) † | Combines the equity assessment with the user's IPS, holdings, and drift into an advisory buy/add/hold/trim/avoid recommendation. Advisory only. | _pending_ |
+
+† Advisory equity-research path (see [issue #344](https://github.com/srinandan/portfolio-copilot/issues/344)). The skills, contracts, deterministic primitives, manifests, and intent/policy routing are in place and unit-tested, but the two skills are **not yet activated in the planner pipeline** (not in `PIPELINE_SKILL_ORDER` / the dispatch `SKILL_PLANS`), so they are not yet reachable end-to-end. Activation (planner dispatch + registration + evalsets) is a separate, reviewed step.
 
 ## Skill Manifests
 

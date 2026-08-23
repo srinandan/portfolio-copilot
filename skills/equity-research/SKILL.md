@@ -83,3 +83,9 @@ Transient (not persisted), like the Drift Report and Research Brief. Key fields:
 - **Missing FCF or price** → the DCF is skipped and the verdict is `unknown`;
   quality/multiples are still returned where computable. Guessing is never
   substituted for missing data.
+
+## Registry metadata
+
+- Registered as: `projects/{project}/locations/{location}/skills/private-equity-research`
+- Skill revision: 0.1.0 (draft — not yet registered)
+- Approval scope: `read:external_market_data,read:fundamentals`
