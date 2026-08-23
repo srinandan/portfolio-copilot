@@ -16,6 +16,7 @@ effective identity has the roles it needs.
 """
 
 import logging
+import os
 import subprocess
 
 import click
