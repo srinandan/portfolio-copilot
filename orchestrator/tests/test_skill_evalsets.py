@@ -16,6 +16,8 @@ ALL_SKILLS = [
     "spending-analysis",
     "research",
     "reviewer",
+    "equity-research",
+    "suitability",
 ]
 
 

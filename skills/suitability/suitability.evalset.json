@@ -1,0 +1,158 @@
+{
+  "eval_set_id": "suitability",
+  "name": "suitability",
+  "description": "Evaluation suite for the suitability runtime skill in Portfolio Copilot.",
+  "eval_cases": [
+    {
+      "evalId": "undervalued_with_room_is_buy",
+      "conversation": [
+        {
+          "invocationId": "",
+          "userContent": {
+            "parts": [
+              {
+                "text": "AAPL looks undervalued and I don't own it. My equity sleeve is under target and I'm well within my per-position concentration limit — should I buy it?"
+              }
+            ]
+          },
+          "finalResponse": {
+            "parts": [
+              {
+                "text": "Combines the standalone undervalued assessment with the user's IPS, holdings, and allocation drift and, finding headroom under the single-position concentration limit and an under-allocated equity sleeve, returns an advisory direction of 'buy' with transparent suitability factors and disclaimers. Advisory only: it never drafts or executes a trade."
+              }
+            ]
+          },
+          "creationTimestamp": 0.0
+        }
+      ],
+      "sessionInput": {
+        "appName": "suitability",
+        "userId": "eval_user",
+        "state": {}
+      },
+      "creationTimestamp": 0.0,
+      "finalSessionState": {}
+    },
+    {
+      "evalId": "at_concentration_limit_is_hold",
+      "conversation": [
+        {
+          "invocationId": "",
+          "userContent": {
+            "parts": [
+              {
+                "text": "MSFT is attractive but it's already 16% of my portfolio and my IPS caps single positions at 15%."
+              }
+            ]
+          },
+          "finalResponse": {
+            "parts": [
+              {
+                "text": "Recognizes there is no headroom under the concentration limit and returns 'hold' at reduced conviction, explaining that the position cannot be safely increased despite the favorable valuation."
+              }
+            ]
+          },
+          "creationTimestamp": 0.0
+        }
+      ],
+      "sessionInput": {
+        "appName": "suitability",
+        "userId": "eval_user",
+        "state": {}
+      },
+      "creationTimestamp": 0.0,
+      "finalSessionState": {}
+    },
+    {
+      "evalId": "overvalued_held_is_trim",
+      "conversation": [
+        {
+          "invocationId": "",
+          "userContent": {
+            "parts": [
+              {
+                "text": "I hold KO and it now trades well above your DCF intrinsic value. What should I do?"
+              }
+            ]
+          },
+          "finalResponse": {
+            "parts": [
+              {
+                "text": "Returns 'trim' for an overvalued position that is currently held, with rationale tied to the negative DCF upside; advisory only, never auto-executing."
+              }
+            ]
+          },
+          "creationTimestamp": 0.0
+        }
+      ],
+      "sessionInput": {
+        "appName": "suitability",
+        "userId": "eval_user",
+        "state": {}
+      },
+      "creationTimestamp": 0.0,
+      "finalSessionState": {}
+    },
+    {
+      "evalId": "excluded_ticker_is_avoid",
+      "conversation": [
+        {
+          "invocationId": "",
+          "userContent": {
+            "parts": [
+              {
+                "text": "Should I add XOM? Note that my IPS excludes fossil-fuel tickers, including XOM."
+              }
+            ]
+          },
+          "finalResponse": {
+            "parts": [
+              {
+                "text": "Returns 'avoid' with high conviction because the ticker is on the IPS excluded list, regardless of the standalone valuation verdict."
+              }
+            ]
+          },
+          "creationTimestamp": 0.0
+        }
+      ],
+      "sessionInput": {
+        "appName": "suitability",
+        "userId": "eval_user",
+        "state": {}
+      },
+      "creationTimestamp": 0.0,
+      "finalSessionState": {}
+    },
+    {
+      "evalId": "no_active_ips_refusal",
+      "conversation": [
+        {
+          "invocationId": "",
+          "userContent": {
+            "parts": [
+              {
+                "text": "Is AAPL a good buy for me? I haven't completed onboarding yet."
+              }
+            ]
+          },
+          "finalResponse": {
+            "parts": [
+              {
+                "text": "Declines to produce a suitability recommendation because there is no active Investment Policy Statement, and directs the user to complete goals onboarding first."
+              }
+            ]
+          },
+          "creationTimestamp": 0.0
+        }
+      ],
+      "sessionInput": {
+        "appName": "suitability",
+        "userId": "eval_user",
+        "state": {}
+      },
+      "creationTimestamp": 0.0,
+      "finalSessionState": {}
+    }
+  ],
+  "creation_timestamp": 0.0
+}
