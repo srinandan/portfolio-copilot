@@ -135,7 +135,10 @@ const messages = ref<ChatMessage[]>([]);
 const examplePrompts = [
   'Analyze my portfolio drift',
   'Check my spending anomalies',
-  'Suggest a rebalance'
+  'Suggest a rebalance',
+  'Should I buy more AAPL?',
+  'Is NVDA overvalued?',
+  'Should I sell some TSLA?'
 ];
 
 onMounted(async () => {
