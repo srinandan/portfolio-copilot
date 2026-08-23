@@ -251,6 +251,29 @@ Notable fields:
 
 See [`w2-document.schema.json`](../../schemas/w2-document.schema.json).
 
+## 12. Equity Assessment & Recommendation
+
+Transient contracts for the advisory equity-research path (like the Drift Report
+and Research Brief — computed and consumed within a planning cycle, not persisted
+or audited). Defined as Pydantic models in `orchestrator/contracts/` and mirrored
+as TypeScript types in `frontend/src/types`; there is no JSON Schema because they
+are not stored.
+
+- **`FundamentalsSnapshot`** — provider-agnostic normalized financials (per-period
+  revenue, net income, FCF, debt, cash, shares) plus latest price and `source`;
+  the cacheable input the valuation reads (all public data, no user data).
+- **`EquityAssessment`** — the standalone, user-independent view: `dcf`
+  (intrinsic value per share, upside %, assumptions), `quality` ratios,
+  `multiples`, a `valuation_verdict` (`undervalued`/`fairly_valued`/`overvalued`/
+  `unknown`), `confidence`, `key_drivers`/`key_risks`, and disclaimers.
+- **`EquityRecommendation`** — the suitability-adjusted advisory lean: `direction`
+  (`buy`/`add`/`hold`/`trim`/`avoid`), `conviction`, `rationale`,
+  `suitability_factors[]`, concentration/weight fields, `key_risks`, and mandatory
+  not-investment-advice `disclaimers`. Advisory only — never a drafted or executed
+  trade.
+
+See [ADR-0027](../adr/0027-equity-research-and-suitability-advisory-analysis.md).
+
 ## Changing these contracts
 
 Additive changes (new optional field) are fine as a normal PR. A breaking

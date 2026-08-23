@@ -8,7 +8,7 @@ Deployed to Agent Platform Agent Runtime using the Python custom-agent contract 
 
 ## What It Does
 
-- **Registry-Driven Dynamic Planning**: At runtime, the root planner queries the Agent Registry to discover which skills (`research`, `action_drafting`, `spending_analysis`, `portfolio_analysis`, `goals_onboarding`, `reviewer`) are currently authorized and available, composing an execution plan dynamically.
+- **Registry-Driven Dynamic Planning**: At runtime, the root planner queries the Agent Registry to discover which skills (`research`, `action_drafting`, `spending_analysis`, `portfolio_analysis`, `goals_onboarding`, `reviewer`, `equity_research`, `suitability`) are currently authorized and available, composing an execution plan dynamically.
 - **Dynamic Workflows**: Uses ADK's programmatic control flow (`@node`, `Workflow`, `Context.run_node`) to coordinate sub-tasks and adapt mid-session without restarting.
 - **State Checkpointing & Resumption**: Leverages ADK session management to pause execution for Human-in-the-Loop (HITL) approvals and resume without re-executing already-completed sub-nodes.
 - **Governance & Auditability**: Ensures all planned and executed actions map directly to registered skill versions and approved user scopes.
