@@ -39,7 +39,8 @@ def test_find_existing_managed_agent_not_found():
         assert result is None
 
 
-def test_provision_managed_agent_creates_and_returns_server_id():
+@patch("google.genai.Client", side_effect=RuntimeError("SDK unavailable"))
+def test_provision_managed_agent_creates_and_returns_server_id(mock_genai):
     # 1. Not existing
     mock_list_proc = MagicMock()
     mock_list_proc.stdout = json.dumps([])
@@ -65,7 +66,8 @@ def test_provision_managed_agent_creates_and_returns_server_id():
         assert result == "projects/test-proj/locations/us-central1/agents/generated-id-789"
 
 
-def test_provision_managed_agent_fails_loud_by_default():
+@patch("google.genai.Client", side_effect=RuntimeError("SDK unavailable"))
+def test_provision_managed_agent_fails_loud_by_default(mock_genai):
     # Both list and create fail
     with patch(
         "subprocess.run",
@@ -75,7 +77,8 @@ def test_provision_managed_agent_fails_loud_by_default():
             provision_managed_agent("test-proj", "us-central1", "portfolio-copilot-worker", allow_placeholder=False)
 
 
-def test_provision_managed_agent_allow_placeholder_returns_fallback():
+@patch("google.genai.Client", side_effect=RuntimeError("SDK unavailable"))
+def test_provision_managed_agent_allow_placeholder_returns_fallback(mock_genai):
     # Both list and create fail, but allow_placeholder is True
     with patch(
         "subprocess.run",
@@ -83,6 +86,17 @@ def test_provision_managed_agent_allow_placeholder_returns_fallback():
     ):
         result = provision_managed_agent("test-proj", "us-central1", "portfolio-copilot-worker", allow_placeholder=True)
         assert result == "projects/test-proj/locations/us-central1/agents/portfolio-copilot-worker"
+
+
+def test_provision_managed_agent_via_genai_sdk():
+    mock_client = MagicMock()
+    mock_agent = MagicMock()
+    mock_agent.name = "projects/test-proj/locations/global/agents/portfolio-copilot-worker"
+    mock_client.agents.get.return_value = mock_agent
+
+    with patch("google.genai.Client", return_value=mock_client):
+        result = provision_managed_agent("test-proj", "global", "portfolio-copilot-worker")
+        assert result == "projects/test-proj/locations/global/agents/portfolio-copilot-worker"
 
 
 def test_grant_iam_role_executes_gcloud_binding():
