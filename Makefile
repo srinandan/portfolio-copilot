@@ -15,7 +15,7 @@ _COMMIT_SHA ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo local)
 # empty --region.
 export GOOGLE_CLOUD_PROJECT GOOGLE_CLOUD_LOCATION AGENT_REGISTRY_LOCATION DOCUMENT_AI_LOCATION DOCUMENT_AI_PROCESSOR_ID _COMMIT_SHA
 
-.PHONY: help install deploy deploy-orchestrator deploy-frontend deploy-managed-agent register-skills setup-agent-engine setup-model-armor setup-all load-testdata local-orchestrator local-frontend local-server local-ui test test-orchestrator test-go test-frontend lint clean
+.PHONY: help install deploy deploy-orchestrator deploy-frontend deploy-managed-agent register-skills setup-agent-engine setup-model-armor setup-all load-testdata local-orchestrator local-frontend local-server local-ui test test-orchestrator test-go test-frontend lint check clean
 
 help:
 	@echo "Portfolio Copilot Makefile"
@@ -28,7 +28,8 @@ help:
 	@echo ""
 	@echo "Testing & Linting:"
 	@echo "  make test                     - Run test suites across Python, Go, and Vue"
-	@echo "  make lint                     - Run linters across Python and Go"
+	@echo "  make lint                     - Run linters across Python and Go (ruff + go vet)"
+	@echo "  make check                    - Run all linters and all test suites before push"
 	@echo ""
 	@echo "Cloud Deployment:"
 	@echo "  make deploy                   - Deploy full stack (orchestrator + frontend)"
@@ -104,8 +105,10 @@ test-frontend:
 test: test-orchestrator test-go test-frontend
 
 lint:
-	$(MAKE) -C orchestrator lint
+	uv run --project orchestrator ruff check .
 	go vet ./...
+
+check: lint test
 
 clean:
 	$(MAKE) -C orchestrator clean

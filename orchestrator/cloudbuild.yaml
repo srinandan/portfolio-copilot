@@ -6,13 +6,22 @@ substitutions:
   _AR_REPO: portfolio-copilot
 
 steps:
-  # Build the container image, tagged with the commit SHA / git tag
+  # 1. Pull previous image from Artifact Registry to use as build layer cache
+  - name: 'gcr.io/cloud-builders/docker'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - 'docker pull ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:latest || true'
+
+  # 2. Build the container image with cache, tagged with commit SHA and latest
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'build'
       - '-t'
       - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:${_COMMIT_SHA}'
       - '-t'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:latest'
+      - '--cache-from'
       - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:latest'
       - '-f'
       - 'orchestrator/Dockerfile'
