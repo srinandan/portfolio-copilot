@@ -29,32 +29,42 @@ Portfolio Copilot is an experimental personal finance assistant built on Google 
 ## System Architecture
 
 ```text
- ┌────────────────────────────────────────────────────────────────────────┐
- │                      Vue 3 + TypeScript Frontend                       │
- │          (Dashboard, Portfolio & Drift, Spending, Ingestion)           │
- └───────────────────────────────────┬────────────────────────────────────┘
-                                     │ HTTP / JSON & SSE
- ┌───────────────────────────────────▼────────────────────────────────────┐
- │                            Go Backend Host                             │
- │                  (Static Asset Serving & API Gateway)                  │
- └───────────────────┬────────────────────────────────────┬───────────────┘
-                     │                                    │
-          State & Ingestion                        Agent Dispatch
-                     │                                    │
- ┌───────────────────▼───────────────────┐ ┌──────────────▼───────────────┐
- │          Google Cloud Store           │ │      Python Orchestrator     │
- │ ───────────────────────────────────── │ │   (Gemini Enterprise ADK)    │
- │ • Firestore: IPS, Holdings, State     │ │ ──────────────────────────── │
- │ • BigQuery: Checking Transactions     │ │ • Intent-Driven Planner      │
- └───────────────────────────────────────┘ │ • Reviewer / Critic Gate     │
-                                           └───────┬──────────────┬───────┘
-                                                   │              │
-                                Sub-Agent Dispatch │              │ Paper Orders
-                                (Interactions API) │              │
-                                     ┌─────────────▼────────┐ ┌───▼───────────────┐
-                                     │ Worker Managed Agent │ │     Alpaca API    │
-                                     │(Antigravity Sandbox) │ │     (Sandbox)     │
-                                     └──────────────────────┘ └───────────────────┘
+ ┌────────────────────────────────────────────────────────────────────────────────────────┐
+ │                              Vue 3 + TypeScript Frontend                               │
+ │         (Dashboard, Portfolio & Equity Analyzer, Spending, Profile & W-2 Hub)          │
+ └───────────────────────────────────────────┬────────────────────────────────────────────┘
+                                             │ HTTP / JSON & SSE Stream
+ ┌───────────────────────────────────────────▼────────────────────────────────────────────┐
+ │                                    Go Backend Host                                     │
+ │                          (Static Asset Serving & API Gateway)                          │
+ └─────────────┬─────────────────────────────┬─────────────────────────────┬──────────────┘
+               │                             │                             │
+     State & Ingestion Reads         Agent Dispatch (SSE)          W-2 Document Uploads
+               │                             │                             │
+ ┌─────────────▼─────────────┐ ┌─────────────▼─────────────┐ ┌─────────────▼────────────┐
+ │     Google Cloud Store    │ │    Python Orchestrator    │ │  Google Cloud Document AI │
+ │ ───────────────────────── │ │  (Vertex AI Agent Runtime)│ │ ───────────────────────── │
+ │ • Firestore: IPS, Holdings│ │ ───────────────────────── │ │ • W-2 Income Extraction   │
+ │   Profiles, W2s, Audit Log│ │ • Dynamic Intent Planner  │ │ • Automatic SSN Masking   │
+ │ • BigQuery: Checking      │ │ • Reviewer / Critic Gate  │ └───────────────────────────┘
+ │   Transactions (NL-to-SQL)│ │ • HITL Approval Gate      │
+ └───────────────────────────┘ └───────┬───────┬───────┬───┘
+                                       │       │       │
+                  Skill Registry Reads │       │       │ SEC EDGAR XBRL & Quotes
+                                       │       │       │ (DCF & Equity Fundamentals)
+       ┌───────────────────────────────▼─┐     │       └───────────────┐
+       │          Agent Registry         │     │                       │
+       │ ─────────────────────────────── │     │         ┌─────────────▼───────────────┐
+       │ • 8 Runtime Skills & Manifests  │     │         │      External Data Layer    │
+       │ • Hot-Pluggable Dynamic Planning│     │         │ • SEC EDGAR (Company Facts) │
+       └─────────────────────────────────┘     │         │ • Market Data / Quotes      │
+                                               │         └─────────────────────────────┘
+                            Sub-Agent Dispatch │ Paper Orders
+                            (Interactions API) │
+                                   ┌───────────▼──────────┐ ┌──────────────────────────┐
+                                   │ Worker Managed Agent │ │        Alpaca API        │
+                                   │ (Antigravity Sandbox)│ │     (Paper Trading)      │
+                                   └──────────────────────┘ └──────────────────────────┘
 ```
 
 For full architectural diagrams, component contracts, and design trade-offs, see the [Detailed Architecture Specification](docs/spec/02-architecture.md) and [Architecture Decision Records (ADRs)](docs/adr/).

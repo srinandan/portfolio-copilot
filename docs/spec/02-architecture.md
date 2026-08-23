@@ -98,6 +98,8 @@ flowchart TD
         Registry[("Agent Registry<br/><i>(Runtime Skills + Manifests)</i>")]
         Firestore[("Cloud Firestore<br/><i>(IPS, Holdings, Liabilities, User Profiles, Documents, Reports, Audit Log)</i>")]
         BigQuery[("BigQuery<br/><i>(Checking Transactions)</i>")]
+        DocAI[("Google Cloud Document AI<br/><i>(W-2 Statements & SSN Masking)</i>")]
+        SecEdgar[("SEC EDGAR & Market Data<br/><i>(XBRL Fundamentals & Quotes)</i>")]
         SessionsStore[("Agent Platform Sessions<br/>& Memory Bank")]
         SecretMgr[("Secret Manager<br/><i>(Alpaca Keys, MA ID)</i>")]
         AlpacaAPI[("Alpaca Trading API<br/><i>(Paper Brokerage)</i>")]
@@ -109,6 +111,7 @@ flowchart TD
     UI -.->|"Client Spans (W3C traceparent)"| APIProxy
     APIProxy <-->|"Direct Reads & Profile/Document Writes"| Firestore
     APIProxy -->|"Aggregate Reads & Streaming CSV Ingestion"| BigQuery
+    APIProxy -->|"Parse W-2 PDFs & Images (SSN masked)"| DocAI
     APIProxy <-->|"POST /v1/invoke & /v1/resume (SSE Stream + Progress)"| Planner
     APIProxy -.->|"Export Server Spans"| CloudTrace
 
@@ -116,6 +119,7 @@ flowchart TD
     Discovery <-->|"List authorized skills + fetch manifests"| Registry
     Preloader -->|"Fetch Snapshot"| Firestore
     Preloader -->|"Fetch Transactions"| BigQuery
+    Preloader -->|"Fetch XBRL Fundamentals & Quotes"| SecEdgar
     Dispatch <-->|"Interactions API"| WorkerMA
     Reviewer <-->|"Verify Draft Actions"| WorkerMA
     HITL <-->|"Checkpoint Turn State"| SessionsStore

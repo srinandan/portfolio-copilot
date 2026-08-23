@@ -41,6 +41,12 @@ and shared libraries are Go, since they are not agents.
 ## Build & test
 
 ```bash
+# Full verification (lint + all test suites across Python, Go, and Vue)
+make check
+
+# Linting only (Python ruff + Go vet) — MUST pass before pushing any code
+make lint       # or: uv run --project orchestrator ruff check . && go vet ./...
+
 # orchestrator/ (Python)
 cd orchestrator && uv run pytest --cov
 
@@ -50,6 +56,21 @@ go test ./... -cover
 
 # frontend UI (Vue + TS)
 cd frontend && npm run build && npm run test -- --coverage
+```
+
+## Pre-Push Checklist (Mandatory)
+
+**Never push a branch or create/update a PR until all linters and tests pass locally.**
+CI strictly runs `ruff check .` across the workspace and will reject any PR with lint errors.
+
+Before running `git push`, always execute:
+```bash
+make check      # runs: make lint && make test
+```
+If only touching Python files, at a minimum verify:
+```bash
+uv run --project orchestrator ruff check .
+cd orchestrator && uv run pytest
 ```
 
 ## Deployment — Always Use Makefile
