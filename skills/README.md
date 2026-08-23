@@ -15,7 +15,7 @@ This directory contains the runtime skills for **Portfolio Copilot**, discovered
 | [`equity-research/`](equity-research/) † | Standalone assessment of whether a single equity is attractive on its own merits (DCF, quality ratios, multiples from SEC EDGAR + market quotes). Read-only. | _pending_ |
 | [`suitability/`](suitability/) † | Combines the equity assessment with the user's IPS, holdings, and drift into an advisory buy/add/hold/trim/avoid recommendation. Advisory only. | _pending_ |
 
-† Advisory equity-research path (see [issue #344](https://github.com/srinandan/portfolio-copilot/issues/344)). The skills, contracts, deterministic primitives, manifests, and intent/policy routing are in place and unit-tested, but the two skills are **not yet activated in the planner pipeline** (not in `PIPELINE_SKILL_ORDER` / the dispatch `SKILL_PLANS`), so they are not yet reachable end-to-end. Activation (planner dispatch + registration + evalsets) is a separate, reviewed step.
+† Advisory equity-research path (see [issue #344](https://github.com/srinandan/portfolio-copilot/issues/344)). Fully wired: contracts, deterministic primitives (DCF/suitability), manifests, intent/policy routing, planner dispatch (`SKILL_PLANS`, `PIPELINE_SKILL_ORDER`), and registration (`register_all_skills.sh`). Reachable end-to-end once the skills are registered in the Agent Registry (`make register-skills`) and, for live valuations, `SEC_EDGAR_USER_AGENT` is set (the offline mock fundamentals provider is used otherwise). ADK evalsets are still pending (hence _pending_ above), and the frontend surface is a separate step.
 
 ## Skill Manifests
 

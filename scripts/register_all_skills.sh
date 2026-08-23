@@ -31,6 +31,8 @@ SKILLS=(
   "research"
   "action-drafting"
   "reviewer"
+  "equity-research"
+  "suitability"
 )
 
 for SKILL in "${SKILLS[@]}"; do
