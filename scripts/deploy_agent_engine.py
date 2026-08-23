@@ -140,7 +140,18 @@ def _get_client(project: str, location: str):
         "When omitted, falls back to the legacy PlaceholderAgent deploy path."
     ),
 )
-def deploy_agent_engine(project: str | None, location: str, display_name: str, container_uri: str | None):
+@click.option(
+    "--sec-edgar-user-agent",
+    default=None,
+    help="User-Agent string for SEC EDGAR requests (defaults to SEC_EDGAR_USER_AGENT env var or standard contact)",
+)
+def deploy_agent_engine(
+    project: str | None,
+    location: str,
+    display_name: str,
+    container_uri: str | None,
+    sec_edgar_user_agent: str | None = None,
+):
     if not project:
         _, project = google.auth.default()
 
@@ -153,6 +164,11 @@ def deploy_agent_engine(project: str | None, location: str, display_name: str, c
     if container_uri:
         print(f"Deploying Agent Engine '{display_name}' from container {container_uri} to {project} in {location}...")
         try:
+            sec_user_agent = (
+                sec_edgar_user_agent
+                or os.environ.get("SEC_EDGAR_USER_AGENT")
+                or "PortfolioCopilot/1.0 (portfolio-copilot@google.com)"
+            )
             env_vars = {
                 "AGENT_ENGINE_ID": "",
                 "PROJECT_ID": project,
@@ -167,6 +183,7 @@ def deploy_agent_engine(project: str | None, location: str, display_name: str, c
                 # Names the orchestrator's spans in Cloud Trace (server.py exports
                 # them via the Cloud Trace exporter it configures at startup).
                 "OTEL_SERVICE_NAME": "portfolio-copilot-orchestrator",
+                "SEC_EDGAR_USER_AGENT": sec_user_agent,
             }
             if existing is not None:
                 engine_id = existing.api_resource.name.split("/")[-1]
