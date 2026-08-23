@@ -1,5 +1,11 @@
 from .audit_log import Actor, ActorType, AuditLogEntry, EventType
 from .drift_report import DriftReport, DriftReportEntry
+from .fundamentals import (
+    FinancialPeriod,
+    FiscalPeriodType,
+    FundamentalsSnapshot,
+    FundamentalsSource,
+)
 from .goals_onboarding import GoalsOnboardingResult
 from .hitl_decision import HITLDecision, HITLOutcome
 from .holdings import AccountType, HoldingsSnapshot, Position
@@ -41,6 +47,10 @@ __all__ = [
     "DriftReport",
     "DriftReportEntry",
     "EventType",
+    "FinancialPeriod",
+    "FiscalPeriodType",
+    "FundamentalsSnapshot",
+    "FundamentalsSource",
     "Goal",
     "GoalsOnboardingResult",
     "HITLDecision",
