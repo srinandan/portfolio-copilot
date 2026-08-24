@@ -1,7 +1,21 @@
 package contracts
 
 import (
+	"fmt"
+	"math"
 	"time"
+)
+
+// IPS constraint integrity floor (SEC-04, issue #355). Mirrors the fail-closed
+// bounds in orchestrator/contracts/ips.py so a permissive-but-schema-valid policy
+// can't neuter the deterministic reviewer, regardless of which write path produced
+// it. Keep these in lockstep with the Python constants.
+const (
+	concentrationLimitMinPercent  = 5.0
+	concentrationLimitMaxPercent  = 50.0
+	maxAllocationBandWidthPercent = 50.0
+	allocationSumTargetPercent    = 100.0
+	allocationSumTolerancePercent = 1.0
 )
 
 // IPSStatus defines allowed status values for an InvestmentPolicyStatement.
@@ -186,6 +200,35 @@ func (ips *InvestmentPolicyStatement) Validate() bool {
 		return false
 	}
 	return true
+}
+
+// ValidateIntegrity enforces the SEC-04 constraint floor (issue #355): it rejects a
+// defanged-but-schema-valid policy so the deterministic reviewer can't be turned into
+// a rubber stamp. Fail closed — a corrupted IPS is rejected rather than silently
+// clamped. Mirrors the validators on orchestrator/contracts/ips.py; callers that
+// persist an externally-supplied IPS (e.g. the document-upload handler) must gate on it.
+func (ips *InvestmentPolicyStatement) ValidateIntegrity() error {
+	c := ips.Constraints.ConcentrationLimitPercent
+	if c < concentrationLimitMinPercent || c > concentrationLimitMaxPercent {
+		return fmt.Errorf(
+			"concentration_limit_percent must be between %.0f and %.0f to remain a credible guardrail (got %g)",
+			concentrationLimitMinPercent, concentrationLimitMaxPercent, c,
+		)
+	}
+	var sum float64
+	for _, a := range ips.TargetAllocation {
+		if a.MaxPercent-a.MinPercent > maxAllocationBandWidthPercent {
+			return fmt.Errorf(
+				"allocation band for %q is too wide (%g-%g%%): a band wider than %.0f points can never constrain drift",
+				a.AssetClass, a.MinPercent, a.MaxPercent, maxAllocationBandWidthPercent,
+			)
+		}
+		sum += a.TargetPercent
+	}
+	if math.Abs(sum-allocationSumTargetPercent) > allocationSumTolerancePercent {
+		return fmt.Errorf("target_allocation target_percent must sum to ~%.0f%% (got %.2f%%)", allocationSumTargetPercent, sum)
+	}
+	return nil
 }
 
 // OnboardingProfile represents the combined active onboarding profile returned to the frontend.

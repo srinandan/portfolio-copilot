@@ -65,7 +65,7 @@ flowchart TD
 * **Vulnerability Mechanism:**  
   During onboarding interview, adversarial input could attempt to produce an unconstrained or extreme IPS policy.
 * **Status:** **Mitigated (integrity floor — issue #355).** A fail-closed constraint floor on the IPS contracts (`orchestrator/contracts/ips.py`) makes a defanged-but-schema-valid policy non-constructable: `concentration_limit_percent` must be within `5..50` (a bare `0..100` range is not a guardrail — it was the gap this closes), target allocations must sum to ~100% (±1), and no single allocation band may span more than 50 points (so `min=0,max=100` is rejected). These combine with the pre-existing `time_horizon_years: 0..100` bound, band-direction validation (`min <= target <= max`), and uppercase/whitespace sanitization on ticker exclusions. Enforced at construction on both `InvestmentPolicyStatement` and `GoalsOnboardingResult`, so a corrupted IPS is rejected regardless of source; regression tests in `orchestrator/tests/contracts/test_ips_integrity.py`.
-* **Residual:** the floor is Python-side. The Go document-upload path (`POST /api/documents`, `document_type=ips` in `frontend/server/handlers.go`) still unmarshals and writes an IPS without these bounds — tracked as follow-up (see #312 on the duplicated Go/Python contracts).
+* **Cross-language:** the same floor is mirrored in Go (`InvestmentPolicyStatement.ValidateIntegrity()` in `pkg/contracts/ips.go`) and enforced on the direct document-upload path (`POST /api/documents`, `document_type=ips` in `frontend/server/handlers.go`, returning 400), so an uploaded IPS is held to the identical bounds. The Go and Python constants must stay in lockstep (tracked with #312 on unifying the duplicated contracts).
 
 ---
 
@@ -124,7 +124,7 @@ flowchart TD
 | **SEC-01** | NL SQL User Scoping Bypass | BigQuery / Python Data Layer | **Critical** | 8.6 | **Completed (ADR-0029)** |
 | **SEC-02** | Unauthenticated BOLA / IDOR | Go Gateway API Handlers | **High** | 7.5 | **Mitigated (Phase 3 / ADR-0031)** |
 | **SEC-03** | Prompt Boundary Delimiter Escape | Worker Managed Agent Dispatcher | **High** | 7.3 | **Completed (ADR-0030)** |
-| **SEC-04** | IPS Policy Manipulation via Interview | Goals Onboarding Extraction | **High** | 7.1 | **Mitigated (integrity floor, #355)** — Python contracts; Go upload path residual |
+| **SEC-04** | IPS Policy Manipulation via Interview | Goals Onboarding Extraction | **High** | 7.1 | **Completed (integrity floor, #355)** — enforced in both Python and Go contracts |
 | **SEC-05** | Shared Process Cache Contamination | Research Worker Memory Cache | **Medium** | 5.8 | **Mitigated (Phase 3 / ADR-0031)** |
 | **SEC-06** | Firestore Path Traversal via User ID | Firestore Storage Client | **Medium** | 5.3 | **Mitigated (Phase 3 / ADR-0031)** |
 | **SEC-07** | Information Schema Catalog Exposure | BigQuery NL SQL Validation | **Medium** | 4.9 | **Completed (ADR-0029)** |

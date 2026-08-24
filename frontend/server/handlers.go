@@ -623,6 +623,17 @@ func (s *Server) HandleUploadDocument(c *gin.Context) {
 		}
 		// Force request identity
 		ips.UserID = userID
+		// Integrity floor (SEC-04, #355): reject a defanged-but-schema-valid IPS
+		// here too, so a direct upload can't install a policy that neuters the
+		// deterministic reviewer. Mirrors the orchestrator's Pydantic validators.
+		if err := ips.ValidateIntegrity(); err != nil {
+			errMsg := fmt.Sprintf("IPS integrity validation failed: %v", err)
+			docItem.Status = "FAILED"
+			docItem.ErrorMessage = &errMsg
+			_ = s.Store.SetDocument(ctx, &docItem)
+			c.JSON(http.StatusBadRequest, gin.H{"error": errMsg, "document": docItem})
+			return
+		}
 		recordsParsed = 1
 		if err := s.Store.UpdateIPS(ctx, &ips); err != nil {
 			errMsg := fmt.Sprintf("failed to update IPS: %v", err)

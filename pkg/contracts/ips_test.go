@@ -458,3 +458,79 @@ func TestInvestmentPolicyStatementRoundTripAndValidation(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateIntegrity(t *testing.T) {
+	// A complete, moderate allocation that sums to 100 with sane bands.
+	validAllocation := []contracts.AllocationBand{
+		{AssetClass: "equity", TargetPercent: 60, MinPercent: 50, MaxPercent: 70},
+		{AssetClass: "bonds", TargetPercent: 40, MinPercent: 30, MaxPercent: 50},
+	}
+
+	tests := []struct {
+		name          string
+		allocation    []contracts.AllocationBand
+		concentration float64
+		wantErr       bool
+	}{
+		{
+			name:          "moderate policy passes",
+			allocation:    validAllocation,
+			concentration: 15,
+			wantErr:       false,
+		},
+		{
+			name:          "concentration above ceiling is rejected",
+			allocation:    validAllocation,
+			concentration: 100,
+			wantErr:       true,
+		},
+		{
+			name:          "concentration below floor is rejected",
+			allocation:    validAllocation,
+			concentration: 2,
+			wantErr:       true,
+		},
+		{
+			name: "allocation not summing to 100 is rejected",
+			allocation: []contracts.AllocationBand{
+				{AssetClass: "equity", TargetPercent: 60, MinPercent: 50, MaxPercent: 70},
+			},
+			concentration: 15,
+			wantErr:       true,
+		},
+		{
+			name:          "empty allocation is rejected",
+			allocation:    []contracts.AllocationBand{},
+			concentration: 15,
+			wantErr:       true,
+		},
+		{
+			name: "full-width band is rejected",
+			allocation: []contracts.AllocationBand{
+				{AssetClass: "equity", TargetPercent: 50, MinPercent: 0, MaxPercent: 100},
+				{AssetClass: "cash", TargetPercent: 50, MinPercent: 40, MaxPercent: 60},
+			},
+			concentration: 15,
+			wantErr:       true,
+		},
+		{
+			name:          "boundary concentration values are accepted",
+			allocation:    validAllocation,
+			concentration: 50,
+			wantErr:       false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ips := contracts.InvestmentPolicyStatement{
+				TargetAllocation: tc.allocation,
+				Constraints:      contracts.Constraints{ConcentrationLimitPercent: tc.concentration},
+			}
+			err := ips.ValidateIntegrity()
+			if (err != nil) != tc.wantErr {
+				t.Errorf("ValidateIntegrity() error = %v, wantErr %v", err, tc.wantErr)
+			}
+		})
+	}
+}
