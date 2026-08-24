@@ -58,6 +58,12 @@ go test ./... -cover
 cd frontend && npm run build && npm run test -- --coverage
 ```
 
+## Branching & PR Workflow (Mandatory)
+
+- **Never commit or push directly to `main`.** All changes must go through a feature/fix branch and a Pull Request.
+- **For large changes / architectural features:** Always create a GitHub issue first outlining the scope, rationale, and design decisions, then create a linked Pull Request.
+- **For smaller changes / bug fixes:** Directly create a feature branch and open a Pull Request.
+
 ## Pre-Push Checklist (Mandatory)
 
 **Never push a branch or create/update a PR until all linters and tests pass locally.**
