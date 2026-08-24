@@ -206,6 +206,17 @@ function formatEntry(entry: string): string {
   return entry.trim();
 }
 
+function isSkillRegistryObject(o: any): boolean {
+  if (!o || typeof o !== 'object') return false;
+  return (
+    'target_state' in o ||
+    'default_revision' in o ||
+    'targetState' in o ||
+    'defaultRevision' in o ||
+    (typeof o.name === 'string' && o.name.includes('/skills/'))
+  );
+}
+
 /**
  * Turn an arbitrary agent response (string, array of result strings, or object)
  * into readable multi-line text. Never returns a raw `[{...}]` blob.
@@ -223,10 +234,15 @@ export function formatAgentResponse(output: unknown): string {
   }
 
   if (Array.isArray(output)) {
+    // Filter out internal discovery skill lists
+    if (output.some(isSkillRegistryObject)) {
+      return '';
+    }
     return output
       .map((item) => {
         if (typeof item === 'string') return formatEntry(item);
         if (item && typeof item === 'object') {
+          if (isSkillRegistryObject(item)) return '';
           return formatStructured(item) || compactSummary(item);
         }
         return String(item);
@@ -236,6 +252,7 @@ export function formatAgentResponse(output: unknown): string {
   }
 
   if (typeof output === 'object') {
+    if (isSkillRegistryObject(output)) return '';
     // Recognized domain objects (DriftReport, ReviewerVerdict, HITL request,
     // or anything carrying a narrative field) render as prose; otherwise fall
     // back to a compact key summary — never a raw JSON blob (issue #272).
@@ -244,3 +261,4 @@ export function formatAgentResponse(output: unknown): string {
 
   return String(output);
 }
+
