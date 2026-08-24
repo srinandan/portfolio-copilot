@@ -703,11 +703,15 @@ def _traced_reasoning_stream(
                 if token is not None:
                     from opentelemetry import context as otel_context
 
-                    otel_context.detach(token)
+                    try:
+                        otel_context.detach(token)
+                    except ValueError:
+                        pass
                 if span is not None:
                     span.end()
             except Exception:
                 logger.exception("reasoning-engine span teardown failed")
+
 
     return _gen()
 
@@ -777,10 +781,14 @@ async def stream_reasoning_engine(request: Request) -> StreamingResponse:
         if token is not None:
             from opentelemetry import context as otel_context
 
-            otel_context.detach(token)
+            try:
+                otel_context.detach(token)
+            except ValueError:
+                pass
         if span is not None:
             span.end()
         raise
+
 
 
 @app.post("/api/reasoning_engine")
