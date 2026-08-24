@@ -154,6 +154,11 @@ def resolve_alpaca_credentials(force_refresh: bool = False, require: bool = Fals
     return key_id, secret
 
 
+def is_managed_agent_configured() -> bool:
+    """Returns True if MANAGED_AGENT_ID is explicitly provided in env or Secret Manager."""
+    return bool(os.environ.get("MANAGED_AGENT_ID") or _fetch_from_secret_manager("MANAGED_AGENT_ID"))
+
+
 def verify_required_secrets(strict: bool = False) -> None:
     """Verifies at startup that required secrets can be resolved.
 
@@ -171,17 +176,17 @@ def verify_required_secrets(strict: bool = False) -> None:
         )
     )
 
-    agent_id = resolve_managed_agent_id()
-    if is_strict and (not agent_id or agent_id == DEFAULT_MANAGED_AGENT_ID):
+    if is_strict and not is_managed_agent_configured():
         raise SecretLoadError(
-            f"Startup validation failed: MANAGED_AGENT_ID could not be loaded "
-            f"from environment or Secret Manager (got default {DEFAULT_MANAGED_AGENT_ID})."
+            "Startup validation failed: MANAGED_AGENT_ID could not be loaded "
+            "from environment or Secret Manager."
         )
 
     try:
         resolve_alpaca_credentials(require=is_strict)
     except SecretLoadError as e:
         raise SecretLoadError(f"Startup validation failed: {e}") from e
+
 
 
 def clear_cache() -> None:
