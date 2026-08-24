@@ -229,6 +229,12 @@ func (c *OrchestratorClient) runPlan(ctx *gin.Context, req PlanRequest, resume b
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "user_id required"})
 		return
 	}
+	validUID, err := validateUserID(req.UserID)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid user_id parameter"})
+		return
+	}
+	req.UserID = validUID
 	if c.directURL == "" && c.agentEngineID == "" {
 		ctx.JSON(http.StatusServiceUnavailable, gin.H{
 			"error": "orchestrator not configured; set ORCHESTRATOR_URL or AGENT_ENGINE_ID",

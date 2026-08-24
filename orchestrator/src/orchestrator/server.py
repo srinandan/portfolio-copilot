@@ -40,9 +40,10 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from google.adk.runners import Runner
 from google.genai.types import Part, UserContent
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from .contracts.goals_onboarding import GoalsOnboardingResult
+from .data.validation import validate_user_id
 from .logger import get_logger
 from .planner import root_agent
 from .progress import PROGRESS_CHANNEL
@@ -64,6 +65,11 @@ class InvokeRequest(BaseModel):
     message: str
     session_id: Optional[str] = None
 
+    @field_validator("user_id")
+    @classmethod
+    def check_user_id(cls, v: str) -> str:
+        return validate_user_id(v)
+
 
 class ResumeRequest(BaseModel):
     user_id: str
@@ -71,6 +77,11 @@ class ResumeRequest(BaseModel):
     invocation_id: str
     interrupt_id: str
     payload: Any
+
+    @field_validator("user_id")
+    @classmethod
+    def check_user_id(cls, v: str) -> str:
+        return validate_user_id(v)
 
 
 class ApplyOnboardingRequest(BaseModel):
@@ -94,6 +105,11 @@ class EquityAnalysisRequest(BaseModel):
 
     ticker: str
     user_id: str = "demo_user"
+
+    @field_validator("user_id")
+    @classmethod
+    def check_user_id(cls, v: str) -> str:
+        return validate_user_id(v)
 
 
 class ServerState:

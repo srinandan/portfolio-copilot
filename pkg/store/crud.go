@@ -20,6 +20,9 @@ const (
 
 // SetHoldings overwrites the holdings snapshot for a given user.
 func (c *Client) SetHoldings(ctx context.Context, userID string, snapshot *contracts.HoldingsSnapshot) error {
+	if err := ValidateUserID(userID); err != nil {
+		return err
+	}
 	if snapshot == nil {
 		return fmt.Errorf("snapshot is nil")
 	}
@@ -38,6 +41,9 @@ func (c *Client) SetHoldings(ctx context.Context, userID string, snapshot *contr
 
 // SetLiabilities overwrites the liabilities snapshot for a given user.
 func (c *Client) SetLiabilities(ctx context.Context, userID string, snapshot *contracts.LiabilitiesSnapshot) error {
+	if err := ValidateUserID(userID); err != nil {
+		return err
+	}
 	if snapshot == nil {
 		return fmt.Errorf("snapshot is nil")
 	}
@@ -155,14 +161,16 @@ func (c *Client) UpdateIPS(ctx context.Context, newIPS *contracts.InvestmentPoli
 
 // SetUserProfile sets the user profile for a given user.
 func (c *Client) SetUserProfile(ctx context.Context, userID string, profile *contracts.UserProfile) error {
+	if err := ValidateUserID(userID); err != nil {
+		return err
+	}
 	if profile == nil {
 		return fmt.Errorf("profile is nil")
 	}
-	if userID == "" {
-		return fmt.Errorf("userID is empty")
-	}
 	if profile.UserID == "" {
 		profile.UserID = userID
+	} else if err := ValidateUserID(profile.UserID); err != nil {
+		return err
 	}
 
 	if c.userProfileSchema != nil {
@@ -187,6 +195,11 @@ func (c *Client) SetDocument(ctx context.Context, item *contracts.DocumentItem) 
 	if item.ID == "" {
 		return fmt.Errorf("document item ID is empty")
 	}
+	if item.UserID != "" {
+		if err := ValidateUserID(item.UserID); err != nil {
+			return err
+		}
+	}
 
 	_, err := c.fs.Collection(collectionDocuments).Doc(item.ID).Set(ctx, item)
 	if err != nil {
@@ -204,8 +217,8 @@ func (c *Client) SetW2Document(ctx context.Context, doc *contracts.W2Document) e
 	if doc.ID == "" {
 		return fmt.Errorf("w2 document ID is empty")
 	}
-	if doc.UserID == "" {
-		return fmt.Errorf("w2 document UserID is empty")
+	if err := ValidateUserID(doc.UserID); err != nil {
+		return err
 	}
 
 	if c.w2Schema != nil {
@@ -224,8 +237,11 @@ func (c *Client) SetW2Document(ctx context.Context, doc *contracts.W2Document) e
 
 // DeleteW2Document deletes a W2 document for a given user from Firestore.
 func (c *Client) DeleteW2Document(ctx context.Context, userID string, docID string) error {
-	if userID == "" || docID == "" {
-		return fmt.Errorf("userID and docID must not be empty")
+	if err := ValidateUserID(userID); err != nil {
+		return err
+	}
+	if docID == "" {
+		return fmt.Errorf("docID must not be empty")
 	}
 
 	docRef := c.fs.Collection(collectionW2Documents).Doc(docID)

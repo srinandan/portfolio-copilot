@@ -17,6 +17,7 @@ from ..contracts import (
 )
 from ..logger import get_logger
 from .firestore_mcp import FirestoreMCPClient
+from .validation import validate_user_id
 
 logger = get_logger(__name__)
 
@@ -140,6 +141,7 @@ class FirestoreClient:
 
     def get_holdings(self, user_id: str) -> HoldingsSnapshot | None:
         """Gets the holdings snapshot for a given user."""
+        user_id = validate_user_id(user_id)
         if self.use_mcp and self.mcp_client:
             try:
                 data = self.mcp_client.get_document(COLLECTION_HOLDINGS, user_id)
@@ -153,6 +155,7 @@ class FirestoreClient:
 
     def set_holdings(self, user_id: str, snapshot: HoldingsSnapshot) -> None:
         """Overwrites the holdings snapshot for a given user."""
+        user_id = validate_user_id(user_id)
         if self.use_mcp and self.mcp_client:
             try:
                 self.mcp_client.set_document(COLLECTION_HOLDINGS, user_id, self._dict_factory(snapshot))
@@ -165,6 +168,7 @@ class FirestoreClient:
     # PURPOSEFUL RETENTION: Direct native google-cloud-firestore SDK implementation.
     # Preserved intentionally for offline/emulator testing and emergency non-MCP fallback.
     def _get_holdings_direct(self, user_id: str) -> HoldingsSnapshot | None:
+        user_id = validate_user_id(user_id)
         doc_ref = self.db.collection(COLLECTION_HOLDINGS).document(user_id)
         doc = doc_ref.get()
         if doc.exists:
@@ -173,6 +177,7 @@ class FirestoreClient:
 
     # PURPOSEFUL RETENTION: Direct native google-cloud-firestore SDK implementation.
     def _set_holdings_direct(self, user_id: str, snapshot: HoldingsSnapshot) -> None:
+        user_id = validate_user_id(user_id)
         doc_ref = self.db.collection(COLLECTION_HOLDINGS).document(user_id)
         doc_ref.set(self._dict_factory(snapshot))
 
@@ -182,6 +187,7 @@ class FirestoreClient:
 
     def get_liabilities(self, user_id: str) -> LiabilitiesSnapshot | None:
         """Gets the liabilities snapshot for a given user."""
+        user_id = validate_user_id(user_id)
         if self.use_mcp and self.mcp_client:
             try:
                 data = self.mcp_client.get_document(COLLECTION_LIABILITIES, user_id)
@@ -195,6 +201,7 @@ class FirestoreClient:
 
     def set_liabilities(self, user_id: str, snapshot: LiabilitiesSnapshot) -> None:
         """Overwrites the liabilities snapshot for a given user."""
+        user_id = validate_user_id(user_id)
         if self.use_mcp and self.mcp_client:
             try:
                 self.mcp_client.set_document(COLLECTION_LIABILITIES, user_id, self._dict_factory(snapshot))
@@ -206,6 +213,7 @@ class FirestoreClient:
 
     # PURPOSEFUL RETENTION: Direct native google-cloud-firestore SDK implementation.
     def _get_liabilities_direct(self, user_id: str) -> LiabilitiesSnapshot | None:
+        user_id = validate_user_id(user_id)
         doc_ref = self.db.collection(COLLECTION_LIABILITIES).document(user_id)
         doc = doc_ref.get()
         if doc.exists:
@@ -214,6 +222,7 @@ class FirestoreClient:
 
     # PURPOSEFUL RETENTION: Direct native google-cloud-firestore SDK implementation.
     def _set_liabilities_direct(self, user_id: str, snapshot: LiabilitiesSnapshot) -> None:
+        user_id = validate_user_id(user_id)
         doc_ref = self.db.collection(COLLECTION_LIABILITIES).document(user_id)
         doc_ref.set(self._dict_factory(snapshot))
 
@@ -325,6 +334,7 @@ class FirestoreClient:
 
     def get_active_ips_by_user(self, user_id: str) -> InvestmentPolicyStatement | None:
         """Gets the currently active IPS for a given user_id."""
+        user_id = validate_user_id(user_id)
         if self.use_mcp and self.mcp_client:
             try:
                 docs = self.mcp_client.list_documents(COLLECTION_IPS)
@@ -367,6 +377,7 @@ class FirestoreClient:
 
     # PURPOSEFUL RETENTION: Direct native google-cloud-firestore SDK implementation.
     def _get_active_ips_by_user_direct(self, user_id: str) -> InvestmentPolicyStatement | None:
+        user_id = validate_user_id(user_id)
         query = (
             self.db.collection(COLLECTION_IPS)
             .where(filter=firestore.FieldFilter("user_id", "==", user_id))
@@ -385,6 +396,7 @@ class FirestoreClient:
 
     def set_spending_report(self, user_id: str, report: Any) -> None:
         """Writes a SpendingReport to Firestore, keyed by user_id."""
+        user_id = validate_user_id(user_id)
         data = (
             self._dict_factory(report)
             if hasattr(report, "model_dump")
@@ -401,6 +413,7 @@ class FirestoreClient:
 
     def get_spending_report(self, user_id: str) -> dict[str, Any] | None:
         """Reads a SpendingReport dict by user_id."""
+        user_id = validate_user_id(user_id)
         if self.use_mcp and self.mcp_client:
             try:
                 return self.mcp_client.get_document(COLLECTION_SPENDING_REPORTS, user_id)
@@ -411,6 +424,7 @@ class FirestoreClient:
 
     # PURPOSEFUL RETENTION: Direct native google-cloud-firestore SDK implementation.
     def _set_spending_report_direct(self, user_id: str, report: Any) -> None:
+        user_id = validate_user_id(user_id)
         doc_ref = self.db.collection(COLLECTION_SPENDING_REPORTS).document(user_id)
         data = (
             self._dict_factory(report)
@@ -421,6 +435,7 @@ class FirestoreClient:
 
     # PURPOSEFUL RETENTION: Direct native google-cloud-firestore SDK implementation.
     def _get_spending_report_direct(self, user_id: str) -> dict[str, Any] | None:
+        user_id = validate_user_id(user_id)
         doc_ref = self.db.collection(COLLECTION_SPENDING_REPORTS).document(user_id)
         doc = doc_ref.get()
         if doc.exists:
@@ -433,6 +448,7 @@ class FirestoreClient:
 
     def set_drift_report(self, user_id: str, report: Any) -> None:
         """Writes a DriftReport to Firestore, keyed by user_id."""
+        user_id = validate_user_id(user_id)
         data = (
             self._dict_factory(report)
             if hasattr(report, "model_dump")
@@ -449,6 +465,7 @@ class FirestoreClient:
 
     def get_drift_report(self, user_id: str) -> dict[str, Any] | None:
         """Reads a DriftReport dict by user_id."""
+        user_id = validate_user_id(user_id)
         if self.use_mcp and self.mcp_client:
             try:
                 return self.mcp_client.get_document(COLLECTION_DRIFT_REPORTS, user_id)
@@ -459,6 +476,7 @@ class FirestoreClient:
 
     # PURPOSEFUL RETENTION: Direct native google-cloud-firestore SDK implementation.
     def _set_drift_report_direct(self, user_id: str, report: Any) -> None:
+        user_id = validate_user_id(user_id)
         doc_ref = self.db.collection(COLLECTION_DRIFT_REPORTS).document(user_id)
         data = (
             self._dict_factory(report)
@@ -469,6 +487,7 @@ class FirestoreClient:
 
     # PURPOSEFUL RETENTION: Direct native google-cloud-firestore SDK implementation.
     def _get_drift_report_direct(self, user_id: str) -> dict[str, Any] | None:
+        user_id = validate_user_id(user_id)
         doc_ref = self.db.collection(COLLECTION_DRIFT_REPORTS).document(user_id)
         doc = doc_ref.get()
         if doc.exists:
@@ -481,6 +500,7 @@ class FirestoreClient:
 
     def set_user_profile(self, user_id: str, profile: Any) -> None:
         """Writes a UserProfile to Firestore, keyed by user_id."""
+        user_id = validate_user_id(user_id)
         data = (
             self._dict_factory(profile)
             if hasattr(profile, "model_dump")
@@ -497,6 +517,7 @@ class FirestoreClient:
 
     def get_user_profile(self, user_id: str) -> dict[str, Any] | None:
         """Reads a UserProfile dict by user_id."""
+        user_id = validate_user_id(user_id)
         if self.use_mcp and self.mcp_client:
             try:
                 return self.mcp_client.get_document(COLLECTION_USER_PROFILES, user_id)
@@ -507,6 +528,7 @@ class FirestoreClient:
 
     # PURPOSEFUL RETENTION: Direct native google-cloud-firestore SDK implementation.
     def _set_user_profile_direct(self, user_id: str, profile: Any) -> None:
+        user_id = validate_user_id(user_id)
         doc_ref = self.db.collection(COLLECTION_USER_PROFILES).document(user_id)
         data = (
             self._dict_factory(profile)
@@ -517,6 +539,7 @@ class FirestoreClient:
 
     # PURPOSEFUL RETENTION: Direct native google-cloud-firestore SDK implementation.
     def _get_user_profile_direct(self, user_id: str) -> dict[str, Any] | None:
+        user_id = validate_user_id(user_id)
         doc_ref = self.db.collection(COLLECTION_USER_PROFILES).document(user_id)
         doc = doc_ref.get()
         if doc.exists:

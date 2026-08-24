@@ -31,6 +31,9 @@ func IsNotFound(err error) bool {
 
 // GetHoldings reads the holdings snapshot for a given user from Firestore.
 func (c *Client) GetHoldings(ctx context.Context, userID string) (*contracts.HoldingsSnapshot, error) {
+	if err := ValidateUserID(userID); err != nil {
+		return nil, err
+	}
 	ctx, span := tracer.Start(ctx, "store.GetHoldings", trace.WithAttributes(attribute.String("user_id", userID)))
 	defer span.End()
 	docRef := c.fs.Collection(collectionHoldings).Doc(userID)
@@ -54,6 +57,9 @@ func (c *Client) GetHoldings(ctx context.Context, userID string) (*contracts.Hol
 
 // GetLiabilities reads the liabilities snapshot for a given user from Firestore.
 func (c *Client) GetLiabilities(ctx context.Context, userID string) (*contracts.LiabilitiesSnapshot, error) {
+	if err := ValidateUserID(userID); err != nil {
+		return nil, err
+	}
 	ctx, span := tracer.Start(ctx, "store.GetLiabilities", trace.WithAttributes(attribute.String("user_id", userID)))
 	defer span.End()
 	docRef := c.fs.Collection(collectionLiabilities).Doc(userID)
@@ -77,6 +83,9 @@ func (c *Client) GetLiabilities(ctx context.Context, userID string) (*contracts.
 
 // GetActiveIPS reads the currently active InvestmentPolicyStatement for a given user from Firestore.
 func (c *Client) GetActiveIPS(ctx context.Context, userID string) (*contracts.InvestmentPolicyStatement, error) {
+	if err := ValidateUserID(userID); err != nil {
+		return nil, err
+	}
 	ctx, span := tracer.Start(ctx, "store.GetActiveIPS", trace.WithAttributes(attribute.String("user_id", userID)))
 	defer span.End()
 	query := c.fs.Collection(collectionIPS).
@@ -101,6 +110,9 @@ func (c *Client) GetActiveIPS(ctx context.Context, userID string) (*contracts.In
 
 // GetSpendingReport reads the spending report for a given user from Firestore.
 func (c *Client) GetSpendingReport(ctx context.Context, userID string) (*contracts.SpendingReport, error) {
+	if err := ValidateUserID(userID); err != nil {
+		return nil, err
+	}
 	ctx, span := tracer.Start(ctx, "store.GetSpendingReport", trace.WithAttributes(attribute.String("user_id", userID)))
 	defer span.End()
 	docRef := c.fs.Collection(collectionSpendingReports).Doc(userID)
@@ -124,6 +136,9 @@ func (c *Client) GetSpendingReport(ctx context.Context, userID string) (*contrac
 
 // GetDriftReport reads the drift report for a given user from Firestore.
 func (c *Client) GetDriftReport(ctx context.Context, userID string) (*contracts.DriftReport, error) {
+	if err := ValidateUserID(userID); err != nil {
+		return nil, err
+	}
 	ctx, span := tracer.Start(ctx, "store.GetDriftReport", trace.WithAttributes(attribute.String("user_id", userID)))
 	defer span.End()
 	docRef := c.fs.Collection(collectionDriftReports).Doc(userID)
@@ -147,6 +162,9 @@ func (c *Client) GetDriftReport(ctx context.Context, userID string) (*contracts.
 
 // GetDocuments reads uploaded document metadata items for a given user from Firestore.
 func (c *Client) GetDocuments(ctx context.Context, userID string) ([]contracts.DocumentItem, error) {
+	if err := ValidateUserID(userID); err != nil {
+		return nil, err
+	}
 	ctx, span := tracer.Start(ctx, "store.GetDocuments", trace.WithAttributes(attribute.String("user_id", userID)))
 	defer span.End()
 	query := c.fs.Collection(collectionDocuments).Where("user_id", "==", userID).Limit(50)
@@ -193,6 +211,9 @@ func (c *Client) UpdateProposedActionStatus(ctx context.Context, actionID string
 
 // GetUserProfile reads the user profile for a given user from Firestore.
 func (c *Client) GetUserProfile(ctx context.Context, userID string) (*contracts.UserProfile, error) {
+	if err := ValidateUserID(userID); err != nil {
+		return nil, err
+	}
 	ctx, span := tracer.Start(ctx, "store.GetUserProfile", trace.WithAttributes(attribute.String("user_id", userID)))
 	defer span.End()
 	docRef := c.fs.Collection(collectionUserProfiles).Doc(userID)
@@ -216,6 +237,9 @@ func (c *Client) GetUserProfile(ctx context.Context, userID string) (*contracts.
 
 // GetW2Documents reads all W-2 documents for a given user from Firestore.
 func (c *Client) GetW2Documents(ctx context.Context, userID string) ([]contracts.W2Document, error) {
+	if err := ValidateUserID(userID); err != nil {
+		return nil, err
+	}
 	ctx, span := tracer.Start(ctx, "store.GetW2Documents", trace.WithAttributes(attribute.String("user_id", userID)))
 	defer span.End()
 
@@ -243,6 +267,9 @@ func (c *Client) GetW2Documents(ctx context.Context, userID string) ([]contracts
 
 // GetW2Document reads a single W-2 document by docID for a user from Firestore.
 func (c *Client) GetW2Document(ctx context.Context, userID string, docID string) (*contracts.W2Document, error) {
+	if err := ValidateUserID(userID); err != nil {
+		return nil, err
+	}
 	ctx, span := tracer.Start(ctx, "store.GetW2Document", trace.WithAttributes(
 		attribute.String("user_id", userID),
 		attribute.String("doc_id", docID),

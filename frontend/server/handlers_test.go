@@ -9,6 +9,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -1026,6 +1027,54 @@ func TestServer_Close(t *testing.T) {
 		t.Errorf("expected srv.Close() to succeed, got %v", err)
 	}
 }
+
+func TestHandlers_RejectMalformedUserID(t *testing.T) {
+	mock := newMockStore()
+	srv := &Server{Store: mock}
+	r := setupTestRouterWithServer(srv)
+
+	malformedIDs := []string{
+		"../traversal",
+		"user/subcollection",
+		"user;DROP",
+		"user space",
+		"user@domain",
+	}
+
+	for _, badID := range malformedIDs {
+		escapedID := url.QueryEscape(badID)
+		// GET endpoints with bad user_id
+		getEndpoints := []string{
+			"/api/holdings?user_id=" + escapedID,
+			"/api/spending_report?user_id=" + escapedID,
+			"/api/drift_report?user_id=" + escapedID,
+			"/api/documents?user_id=" + escapedID,
+			"/api/profile?user_id=" + escapedID,
+			"/api/onboarding?user_id=" + escapedID,
+			"/api/profile/w2?user_id=" + escapedID,
+		}
+
+		for _, path := range getEndpoints {
+			req, _ := http.NewRequest(http.MethodGet, path, nil)
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+			if w.Code != http.StatusBadRequest {
+				t.Errorf("path %s with bad user_id %q returned %d, want 400 Bad Request", path, badID, w.Code)
+			}
+		}
+
+		// POST profile with bad user_id
+		body := fmt.Sprintf(`{"user_id":%q,"full_name":"Attacker"}`, badID)
+		req, _ := http.NewRequest(http.MethodPost, "/api/profile", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("POST /api/profile with bad user_id %q returned %d, want 400 Bad Request", badID, w.Code)
+		}
+	}
+}
+
 
 
 

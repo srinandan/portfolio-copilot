@@ -234,3 +234,39 @@ func TestW2DocumentValidation(t *testing.T) {
 	}
 }
 
+func TestValidateUserID(t *testing.T) {
+	validIDs := []string{
+		"demo_user",
+		"user-123",
+		"USER_456",
+		"a",
+		"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_",
+		"  trimmed_user  ",
+	}
+	for _, id := range validIDs {
+		if err := ValidateUserID(id); err != nil {
+			t.Errorf("expected valid user_id %q, got error: %v", id, err)
+		}
+	}
+
+	invalidIDs := []string{
+		"",
+		"   ",
+		"../traversal",
+		"user/subdoc",
+		"user\\backslash",
+		"user space",
+		"user@domain",
+		"user;DROP",
+		"user#1",
+		"user$2",
+		"toolong_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+	}
+	for _, id := range invalidIDs {
+		if err := ValidateUserID(id); err == nil {
+			t.Errorf("expected invalid user_id %q to return error, got nil", id)
+		}
+	}
+}
+
+

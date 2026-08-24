@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -21,6 +22,16 @@ import (
 	"portfolio-copilot/pkg/documentai"
 	"portfolio-copilot/pkg/store"
 )
+
+var validUserIDRegex = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,64}$`)
+
+func validateUserID(userID string) (string, error) {
+	trimmed := strings.TrimSpace(userID)
+	if trimmed == "" || !validUserIDRegex.MatchString(trimmed) {
+		return "", fmt.Errorf("invalid user_id format: %q", userID)
+	}
+	return trimmed, nil
+}
 
 // Server holds dependencies for HTTP handlers, using interfaces for testability.
 type Server struct {
@@ -119,7 +130,11 @@ func (s *Server) Close() error {
 }
 
 func (s *Server) HandleGetHoldings(c *gin.Context) {
-	userID := c.DefaultQuery("user_id", "demo_user")
+	userID, err := validateUserID(c.DefaultQuery("user_id", "demo_user"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user_id parameter"})
+		return
+	}
 	if s.Store == nil {
 		c.JSON(http.StatusOK, defaultHoldings())
 		return
@@ -137,7 +152,11 @@ func (s *Server) HandleGetHoldings(c *gin.Context) {
 }
 
 func (s *Server) HandleGetSpendingReport(c *gin.Context) {
-	userID := c.DefaultQuery("user_id", "demo_user")
+	userID, err := validateUserID(c.DefaultQuery("user_id", "demo_user"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user_id parameter"})
+		return
+	}
 	if s.Store == nil {
 		c.JSON(http.StatusOK, defaultSpendingReport())
 		return
@@ -155,7 +174,11 @@ func (s *Server) HandleGetSpendingReport(c *gin.Context) {
 }
 
 func (s *Server) HandleGetDriftReport(c *gin.Context) {
-	userID := c.DefaultQuery("user_id", "demo_user")
+	userID, err := validateUserID(c.DefaultQuery("user_id", "demo_user"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user_id parameter"})
+		return
+	}
 	if s.Store == nil {
 		c.JSON(http.StatusOK, defaultDriftReport())
 		return
@@ -173,7 +196,11 @@ func (s *Server) HandleGetDriftReport(c *gin.Context) {
 }
 
 func (s *Server) HandleGetDocuments(c *gin.Context) {
-	userID := c.DefaultQuery("user_id", "demo_user")
+	userID, err := validateUserID(c.DefaultQuery("user_id", "demo_user"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user_id parameter"})
+		return
+	}
 	if s.Store == nil {
 		c.JSON(http.StatusOK, defaultDocuments())
 		return
@@ -195,7 +222,11 @@ func (s *Server) HandleGetDocuments(c *gin.Context) {
 }
 
 func (s *Server) HandleGetUserProfile(c *gin.Context) {
-	userID := c.DefaultQuery("user_id", "demo_user")
+	userID, err := validateUserID(c.DefaultQuery("user_id", "demo_user"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user_id parameter"})
+		return
+	}
 	if s.Store == nil {
 		c.JSON(http.StatusOK, defaultUserProfile())
 		return
@@ -221,6 +252,10 @@ func (s *Server) HandleSetUserProfile(c *gin.Context) {
 	if profile.UserID == "" {
 		profile.UserID = "demo_user"
 	}
+	if _, err := validateUserID(profile.UserID); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user_id parameter"})
+		return
+	}
 	profile.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
 
 	if s.Store == nil {
@@ -238,7 +273,11 @@ func (s *Server) HandleSetUserProfile(c *gin.Context) {
 }
 
 func (s *Server) HandleGetOnboarding(c *gin.Context) {
-	userID := c.DefaultQuery("user_id", "demo_user")
+	userID, err := validateUserID(c.DefaultQuery("user_id", "demo_user"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user_id parameter"})
+		return
+	}
 	if s.Store == nil {
 		c.JSON(http.StatusOK, contracts.OnboardingProfile{
 			HasActiveIPS: false,
@@ -315,7 +354,11 @@ func (s *Server) HandleGetOnboarding(c *gin.Context) {
 }
 
 func (s *Server) HandleUploadDocument(c *gin.Context) {
-	userID := c.DefaultPostForm("user_id", "demo_user")
+	userID, err := validateUserID(c.DefaultPostForm("user_id", "demo_user"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user_id parameter"})
+		return
+	}
 	documentType := strings.ToLower(strings.TrimSpace(c.PostForm("document_type")))
 	targetTable := strings.TrimSpace(c.PostForm("target_table"))
 
@@ -600,7 +643,11 @@ func (s *Server) HandleUploadDocument(c *gin.Context) {
 }
 
 func (s *Server) HandleUploadW2(c *gin.Context) {
-	userID := c.DefaultPostForm("user_id", "demo_user")
+	userID, err := validateUserID(c.DefaultPostForm("user_id", "demo_user"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user_id parameter"})
+		return
+	}
 
 	if s.DocAIParser == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Document AI parsing is unavailable"})
@@ -681,7 +728,11 @@ func (s *Server) HandleUploadW2(c *gin.Context) {
 }
 
 func (s *Server) HandleGetW2Documents(c *gin.Context) {
-	userID := c.DefaultQuery("user_id", "demo_user")
+	userID, err := validateUserID(c.DefaultQuery("user_id", "demo_user"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user_id parameter"})
+		return
+	}
 	if s.Store == nil {
 		c.JSON(http.StatusOK, []contracts.W2Document{})
 		return
@@ -699,7 +750,11 @@ func (s *Server) HandleGetW2Documents(c *gin.Context) {
 }
 
 func (s *Server) HandleDeleteW2Document(c *gin.Context) {
-	userID := c.DefaultQuery("user_id", "demo_user")
+	userID, err := validateUserID(c.DefaultQuery("user_id", "demo_user"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user_id parameter"})
+		return
+	}
 	docID := c.Param("id")
 	if docID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "id parameter is required"})
@@ -729,7 +784,11 @@ func (s *Server) HandleDeleteW2Document(c *gin.Context) {
 }
 
 func (s *Server) HandleApplyW2ToProfile(c *gin.Context) {
-	userID := c.DefaultQuery("user_id", "demo_user")
+	userID, err := validateUserID(c.DefaultQuery("user_id", "demo_user"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user_id parameter"})
+		return
+	}
 	docID := c.Param("id")
 	if docID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "id parameter is required"})

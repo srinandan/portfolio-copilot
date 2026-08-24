@@ -18,6 +18,7 @@ from ..contracts.proposed_action import ProposedActionRationale
 from ..contracts.research_brief import ResearchBrief
 from ..contracts.reviewer_verdict import ReviewerVerdict
 from ..contracts.spending_analysis import SpendingNarrative
+from ..data.validation import validate_user_id
 from ..logger import get_logger
 from ..registry_client import AgentRegistryClient
 from .worker import build_worker_managed_agent
@@ -38,14 +39,19 @@ _RESEARCH_CACHE: Dict[str, ResearchBrief] = {}
 _RESEARCH_CACHE_MAX = 128
 
 
-def _research_cache_key(node_input: Any) -> Optional[str]:
-    """Generates normalized cache key for research queries."""
+def _research_cache_key(node_input: Any, user_id: Optional[str] = None) -> Optional[str]:
+    """Generates normalized cache key for research queries namespaced by tenant/user_id."""
     if not isinstance(node_input, dict):
         return None
     q = node_input.get("research_question") or node_input.get("query")
     if not isinstance(q, str) or not q.strip():
         return None
-    return q.strip().lower()
+    raw_uid = user_id or node_input.get("user_id") or "anonymous"
+    try:
+        uid = validate_user_id(str(raw_uid))
+    except Exception:
+        uid = "anonymous"
+    return f"{uid}:{q.strip().lower()}"
 
 
 def get_skill_tools(skill_name: str) -> list:
@@ -417,8 +423,18 @@ async def dispatch_managed_skill(
     output_schema = OUTPUT_SCHEMA_BY_SKILL.get(normalize_private_skill_name(short_name))
     tools = get_skill_tools(short_name)
 
+    user_id = None
+    if isinstance(node_input, dict):
+        user_id = node_input.get("user_id")
+    if not user_id:
+        session = getattr(ctx, "session", None)
+        if session:
+            user_id = getattr(session, "user_id", None)
+            if not user_id and hasattr(session, "state") and isinstance(session.state, dict):
+                user_id = session.state.get("user_id")
+
     if normalized_short == "research":
-        cache_key = _research_cache_key(node_input)
+        cache_key = _research_cache_key(node_input, user_id=user_id)
         if cache_key and cache_key in _RESEARCH_CACHE:
             logger.info(f"Research cache hit for '{cache_key}'")
             return _RESEARCH_CACHE[cache_key]
@@ -503,7 +519,7 @@ async def dispatch_managed_skill(
         result_to_return = raw_result
 
     if normalized_short == "research":
-        cache_key = _research_cache_key(node_input)
+        cache_key = _research_cache_key(node_input, user_id=user_id)
         if cache_key and isinstance(result_to_return, ResearchBrief):
             if len(_RESEARCH_CACHE) >= _RESEARCH_CACHE_MAX:
                 _RESEARCH_CACHE.pop(next(iter(_RESEARCH_CACHE)))
