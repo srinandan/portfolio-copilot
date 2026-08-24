@@ -36,9 +36,17 @@ During the runtime security threat model evaluation, three related storage and i
    ```
    This guarantees that research briefs generated for user A are never returned in cache lookups for user B.
 
+4. **Gin Gateway Security Hardening:**
+   Adopting Gin web framework security best practices:
+   - **Security Headers Middleware:** Sets `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `X-XSS-Protection: 1; mode=block`, `Referrer-Policy: strict-origin-when-cross-origin`, `Content-Security-Policy`, and conditional HSTS `Strict-Transport-Security` over TLS / `X-Forwarded-Proto: https`.
+   - **Trusted Proxy Configuration:** Disallows untrusted proxy header spoofing by explicitly configuring `r.SetTrustedProxies(nil)` (or explicit CIDRs via `TRUSTED_PROXIES` environment variable).
+   - **Multipart Memory & Body Ceilings:** Sets `r.MaxMultipartMemory = 8 << 20` and applies `MaxBodySizeMiddleware(10 << 20)` on file ingestion routes.
+
 ## Consequences
 
 - **Positive:** Closes path traversal vectors in Firestore storage access across Go and Python runtimes.
 - **Positive:** Enforces uniform identifier validation at API boundaries, returning structured 400 Bad Request responses for malformed client inputs.
 - **Positive:** Completely eliminates cross-session research cache contamination between different users.
+- **Positive:** Enforces defense-in-depth HTTP security headers across all API and SPA routes.
+- **Positive:** Protects against `X-Forwarded-For` spoofing and memory exhaustion during large file uploads.
 - **Neutral:** Rejects user identifiers containing characters outside `[a-zA-Z0-9_-]` or longer than 64 characters.
