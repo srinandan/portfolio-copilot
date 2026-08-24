@@ -37,7 +37,7 @@ def sample_ips():
             TargetAllocation(asset_class="Fixed Income", target_percent=30.0, min_percent=20.0, max_percent=40.0),
             TargetAllocation(asset_class="Cash", target_percent=10.0, min_percent=5.0, max_percent=15.0),
         ],
-        constraints=Constraints(concentration_limit_percent=100.0, excluded_tickers=[]),
+        constraints=Constraints(concentration_limit_percent=50.0, excluded_tickers=[]),
         rebalancing_rules=RebalancingRules(drift_threshold_percent=5.0),
         created_at=datetime.now(timezone.utc),
     )
@@ -132,7 +132,9 @@ def test_preload_action_drafting_with_requested_trade(sample_ips, sample_holding
     mock_fs.get_active_ips_by_user.return_value = sample_ips
     mock_fs.get_holdings.return_value = sample_holdings
 
-    requested_trade = {"ticker": "VTI", "side": "buy", "quantity": 10}
+    # BND sits well under the concentration ceiling, so a buy drafts cleanly.
+    # (Buying more VTI, already 80% of the book, is correctly blocked by the cap.)
+    requested_trade = {"ticker": "BND", "side": "buy", "quantity": 10}
     result = preload_for_action_drafting(
         user_id="user_123",
         requested_trade=requested_trade,
@@ -141,7 +143,7 @@ def test_preload_action_drafting_with_requested_trade(sample_ips, sample_holding
 
     assert result["requested_trade"] == requested_trade
     assert result["precomputed_trade"] is not None
-    assert result["precomputed_trade"]["ticker"] == "VTI"
+    assert result["precomputed_trade"]["ticker"] == "BND"
     assert result["precomputed_trade"]["side"] == "buy"
     assert result["precomputed_trade"]["quantity"] == 10
 
@@ -158,8 +160,9 @@ def test_preload_action_drafting_constraint_violation_propagates(sample_holdings
         time_horizon_years=10,
         target_allocation=[
             TargetAllocation(asset_class="Equity", target_percent=60.0, min_percent=50.0, max_percent=70.0),
+            TargetAllocation(asset_class="Bonds", target_percent=40.0, min_percent=30.0, max_percent=50.0),
         ],
-        constraints=Constraints(concentration_limit_percent=100.0, excluded_tickers=["TSLA"]),
+        constraints=Constraints(concentration_limit_percent=50.0, excluded_tickers=["TSLA"]),
         rebalancing_rules=RebalancingRules(drift_threshold_percent=5.0),
         created_at=datetime.now(timezone.utc),
     )

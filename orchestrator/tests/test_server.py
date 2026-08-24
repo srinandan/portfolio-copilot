@@ -425,7 +425,10 @@ def test_onboarding_apply_persists_via_writer(client_with_runner):
         effective_date="2026-01-01",
         risk_tolerance=RiskTolerance.MODERATE,
         time_horizon_years=10,
-        target_allocation=[],
+        target_allocation=[
+            {"asset_class": "equity", "target_percent": 60, "min_percent": 50, "max_percent": 70},
+            {"asset_class": "bonds", "target_percent": 40, "min_percent": 30, "max_percent": 50},
+        ],
         constraints=__import__("src.orchestrator.contracts.ips", fromlist=["Constraints"]).Constraints(
             concentration_limit_percent=10.0
         ),
@@ -448,7 +451,10 @@ def test_onboarding_apply_persists_via_writer(client_with_runner):
                     "user_id": "u_wiz",
                     "risk_tolerance": "moderate",
                     "time_horizon_years": 10,
-                    "target_allocation": [],
+                    "target_allocation": [
+                        {"asset_class": "equity", "target_percent": 60, "min_percent": 50, "max_percent": 70},
+                        {"asset_class": "bonds", "target_percent": 40, "min_percent": 30, "max_percent": 50},
+                    ],
                     "identified_liabilities": [],
                     "additional_goals": [],
                     "interview_summary": "wizard",
@@ -488,7 +494,10 @@ def test_onboarding_apply_returns_500_on_writer_failure(client_with_runner):
                     "user_id": "u_wiz",
                     "risk_tolerance": "moderate",
                     "time_horizon_years": 10,
-                    "target_allocation": [],
+                    "target_allocation": [
+                        {"asset_class": "equity", "target_percent": 60, "min_percent": 50, "max_percent": 70},
+                        {"asset_class": "bonds", "target_percent": 40, "min_percent": 30, "max_percent": 50},
+                    ],
                     "identified_liabilities": [],
                     "additional_goals": [],
                     "interview_summary": "wizard",

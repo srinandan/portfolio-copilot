@@ -35,6 +35,7 @@ def test_pydantic_dict_factory():
             time_horizon_years=10,
             target_allocation=[
                 TargetAllocation(asset_class="equity", target_percent=60, min_percent=50, max_percent=70),
+                TargetAllocation(asset_class="bonds", target_percent=40, min_percent=30, max_percent=50),
             ],
             constraints=Constraints(concentration_limit_percent=15),
             created_at=datetime.now(timezone.utc),
@@ -109,7 +110,10 @@ def test_update_ips_transactional_error_multiple_active():
             effective_date="2026-01-01",
             risk_tolerance=RiskTolerance.MODERATE,
             time_horizon_years=10,
-            target_allocation=[],
+            target_allocation=[
+                TargetAllocation(asset_class="equity", target_percent=60, min_percent=50, max_percent=70),
+                TargetAllocation(asset_class="bonds", target_percent=40, min_percent=30, max_percent=50),
+            ],
             constraints=Constraints(concentration_limit_percent=15),
             created_at=datetime.now(timezone.utc),
         )
@@ -145,7 +149,10 @@ def test_update_ips_transactional_error_version_not_1():
             effective_date="2026-01-01",
             risk_tolerance=RiskTolerance.MODERATE,
             time_horizon_years=10,
-            target_allocation=[],
+            target_allocation=[
+                TargetAllocation(asset_class="equity", target_percent=60, min_percent=50, max_percent=70),
+                TargetAllocation(asset_class="bonds", target_percent=40, min_percent=30, max_percent=50),
+            ],
             constraints=Constraints(concentration_limit_percent=15),
             created_at=datetime.now(timezone.utc),
         )
@@ -174,7 +181,10 @@ def test_update_ips_transactional_success_update():
             effective_date="2026-01-01",
             risk_tolerance=RiskTolerance.MODERATE,
             time_horizon_years=10,
-            target_allocation=[],
+            target_allocation=[
+                TargetAllocation(asset_class="equity", target_percent=60, min_percent=50, max_percent=70),
+                TargetAllocation(asset_class="bonds", target_percent=40, min_percent=30, max_percent=50),
+            ],
             constraints=Constraints(concentration_limit_percent=15),
             created_at=datetime.now(timezone.utc),
         )
@@ -267,7 +277,8 @@ def test_get_active_ips_by_user_single(mock_client):
         "risk_tolerance": "moderate",
         "time_horizon_years": 10,
         "target_allocation": [
-            {"asset_class": "equity", "target_percent": 60.0, "min_percent": 50.0, "max_percent": 70.0}
+            {"asset_class": "equity", "target_percent": 60.0, "min_percent": 50.0, "max_percent": 70.0},
+            {"asset_class": "bonds", "target_percent": 40.0, "min_percent": 30.0, "max_percent": 50.0},
         ],
         "constraints": {"concentration_limit_percent": 15},
         "created_at": "2026-01-01T00:00:00Z",
@@ -569,7 +580,8 @@ def test_firestore_client_mcp_path():
             "risk_tolerance": "moderate",
             "time_horizon_years": 10,
             "target_allocation": [
-                {"asset_class": "equity", "target_percent": 60, "min_percent": 50, "max_percent": 70}
+                {"asset_class": "equity", "target_percent": 60, "min_percent": 50, "max_percent": 70},
+                {"asset_class": "bonds", "target_percent": 40, "min_percent": 30, "max_percent": 50},
             ],
             "constraints": {"concentration_limit_percent": 15},
             "created_at": "2026-01-01T00:00:00Z",

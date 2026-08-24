@@ -118,7 +118,10 @@ def test_write_ips_revision_trigger_supersedes_existing(sample_interview_result)
         effective_date="2023-01-01",
         risk_tolerance=RiskTolerance.CONSERVATIVE,
         time_horizon_years=5,
-        target_allocation=[],
+        target_allocation=[
+            TargetAllocation(asset_class="equity", target_percent=60, min_percent=50, max_percent=70),
+            TargetAllocation(asset_class="bonds", target_percent=40, min_percent=30, max_percent=50),
+        ],
         constraints=Constraints(concentration_limit_percent=15.0),
         created_at=datetime.now(timezone.utc),
     )

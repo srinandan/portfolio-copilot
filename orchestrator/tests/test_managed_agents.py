@@ -78,7 +78,10 @@ async def test_dispatch_managed_skill_success_typed_output(mock_resolve):
         primary_goal=Goal(name="Retirement", target_amount_usd=1000000.0, target_date="2045-01-01"),
         risk_tolerance=RiskTolerance.MODERATE,
         time_horizon_years=10,
-        target_allocation=[TargetAllocation(asset_class="equity", target_percent=60, min_percent=50, max_percent=70)],
+        target_allocation=[
+            TargetAllocation(asset_class="equity", target_percent=60, min_percent=50, max_percent=70),
+            TargetAllocation(asset_class="bonds", target_percent=40, min_percent=30, max_percent=50),
+        ],
         interview_summary="User seeks retirement growth.",
     )
     mock_ctx.run_node.return_value = expected_result

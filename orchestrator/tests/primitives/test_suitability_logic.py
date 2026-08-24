@@ -47,7 +47,10 @@ def _ips(risk=RiskTolerance.MODERATE, concentration=15.0, excluded=None):
         effective_date=date(2024, 1, 1),
         risk_tolerance=risk,
         time_horizon_years=10,
-        target_allocation=[TargetAllocation(asset_class="Equity", target_percent=60, min_percent=50, max_percent=70)],
+        target_allocation=[
+            TargetAllocation(asset_class="Equity", target_percent=60, min_percent=50, max_percent=70),
+            TargetAllocation(asset_class="Bonds", target_percent=40, min_percent=30, max_percent=50),
+        ],
         constraints=Constraints(concentration_limit_percent=concentration, excluded_tickers=excluded or []),
         created_at=datetime.now(timezone.utc),
     )

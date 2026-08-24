@@ -11,7 +11,7 @@ from google.genai.types import Part, UserContent
 from orchestrator.contracts.audit_log import AuditLogEntry, EventType
 from orchestrator.contracts.drift_report import DriftReport
 from orchestrator.contracts.goals_onboarding import Goal, GoalsOnboardingResult
-from orchestrator.contracts.ips import RelatedIPSVersion, RiskTolerance
+from orchestrator.contracts.ips import RelatedIPSVersion, RiskTolerance, TargetAllocation
 from orchestrator.contracts.proposed_action import (
     ActionStatus,
     ActionType,
@@ -42,7 +42,10 @@ class FakeFirestore:
             effective_date=date(2026, 1, 1),
             risk_tolerance=RiskTolerance.MODERATE,
             time_horizon_years=10,
-            target_allocation=[],
+            target_allocation=[
+                TargetAllocation(asset_class="equity", target_percent=60, min_percent=50, max_percent=70),
+                TargetAllocation(asset_class="bonds", target_percent=40, min_percent=30, max_percent=50),
+            ],
             constraints=Constraints(
                 excluded_tickers=[],
                 excluded_sectors=[],
@@ -98,7 +101,10 @@ def mock_pipeline_environment():
                 ),
                 risk_tolerance=RiskTolerance.MODERATE,
                 time_horizon_years=10,
-                target_allocation=[],
+                target_allocation=[
+                    TargetAllocation(asset_class="equity", target_percent=60, min_percent=50, max_percent=70),
+                    TargetAllocation(asset_class="bonds", target_percent=40, min_percent=30, max_percent=50),
+                ],
                 interview_summary="Goals onboarding complete",
             )
         if skill_name == "private-portfolio-analysis":

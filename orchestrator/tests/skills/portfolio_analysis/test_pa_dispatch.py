@@ -30,7 +30,7 @@ def sample_ips():
             TargetAllocation(asset_class="Equity", target_percent=60.0, min_percent=50.0, max_percent=70.0),
             TargetAllocation(asset_class="Fixed Income", target_percent=40.0, min_percent=30.0, max_percent=50.0),
         ],
-        constraints=Constraints(concentration_limit_percent=100.0, excluded_tickers=[]),
+        constraints=Constraints(concentration_limit_percent=50.0, excluded_tickers=[]),
         rebalancing_rules=RebalancingRules(drift_threshold_percent=5.0),
         created_at=datetime.now(timezone.utc),
     )
