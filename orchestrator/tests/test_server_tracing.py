@@ -282,3 +282,64 @@ def test_outbound_httpx_emits_client_span_and_injects_traceparent():
     traceparent = received.get("traceparent")
     assert traceparent, "expected traceparent to be injected onto the outbound request"
     assert traceparent.split("-")[1] == parent_trace_id
+
+
+def test_patch_opentelemetry_context_detach_suppresses_cross_context_value_error():
+    """Verify that when a token created in another Context is detached, the
+    resulting 'was created in a different Context' ValueError is safely caught."""
+    import contextvars
+
+    from opentelemetry.context.contextvars_context import ContextVarsRuntimeContext
+
+    server._patch_opentelemetry_context_detach()
+    runtime_ctx = ContextVarsRuntimeContext()
+
+    token = None
+
+    def _in_other_context():
+        nonlocal token
+        token = runtime_ctx.attach({"test_key": "test_val"})
+
+    # Run in a separate context to generate a token tied to that other context.
+    ctx = contextvars.copy_context()
+    ctx.run(_in_other_context)
+
+    assert token is not None
+    # In this context, detaching token from another context would normally raise
+    # ValueError("<Token ...> was created in a different Context").
+    # With the patch, it must return silently without raising.
+    runtime_ctx.detach(token)
+
+
+def test_patch_opentelemetry_context_detach_re_raises_unrelated_value_error(monkeypatch):
+    """Verify that unrelated ValueErrors are not swallowed."""
+    import pytest
+    from opentelemetry.context.contextvars_context import ContextVarsRuntimeContext
+
+    # Unpatch temporarily to install a mock that throws an unrelated ValueError
+    orig_fn = ContextVarsRuntimeContext.detach
+    if hasattr(orig_fn, "_is_safe_patched"):
+        # Reset patch marker for test
+        delattr(orig_fn, "_is_safe_patched")
+
+    def _broken_detach(self, token):
+        raise ValueError("unrelated failure")
+
+    monkeypatch.setattr(ContextVarsRuntimeContext, "detach", _broken_detach)
+    server._patch_opentelemetry_context_detach()
+
+    runtime_ctx = ContextVarsRuntimeContext()
+    with pytest.raises(ValueError, match="unrelated failure"):
+        runtime_ctx.detach("dummy_token")
+
+
+def test_patch_opentelemetry_context_detach_is_idempotent():
+    """Verify that multiple invocations of _patch_opentelemetry_context_detach are safe."""
+    from opentelemetry.context.contextvars_context import ContextVarsRuntimeContext
+
+    server._patch_opentelemetry_context_detach()
+    first_fn = ContextVarsRuntimeContext.detach
+    server._patch_opentelemetry_context_detach()
+    second_fn = ContextVarsRuntimeContext.detach
+    assert first_fn is second_fn
+
