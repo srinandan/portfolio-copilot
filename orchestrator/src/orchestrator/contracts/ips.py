@@ -1,7 +1,8 @@
+import re
 from datetime import date, datetime
 from enum import Enum
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class IPSStatus(str, Enum):
@@ -94,6 +95,14 @@ class InvestmentPolicyStatement(BaseModel):
 
     created_at: datetime
     updated_at: datetime | None = None
+
+    @field_validator("user_id")
+    @classmethod
+    def check_user_id(cls, v: str) -> str:
+        trimmed = str(v).strip()
+        if not re.match(r"^[a-zA-Z0-9_-]{1,64}$", trimmed):
+            raise ValueError(f"Invalid user_id format: {v!r}")
+        return trimmed
 
 
 class RelatedIPSVersion(BaseModel):

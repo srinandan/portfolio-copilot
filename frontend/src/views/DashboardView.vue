@@ -278,18 +278,29 @@ function handleStreamEvent(event: Record<string, any>, currentMsg: ChatMessage) 
     return;
   }
 
-  if (event.output !== undefined && event.output !== null) {
-    const formatted = formatAgentResponse(event.output);
-    if (formatted) {
-      currentMsg.text = formatted;
-    }
-  } else if (event.content?.parts) {
-    const text = event.content.parts.map((p: any) => p.text || '').join('');
-    if (text) {
-      currentMsg.text = formatAgentResponse(text);
+  const isInternalNode =
+    event.author === 'get_skills' ||
+    event.node_info?.path?.includes('get_skills') ||
+    event.author?.includes('get_skills');
+
+  if (!isInternalNode) {
+    if (event.output !== undefined && event.output !== null) {
+      const formatted = formatAgentResponse(event.output);
+      if (formatted) {
+        currentMsg.text = formatted;
+      }
+    } else if (event.content?.parts) {
+      const text = event.content.parts.map((p: any) => p.text || '').join('');
+      if (text) {
+        const formatted = formatAgentResponse(text);
+        if (formatted) {
+          currentMsg.text = formatted;
+        }
+      }
     }
   }
 }
+
 
 async function triggerPlan(promptText?: string) {
   const text = (promptText || 'Analyze my portfolio drift and suggest rebalancing').trim();

@@ -38,6 +38,12 @@ func (c *OrchestratorClient) HandleAnalyzeEquity(ctx *gin.Context) {
 	if userID == "" {
 		userID = ctx.DefaultQuery("user_id", "demo_user")
 	}
+	validUID, err := validateUserID(userID)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid user_id parameter"})
+		return
+	}
+	userID = validUID
 
 	orchestratorURL := strings.TrimRight(c.directURL, "/")
 	if orchestratorURL == "" {

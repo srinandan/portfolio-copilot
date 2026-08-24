@@ -19,7 +19,17 @@ var (
 	qualifiedTransactionRefBare     = regexp.MustCompile(`(?i)\b(?:[A-Za-z_][\w-]*\.)+([a-zA-Z0-9_]+_transactions)\b`)
 	limitRegex                      = regexp.MustCompile(`(?i)\blimit\s+\d+\s*;?\s*$`)
 	restrictedRegex                 = regexp.MustCompile(`(?i)\b(INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|TRUNCATE|MERGE|EXPORT|LOAD|CALL|EXECUTE)\b`)
+	validUserIDRegex                = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,64}$`)
 )
+
+// ValidateUserID verifies that a user_id conforms to the safe identifier format ^[a-zA-Z0-9_-]{1,64}$.
+func ValidateUserID(userID string) error {
+	trimmed := strings.TrimSpace(userID)
+	if trimmed == "" || !validUserIDRegex.MatchString(trimmed) {
+		return fmt.Errorf("invalid user_id format: %q", userID)
+	}
+	return nil
+}
 
 func stripCommentsAndSpace(sql string) string {
 	cleaned := blockCommentRegex.ReplaceAllString(sql, " ")
@@ -31,6 +41,9 @@ func stripCommentsAndSpace(sql string) string {
 // row-scoped version of the query along with a map of parameters.
 // This enforces the read-only, table targeting, user scoping, and LIMIT constraints.
 func PrepareSecureSQL(generatedSQL, userID string) (string, map[string]interface{}, error) {
+	if err := ValidateUserID(userID); err != nil {
+		return "", nil, err
+	}
 	trimmed := stripCommentsAndSpace(generatedSQL)
 	if trimmed == "" {
 		return "", nil, fmt.Errorf("query cannot be empty")

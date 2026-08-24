@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
@@ -25,9 +26,25 @@ func main() {
 	defer func() { _ = shutdownTracing(context.Background()) }()
 
 	r := gin.New()
+
+	// Configure trusted proxies (Gin security best practice: disallow untrusted proxy spoofing by default)
+	if trustedProxies := os.Getenv("TRUSTED_PROXIES"); trustedProxies != "" {
+		_ = r.SetTrustedProxies(strings.Split(trustedProxies, ","))
+	} else {
+		_ = r.SetTrustedProxies(nil)
+	}
+
+	// 8 MiB max memory for multipart uploads before spooling to temp files
+	r.MaxMultipartMemory = 8 << 20
+
 	// otelgin first so the server span (with any extracted `traceparent`) is in
 	// the request context for the logging middleware and all handlers.
-	r.Use(otelgin.Middleware(serviceName()), StructuredLogMiddleware(), gin.Recovery())
+	r.Use(
+		otelgin.Middleware(serviceName()),
+		SecurityHeadersMiddleware(),
+		StructuredLogMiddleware(),
+		gin.Recovery(),
+	)
 
 	srv := NewServer()
 	defer func() { _ = srv.Close() }()
@@ -46,10 +63,10 @@ func main() {
 	r.GET("/api/spending_report", srv.HandleGetSpendingReport)
 	r.GET("/api/drift_report", srv.HandleGetDriftReport)
 	r.GET("/api/documents", srv.HandleGetDocuments)
-	r.POST("/api/documents", srv.HandleUploadDocument)
+	r.POST("/api/documents", MaxBodySizeMiddleware(10<<20), srv.HandleUploadDocument)
 	r.GET("/api/profile", srv.HandleGetUserProfile)
 	r.POST("/api/profile", srv.HandleSetUserProfile)
-	r.POST("/api/profile/w2/upload", srv.HandleUploadW2)
+	r.POST("/api/profile/w2/upload", MaxBodySizeMiddleware(10<<20), srv.HandleUploadW2)
 	r.GET("/api/profile/w2", srv.HandleGetW2Documents)
 	r.DELETE("/api/profile/w2/:id", srv.HandleDeleteW2Document)
 	r.POST("/api/profile/w2/:id/apply", srv.HandleApplyW2ToProfile)

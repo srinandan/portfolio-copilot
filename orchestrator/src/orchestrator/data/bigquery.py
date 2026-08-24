@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 from google.cloud import bigquery
 
 from ..logger import get_logger
+from .validation import validate_user_id
 
 logger = get_logger(__name__)
 
@@ -34,6 +35,7 @@ def prepare_secure_sql(
     generated_sql: str, user_id: str, project_id: str = "test-project"
 ) -> tuple[str, list[dict[str, Any]]]:
     """Validates, sanitizes, and row-scopes a natural language SQL query with a shadowing CTE."""
+    user_id = validate_user_id(user_id)
     trimmed = strip_comments_and_space(generated_sql)
     if not trimmed:
         raise ValueError("Query cannot be empty.")

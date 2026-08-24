@@ -220,3 +220,23 @@ func TestPrepareSecureSQL(t *testing.T) {
 		})
 	}
 }
+
+func TestPrepareSecureSQL_RejectsInvalidUserID(t *testing.T) {
+	invalidUserIDs := []string{
+		"",
+		"   ",
+		"../traversal",
+		"user/subdoc",
+		"user;DROP TABLE checking_transactions",
+		"user space",
+		"toolong_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+	}
+
+	for _, uid := range invalidUserIDs {
+		_, _, err := PrepareSecureSQL("SELECT * FROM checking_transactions", uid)
+		if err == nil {
+			t.Errorf("expected PrepareSecureSQL to reject invalid user_id %q, got nil error", uid)
+		}
+	}
+}
+

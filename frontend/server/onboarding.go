@@ -36,6 +36,12 @@ func (c *OrchestratorClient) HandleApplyOnboarding(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	if req.UserID != "" {
+		if _, err := validateUserID(req.UserID); err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid user_id parameter"})
+			return
+		}
+	}
 	if len(req.Result) == 0 {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "result is required"})
 		return

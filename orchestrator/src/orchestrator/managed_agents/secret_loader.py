@@ -57,6 +57,18 @@ def _fetch_from_secret_manager(secret_name: str) -> Optional[str]:
     return None
 
 
+def _normalize_agent_id(val: str) -> str:
+    """Ensures agent_id is compatible with interactions API."""
+    trimmed = val.strip()
+    if "/" in trimmed:
+        short = trimmed.split("/")[-1]
+    else:
+        short = trimmed
+    if short in ("portfolio-copilot-worker", "worker", "portfolio-worker"):
+        return DEFAULT_MANAGED_AGENT_ID
+    return short
+
+
 def resolve_managed_agent_id(force_refresh: bool = False) -> str:
     """Resolves MANAGED_AGENT_ID checking env var, Secret Manager, then default."""
     global _CACHED_AGENT_ID
@@ -64,15 +76,8 @@ def resolve_managed_agent_id(force_refresh: bool = False) -> str:
     # 1. Check environment variable first (allows overrides in dev/test/Cloud Run)
     env_val = os.environ.get("MANAGED_AGENT_ID")
     if env_val:
-        if "/" in env_val:
-            short = env_val.split("/")[-1]
-            logger.info(
-                "MANAGED_AGENT_ID truncated from %r to %r for SDK compatibility.",
-                env_val,
-                short,
-            )
-            return short
-        return env_val
+        _CACHED_AGENT_ID = _normalize_agent_id(env_val)
+        return _CACHED_AGENT_ID
 
     if _CACHED_AGENT_ID is not None and not force_refresh:
         return _CACHED_AGENT_ID
@@ -80,16 +85,7 @@ def resolve_managed_agent_id(force_refresh: bool = False) -> str:
     # 2. Check Secret Manager
     sm_val = _fetch_from_secret_manager("MANAGED_AGENT_ID")
     if sm_val:
-        if "/" in sm_val:
-            short = sm_val.split("/")[-1]
-            logger.info(
-                "MANAGED_AGENT_ID truncated from %r to %r for SDK compatibility.",
-                sm_val,
-                short,
-            )
-            _CACHED_AGENT_ID = short
-        else:
-            _CACHED_AGENT_ID = sm_val
+        _CACHED_AGENT_ID = _normalize_agent_id(sm_val)
         return _CACHED_AGENT_ID
 
     # 3. Fall back to placeholder default with clear warning
@@ -98,6 +94,7 @@ def resolve_managed_agent_id(force_refresh: bool = False) -> str:
     )
     _CACHED_AGENT_ID = DEFAULT_MANAGED_AGENT_ID
     return _CACHED_AGENT_ID
+
 
 
 def resolve_alpaca_credentials(force_refresh: bool = False, require: bool = False) -> tuple[str, str]:
@@ -157,6 +154,11 @@ def resolve_alpaca_credentials(force_refresh: bool = False, require: bool = Fals
     return key_id, secret
 
 
+def is_managed_agent_configured() -> bool:
+    """Returns True if MANAGED_AGENT_ID is explicitly provided in env or Secret Manager."""
+    return bool(os.environ.get("MANAGED_AGENT_ID") or _fetch_from_secret_manager("MANAGED_AGENT_ID"))
+
+
 def verify_required_secrets(strict: bool = False) -> None:
     """Verifies at startup that required secrets can be resolved.
 
@@ -174,17 +176,17 @@ def verify_required_secrets(strict: bool = False) -> None:
         )
     )
 
-    agent_id = resolve_managed_agent_id()
-    if is_strict and (not agent_id or agent_id == DEFAULT_MANAGED_AGENT_ID):
+    if is_strict and not is_managed_agent_configured():
         raise SecretLoadError(
-            f"Startup validation failed: MANAGED_AGENT_ID could not be loaded "
-            f"from environment or Secret Manager (got default {DEFAULT_MANAGED_AGENT_ID})."
+            "Startup validation failed: MANAGED_AGENT_ID could not be loaded "
+            "from environment or Secret Manager."
         )
 
     try:
         resolve_alpaca_credentials(require=is_strict)
     except SecretLoadError as e:
         raise SecretLoadError(f"Startup validation failed: {e}") from e
+
 
 
 def clear_cache() -> None:

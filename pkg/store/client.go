@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"regexp"
+	"strings"
 
 	"cloud.google.com/go/firestore"
 	"github.com/xeipuuv/gojsonschema"
@@ -15,6 +17,17 @@ import (
 
 //go:embed schemas/*.schema.json
 var schemaFS embed.FS
+
+var validUserIDRegex = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,64}$`)
+
+// ValidateUserID verifies that a user_id conforms to the safe identifier format ^[a-zA-Z0-9_-]{1,64}$.
+func ValidateUserID(userID string) error {
+	trimmed := strings.TrimSpace(userID)
+	if trimmed == "" || !validUserIDRegex.MatchString(trimmed) {
+		return fmt.Errorf("invalid user_id format: %q", userID)
+	}
+	return nil
+}
 
 // tracer emits child spans for Firestore reads/writes so they nest under the
 // incoming request's server span in Cloud Trace.
