@@ -119,7 +119,13 @@ func SecurityHeadersMiddleware() gin.HandlerFunc {
 		c.Header("X-Frame-Options", "DENY")
 		c.Header("X-XSS-Protection", "1; mode=block")
 		c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
-		c.Header("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https:;")
+		// Allow Google Fonts: the SPA's index.html pulls the Geist / JetBrains Mono
+		// stylesheet from fonts.googleapis.com and the Material Symbols Outlined icon
+		// font files from fonts.gstatic.com. Without these hosts whitelisted the
+		// stylesheet and font faces are blocked, so body/mono text falls back to the
+		// system stack and every material-symbols glyph renders as raw ligature text
+		// (e.g. a spinning "progress_activity" instead of the spinner icon).
+		c.Header("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https:;")
 
 		if c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https" {
 			c.Header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")

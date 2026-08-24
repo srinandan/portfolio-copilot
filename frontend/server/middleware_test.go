@@ -59,7 +59,12 @@ func TestSecurityHeadersMiddleware_DefaultHeaders(t *testing.T) {
 	assert.Equal(t, "DENY", w.Header().Get("X-Frame-Options"))
 	assert.Equal(t, "1; mode=block", w.Header().Get("X-XSS-Protection"))
 	assert.Equal(t, "strict-origin-when-cross-origin", w.Header().Get("Referrer-Policy"))
-	assert.Contains(t, w.Header().Get("Content-Security-Policy"), "default-src 'self'")
+	csp := w.Header().Get("Content-Security-Policy")
+	assert.Contains(t, csp, "default-src 'self'")
+	// Google Fonts must be reachable or the Geist/JetBrains Mono text and the
+	// Material Symbols icon font fail to load (icons render as raw ligature text).
+	assert.Contains(t, csp, "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com")
+	assert.Contains(t, csp, "font-src 'self' data: https://fonts.gstatic.com")
 	assert.Empty(t, w.Header().Get("Strict-Transport-Security"))
 }
 
