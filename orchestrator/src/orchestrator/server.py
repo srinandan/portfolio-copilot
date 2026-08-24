@@ -452,6 +452,36 @@ def _instrument_outbound_http() -> None:
         logger.exception("httpx instrumentation failed; outbound MCP calls will not be traced")
 
 
+def _patch_opentelemetry_context_detach() -> None:
+    """Suppresses upstream OpenTelemetry ValueError on cross-context detach.
+
+    FastAPI/Starlette StreamingResponse yields chunks across async task
+    boundaries. When OpenTelemetry's ASGI middleware runs its cleanup in
+    finally:, ContextVarsRuntimeContext.detach(token) can raise:
+        ValueError: <Token ...> was created in a different Context
+    This is harmless teardown noise that dumps tracebacks to stderr in Agent Runtime.
+    """
+    try:
+        from opentelemetry.context.contextvars_context import ContextVarsRuntimeContext
+
+        orig_detach = ContextVarsRuntimeContext.detach
+        if getattr(orig_detach, "_is_safe_patched", False):
+            return
+
+        def safe_detach(self, token: Any) -> None:
+            try:
+                orig_detach(self, token)
+            except ValueError as exc:
+                if "was created in a different Context" in str(exc):
+                    return
+                raise
+
+        safe_detach._is_safe_patched = True  # type: ignore[attr-defined]
+        ContextVarsRuntimeContext.detach = safe_detach
+    except Exception:
+        logger.exception("Failed to patch OpenTelemetry context detachment")
+
+
 def _init_server_tracing(fastapi_app: FastAPI) -> None:
     """Instrument the FastAPI ingress AND export the orchestrator's spans to Cloud Trace.
 
@@ -484,6 +514,7 @@ def _init_server_tracing(fastapi_app: FastAPI) -> None:
     body context (``_traced_reasoning_stream``). In direct (``ORCHESTRATOR_URL``)
     mode the header always reaches ``/v1/*``, which keep normal ingress spans.
     """
+    _patch_opentelemetry_context_detach()
     if os.environ.get("OTEL_TRACES_ENABLED", "").lower() in ("false", "0"):
         logger.info("FastAPI server-side tracing disabled via OTEL_TRACES_ENABLED")
         return
