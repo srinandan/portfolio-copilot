@@ -1,9 +1,17 @@
 import re
 from typing import List, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
-from .ips import Constraints, Goal, LiquidityNeeds, RebalancingRules, RiskTolerance, TargetAllocation
+from .ips import (
+    Constraints,
+    Goal,
+    LiquidityNeeds,
+    RebalancingRules,
+    RiskTolerance,
+    TargetAllocation,
+    assert_allocations_sum_to_target,
+)
 from .liabilities import Liability
 
 
@@ -35,4 +43,9 @@ class GoalsOnboardingResult(BaseModel):
         if not re.match(r"^[a-zA-Z0-9_-]{1,64}$", trimmed):
             raise ValueError(f"Invalid user_id format: {v!r}")
         return trimmed
+
+    @model_validator(mode="after")
+    def check_allocation_integrity(self) -> "GoalsOnboardingResult":
+        assert_allocations_sum_to_target(self.target_allocation)
+        return self
 

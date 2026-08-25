@@ -661,7 +661,10 @@ func TestUploadDocumentEndpoint_JSONIPS_OverridesBodyUserID(t *testing.T) {
 	srv := &Server{Store: mock}
 	r := setupTestRouterWithServer(srv)
 
-	jsonData := []byte(`{"user_id":"victim_user","ips_id":"ips_1","version":1}`)
+	jsonData := []byte(`{"user_id":"victim_user","ips_id":"ips_1","version":1,` +
+		`"target_allocation":[{"asset_class":"equity","target_percent":60,"min_percent":50,"max_percent":70},` +
+		`{"asset_class":"bonds","target_percent":40,"min_percent":30,"max_percent":50}],` +
+		`"constraints":{"concentration_limit_percent":15}}`)
 	req, _ := createMultipartUpload("file", "ips.json", "ips", "", "demo_user", jsonData)
 
 	w := httptest.NewRecorder()
@@ -676,6 +679,31 @@ func TestUploadDocumentEndpoint_JSONIPS_OverridesBodyUserID(t *testing.T) {
 	}
 	if mock.ips["demo_user"] == nil {
 		t.Fatalf("expected IPS saved under request user 'demo_user'")
+	}
+}
+
+func TestUploadDocumentEndpoint_JSONIPS_RejectsDefangedPolicy(t *testing.T) {
+	// SEC-04 / #355: a direct upload must not be able to install an IPS whose
+	// permissive constraints (here, concentration_limit_percent=100) would neuter
+	// the deterministic reviewer. The integrity floor rejects it with a 400.
+	mock := newMockStore()
+	srv := &Server{Store: mock}
+	r := setupTestRouterWithServer(srv)
+
+	jsonData := []byte(`{"ips_id":"ips_evil","version":1,` +
+		`"target_allocation":[{"asset_class":"equity","target_percent":60,"min_percent":50,"max_percent":70},` +
+		`{"asset_class":"bonds","target_percent":40,"min_percent":30,"max_percent":50}],` +
+		`"constraints":{"concentration_limit_percent":100}}`)
+	req, _ := createMultipartUpload("file", "ips.json", "ips", "", "demo_user", jsonData)
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400 for a defanged IPS, got %d: %s", w.Code, w.Body.String())
+	}
+	if mock.ips["demo_user"] != nil {
+		t.Fatalf("a policy-violating IPS must not be persisted")
 	}
 }
 
@@ -1074,7 +1102,3 @@ func TestHandlers_RejectMalformedUserID(t *testing.T) {
 		}
 	}
 }
-
-
-
-

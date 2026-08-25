@@ -37,8 +37,9 @@ def sample_ips():
         time_horizon_years=10,
         target_allocation=[
             TargetAllocation(asset_class="Equity", target_percent=60.0, min_percent=50.0, max_percent=70.0),
+            TargetAllocation(asset_class="Bonds", target_percent=40.0, min_percent=30.0, max_percent=50.0),
         ],
-        constraints=Constraints(concentration_limit_percent=100.0, excluded_tickers=[]),
+        constraints=Constraints(concentration_limit_percent=50.0, excluded_tickers=[]),
         rebalancing_rules=RebalancingRules(drift_threshold_percent=5.0),
         created_at=datetime.now(timezone.utc),
     )
@@ -50,9 +51,9 @@ def sample_holdings():
         user_id="user_123",
         as_of=datetime.now(timezone.utc),
         positions=[
-            Position(ticker="VTI", quantity=1000, asset_class="Equity", market_value_usd=80000.0),
+            Position(ticker="VTI", quantity=1000, asset_class="Equity", market_value_usd=20000.0),
         ],
-        cash_usd=20000.0,
+        cash_usd=80000.0,
         total_value_usd=100000.0,
     )
 

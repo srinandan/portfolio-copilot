@@ -10,7 +10,7 @@ from google.adk.sessions.in_memory_session_service import InMemorySessionService
 from google.adk.workflow import Workflow, node
 from google.genai.types import Part, UserContent
 
-from src.orchestrator.contracts import Goal, GoalsOnboardingResult, RiskTolerance
+from src.orchestrator.contracts import Goal, GoalsOnboardingResult, RiskTolerance, TargetAllocation
 from src.orchestrator.planner import root_planner
 from src.orchestrator.registry_client import Skill
 
@@ -225,7 +225,10 @@ async def test_root_planner_json_input():
             primary_goal=Goal(name="Retirement", target_amount_usd=1000000.0, target_date="2045-01-01"),
             risk_tolerance=RiskTolerance.MODERATE,
             time_horizon_years=10,
-            target_allocation=[],
+            target_allocation=[
+                TargetAllocation(asset_class="equity", target_percent=60, min_percent=50, max_percent=70),
+                TargetAllocation(asset_class="bonds", target_percent=40, min_percent=30, max_percent=50),
+            ],
             interview_summary="Goals onboarding complete",
         )
 
@@ -286,7 +289,10 @@ async def test_root_planner_dispatches_goals_onboarding_with_realistic_name():
             primary_goal=Goal(name="Retirement", target_amount_usd=1000000.0, target_date="2045-01-01"),
             risk_tolerance=RiskTolerance.MODERATE,
             time_horizon_years=10,
-            target_allocation=[],
+            target_allocation=[
+                TargetAllocation(asset_class="equity", target_percent=60, min_percent=50, max_percent=70),
+                TargetAllocation(asset_class="bonds", target_percent=40, min_percent=30, max_percent=50),
+            ],
             interview_summary="Goals onboarding complete",
         )
 
@@ -1056,7 +1062,10 @@ async def test_root_planner_threads_registry_entry_id_to_goals_onboarding_write(
             primary_goal=Goal(name="House", target_amount_usd=200000.0, target_date="2030-01-01"),
             risk_tolerance=RiskTolerance.MODERATE,
             time_horizon_years=5,
-            target_allocation=[],
+            target_allocation=[
+                TargetAllocation(asset_class="equity", target_percent=60, min_percent=50, max_percent=70),
+                TargetAllocation(asset_class="bonds", target_percent=40, min_percent=30, max_percent=50),
+            ],
             interview_summary="Onboarding complete",
         )
 
@@ -1125,7 +1134,10 @@ async def test_reviewer_postprocess_populates_context(mock_emit, mock_fs_cls):
         effective_date="2026-01-01",
         risk_tolerance=RiskTolerance.MODERATE,
         time_horizon_years=10,
-        target_allocation=[TargetAllocation(asset_class="Equity", target_percent=60, min_percent=50, max_percent=70)],
+        target_allocation=[
+            TargetAllocation(asset_class="Equity", target_percent=60, min_percent=50, max_percent=70),
+            TargetAllocation(asset_class="Bonds", target_percent=40, min_percent=30, max_percent=50),
+        ],
         constraints=Constraints(concentration_limit_percent=15, excluded_tickers=[], excluded_sectors=[]),
         approval_required_above_usd=25000.0,
         approval_required_above_percent=20.0,
@@ -1216,7 +1228,10 @@ async def test_reviewer_build_input_mirrors_preloaded_state_into_input_dict(
         effective_date=date(2026, 1, 1),
         risk_tolerance=RiskTolerance.MODERATE,
         time_horizon_years=10,
-        target_allocation=[TargetAllocation(asset_class="Equity", target_percent=60, min_percent=50, max_percent=70)],
+        target_allocation=[
+            TargetAllocation(asset_class="Equity", target_percent=60, min_percent=50, max_percent=70),
+            TargetAllocation(asset_class="Bonds", target_percent=40, min_percent=30, max_percent=50),
+        ],
         constraints=Constraints(concentration_limit_percent=15, excluded_tickers=[], excluded_sectors=[]),
         approval_required_above_usd=25000.0,
         approval_required_above_percent=20.0,
@@ -1302,15 +1317,18 @@ async def test_action_drafting_stamps_active_ips_version_from_rationale(mock_pre
         effective_date=date(2026, 1, 1),
         risk_tolerance=RiskTolerance.MODERATE,
         time_horizon_years=10,
-        target_allocation=[TargetAllocation(asset_class="Equity", target_percent=60, min_percent=50, max_percent=70)],
-        constraints=Constraints(concentration_limit_percent=90, excluded_tickers=[], excluded_sectors=[]),
+        target_allocation=[
+            TargetAllocation(asset_class="Equity", target_percent=60, min_percent=50, max_percent=70),
+            TargetAllocation(asset_class="Bonds", target_percent=40, min_percent=30, max_percent=50),
+        ],
+        constraints=Constraints(concentration_limit_percent=50, excluded_tickers=[], excluded_sectors=[]),
         created_at=datetime.now(timezone.utc),
     )
     fake_holdings = HoldingsSnapshot(
         user_id="user_ad",
         as_of=datetime.now(timezone.utc),
-        positions=[Position(ticker="AAPL", quantity=100, asset_class="Equity", market_value_usd=80000.0)],
-        cash_usd=20000.0,
+        positions=[Position(ticker="AAPL", quantity=100, asset_class="Equity", market_value_usd=40000.0)],
+        cash_usd=60000.0,
         total_value_usd=100000.0,
     )
     preload_fs = mock_preload_fs_cls.return_value
@@ -1568,7 +1586,10 @@ async def test_postprocess_goals_onboarding_adds_adk_event_to_memory(mock_write)
         primary_goal=Goal(name="Retirement", target_amount_usd=1000000.0, target_date="2045-01-01"),
         risk_tolerance=RiskTolerance.MODERATE,
         time_horizon_years=10,
-        target_allocation=[],
+        target_allocation=[
+            TargetAllocation(asset_class="equity", target_percent=60, min_percent=50, max_percent=70),
+            TargetAllocation(asset_class="bonds", target_percent=40, min_percent=30, max_percent=50),
+        ],
         interview_summary="User seeks moderate growth over 10 years.",
     )
 
