@@ -44,6 +44,11 @@ from pydantic import BaseModel, field_validator
 
 from .contracts.goals_onboarding import GoalsOnboardingResult
 from .data.validation import validate_user_id
+from .guardrails import (
+    build_model_armor_plugin,
+    guardrail_block_frame,
+    wire_is_model_armor_block,
+)
 from .logger import get_logger
 from .planner import root_agent
 from .progress import PROGRESS_CHANNEL
@@ -181,11 +186,17 @@ async def _lifespan(_app: FastAPI):
 
     state.session_manager = SessionManager()
 
+    # Optional Model Armor runtime guardrail (ADR-0026). Default OFF: returns
+    # None unless MODEL_ARMOR_PLUGIN_ENABLED is set and a template is configured,
+    # so a fresh deploy is unaffected. Complements the project floor settings.
+    guardrail_plugins = [p for p in (build_model_armor_plugin(),) if p is not None]
+
     state.runner = Runner(
         app_name=APP_NAME,
         agent=root_agent,
         session_service=state.session_manager.session_service,
         memory_service=state.session_manager.memory_service,
+        plugins=guardrail_plugins or None,
         auto_create_session=True,
     )
     state.ready = True
@@ -618,7 +629,15 @@ async def _interleave_progress(events: AsyncIterator[Any]) -> AsyncIterator[Dict
     async def _drain_runner() -> None:
         try:
             async for event in events:
-                queue.put_nowait(_event_to_wire(event))
+                wire = _event_to_wire(event)
+                queue.put_nowait(wire)
+                # A Model Armor block surfaces as an LlmResponse with a
+                # custom_metadata flag (ADR-0026). Emit an advisory guardrail
+                # frame alongside it so the UI can render a block notice; the
+                # governance audit log is untouched.
+                if wire_is_model_armor_block(wire):
+                    logger.warning("Model Armor blocked a turn (author=%s)", wire.get("author"))
+                    queue.put_nowait(guardrail_block_frame(wire))
         except Exception as e:
             # Logged here (with traceback) for operators; forwarded to the client
             # as an error frame by the framing layer below.
