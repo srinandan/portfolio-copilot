@@ -38,19 +38,21 @@ def _clear_ma_env(monkeypatch):
 # --- build_model_armor_plugin ------------------------------------------------
 
 
-def test_disabled_by_default_returns_none():
-    """Fresh deploy: no env -> no plugin, Runner runs unguarded by this layer."""
+def test_no_template_returns_none_even_though_enabled_by_default():
+    """Fresh deploy: enabled by default, but no template configured -> no plugin.
+    The layer stays inert until templates are provisioned."""
     assert build_model_armor_plugin() is None
 
 
-def test_enabled_but_unconfigured_returns_none(monkeypatch):
-    """Opt-in flag with no template configured degrades to no runtime guardrail."""
-    monkeypatch.setenv("MODEL_ARMOR_PLUGIN_ENABLED", "true")
+def test_explicitly_disabled_returns_none(monkeypatch):
+    """MODEL_ARMOR_PLUGIN_ENABLED=false disables even when a template is set."""
+    monkeypatch.setenv("MODEL_ARMOR_PLUGIN_ENABLED", "false")
+    monkeypatch.setenv("MODEL_ARMOR_PROMPT_TEMPLATE", "projects/p/locations/us-central1/templates/t")
     assert build_model_armor_plugin() is None
 
 
-def test_enabled_with_full_template_names(monkeypatch):
-    monkeypatch.setenv("MODEL_ARMOR_PLUGIN_ENABLED", "1")
+def test_enabled_by_default_with_full_template_names(monkeypatch):
+    """No enable flag needed: a configured template activates the guardrail."""
     prompt = "projects/p/locations/us-central1/templates/prompt-tpl"
     response = "projects/p/locations/us-central1/templates/response-tpl"
     monkeypatch.setenv("MODEL_ARMOR_PROMPT_TEMPLATE", prompt)
@@ -62,6 +64,7 @@ def test_enabled_with_full_template_names(monkeypatch):
     # Config is carried on the plugin; confirm both templates round-tripped.
     assert plugin._config.prompt_template_name == prompt
     assert plugin._config.response_template_name == response
+    # Detection blocks the turn, and screening failures block too (fail-closed).
     assert plugin._config.block_on_screening_failure is True
 
 

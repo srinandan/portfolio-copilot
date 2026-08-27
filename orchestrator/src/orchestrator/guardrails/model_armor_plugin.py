@@ -16,10 +16,12 @@ Two layers, one config source:
   onto the Runner. Needs regional Model Armor *template* resources, created by
   ``scripts/setup_model_armor_templates.py``.
 
-Default OFF. :func:`build_model_armor_plugin` returns ``None`` unless
-``MODEL_ARMOR_PLUGIN_ENABLED`` is truthy *and* at least one template is
-configured, so nothing changes until an operator opts in — the plugin is inert
-on a fresh deploy.
+Default ON. :func:`build_model_armor_plugin` builds the plugin whenever at least
+one template is configured, *unless* ``MODEL_ARMOR_PLUGIN_ENABLED`` is explicitly
+false. A deploy with no template configured is still inert (returns ``None``),
+so the guardrail activates automatically once the templates exist without an
+operator having to flip a separate enable flag. On a match the plugin blocks the
+turn (detection → block); there is no redaction/de-identify path.
 
 Block signalling. A block surfaces as an ``LlmResponse`` carrying
 ``custom_metadata={"model_armor_blocked": True}``; the streaming layer
@@ -109,19 +111,18 @@ def build_model_armor_plugin() -> Optional["BasePlugin"]:
     degrades to "no runtime guardrail" and is logged, so the floor-settings
     backstop still applies and the server still starts.
     """
-    if not _env_bool(ENABLED_ENV):
-        logger.info("Model Armor runtime plugin disabled (%s not set).", ENABLED_ENV)
+    if not _env_bool(ENABLED_ENV, default=True):
+        logger.info("Model Armor runtime plugin explicitly disabled (%s is false).", ENABLED_ENV)
         return None
 
     prompt_template = _resolve_template(PROMPT_TEMPLATE_ENV, PROMPT_TEMPLATE_ID_ENV)
     response_template = _resolve_template(RESPONSE_TEMPLATE_ENV, RESPONSE_TEMPLATE_ID_ENV)
 
     if not prompt_template and not response_template:
-        logger.warning(
-            "%s is enabled but no Model Armor template is configured "
+        logger.info(
+            "Model Armor runtime plugin is enabled by default but no template is configured "
             "(set %s / %s or the *_TEMPLATE_ID + %s convenience vars); "
-            "running without the runtime guardrail.",
-            ENABLED_ENV,
+            "running without the runtime guardrail until templates are provisioned.",
             PROMPT_TEMPLATE_ENV,
             RESPONSE_TEMPLATE_ENV,
             LOCATION_ENV,

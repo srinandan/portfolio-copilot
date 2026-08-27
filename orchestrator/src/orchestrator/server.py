@@ -190,9 +190,10 @@ async def _lifespan(_app: FastAPI):
 
     state.session_manager = SessionManager()
 
-    # Optional Model Armor runtime guardrail (ADR-0026). Default OFF: returns
-    # None unless MODEL_ARMOR_PLUGIN_ENABLED is set and a template is configured,
-    # so a fresh deploy is unaffected. Complements the project floor settings.
+    # Model Armor runtime guardrail (ADR-0032). Enabled by default: activates
+    # once templates are configured (returns None if none are, or if
+    # MODEL_ARMOR_PLUGIN_ENABLED is explicitly false). Complements the project
+    # floor settings.
     guardrail_plugins = [p for p in (build_model_armor_plugin(),) if p is not None]
 
     state.runner = Runner(

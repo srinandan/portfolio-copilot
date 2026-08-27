@@ -18,9 +18,9 @@ So this script provisions two things, in order:
   2. the regional Model Armor prompt/response templates whose `sdpSettings`
      reference that inspect template via `advancedConfig`.
 
-After running, enable the runtime guardrail with:
+The runtime guardrail is ON by default; it activates as soon as you point it at
+the templates (set MODEL_ARMOR_PLUGIN_ENABLED=false to turn it off):
 
-    export MODEL_ARMOR_PLUGIN_ENABLED=true
     export MODEL_ARMOR_LOCATION=<location>
     export MODEL_ARMOR_PROMPT_TEMPLATE_ID=<prompt template id>
     export MODEL_ARMOR_RESPONSE_TEMPLATE_ID=<response template id>
@@ -285,11 +285,11 @@ def main(argv: Optional[list[str]] = None) -> int:
             result = create_or_update_template(project_id, args.location, tid, filter_config)
             print(json.dumps(result, indent=2))
 
-        print("\nDone. Enable the runtime guardrail with:")
-        print("  export MODEL_ARMOR_PLUGIN_ENABLED=true")
+        print("\nDone. The guardrail is ON by default; point it at these templates with:")
         print(f"  export MODEL_ARMOR_LOCATION={args.location}")
         print(f"  export MODEL_ARMOR_PROMPT_TEMPLATE_ID={args.prompt_template_id}")
         print(f"  export MODEL_ARMOR_RESPONSE_TEMPLATE_ID={args.response_template_id}")
+        print("  # (set MODEL_ARMOR_PLUGIN_ENABLED=false to disable)")
         return 0
     except Exception as e:
         print(f"Error managing Model Armor templates: {e}", file=sys.stderr)
