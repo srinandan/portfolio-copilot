@@ -170,18 +170,40 @@ async def test_plugin_block_is_detected_by_wire_helper(monkeypatch):
 # --- setup script filter config ----------------------------------------------
 
 
-def test_setup_script_filter_config_mirrors_floor_policy():
+def _load_setup_script():
     scripts_dir = Path(__file__).resolve().parent.parent.parent / "scripts"
     sys.path.insert(0, str(scripts_dir))
     import setup_model_armor_templates
 
-    cfg = setup_model_armor_templates.build_filter_config()
-    assert cfg["piAndJailbreakFilterSettings"]["filterEnforcement"] == "ENABLED"
-    assert cfg["maliciousUriFilterSettings"]["filterEnforcement"] == "ENABLED"
-    assert cfg["sdpSettings"]["basicConfig"]["filterEnforcement"] == "ENABLED"
-    assert {f["filterType"] for f in cfg["raiSettings"]["raiFilters"]} == {
-        "HATE_SPEECH",
-        "DANGEROUS",
-        "SEXUALLY_EXPLICIT",
-        "HARASSMENT",
-    }
+    return setup_model_armor_templates
+
+
+def test_setup_script_template_uses_advanced_sdp_only():
+    """Layer 2 (ADR-0032) is advanced SDP referencing the DLP inspect template,
+    and must NOT duplicate the broad floor filters (RAI/PI/URI/basic SDP)."""
+    mod = _load_setup_script()
+    inspect_name = "projects/p/locations/us-central1/inspectTemplates/portfolio-copilot-pii"
+
+    cfg = mod.build_filter_config(inspect_name)
+
+    assert cfg["sdpSettings"]["advancedConfig"]["inspectTemplate"] == inspect_name
+    # Broad policy stays with the floor (ADR-0025); the template does not repeat it.
+    assert "raiSettings" not in cfg
+    assert "piAndJailbreakFilterSettings" not in cfg
+    assert "maliciousUriFilterSettings" not in cfg
+    assert "basicConfig" not in cfg["sdpSettings"]
+
+
+def test_setup_script_dlp_inspect_config_targets_financial_pii():
+    """The DLP inspect template declares the specific financial PII infoTypes."""
+    mod = _load_setup_script()
+
+    inspect = mod.build_dlp_inspect_config()
+
+    names = {it["name"] for it in inspect["infoTypes"]}
+    assert "US_SOCIAL_SECURITY_NUMBER" in names
+    assert "CREDIT_CARD_NUMBER" in names
+    assert "US_BANK_ROUTING_MICR" in names
+    # Never echo the matched value back in findings.
+    assert inspect["includeQuote"] is False
+    assert inspect["minLikelihood"] == "POSSIBLE"

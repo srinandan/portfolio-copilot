@@ -14,9 +14,9 @@ Model Armor **templates** are a different primitive from **floor settings**: tem
 
 ## Decision
 
-1. **Two complementary layers, one policy.**
-   - **Floor settings** (ADR-0025) remain the always-on project backstop, provisioned by `scripts/model_armor_floor_settings.py`.
-   - **The runtime plugin** adds a per-request layer wired onto the `Runner` in `orchestrator/src/orchestrator/server.py`. The template filter config created by `scripts/setup_model_armor_templates.py` mirrors the floor-settings policy (RAI at `HIGH`, PI/jailbreak at `MEDIUM_AND_ABOVE`, SDP `ENABLED`, malicious-URI `ENABLED`) so both layers enforce the same rules.
+1. **Two complementary layers, split by scope — broad vs. specific.**
+   - **Layer 1 — floor settings** (ADR-0025) remain the always-on, project-wide backstop: the *broad* policy — Responsible AI / abuse, prompt-injection & jailbreak, malicious-URI, and basic SDP. Provisioned by `scripts/model_armor_floor_settings.py`.
+   - **Layer 2 — the runtime plugin's template** adds a *per-request* layer wired onto the `Runner` in `orchestrator/src/orchestrator/server.py`, and owns the *specifics*. The template created by `scripts/setup_model_armor_templates.py` uses **advanced SDP** (`sdpSettings.advancedConfig`) referencing a **Cloud DLP inspect template** that declares the exact financial-PII infoTypes we care about — `US_SOCIAL_SECURITY_NUMBER`, `CREDIT_CARD_NUMBER`, `US_BANK_ROUTING_MICR`, `IBAN_CODE`, `US_INDIVIDUAL_TAXPAYER_IDENTIFICATION_NUMBER` — at a tunable likelihood. It deliberately does **not** repeat the broad RAI/PI/malicious-URI filters; the floor owns those, so the two layers divide the work rather than duplicate it. The setup script provisions the DLP inspect template first, then the Model Armor prompt/response templates that reference it (both regional, sharing one location).
 
 2. **Default OFF, opt-in via environment.** `orchestrator/src/orchestrator/guardrails/model_armor_plugin.py` builds the plugin only when `MODEL_ARMOR_PLUGIN_ENABLED` is truthy **and** at least one template is configured (full resource name in `MODEL_ARMOR_PROMPT_TEMPLATE` / `MODEL_ARMOR_RESPONSE_TEMPLATE`, or assembled from `MODEL_ARMOR_LOCATION` + `*_TEMPLATE_ID`). Otherwise `build_model_armor_plugin()` returns `None` and the Runner is constructed without it. A fresh deploy is unaffected; misconfiguration degrades to "no runtime guardrail" (logged), never a failed startup.
 
@@ -28,5 +28,7 @@ Model Armor **templates** are a different primitive from **floor settings**: tem
 
 - **Positive:** Per-request, in-Runtime enforcement on the sensitive planning path, with the block visible on the orchestrator's own SSE stream so the UI can render a notice.
 - **Positive:** Rollout is safe and reversible — a single env flag, inert until templates exist.
-- **Neutral:** Requires regional Model Armor **template** resources (new infra beyond the global floor settings) created via `scripts/setup_model_armor_templates.py`; templates must share one location per client.
+- **Positive:** No duplicated policy — the floor owns broad enforcement, the template owns specific PII detection, so tuning one layer doesn't drift from the other.
+- **Neutral:** Requires two new regional resources (beyond the global floor settings), both created by `scripts/setup_model_armor_templates.py` and sharing one location: a **Cloud DLP inspect template** (the infoType list) and the **Model Armor templates** that reference it via advanced SDP.
+- **Neutral:** Detection-only for now — the template references a DLP *inspect* template (block on match), not a *de-identify* template; redaction/masking of PII instead of blocking is a future option.
 - **Follow-up:** Promoting a guardrail block to a first-class `GUARDRAIL_BLOCKED` audit `EventType` — which spans the Python (`contracts/audit_log.py`) and Go (`pkg/contracts/audit_log.go`) governance contracts — is intentionally deferred and tracked separately, so this change stays confined to the Python orchestrator.
