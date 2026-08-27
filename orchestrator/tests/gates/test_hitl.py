@@ -216,18 +216,24 @@ async def test_gate_reject_returns_rejected_decision(
     )
     response_part.function_response.id = interrupt_id
 
-    events2 = await _run_runner(
-        runner,
-        "test_session",
-        response_part,
-        invocation_id=last_event.invocation_id,
-    )
+    # Capture the audit emission for the resume turn: the reject path must write
+    # the immutable audit trail (ADR-0005), and this end-to-end resume through the
+    # real Runner is our regression lock for reject propagating across the
+    # request-input boundary (the closest analogue to a future A2A hop; see #366).
+    with patch("orchestrator.gates.hitl.emit_approval_rejected_audit") as mock_reject_audit:
+        events2 = await _run_runner(
+            runner,
+            "test_session",
+            response_part,
+            invocation_id=last_event.invocation_id,
+        )
 
     final_event = events2[-1]
     result = final_event.output
     assert result["outcome"] == HITLOutcome.REJECTED.value
     assert result["reason"] == "too risky"
     mock_firestore_client.update_proposed_action_status.assert_called_once_with("act-test-123", ActionStatus.REJECTED)
+    mock_reject_audit.assert_called_once()
 
 
 @pytest.mark.asyncio
