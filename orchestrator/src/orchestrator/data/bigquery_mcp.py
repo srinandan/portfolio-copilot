@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import httpx
@@ -190,6 +191,84 @@ def _decode_bigquery_mcp_rows(data: Dict[str, Any]) -> List[Dict[str, Any]]:
                 row_dict[col] = None
         decoded.append(row_dict)
     return decoded
+
+
+def _bq_string_literal(s: str) -> str:
+    """Renders a Python str as a safe single-quoted BigQuery string literal.
+
+    Backslash-escapes the escape character, the closing quote, and control
+    characters, and drops embedded NUL, so the value cannot terminate its
+    literal early. A value like ``o'brien`` or ``'; DROP TABLE x; --`` stays
+    inert text inside the quotes.
+    """
+    escaped = (
+        s.replace("\\", "\\\\")
+        .replace("'", "\\'")
+        .replace("\n", "\\n")
+        .replace("\r", "\\r")
+        .replace("\t", "\\t")
+        .replace("\x00", "")
+    )
+    return f"'{escaped}'"
+
+
+def _encode_bq_literal(value: Any, type_: str) -> str:
+    """Encodes a query-parameter value as a safe, type-checked BigQuery literal.
+
+    Numeric/bool types are validated (a non-numeric value for an INT/FLOAT
+    parameter is rejected rather than pasted in raw), and everything else is
+    rendered as an escaped string literal. This replaces raw ``f"'{value}'"``
+    interpolation, which let a crafted value break out of its literal.
+    """
+    if value is None:
+        return "NULL"
+    t = (type_ or "STRING").upper()
+    if t in ("INT64", "INTEGER"):
+        try:
+            return str(int(value))
+        except (TypeError, ValueError) as e:
+            raise ValueError(f"parameter value {value!r} is not a valid {t}") from e
+    if t in ("FLOAT64", "FLOAT", "NUMERIC", "BIGNUMERIC"):
+        try:
+            return repr(float(value))
+        except (TypeError, ValueError) as e:
+            raise ValueError(f"parameter value {value!r} is not a valid {t}") from e
+    if t in ("BOOL", "BOOLEAN"):
+        if isinstance(value, bool):
+            return "TRUE" if value else "FALSE"
+        return "TRUE" if str(value).strip().lower() == "true" else "FALSE"
+    # STRING and any unrecognized type fall back to a safely escaped literal.
+    return _bq_string_literal(str(value))
+
+
+def _resolve_query_parameters(query: str, query_parameters: Optional[List[Dict[str, Any]]]) -> str:
+    """Substitutes ``@named`` parameters with safe BigQuery literals in one pass.
+
+    A single :func:`re.sub` pass (the replacement function's output is never
+    re-scanned) means a value that itself contains an ``@token`` cannot be
+    reinterpreted as another parameter, and each ``@name`` is encoded exactly
+    once — closing the ordering/double-substitution hole in the previous
+    sequential loop. Unknown ``@tokens`` are left intact.
+    """
+    if not query_parameters:
+        return query
+
+    param_by_name: Dict[str, Dict[str, Any]] = {}
+    for p in query_parameters:
+        name = p.get("name")
+        if name:
+            param_by_name[name] = p
+
+    def _replace(match: "re.Match[str]") -> str:
+        name = match.group(1)
+        p = param_by_name.get(name)
+        if p is None:
+            return match.group(0)
+        value = p.get("parameterValue", {}).get("value")
+        ptype = p.get("parameterType", {}).get("type", "STRING")
+        return _encode_bq_literal(value, ptype)
+
+    return re.sub(r"@(\w+)", _replace, query)
 
 
 class BigQueryMCPClient:
@@ -383,21 +462,19 @@ class BigQueryMCPClient:
         query_parameters: Optional[List[Dict[str, Any]]] = None,
         maximum_bytes_billed: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
-        """Executes a read-only SQL query via BigQuery Remote MCP Server."""
-        import re
+        """Executes a read-only SQL query via BigQuery Remote MCP Server.
 
+        The remote ``execute_sql_readonly`` tool accepts only a query string, so
+        named ``query_parameters`` are resolved into the SQL here. Values are
+        encoded as safe, type-checked BigQuery literals (see
+        :func:`_resolve_query_parameters`) rather than string-formatted in, so a
+        value containing a quote, semicolon, or ``UNION`` cannot break out of its
+        literal. This preserves the parameterization guarantee the callers in
+        ``bigquery.py`` rely on (ADR-0029) end-to-end on the MCP path, matching
+        the direct-SDK path's bound ``ScalarQueryParameter`` semantics.
+        """
         target_project = project_id or self.project
-        resolved_query = query
-        if query_parameters:
-            for p in query_parameters:
-                p_name = p.get("name")
-                p_val = p.get("parameterValue", {}).get("value")
-                if p_name and p_val is not None:
-                    p_type = p.get("parameterType", {}).get("type", "STRING")
-                    if p_type == "STRING":
-                        resolved_query = re.sub(rf"@{p_name}\b", f"'{p_val}'", resolved_query)
-                    else:
-                        resolved_query = re.sub(rf"@{p_name}\b", str(p_val), resolved_query)
+        resolved_query = _resolve_query_parameters(query, query_parameters)
 
         args: Dict[str, Any] = {
             "query": resolved_query,
