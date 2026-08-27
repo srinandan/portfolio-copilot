@@ -181,20 +181,19 @@ def _load_setup_script():
     return setup_model_armor_templates
 
 
-def test_setup_script_template_uses_advanced_sdp_only():
-    """Layer 2 (ADR-0032) is advanced SDP referencing the DLP inspect template,
-    and must NOT duplicate the broad floor filters (RAI/PI/URI/basic SDP)."""
+def test_setup_script_template_combines_advanced_sdp_with_floor_conformance():
+    """Layer 2 (ADR-0032) combines advanced SDP referencing the DLP inspect template
+    with floor-conforming filters (RAI, PI/jailbreak, URI) required by Model Armor."""
     mod = _load_setup_script()
     inspect_name = "projects/p/locations/us-central1/inspectTemplates/portfolio-copilot-pii"
 
     cfg = mod.build_filter_config(inspect_name)
 
     assert cfg["sdpSettings"]["advancedConfig"]["inspectTemplate"] == inspect_name
-    # Broad policy stays with the floor (ADR-0025); the template does not repeat it.
-    assert "raiSettings" not in cfg
-    assert "piAndJailbreakFilterSettings" not in cfg
-    assert "maliciousUriFilterSettings" not in cfg
-    assert "basicConfig" not in cfg["sdpSettings"]
+    assert "raiSettings" in cfg
+    assert "piAndJailbreakFilterSettings" in cfg
+    assert "maliciousUriFilterSettings" in cfg
+    assert cfg["piAndJailbreakFilterSettings"]["filterEnforcement"] == "ENABLED"
 
 
 def test_setup_script_dlp_inspect_config_targets_financial_pii():

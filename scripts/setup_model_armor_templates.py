@@ -66,16 +66,20 @@ def _dlp_base_url() -> str:
     return "https://dlp.googleapis.com/v2"
 
 
-def get_auth_headers() -> Dict[str, str]:
+def get_auth_headers(project_id: Optional[str] = None) -> Dict[str, str]:
     """Generates bearer authorization headers from Application Default Credentials."""
     creds, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
     if not creds.valid:
         creds.refresh(Request())
-    return {
+    headers = {
         "Authorization": f"Bearer {creds.token}",
         "Content-Type": "application/json",
         "Accept": "application/json",
     }
+    proj = project_id or get_default_project()
+    if proj:
+        headers["X-Goog-User-Project"] = proj
+    return headers
 
 
 def get_default_project() -> str:
@@ -118,7 +122,7 @@ def get_dlp_inspect_template(project_id: str, location: str, template_id: str, t
     name = dlp_inspect_template_name(project_id, location, template_id)
     url = f"{_dlp_base_url()}/{name}"
     with httpx.Client(timeout=timeout) as client:
-        resp = client.get(url, headers=get_auth_headers())
+        resp = client.get(url, headers=get_auth_headers(project_id))
         if resp.status_code == 404:
             return {}
         resp.raise_for_status()
@@ -138,7 +142,7 @@ def create_or_update_dlp_inspect_template(
     Returns the template resource (its ``name`` is what the Model Armor template
     references via ``sdpSettings.advancedConfig.inspectTemplate``).
     """
-    headers = get_auth_headers()
+    headers = get_auth_headers(project_id)
     parent = f"projects/{project_id}/locations/{location}"
     inspect_config = build_dlp_inspect_config(info_types=info_types, min_likelihood=min_likelihood)
     existing = get_dlp_inspect_template(project_id, location, template_id, timeout=timeout)
@@ -164,19 +168,37 @@ def create_or_update_dlp_inspect_template(
 # --- Model Armor templates (reference the DLP inspect template) --------------
 
 
-def build_filter_config(inspect_template_name: str) -> Dict[str, Any]:
-    """Builds the Model Armor template filter config (layer 2, ADR-0032).
+def build_filter_config(
+    inspect_template_name: str,
+    rai_confidence: str = "HIGH",
+    pi_confidence: str = "MEDIUM_AND_ABOVE",
+) -> Dict[str, Any]:
+    """Builds the Model Armor template filter config.
 
-    Advanced SDP only: the template's job is the *specifics* (SSN, card, bank
-    routing, ...) via the referenced DLP inspect template. The broad RAI /
-    PI-jailbreak / malicious-URI filters are intentionally omitted — the project
-    floor settings (ADR-0025) own those, so we don't duplicate them per request.
+    Combines advanced SDP (referencing the DLP inspect template) with floor-conforming
+    RAI, PI/jailbreak, and malicious URI filters. Model Armor validates that template
+    filter settings conform to (match or exceed) active floor settings.
     """
     return {
+        "raiSettings": {
+            "raiFilters": [
+                {"filterType": "HATE_SPEECH", "confidenceLevel": rai_confidence.upper()},
+                {"filterType": "DANGEROUS", "confidenceLevel": rai_confidence.upper()},
+                {"filterType": "SEXUALLY_EXPLICIT", "confidenceLevel": rai_confidence.upper()},
+                {"filterType": "HARASSMENT", "confidenceLevel": rai_confidence.upper()},
+            ]
+        },
         "sdpSettings": {
             "advancedConfig": {
                 "inspectTemplate": inspect_template_name,
             }
+        },
+        "piAndJailbreakFilterSettings": {
+            "filterEnforcement": "ENABLED",
+            "confidenceLevel": pi_confidence.upper(),
+        },
+        "maliciousUriFilterSettings": {
+            "filterEnforcement": "ENABLED",
         },
     }
 
@@ -186,7 +208,7 @@ def get_template(project_id: str, location: str, template_id: str, timeout: floa
     name = f"projects/{project_id}/locations/{location}/templates/{template_id}"
     url = f"{_model_armor_base_url(location)}/{name}"
     with httpx.Client(timeout=timeout) as client:
-        resp = client.get(url, headers=get_auth_headers())
+        resp = client.get(url, headers=get_auth_headers(project_id))
         if resp.status_code == 404:
             return {}
         resp.raise_for_status()
@@ -201,7 +223,7 @@ def create_or_update_template(
     timeout: float = 30.0,
 ) -> Dict[str, Any]:
     """Creates the Model Armor template, or updates its filter config if present."""
-    headers = get_auth_headers()
+    headers = get_auth_headers(project_id)
     parent = f"projects/{project_id}/locations/{location}"
     name = f"{parent}/templates/{template_id}"
     payload = {"filterConfig": filter_config}

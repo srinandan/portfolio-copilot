@@ -30,7 +30,9 @@ from typing import Any
 
 import click
 import google.auth
+import httpx
 import vertexai
+from google.auth.transport.requests import Request
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -138,12 +140,43 @@ def describe_engine(project: str | None, location: str, engine: str) -> None:
 @click.option("--engine", required=True, help="Resource name or display_name.")
 @click.option("--input", "user_input", required=True, help="Message to send to the agent.")
 def query_engine(project: str | None, location: str, engine: str, user_input: str) -> None:
-    """Send a synchronous query to an Agent Engine."""
+    """Send a query to an Agent Engine."""
     project = _resolve_project(project)
     client = _get_client(project, location)
     resolved = _resolve_engine(client, engine)
-    response = resolved.query(input=user_input)
-    click.echo(json.dumps(_to_jsonable(response), indent=2, default=str))
+    query_fn = getattr(resolved, "query", None)
+    if callable(query_fn):
+        try:
+            response = query_fn(input=user_input)
+            click.echo(json.dumps(_to_jsonable(response), indent=2, default=str))
+            return
+        except (AttributeError, TypeError):
+            pass
+
+    # For container-based ReasoningEngines, invoke via the Vertex AI REST endpoint.
+    name = resolved.api_resource.name
+    creds, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
+    if not creds.valid:
+        creds.refresh(Request())
+    headers = {
+        "Authorization": f"Bearer {creds.token}",
+        "Content-Type": "application/json",
+    }
+    url = f"https://{location}-aiplatform.googleapis.com/v1beta1/{name}:streamQuery"
+    payload = {
+        "class_method": "invoke",
+        "input": {
+            "user_id": "demo_user",
+            "message": user_input,
+        },
+    }
+    with httpx.Client(timeout=120.0) as http_client:
+        resp = http_client.post(url, headers=headers, json=payload)
+        resp.raise_for_status()
+        for line in resp.text.splitlines():
+            line = line.strip()
+            if line:
+                click.echo(line)
 
 
 @cli.command("delete")
