@@ -42,6 +42,7 @@ from google.adk.runners import Runner
 from google.genai.types import Part, UserContent
 from pydantic import BaseModel, field_validator
 
+from .adk_telemetry import build_adk_run_config
 from .contracts.goals_onboarding import GoalsOnboardingResult
 from .data.validation import validate_user_id
 from .guardrails import (
@@ -122,6 +123,9 @@ class ServerState:
     runner: Optional[Runner] = None
     firestore_mcp_toolset: Optional[Any] = None
     bigquery_mcp_toolset: Optional[Any] = None
+    # Per-request RunConfig opting into ADK experimental telemetry, or None
+    # (default). Built once at startup from env; see adk_telemetry.py.
+    adk_run_config: Optional[Any] = None
     ready: bool = False
 
 
@@ -199,6 +203,9 @@ async def _lifespan(_app: FastAPI):
         plugins=guardrail_plugins or None,
         auto_create_session=True,
     )
+    # Opt into ADK experimental telemetry (token-spend + per-workflow metrics)
+    # via RunConfig, gated by env (default OFF). See ADR-0019 and adk_telemetry.py.
+    state.adk_run_config = build_adk_run_config()
     state.ready = True
     logger.info("Orchestrator HTTP server ready (app_name=%s)", APP_NAME)
     try:
@@ -812,6 +819,7 @@ async def stream_reasoning_engine(request: Request) -> StreamingResponse:
                 session_id=session_id,
                 invocation_id=invocation_id,
                 new_message=UserContent(parts=[response_part]),
+                run_config=state.adk_run_config,
             )
         else:
             session = await state.session_manager.get_or_create_session(
@@ -821,6 +829,7 @@ async def stream_reasoning_engine(request: Request) -> StreamingResponse:
                 user_id=user_id,
                 session_id=session.id,
                 new_message=UserContent(parts=[Part.from_text(text=message)]),
+                run_config=state.adk_run_config,
             )
 
         return StreamingResponse(
@@ -870,6 +879,7 @@ async def reasoning_engine(request: Request) -> dict[str, Any]:
             user_id=user_id,
             session_id=session.id,
             new_message=UserContent(parts=[Part.from_text(text=message)]),
+            run_config=state.adk_run_config,
         )
 
         collected = []
@@ -890,6 +900,7 @@ async def invoke(req: InvokeRequest) -> StreamingResponse:
         user_id=req.user_id,
         session_id=session.id,
         new_message=UserContent(parts=[Part.from_text(text=req.message)]),
+        run_config=state.adk_run_config,
     )
     return StreamingResponse(_sse(events), media_type="text/event-stream")
 
@@ -967,6 +978,7 @@ async def resume(req: ResumeRequest) -> StreamingResponse:
         session_id=req.session_id,
         invocation_id=req.invocation_id,
         new_message=UserContent(parts=[response_part]),
+        run_config=state.adk_run_config,
     )
     return StreamingResponse(_sse(events), media_type="text/event-stream")
 

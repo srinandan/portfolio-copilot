@@ -129,5 +129,18 @@ spans are skipped (not fatal), and disabled export still propagates context.
   header-based ingress). This restores one Trace ID from browser click through the
   orchestrator even across the Vertex proxy hop. Direct (`ORCHESTRATOR_URL`) mode is
   unaffected — its `/v1/*` routes keep normal header-based ingress spans.
+- **ADK-native per-request telemetry (follow-up, #364)**: ADK 2.8.0 emits
+  per-invocation **token-spend** and per-workflow inference/tool-call metrics,
+  gated behind experimental telemetry (default OFF). We opt in per request via
+  `RunConfig.telemetry` rather than a bare process-global env var, so it is a
+  code-controlled, testable setting: `adk_telemetry.build_adk_run_config()`
+  returns a `RunConfig(telemetry=TelemetryConfig(adk_experimental_telemetry_opt_in=True))`
+  when `ORCHESTRATOR_ADK_TELEMETRY_ENABLED` is truthy, and `server.py` threads it
+  into every `run_async` call site (`None` selects the default, so a fresh deploy
+  is unchanged). These metrics export through the OTel MeterProvider the server's
+  telemetry setup already installs. This first step only flips the opt-in;
+  reconciling the hand-rolled spans above against ADK's native invocation span
+  (de-duplication) and surfacing token-spend to the product for the #169 cost cap
+  are deliberately left as larger, separate follow-ups.
 - **Numbering note**: issue #286 referenced "ADR-0022"; this is filed as the
   next sequential number, 0019.
