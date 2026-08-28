@@ -6,12 +6,12 @@ This document describes how the system is built, reflecting the completed Phase 
 
 | Layer | Choice | ADR |
 |---|---|---|
-| Agent implementation | **Python**, ADK dynamic workflows | [0008](../adr/0008-python-for-orchestrator.md) (supersedes [0001](../adr/0001-go-over-python-for-agents.md)) |
+| Agent implementation | **Python**, ADK dynamic workflows (v2.8.0) | [0008](../adr/0008-python-for-orchestrator.md) (supersedes [0001](../adr/0001-go-over-python-for-agents.md)) |
 | Root orchestration | ADK `DynamicNode` / Workflow orchestrator; intent-driven plan construction (Retrieve → Plan → Resolve → Schedule) | [0004](../adr/0004-dynamic-planning-over-fixed-pipeline.md), [0022](../adr/0022-intent-driven-skill-planning.md) |
 | Sub-agent execution layer | Managed Agents API (Antigravity worker agent + per-interaction SKILL.md override) | [0014](../adr/0014-managed-agents-subagent-execution-layer.md) (supersedes [0005](../adr/0005-managed-agents-hybrid-evaluation.md)), [0007](../adr/0007-skill-content-via-input-not-mounting.md), [0009](../adr/0009-managed-agent-native-class.md) |
-| Governance & safety | Reviewer/Critic Managed Agent → HITL Approval Gate (`RequestInput`) → Alpaca Execution Gate | [0014](../adr/0014-managed-agents-subagent-execution-layer.md), [0015](../adr/0015-real-user-data-antigravity-sandbox.md) |
+| Governance & safety | Reviewer/Critic Managed Agent → HITL Approval Gate (`RequestInput`) → Alpaca Execution Gate; Model Armor runtime guardrails & floor settings | [0014](../adr/0014-managed-agents-subagent-execution-layer.md), [0015](../adr/0015-real-user-data-antigravity-sandbox.md), [0025](../adr/0025-model-armor-floor-settings.md), [0032](../adr/0032-model-armor-runtime-plugin.md) |
 | Deterministic math & primitives | In-process Python functions under `orchestrator/primitives/` | [0016](../adr/0016-deterministic-primitives-in-orchestrator.md) |
-| Analytical data | BigQuery (Checking transactions) | [0002](../adr/0002-bigquery-plus-firestore-split.md), [0015](../adr/0015-real-user-data-antigravity-sandbox.md) |
+| Analytical data | BigQuery (Checking transactions via Remote MCP with type-checked parameter encoding) | [0002](../adr/0002-bigquery-plus-firestore-split.md), [0015](../adr/0015-real-user-data-antigravity-sandbox.md), [0024](../adr/0024-bigquery-mcp-orchestrator.md), [0029](../adr/0029-bigquery-sql-scoping-and-hardening.md), [0033](../adr/0033-bigquery-mcp-parameter-encoding.md) |
 | Transactional data | Firestore (IPS, holdings, liabilities, audit log) — separate Go and Python clients | [0002](../adr/0002-bigquery-plus-firestore-split.md), [0008](../adr/0008-python-for-orchestrator.md) |
 | Market & fundamentals data (read-only) | SEC EDGAR (free XBRL fundamentals) + Alpaca market quotes, behind a pluggable `FundamentalsProvider` with a TTL cache | [0028](../adr/0028-equity-research-and-suitability-advisory-analysis.md) |
 | Session state | Agent Platform Sessions | — |
@@ -60,6 +60,7 @@ flowchart TD
 
     subgraph AgentRuntimeLayer ["Agent Platform Agent Runtime (Cloud Custom Container)"]
         Planner["Root Intent-Driven Planner<br/><code>orchestrator.planner:root_agent</code><br/><i>(ADK DynamicNode / Workflow)</i>"]
+        GuardrailPlugin["Model Armor Runtime Plugin<br/><code>guardrails/model_armor_plugin.py</code>"]
         
         subgraph OrchestratorLoop ["Intent-Driven Planning & Governance Loop"]
             Discovery["1. Retrieve — skills + manifests<br/><code>registry_client.py</code>, <code>planning/retrieval.py</code>"]
@@ -75,6 +76,7 @@ flowchart TD
             Progress["Advisory Progress Channel<br/><code>progress.py</code> (SSE Interleaving)"]
         end
 
+        Planner --> GuardrailPlugin
         Planner --> Discovery
         Planner --> PlanStage
         Planner --> Schedule
@@ -99,6 +101,7 @@ flowchart TD
         Firestore[("Cloud Firestore<br/><i>(IPS, Holdings, Liabilities, User Profiles, Documents, Reports, Audit Log)</i>")]
         BigQuery[("BigQuery<br/><i>(Checking Transactions)</i>")]
         DocAI[("Google Cloud Document AI<br/><i>(W-2 Statements & SSN Masking)</i>")]
+        ModelArmor[("Model Armor & Cloud DLP<br/><i>(Floor Settings & Regional Templates)</i>")]
         SecEdgar[("SEC EDGAR & Market Data<br/><i>(XBRL Fundamentals & Quotes)</i>")]
         SessionsStore[("Agent Platform Sessions<br/>& Memory Bank")]
         SecretMgr[("Secret Manager<br/><i>(Alpaca Keys, MA ID)</i>")]
@@ -116,6 +119,7 @@ flowchart TD
     APIProxy -.->|"Export Server Spans"| CloudTrace
 
     %% Orchestrator Cloud Interactions
+    GuardrailPlugin <-->|"Screen Prompts/Responses (DLP PII & RAI)"| ModelArmor
     Discovery <-->|"List authorized skills + fetch manifests"| Registry
     Preloader -->|"Fetch Snapshot"| Firestore
     Preloader -->|"Fetch Transactions"| BigQuery

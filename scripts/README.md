@@ -20,6 +20,7 @@ This directory contains the operational, provisioning, deployment, data loading,
 | [`setup_documentai.sh`](setup_documentai.sh) | Enables the Document AI API, grants the frontend service account Document AI roles, and creates/reuses the pre-trained US Form W-2 processor (used to parse uploaded W-2 income statements). | `./scripts/setup_documentai.sh <PROJECT_ID> <LOCATION>` |
 | [`setup_processor.go`](setup_processor.go) | Go helper that creates (or reuses) the US Form W-2 Document AI processor and prints its processor ID; invoked by `setup_documentai.sh` and the Makefile to resolve `DOCUMENT_AI_PROCESSOR_ID`. | `go run ./scripts/setup_processor.go -project=<PROJECT_ID> -location=<LOCATION>` |
 | [`setup_model_armor.sh`](setup_model_armor.sh) | Configures project-wide Model Armor Floor Settings for MCP tool sanitization, RAI filters, and prompt injection defense. | `./scripts/setup_model_armor.sh [PROJECT_ID] [ENABLE_MODEL_ARMOR] [ENFORCEMENT_MODE]` |
+| [`setup_model_armor_templates.py`](setup_model_armor_templates.py) | Provisions Cloud DLP inspect template and regional Model Armor prompt/response templates for the in-Runner runtime guardrail plugin (ADR-0032). | `python3 scripts/setup_model_armor_templates.py --project=<PROJECT_ID> --location=<REGION>` |
 | [`setup_cloudbuild_triggers.sh`](setup_cloudbuild_triggers.sh) | Configures Developer Connect GitHub connection and tag-triggered Cloud Build pipelines for automatic releases. | `./scripts/setup_cloudbuild_triggers.sh <PROJECT_ID> <REGION>` |
 
 ---
@@ -38,7 +39,7 @@ This directory contains the operational, provisioning, deployment, data loading,
 
 | Script | Description | Usage |
 |---|---|---|
-| [`register_all_skills.sh`](register_all_skills.sh) | Registers all 6 runtime skills from `skills/` to the Agent Registry as `private-<skill-name>`. | `./scripts/register_all_skills.sh <PROJECT_ID> <LOCATION>` |
+| [`register_all_skills.sh`](register_all_skills.sh) | Registers all 8 runtime skills from `skills/` to the Agent Registry as `private-<skill-name>`. | `./scripts/register_all_skills.sh <PROJECT_ID> <LOCATION>` |
 | [`register_skill.sh`](register_skill.sh) | Packages and registers or updates a specific skill with the Agent Registry. | `./scripts/register_skill.sh <skill-name> <PROJECT_ID> <LOCATION>` |
 | [`revoke_skill.sh`](revoke_skill.sh) | Sets a skill's lifecycle state to `DEPRECATED` in the Agent Registry for live revocation testing. | `./scripts/revoke_skill.sh <skill-name>` |
 | [`restore_skill.sh`](restore_skill.sh) | Restores a skill's lifecycle state to `ACTIVE` in the Agent Registry. | `./scripts/restore_skill.sh <skill-name>` |
