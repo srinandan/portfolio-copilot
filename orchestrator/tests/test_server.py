@@ -284,6 +284,60 @@ def test_invoke_503_when_runner_not_initialized():
         assert r.status_code == 503
 
 
+def _invoke_capturing_run_async(monkeypatch, telemetry_env):
+    """Posts /v1/invoke against a mocked Runner and returns the run_async kwargs.
+
+    ``telemetry_env`` is the value for ORCHESTRATOR_ADK_TELEMETRY_ENABLED (or
+    None to leave it unset). The env must be set before the lifespan runs, since
+    the RunConfig is built once at startup.
+    """
+    from src.orchestrator import server
+
+    if telemetry_env is None:
+        monkeypatch.delenv("ORCHESTRATOR_ADK_TELEMETRY_ENABLED", raising=False)
+    else:
+        monkeypatch.setenv("ORCHESTRATOR_ADK_TELEMETRY_ENABLED", telemetry_env)
+
+    captured = {}
+    fake_event = MagicMock()
+    fake_event.model_dump.return_value = {"kind": "test_event"}
+
+    async def _fake_run_async(**kwargs):
+        captured.update(kwargs)
+        yield fake_event
+
+    fake_runner = MagicMock()
+    fake_runner.run_async = _fake_run_async
+    fake_sm = MagicMock()
+    fake_session = MagicMock()
+    fake_session.id = "sess_abc"
+    fake_sm.get_or_create_session = AsyncMock(return_value=fake_session)
+
+    with (
+        patch("src.orchestrator.server.SessionManager", return_value=fake_sm),
+        patch("src.orchestrator.server.Runner", return_value=fake_runner),
+    ):
+        with TestClient(server.app) as client:
+            server.state.ready = True
+            r = client.post("/v1/invoke", json={"user_id": "u1", "message": "hi"})
+            assert r.status_code == 200
+            _ = r.text  # drain the stream so run_async is consumed
+    return captured
+
+
+def test_invoke_run_config_none_by_default(monkeypatch):
+    captured = _invoke_capturing_run_async(monkeypatch, telemetry_env=None)
+    assert "run_config" in captured
+    assert captured["run_config"] is None
+
+
+def test_invoke_threads_telemetry_run_config_when_enabled(monkeypatch):
+    captured = _invoke_capturing_run_async(monkeypatch, telemetry_env="true")
+    run_config = captured.get("run_config")
+    assert run_config is not None
+    assert run_config.telemetry.adk_experimental_telemetry_opt_in is True
+
+
 def test_sse_serializes_error_events():
     """When the underlying event stream raises, the SSE stream emits an `error` event
     instead of crashing the connection."""

@@ -35,6 +35,7 @@ AGENT_IDENTITY_ROLES = [
     "roles/secretmanager.secretAccessor",  # Secret Manager: Alpaca API key & MANAGED_AGENT_ID
     "roles/agentregistry.viewer",  # Agent Registry: list authorized skills
     "roles/aiplatform.user",  # Vertex AI: Managed Agents and Reasoning Engine invocation
+    "roles/modelarmor.user",  # Model Armor: invoke template sanitization
     "roles/serviceusage.serviceUsageConsumer",  # Service usage consumer
     "roles/logging.logWriter",  # Cloud Logging
     "roles/monitoring.metricWriter",  # Cloud Monitoring
@@ -185,6 +186,13 @@ def deploy_agent_engine(
                 # them via the Cloud Trace exporter it configures at startup).
                 "OTEL_SERVICE_NAME": "portfolio-copilot-orchestrator",
                 "SEC_EDGAR_USER_AGENT": sec_user_agent,
+                "MODEL_ARMOR_LOCATION": location,
+                "MODEL_ARMOR_PROMPT_TEMPLATE_ID": os.environ.get(
+                    "MODEL_ARMOR_PROMPT_TEMPLATE_ID", "portfolio-copilot-prompt"
+                ),
+                "MODEL_ARMOR_RESPONSE_TEMPLATE_ID": os.environ.get(
+                    "MODEL_ARMOR_RESPONSE_TEMPLATE_ID", "portfolio-copilot-response"
+                ),
             }
             if existing is not None:
                 engine_id = existing.api_resource.name.split("/")[-1]

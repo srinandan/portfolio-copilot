@@ -115,6 +115,40 @@ async def test_interleave_merges_progress_with_runner_events():
 
 
 @pytest.mark.asyncio
+async def test_concurrent_interleave_streams_isolate_progress_channels():
+    """Two streams running concurrently must not cross-contaminate their per-run
+    progress channels. Each ``_interleave_progress`` installs its own
+    ``PROGRESS_CHANNEL`` contextvar, so a ``report_progress`` call from one run's
+    drained events must land only on that run's output stream. This guards the
+    contextvar isolation our SSE path depends on — the exact class of bug ADK
+    2.8.0's "contextvars leak prevention in async generators" fix addresses —
+    against a regression where one invocation's progress bleeds into another's."""
+
+    async def run_stream(stage: str):
+        async def events():
+            report_progress(stage, "running", stage)
+            yield _FakeEvent(1)
+            # Yield the loop so the two streams genuinely interleave.
+            await asyncio.sleep(0)
+            report_progress(stage, "done", stage)
+            yield _FakeEvent(2)
+
+        collected = [item async for item in _interleave_progress(events())]
+        return stage, collected
+
+    (_, items_a), (_, items_b) = await asyncio.gather(run_stream("alpha"), run_stream("beta"))
+
+    # No cross-talk: each stream only ever sees its own stage's progress events.
+    assert {i["stage"] for i in items_a if i.get("kind") == "progress"} == {"alpha"}
+    assert {i["stage"] for i in items_b if i.get("kind") == "progress"} == {"beta"}
+    # Each stream still saw both of its own ADK events, in order.
+    assert [i["n"] for i in items_a if i.get("kind") == "adk_event"] == [1, 2]
+    assert [i["n"] for i in items_b if i.get("kind") == "adk_event"] == [1, 2]
+    # Both per-run channels torn down; nothing leaked into the caller context.
+    assert PROGRESS_CHANNEL.get() is None
+
+
+@pytest.mark.asyncio
 async def test_interleave_forwards_stream_error_marker():
     async def failing():
         raise RuntimeError("registry 401")

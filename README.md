@@ -22,6 +22,7 @@ Portfolio Copilot is an experimental personal finance assistant built on Google 
 - **Human-in-the-Loop Trade Governance:** Evaluates proposed actions against an Investment Policy Statement (IPS) using an independent Reviewer/Critic agent before rendering an interactive approval card for the user.
 - **End-to-End Traceability:** Records all state transitions, skill execution logs, and reviewer verdicts with immutable skill versioning and approval metadata.
 - **Document & Data Ingestion:** Streams bank transaction CSVs into BigQuery with deduplication, stores JSON snapshots in Firestore, and extracts W-2 income statements via Google Cloud Document AI (with automatic SSN masking). See [ADR-0026](docs/adr/0026-w2-document-ai-ingestion-and-profile-sync.md).
+- **Dual-Layer Model Armor Guardrails:** Enforces Responsible AI, prompt-injection defense, and malicious-URI filtering across project services via Model Armor Floor Settings, coupled with an in-Runner per-request plugin screening for sensitive financial PII (SSN, routing, cards) using regional Cloud DLP inspect templates. See [ADR-0025](docs/adr/0025-model-armor-floor-settings.md) and [ADR-0032](docs/adr/0032-model-armor-runtime-plugin.md).
 - **Advisory Equity Research:** Generates DCF valuations from SEC EDGAR fundamentals and produces suitability-adjusted allocation recommendations (`buy`/`add`/`hold`/`trim`/`avoid`) against your IPS. Advisory only—never executes trades automatically. See [ADR-0028](docs/adr/0028-equity-research-and-suitability-advisory-analysis.md).
 
 ---
@@ -46,9 +47,10 @@ Portfolio Copilot is an experimental personal finance assistant built on Google 
  │ ───────────────────────── │ │  (Vertex AI Agent Runtime)│ │ ───────────────────────── │
  │ • Firestore: IPS, Holdings│ │ ───────────────────────── │ │ • W-2 Income Extraction   │
  │   Profiles, W2s, Audit Log│ │ • Dynamic Intent Planner  │ │ • Automatic SSN Masking   │
- │ • BigQuery: Checking      │ │ • Reviewer / Critic Gate  │ └───────────────────────────┘
- │   Transactions (NL-to-SQL)│ │ • HITL Approval Gate      │
- └───────────────────────────┘ └───────┬───────┬───────┬───┘
+ │ • BigQuery: Checking      │ │ • Model Armor Guardrails  │ └───────────────────────────┘
+ │   Transactions (NL-to-SQL)│ │ • Reviewer / Critic Gate  │
+ └───────────────────────────┘ │ • HITL Approval Gate      │
+                               └───────┬───────┬───────┬───┘
                                        │       │       │
                   Skill Registry Reads │       │       │ SEC EDGAR XBRL & Quotes
                                        │       │       │ (DCF & Equity Fundamentals)

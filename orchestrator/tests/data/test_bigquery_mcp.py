@@ -8,12 +8,18 @@ import pytest
 from src.orchestrator.data.bigquery_mcp import (
     DEFAULT_BIGQUERY_MCP_URL,
     BigQueryMCPClient,
+    _encode_bq_literal,
+    _resolve_query_parameters,
     create_bigquery_mcp_toolset,
     get_bigquery_auth_headers,
     get_bigquery_mcp_toolset_from_registry,
     google_auth_header_provider,
     list_available_mcp_tools,
 )
+
+
+def _string_param(name, value):
+    return {"name": name, "parameterType": {"type": "STRING"}, "parameterValue": {"value": value}}
 
 
 def test_get_bigquery_auth_headers_valid_token():
@@ -782,3 +788,94 @@ def test_decode_bigquery_mcp_rows_nested_records():
         "current_month_spend": 2000.0,
         "trailing_3mo_avg": 2000.0,
     }
+
+
+# --- SQL-injection hardening for query-parameter resolution (ADR-0029) -------
+
+
+def test_encode_bq_literal_string_escapes_quote():
+    assert _encode_bq_literal("o'brien", "STRING") == "'o\\'brien'"
+
+
+def test_encode_bq_literal_string_neutralizes_injection():
+    # A classic breakout payload stays inert text inside the quotes.
+    encoded = _encode_bq_literal("'; DROP TABLE t; --", "STRING")
+    assert encoded.startswith("'") and encoded.endswith("'")
+    # The closing quote of the value is escaped, so it cannot terminate early.
+    assert "\\'" in encoded
+    assert "DROP TABLE" in encoded  # preserved as data, not executable
+
+
+def test_encode_bq_literal_int_valid_and_invalid():
+    assert _encode_bq_literal(3, "INT64") == "3"
+    assert _encode_bq_literal("7", "INTEGER") == "7"
+    with pytest.raises(ValueError):
+        _encode_bq_literal("5; DROP TABLE t", "INT64")
+
+
+def test_encode_bq_literal_float_rejects_non_numeric():
+    assert _encode_bq_literal("1.5", "FLOAT64") == "1.5"
+    with pytest.raises(ValueError):
+        _encode_bq_literal("1.5 OR 1=1", "NUMERIC")
+
+
+def test_encode_bq_literal_bool_and_null():
+    assert _encode_bq_literal(True, "BOOL") == "TRUE"
+    assert _encode_bq_literal("false", "BOOLEAN") == "FALSE"
+    assert _encode_bq_literal(None, "STRING") == "NULL"
+
+
+def test_resolve_query_parameters_basic_substitution():
+    q = "SELECT * FROM t WHERE user_id = @user_id"
+    resolved = _resolve_query_parameters(q, [_string_param("user_id", "u1")])
+    assert resolved == "SELECT * FROM t WHERE user_id = 'u1'"
+
+
+def test_resolve_query_parameters_boolean_bypass_stays_literal():
+    # A boolean-injection value must not alter query structure.
+    q = "SELECT * FROM t WHERE user_id = @user_id"
+    resolved = _resolve_query_parameters(q, [_string_param("user_id", "x' OR '1'='1")])
+    # Exactly one string literal; the injected quote is escaped.
+    assert resolved == "SELECT * FROM t WHERE user_id = 'x\\' OR \\'1\\'=\\'1'"
+
+
+def test_resolve_query_parameters_single_pass_no_recursion():
+    # A value that itself contains an @token must NOT be re-substituted.
+    q = "SELECT @a, @b"
+    params = [_string_param("a", "@b"), _string_param("b", "secret")]
+    resolved = _resolve_query_parameters(q, params)
+    # @a -> '@b' (literal), and the @b inside it is NOT expanded to 'secret'.
+    assert resolved == "SELECT '@b', 'secret'"
+
+
+def test_resolve_query_parameters_unknown_token_left_intact():
+    q = "SELECT @known, @unknown"
+    resolved = _resolve_query_parameters(q, [_string_param("known", "v")])
+    assert resolved == "SELECT 'v', @unknown"
+
+
+def test_execute_query_sends_safely_encoded_sql():
+    """End-to-end: a malicious STRING parameter is safely encoded in the SQL
+    actually sent to the MCP tool (captured from the POST payload)."""
+    client = BigQueryMCPClient(project="test-proj")
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {"id": 1, "jsonrpc": "2.0", "result": {"structuredContent": []}}
+    with (
+        patch(
+            "src.orchestrator.data.bigquery_mcp.get_bigquery_auth_headers",
+            return_value={"Authorization": "Bearer token"},
+        ),
+        patch("httpx.Client.post", return_value=mock_resp) as mock_post,
+    ):
+        client.execute_query(
+            "SELECT * FROM checking_transactions WHERE user_id = @user_id",
+            query_parameters=[_string_param("user_id", "'; DROP TABLE checking_transactions; --")],
+        )
+    sent_query = mock_post.call_args.kwargs["json"]["params"]["arguments"]["query"]
+    # The whole payload is contained in one escaped string literal: the value's
+    # leading quote is backslash-escaped, so it cannot terminate the literal and
+    # start a new statement. Exact-match the safely-encoded SQL.
+    assert sent_query == (
+        "SELECT * FROM checking_transactions WHERE user_id = "
+        "'\\'; DROP TABLE checking_transactions; --'"
+    )

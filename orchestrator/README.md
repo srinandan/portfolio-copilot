@@ -26,10 +26,12 @@ orchestrator/
 ├── src/
 │   └── orchestrator/
 │       ├── __init__.py     # Package initialization and version
+│       ├── adk_telemetry.py # ADK native per-request telemetry RunConfig builder
 │       ├── contracts/      # Typed Pydantic data models (IPS, Holdings, Actions, Audit, etc.)
 │       ├── data/           # Firestore and BigQuery data clients
 │       ├── executors/      # Broker (Alpaca paper trading) execution client
 │       ├── gates/          # HITL approval and execution governance gates
+│       ├── guardrails/     # Model Armor runtime plugin (per-request screening layer)
 │       ├── logger.py       # Structured JSON logger with trace propagation
 │       ├── managed_agents/ # Managed Agent dispatcher, worker wrapper, and secret loader
 │       ├── planner.py      # Root dynamic planner workflow, node definitions, and dispatch logic

@@ -24,10 +24,10 @@ echo "Enforcement: $ENABLE_MODEL_ARMOR (default: true)"
 echo "Mode: $ENFORCEMENT_MODE"
 echo "========================================"
 
-echo "--- 1. Enabling Model Armor API ---"
-gcloud services enable modelarmor.googleapis.com --project="$PROJECT_ID" --quiet
+echo "--- 1. Enabling Model Armor & DLP APIs ---"
+gcloud services enable modelarmor.googleapis.com dlp.googleapis.com --project="$PROJECT_ID" --quiet
 
-echo "--- 2. Applying Floor Settings ---"
+echo "--- 2. Applying Floor Settings (Layer 1) ---"
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 REPO_ROOT="$( cd "$DIR/.." && pwd )"
 
@@ -64,6 +64,18 @@ else
     --quiet
 fi
 
+echo "--- 3. Provisioning Model Armor Templates (Layer 2) ---"
+LOCATION=${REGION:-${GOOGLE_CLOUD_LOCATION:-us-central1}}
+if command -v uv &> /dev/null; then
+  uv run --project "$REPO_ROOT/orchestrator" python "$DIR/setup_model_armor_templates.py" \
+    --project="$PROJECT_ID" \
+    --location="$LOCATION"
+elif command -v python3 &> /dev/null; then
+  python3 "$DIR/setup_model_armor_templates.py" \
+    --project="$PROJECT_ID" \
+    --location="$LOCATION"
+fi
+
 echo "========================================"
-echo "Model Armor Floor Settings configured successfully!"
+echo "Model Armor configured successfully (Floor Settings & Templates)!"
 echo "========================================"

@@ -11,12 +11,13 @@ from deploy_agent_engine import AGENT_IDENTITY_ROLES
 
 
 def test_agent_identity_roles_includes_cloud_trace():
-    """Verifies that AGENT_IDENTITY_ROLES includes roles/cloudtrace.agent for OpenTelemetry emission."""
+    """Verifies that AGENT_IDENTITY_ROLES includes roles/cloudtrace.agent and modelarmor.user."""
     assert "roles/cloudtrace.agent" in AGENT_IDENTITY_ROLES
     assert "roles/datastore.user" in AGENT_IDENTITY_ROLES
     assert "roles/bigquery.dataViewer" in AGENT_IDENTITY_ROLES
     assert "roles/logging.logWriter" in AGENT_IDENTITY_ROLES
     assert "roles/monitoring.metricWriter" in AGENT_IDENTITY_ROLES
+    assert "roles/modelarmor.user" in AGENT_IDENTITY_ROLES
 
 
 def test_agent_framework_google_adk_constant():

@@ -42,8 +42,14 @@ from google.adk.runners import Runner
 from google.genai.types import Part, UserContent
 from pydantic import BaseModel, field_validator
 
+from .adk_telemetry import build_adk_run_config
 from .contracts.goals_onboarding import GoalsOnboardingResult
 from .data.validation import validate_user_id
+from .guardrails import (
+    build_model_armor_plugin,
+    guardrail_block_frame,
+    wire_is_model_armor_block,
+)
 from .logger import get_logger
 from .planner import root_agent
 from .progress import PROGRESS_CHANNEL
@@ -117,6 +123,9 @@ class ServerState:
     runner: Optional[Runner] = None
     firestore_mcp_toolset: Optional[Any] = None
     bigquery_mcp_toolset: Optional[Any] = None
+    # Per-request RunConfig opting into ADK experimental telemetry, or None
+    # (default). Built once at startup from env; see adk_telemetry.py.
+    adk_run_config: Optional[Any] = None
     ready: bool = False
 
 
@@ -181,13 +190,23 @@ async def _lifespan(_app: FastAPI):
 
     state.session_manager = SessionManager()
 
+    # Model Armor runtime guardrail (ADR-0032). Enabled by default: activates
+    # once templates are configured (returns None if none are, or if
+    # MODEL_ARMOR_PLUGIN_ENABLED is explicitly false). Complements the project
+    # floor settings.
+    guardrail_plugins = [p for p in (build_model_armor_plugin(),) if p is not None]
+
     state.runner = Runner(
         app_name=APP_NAME,
         agent=root_agent,
         session_service=state.session_manager.session_service,
         memory_service=state.session_manager.memory_service,
+        plugins=guardrail_plugins or None,
         auto_create_session=True,
     )
+    # Opt into ADK experimental telemetry (token-spend + per-workflow metrics)
+    # via RunConfig, gated by env (default OFF). See ADR-0019 and adk_telemetry.py.
+    state.adk_run_config = build_adk_run_config()
     state.ready = True
     logger.info("Orchestrator HTTP server ready (app_name=%s)", APP_NAME)
     try:
@@ -618,7 +637,15 @@ async def _interleave_progress(events: AsyncIterator[Any]) -> AsyncIterator[Dict
     async def _drain_runner() -> None:
         try:
             async for event in events:
-                queue.put_nowait(_event_to_wire(event))
+                wire = _event_to_wire(event)
+                queue.put_nowait(wire)
+                # A Model Armor block surfaces as an LlmResponse with a
+                # custom_metadata flag (ADR-0026). Emit an advisory guardrail
+                # frame alongside it so the UI can render a block notice; the
+                # governance audit log is untouched.
+                if wire_is_model_armor_block(wire):
+                    logger.warning("Model Armor blocked a turn (author=%s)", wire.get("author"))
+                    queue.put_nowait(guardrail_block_frame(wire))
         except Exception as e:
             # Logged here (with traceback) for operators; forwarded to the client
             # as an error frame by the framing layer below.
@@ -793,6 +820,7 @@ async def stream_reasoning_engine(request: Request) -> StreamingResponse:
                 session_id=session_id,
                 invocation_id=invocation_id,
                 new_message=UserContent(parts=[response_part]),
+                run_config=state.adk_run_config,
             )
         else:
             session = await state.session_manager.get_or_create_session(
@@ -802,6 +830,7 @@ async def stream_reasoning_engine(request: Request) -> StreamingResponse:
                 user_id=user_id,
                 session_id=session.id,
                 new_message=UserContent(parts=[Part.from_text(text=message)]),
+                run_config=state.adk_run_config,
             )
 
         return StreamingResponse(
@@ -851,6 +880,7 @@ async def reasoning_engine(request: Request) -> dict[str, Any]:
             user_id=user_id,
             session_id=session.id,
             new_message=UserContent(parts=[Part.from_text(text=message)]),
+            run_config=state.adk_run_config,
         )
 
         collected = []
@@ -871,6 +901,7 @@ async def invoke(req: InvokeRequest) -> StreamingResponse:
         user_id=req.user_id,
         session_id=session.id,
         new_message=UserContent(parts=[Part.from_text(text=req.message)]),
+        run_config=state.adk_run_config,
     )
     return StreamingResponse(_sse(events), media_type="text/event-stream")
 
@@ -948,6 +979,7 @@ async def resume(req: ResumeRequest) -> StreamingResponse:
         session_id=req.session_id,
         invocation_id=req.invocation_id,
         new_message=UserContent(parts=[response_part]),
+        run_config=state.adk_run_config,
     )
     return StreamingResponse(_sse(events), media_type="text/event-stream")
 
