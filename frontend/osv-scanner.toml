@@ -1,0 +1,5 @@
+# osv-scanner.toml - Configuration for OSV-Scanner
+
+[[IgnoredVulns]]
+id = "GHSA-vfj7-8cjw-p6xm"
+reason = "No fixed version available upstream yet in braces (transitive dev dependency of tailwindcss v3)"
