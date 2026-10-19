@@ -7,7 +7,7 @@
 [![License](https://img.shields.io/github/license/srinandan/portfolio-copilot)](./LICENSE)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/srinandan/portfolio-copilot?filename=go.mod)](./go.mod)
 [![Python Version](https://img.shields.io/badge/python-3.12+-blue.svg)](./orchestrator/pyproject.toml)
-[![Node Version](https://img.shields.io/badge/node-20+-green.svg)](./frontend/package.json)
+[![Node Version](https://img.shields.io/badge/node-22+-green.svg)](./frontend/package.json)
 
 Portfolio Copilot is an experimental personal finance assistant built on Google Cloud's Gemini Enterprise Agent Platform. It demonstrates dynamic runtime planning over static execution graphs: given a user goal, the root agent discovers authorized skills from the Agent Registry, constructs an execution plan, enforces policy constraints with an independent critic, and requires explicit human approval before executing any paper trades.
 

@@ -3,13 +3,13 @@
 ## Prerequisites
 
 - `gcloud` CLI, authenticated, with a GCP project you can administer
-- `python3` (3.11+), `pip`, `uv` (recommended for Python packaging)
-- `go` (for the Go backend server)
-- `node`/`npm` (for the Vue frontend)
+- `python3` (3.12+), `pip`, `uv` (recommended for Python packaging)
+- `go` (1.26+, for the Go backend server)
+- `node`/`npm` (Node.js 22+, for the Vue frontend)
 
 ## First-time setup
 
-Provisions Secret Manager, BigQuery, Firestore, Cloud Run, Managed Agent workers, Agent Runtime, and Document AI, in the order each depends on the last:
+Provisions Secret Manager, BigQuery, Firestore, Cloud Run, Managed Agent workers, Agent Runtime, Document AI, Model Armor floor settings, and runtime skills, in the order each depends on the last:
 
 ```bash
 make setup-all
@@ -22,10 +22,10 @@ This runs, in sequence:
 2. `setup_bigquery.sh`, creates the `portfolio_copilot.checking_transactions` dataset and table.
 3. `setup_firestore.sh`, provisions the Firestore database.
 4. `setup_cloudrun.sh`, deploys `frontend` (unified web host and backend API server) to Cloud Run with its own dedicated, least-privilege service account, not the default compute service account.
-5. `setup_managed_agent.sh`, provisions and deploys the worker Managed Agent (`scripts/deploy_managed_agent.py`) and stores its resource ID in Secret Manager as `MANAGED_AGENT_ID`.
-6. `setup_agent_engine.sh`, provisions Agent Runtime for the orchestrator (`scripts/deploy_agent_engine.py`), including least-privilege Agent Identity IAM roles.
-7. `setup_documentai.sh`, enables the Document AI API, grants the frontend service account Document AI roles, and creates or reuses the pre-trained US Form W-2 processor (`scripts/setup_processor.go`, which prints the processor ID). Used to parse uploaded W-2 income statements.
-8. `register_all_skills.sh`, registers all 6 runtime skills (`goals-onboarding`, `spending-analysis`, `portfolio-analysis`, `research`, `action-drafting`, `reviewer`) in the Agent Registry.
+5. `setup_agent_engine.sh`, provisions Agent Runtime for the orchestrator (`scripts/deploy_agent_engine.py`), including least-privilege Agent Identity IAM roles and regional Model Armor templates (`scripts/setup_model_armor_templates.py`).
+6. `setup_documentai.sh`, enables the Document AI API, grants the frontend service account Document AI roles, and creates or reuses the pre-trained US Form W-2 processor (`scripts/setup_processor.go`, which prints the processor ID). Used to parse uploaded W-2 income statements.
+7. `setup_model_armor.sh`, configures project-wide Model Armor floor settings for MCP tool sanitization, Responsible AI filters, and prompt injection defense.
+8. `register_all_skills.sh`, registers all 8 runtime skills (`goals-onboarding`, `spending-analysis`, `portfolio-analysis`, `research`, `action-drafting`, `reviewer`, `equity-research`, `suitability`) in the Agent Registry.
 
 Each script also runs standalone if you only need to redo one step:
 `./scripts/setup_bigquery.sh <PROJECT_ID>`, etc.

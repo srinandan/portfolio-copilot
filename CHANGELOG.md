@@ -3,13 +3,70 @@
 All notable changes to Portfolio Copilot are recorded here.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this
-project intends to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
-once tagged. Nothing has been released yet — see the note under `[Unreleased]`.
+project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4] - 2026-10-19
+
 ### Added
-- OTLP trace forwarding for the Go server and browser spans ([ADR-0019](docs/adr/0019-distributed-tracing-frontend-and-server.md), #313).
+- **Model Armor runtime guardrail plugin** ([ADR-0032](docs/adr/0032-model-armor-runtime-plugin.md), #369):
+  Added an in-Runner per-request guardrail plugin (`orchestrator/src/orchestrator/guardrails/model_armor_plugin.py`),
+  enabled by default (`MODEL_ARMOR_PLUGIN_ENABLED=true`), that screens user prompts and
+  model responses via regional Model Armor templates (`portfolio-copilot-prompt`,
+  `portfolio-copilot-response`) backed by Cloud DLP inspect templates for sensitive
+  financial PII (`US_SOCIAL_SECURITY_NUMBER`, `CREDIT_CARD_NUMBER`, `US_BANK_ROUTING_MICR`,
+  `IBAN_CODE`), complementing project-wide Model Armor Floor Settings.
+- **ADK native per-request telemetry** (#369):
+  Opted into ADK native per-request OpenTelemetry tracing via `RunConfig`
+  (`orchestrator/src/orchestrator/adk_telemetry.py`).
+- **Storage identity validation, BOLA protection, and tenant cache isolation** ([ADR-0031](docs/adr/0031-storage-identity-and-cache-isolation.md), #353, #354):
+  Added strict caller identity validation across Firestore and BigQuery data paths and
+  isolated in-memory caches by user identity.
+
+### Changed
+- **Dependency and platform upgrades** (#369, #370, #371, #372, #373, #374):
+  - Upgraded `orchestrator` Python dependencies including `google-adk` (`2.12.0`),
+    `google-cloud-aiplatform` (`1.148.0`), `google-genai` (`1.73.1`), `fastapi` (`0.136.0`),
+    `mcp` (`1.27.0`), `pydantic` (`2.13.2`), and `uvicorn` (`0.44.0`).
+  - Upgraded Go toolchain to `1.26.9` and updated `google.golang.org/grpc` (`v1.83.2`),
+    `go.opentelemetry.io/otel` (`v1.45.0`), and `cloud.google.com/go/*` libraries,
+    resolving all Dependabot and OSV-Scanner security advisories.
+  - Upgraded `frontend` toolchain and dependencies to Node.js 22, Vite 8 (`^8.3.4`),
+    Vitest 5 (`^5.0.5`), Vue 3.5 (`^3.5.44`), Vue Router 5 (`^5.4.0`), Pinia 4 (`^4.1.0`),
+    and Tailwind CSS 4 (`^4.3.3` with `@tailwindcss/postcss`).
+
+### Fixed
+- **IPS constraint integrity floor across Python and Go** ([ADR-0030](docs/adr/0030-ips-constraint-integrity-floor.md), #355, #360):
+  Enforced non-bypassable policy constraint floors in both Python and Go contracts,
+  including gating the document upload path against out-of-bounds IPS configurations.
+- **BigQuery SQL scoping and MCP parameter encoding** ([ADR-0029](docs/adr/0029-bigquery-sql-scoping-and-hardening.md), [ADR-0033](docs/adr/0033-bigquery-mcp-parameter-encoding.md), #369):
+  Hardened CTE row-scoping for natural-language SQL queries and safely encoded query
+  parameters on the BigQuery Remote MCP path.
+- **XML delimiter isolation for untrusted inputs** ([ADR-0028](docs/adr/0028-xml-delimiter-prompt-hardening.md)):
+  Wrapped untrusted user and data inputs in escaped XML delimiters before prompt construction.
+- **OpenTelemetry ASGI context detach suppression** (#358):
+  Suppressed harmless cross-context token detach `ValueError` exceptions in streaming ASGI middleware.
+- **Frontend Content Security Policy (CSP)** (#357):
+  Allowed Google Fonts (`fonts.googleapis.com`, `fonts.gstatic.com`) in CSP headers so UI
+  typography and icons render properly.
+
+## [0.3] - 2026-08-23
+
+### Added
+- **Advisory equity research & suitability analysis** ([ADR-0028](docs/adr/0028-equity-research-and-suitability-advisory-analysis.md), #345):
+  - Added SEC EDGAR XBRL fundamentals data provider (`sec_edgar.py`) and market quote
+    integration (`market_data.py`) with TTL caching (`fundamentals_cache.py`).
+  - Added `equity-research` and `suitability` runtime skills for standalone DCF valuation,
+    quality metric assessment, and multi-factor portfolio suitability evaluation (`buy` /
+    `add` / `hold` / `trim` / `avoid`) against active IPS target bands and risk tolerance.
+  - Added synchronous `POST /api/analysis/equity` endpoint and Portfolio view
+    `<EquityAnalyzer />` / `<EquityRecommendationCard />` UI components.
+- **Form W-2 income statement ingestion via Google Cloud Document AI** ([ADR-0026](docs/adr/0026-w2-document-ai-ingestion-and-profile-sync.md), #340, #342, #343):
+  Automated US Form W-2 Document AI processor provisioning (`scripts/setup_documentai.sh`,
+  `scripts/setup_processor.go`), in-memory SSN masking (`***-**-XXXX`), Firestore persistence
+  (`w2_documents/{w2_id}`), and 1-click annual income synchronization in the Profile & Policy Hub.
+- **OTLP trace forwarding for the Go server and browser spans** ([ADR-0019](docs/adr/0019-distributed-tracing-frontend-and-server.md), #313, #336):
   The frontend server's span exporter is now selectable: OTLP (`otlptracehttp`)
   when an OTLP endpoint is configured (`OTEL_EXPORTER_OTLP_ENDPOINT`,
   `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`, or `OTEL_TRACES_EXPORTER=otlp`), otherwise
@@ -17,8 +74,10 @@ once tagged. Nothing has been released yet — see the note under `[Unreleased]`
   SPA are now **re-emitted as real spans** — preserving the SPA-supplied
   trace/span/parent ids so the server request span attaches to a real parent —
   instead of only correlating via trace-linked logs; the log path remains as the
-  fallback when span export is disabled. No SPA changes and no new browser
-  dependencies. See `scripts/setup_cloudrun.sh` for the opt-in env var.
+  fallback when span export is disabled.
+- **Build optimization & developer tooling** (#346):
+  Enabled Docker layer caching (`--cache-from`) in Cloud Build for both orchestrator and
+  frontend, and added pre-push linter verification targets (`make check`, `make lint`).
 
 ## [0.2.0] - 2026-08-18
 

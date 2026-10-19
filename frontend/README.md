@@ -30,7 +30,7 @@ See [ADR-0003](../docs/adr/0003-standalone-ui-not-agentspace.md) and [ADR-0017](
 
 ```
 frontend/
-├── Dockerfile              # Multi-stage build: Node 20 (SPA) + Go 1.25 (server) -> distroless static
+├── Dockerfile              # Multi-stage build: Node 22 (SPA) + Go 1.26 (server) -> distroless static
 ├── cloudbuild.yaml         # Cloud Build CI/CD pipeline configuration
 ├── Makefile                # Local dev and deployment automation
 ├── server/                 # Go backend server (serves /dist and handles /api/* in-process)
@@ -67,8 +67,8 @@ frontend/
 
 ## Prerequisites
 
-- **Node.js 20+**
-- **Go 1.25+**
+- **Node.js 22+**
+- **Go 1.26+**
 
 ---
 
@@ -119,8 +119,8 @@ make build
 ## Docker & Cloud Run Deployment
 
 The frontend is containerized using a multi-stage `Dockerfile`:
-1. **UI Builder Stage**: Uses `node:20-alpine` to execute `npm ci` and `npm run build`, producing static assets in `dist/`.
-2. **Go Builder Stage**: Uses `golang:1.25` to compile `./frontend/server`.
+1. **UI Builder Stage**: Uses `node:22-alpine` to execute `npm ci` and `npm run build`, producing static assets in `dist/`.
+2. **Go Builder Stage**: Uses `golang:1.26.9` to compile `./frontend/server`.
 3. **Runtime Stage**: Uses `gcr.io/distroless/static:nonroot`, ships the Go binary plus the `dist/` assets, and runs on port `8080` as the `nonroot` user.
 
 ### Deploying via Makefile
