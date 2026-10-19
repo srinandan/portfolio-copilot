@@ -6,7 +6,7 @@ This document describes how the system is built, reflecting the completed Phase 
 
 | Layer | Choice | ADR |
 |---|---|---|
-| Agent implementation | **Python**, ADK dynamic workflows (v2.8.0) | [0008](../adr/0008-python-for-orchestrator.md) (supersedes [0001](../adr/0001-go-over-python-for-agents.md)) |
+| Agent implementation | **Python**, ADK dynamic workflows (v2.12.0) | [0008](../adr/0008-python-for-orchestrator.md) (supersedes [0001](../adr/0001-go-over-python-for-agents.md)) |
 | Root orchestration | ADK `DynamicNode` / Workflow orchestrator; intent-driven plan construction (Retrieve → Plan → Resolve → Schedule) | [0004](../adr/0004-dynamic-planning-over-fixed-pipeline.md), [0022](../adr/0022-intent-driven-skill-planning.md) |
 | Sub-agent execution layer | Managed Agents API (Antigravity worker agent + per-interaction SKILL.md override) | [0014](../adr/0014-managed-agents-subagent-execution-layer.md) (supersedes [0005](../adr/0005-managed-agents-hybrid-evaluation.md)), [0007](../adr/0007-skill-content-via-input-not-mounting.md), [0009](../adr/0009-managed-agent-native-class.md) |
 | Governance & safety | Reviewer/Critic Managed Agent → HITL Approval Gate (`RequestInput`) → Alpaca Execution Gate; Model Armor runtime guardrails & floor settings | [0014](../adr/0014-managed-agents-subagent-execution-layer.md), [0015](../adr/0015-real-user-data-antigravity-sandbox.md), [0025](../adr/0025-model-armor-floor-settings.md), [0032](../adr/0032-model-armor-runtime-plugin.md) |
