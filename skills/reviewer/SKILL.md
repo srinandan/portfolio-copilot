@@ -21,10 +21,10 @@ the `ProposedAction` itself; produces a `ReviewerVerdict` with itemized
 
 Per ADR-0014's defense-in-depth pattern, the LLM's verdict is
 **advisory**. The orchestrator re-runs every rule deterministically in
-`orchestrator/reviewer/rules.py` and uses **that** verdict for
-enforcement. This SKILL.md defines the rules for both — the LLM reasons
-over them here, the orchestrator enforces them in code. Any divergence
-is audited.
+code and uses **that** verdict for enforcement. This SKILL.md defines the
+rules for both — the LLM reasons over them here using only the input
+payload, and the orchestrator enforces them in code. Any divergence is
+audited.
 
 ## When this skill runs
 
@@ -58,10 +58,11 @@ Fails if `proposed_action.ticker` appears in `active_ips.constraints.excluded_ti
 
 ### `excluded_sector`
 Fails if the sector of `proposed_action.ticker` appears in
-`active_ips.constraints.excluded_sectors`. Sector lookup uses the same
-static map the orchestrator's `primitives/action_drafting.py::KNOWN_SECTOR_MAP` provides;
-if `excluded_sectors` is defined in the IPS and the ticker isn't in the map (sector is `Unknown`),
-this rule fails-closed to prevent unverified sector exposure.
+`active_ips.constraints.excluded_sectors`. Determine the ticker's sector
+from the input payload (or standard GICS sector classification); if
+`excluded_sectors` is defined in the IPS and the ticker's sector is
+`Unknown` or cannot be determined, this rule fails-closed to prevent
+unverified sector exposure.
 
 ### `concentration_limit`
 Applies to **buys only**. Fails a buy whose *resulting* position value
@@ -77,8 +78,9 @@ that a sell moves the asset class the right way.
 ### `allocation_band_direction`
 Fails if the trade moves the asset class **away from** the IPS target
 band. A sell in an under-allocated asset class fails; a buy in an
-over-allocated asset class fails. Uses `primitives/portfolio_analysis.py::calculate_drift`
-semantics to determine current-vs-target position of the asset class.
+over-allocated asset class fails. Compare each asset class's current
+portfolio weight against its IPS target band to determine whether it is
+under- or over-allocated.
 
 ### `ips_version_current`
 Fails if `proposed_action.ips_version_referenced` does not match the
