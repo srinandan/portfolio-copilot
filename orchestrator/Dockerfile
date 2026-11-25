@@ -7,7 +7,7 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
 # Install and upgrade packaging tools in builder stage
-RUN pip install --no-cache-dir --upgrade "pip>=26.1.2" uv
+RUN pip install --no-cache-dir --upgrade "pip>=26.3" uv
 
 # Create a clean virtual environment
 RUN python -m venv /opt/venv

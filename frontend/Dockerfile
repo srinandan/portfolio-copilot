@@ -1,5 +1,5 @@
 # Stage 1: Build the Vue SPA frontend
-FROM node:22-alpine AS ui-builder
+FROM node:24-alpine AS ui-builder
 WORKDIR /app
 COPY frontend/package*.json ./
 RUN npm ci
@@ -7,7 +7,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # Stage 2: Build the Go backend server
-FROM golang:1.26.9 AS go-builder
+FROM golang:1.27.4 AS go-builder
 WORKDIR /app
 
 COPY go.mod go.sum ./
