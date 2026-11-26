@@ -44,7 +44,10 @@ steps:
       - '-c'
       - |
         set -eu
-        pip install --no-cache-dir --break-system-packages "google-cloud-aiplatform[agent_engines,adk]" click google-auth
+        if ! python3 -m pip --version &>/dev/null; then
+          apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends python3-pip
+        fi
+        python3 -m pip install --no-cache-dir --break-system-packages "google-cloud-aiplatform[agent_engines,adk]" click google-auth
         python3 scripts/deploy_agent_engine.py \
           --project="${PROJECT_ID}" \
           --location="${_REGION}" \
