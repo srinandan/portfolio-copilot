@@ -322,3 +322,83 @@ async def test_dispatch_managed_skill_extracts_from_session_events(mock_resolve)
     assert isinstance(result, GoalsOnboardingResult)
     assert result.user_id == "usr_456"
     assert result.time_horizon_years == 20
+
+
+def test_patch_adk_function_result_delta_handles_missing_call_id():
+    """Regression test: google-genai >= 2.23 dropped FunctionResultDelta.call_id while
+    google-adk still reads delta.call_id in _handle_function_result."""
+    from google.adk.models import interactions_utils
+    from google.genai.interactions import FunctionResultDelta, StepDelta
+
+    from orchestrator.managed_agents import patch_adk_function_result_delta
+
+    patch_adk_function_result_delta()
+
+    delta = FunctionResultDelta(name="sandbox_tool", result="ok")
+    assert not hasattr(delta, "call_id")
+
+    event = StepDelta(index=0, delta=delta)
+    state = interactions_utils._StreamState()
+    response = interactions_utils.convert_interaction_event_to_llm_response(event, state, "inter_123")
+
+    assert response is not None
+    assert response.interaction_id == "inter_123"
+    assert response.partial is True
+    assert response.content is not None
+    assert len(response.content.parts) == 1
+    fn_resp = response.content.parts[0].function_response
+    assert fn_resp is not None
+    assert fn_resp.id == ""
+    assert fn_resp.name == "sandbox_tool"
+    assert fn_resp.response == {"result": "ok"}
+    assert len(state.parts) == 1
+
+
+def test_patch_adk_function_result_delta_preserves_call_id_when_present():
+    """When a delta object carries call_id, the patch delegates to the original handler."""
+    from types import SimpleNamespace
+
+    from google.adk.models import interactions_utils
+
+    from orchestrator.managed_agents import patch_adk_function_result_delta
+
+    patch_adk_function_result_delta()
+
+    delta = SimpleNamespace(call_id="call_42", name="sandbox_tool", result={"status": "done"})
+    state = interactions_utils._StreamState()
+    response = interactions_utils._handle_function_result(delta, state, "inter_456")
+
+    assert response is not None
+    fn_resp = response.content.parts[0].function_response
+    assert fn_resp.id == "call_42"
+    assert fn_resp.name == "sandbox_tool"
+    assert fn_resp.response == {"status": "done"}
+
+
+def test_patch_adk_function_result_delta_reraises_unrelated_attribute_error(monkeypatch):
+    """Unrelated AttributeErrors from _handle_function_result must not be swallowed."""
+    from google.adk.models import interactions_utils
+
+    from orchestrator.managed_agents import patch_adk_function_result_delta
+
+    def _broken_handler(delta, state, interaction_id):
+        raise AttributeError("'OtherObj' object has no attribute 'other_field'")
+
+    monkeypatch.setattr(interactions_utils, "_handle_function_result", _broken_handler)
+    patch_adk_function_result_delta()
+
+    with pytest.raises(AttributeError, match="other_field"):
+        interactions_utils._handle_function_result(object(), interactions_utils._StreamState(), "inter_789")
+
+
+def test_patch_adk_function_result_delta_is_idempotent():
+    """Calling patch_adk_function_result_delta repeatedly must not double-wrap."""
+    from google.adk.models import interactions_utils
+
+    from orchestrator.managed_agents import patch_adk_function_result_delta
+
+    patch_adk_function_result_delta()
+    first = interactions_utils._handle_function_result
+    patch_adk_function_result_delta()
+    second = interactions_utils._handle_function_result
+    assert first is second

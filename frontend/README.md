@@ -119,8 +119,8 @@ make build
 ## Docker & Cloud Run Deployment
 
 The frontend is containerized using a multi-stage `Dockerfile`:
-1. **UI Builder Stage**: Uses `node:22-alpine` to execute `npm ci` and `npm run build`, producing static assets in `dist/`.
-2. **Go Builder Stage**: Uses `golang:1.26.9` to compile `./frontend/server`.
+1. **UI Builder Stage**: Uses `node:24-alpine` to execute `npm ci` and `npm run build`, producing static assets in `dist/`.
+2. **Go Builder Stage**: Uses `golang:1.27.4` to compile `./frontend/server`.
 3. **Runtime Stage**: Uses `gcr.io/distroless/static:nonroot`, ships the Go binary plus the `dist/` assets, and runs on port `8080` as the `nonroot` user.
 
 ### Deploying via Makefile

@@ -6,11 +6,16 @@ from .dispatcher import (
     get_skill_tools,
     resolve_skill_instructions,
 )
-from .worker import build_worker_managed_agent, get_worker_agent_id
+from .worker import (
+    build_worker_managed_agent,
+    get_worker_agent_id,
+    patch_adk_function_result_delta,
+)
 
 __all__ = [
     "build_worker_managed_agent",
     "get_worker_agent_id",
+    "patch_adk_function_result_delta",
     "dispatch_managed_skill",
     "resolve_skill_instructions",
     "get_skill_tools",

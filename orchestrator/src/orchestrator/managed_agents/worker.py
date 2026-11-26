@@ -26,8 +26,49 @@ __all__ = [
     "PER_SKILL_TIMEOUT",
     "build_worker_managed_agent",
     "get_worker_agent_id",
+    "patch_adk_function_result_delta",
     "sanitize_node_name",
 ]
+
+
+def patch_adk_function_result_delta() -> None:
+    """Patches ADK's streaming FunctionResultDelta handler for google-genai >= 2.23.
+
+    google-genai >= 2.23 removed ``call_id`` from ``FunctionResultDelta`` while
+    google-adk (through 2.15.0) still reads ``delta.call_id`` unconditionally in
+    ``google.adk.models.interactions_utils._handle_function_result``. Whenever a
+    remote Managed Agent invokes an internal sandbox tool during streaming, that
+    raises ``AttributeError`` and aborts the turn.
+
+    Remove this workaround once upstream google-adk guards ``delta.call_id``.
+    """
+    from google.adk.models import interactions_utils
+    from google.genai import types
+
+    orig_handler = getattr(interactions_utils, "_handle_function_result", None)
+    if orig_handler is None or getattr(orig_handler, "_is_safe_patched", False):
+        return
+
+    def safe_handle_function_result(
+        delta: Any, state: Any, interaction_id: Optional[str], *args: Any, **kwargs: Any
+    ) -> Any:
+        try:
+            return orig_handler(delta, state, interaction_id, *args, **kwargs)
+        except AttributeError as exc:
+            if "call_id" not in str(exc):
+                raise
+            part = types.Part(
+                function_response=types.FunctionResponse(
+                    id="",
+                    name=delta.name,
+                    response=interactions_utils._function_result_to_response(delta.result),
+                )
+            )
+            state.parts.append(part)
+            return interactions_utils._partial_part_response(part, interaction_id)
+
+    safe_handle_function_result._is_safe_patched = True  # type: ignore[attr-defined]
+    interactions_utils._handle_function_result = safe_handle_function_result
 
 
 def get_worker_agent_id() -> str:
@@ -62,6 +103,7 @@ def build_worker_managed_agent(
     Returns:
         Configured ADK ManagedAgent node.
     """
+    patch_adk_function_result_delta()
     resolved_id = agent_id or get_worker_agent_id()
     safe_name = sanitize_node_name(name)
     short = name.replace("private-", "")
