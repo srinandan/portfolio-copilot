@@ -145,7 +145,7 @@ describe('ApprovalCard.vue', () => {
     });
 
     const banner = screen.getByTestId('completed-banner');
-    expect(banner.textContent).toContain('APPROVED — Execution Triggered');
+    expect(banner.textContent).toContain('APPROVED: Execution Triggered');
     expect(screen.queryByTestId('action-buttons')).toBeNull();
   });
 
@@ -159,7 +159,7 @@ describe('ApprovalCard.vue', () => {
     });
 
     const banner = screen.getByTestId('completed-banner');
-    expect(banner.textContent).toContain('REJECTED — Trade Aborted');
+    expect(banner.textContent).toContain('REJECTED: Trade Aborted');
     expect(screen.queryByTestId('action-buttons')).toBeNull();
   });
 });

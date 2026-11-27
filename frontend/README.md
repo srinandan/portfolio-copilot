@@ -12,9 +12,10 @@ See [ADR-0003](../docs/adr/0003-standalone-ui-not-agentspace.md) and [ADR-0017](
 
 - **Unified Web & API Architecture**: Hosts the compiled Vue 3 SPA and handles `/api/*` data requests (Firestore, BigQuery, Orchestrator SSE streaming) in-process without cross-service network hops (ADR-0017).
 - **Human-in-the-Loop (HITL) Governance**: Renders interactive cards (`<ApprovalCard />`) for proposed trades and rebalancing actions, with itemized Policy Safety Checklists (`verdict.rule_results`) showing `PASS` / `FAIL` (`VIOLATION`) status pills and inline quantity/rationale editing before sign-off.
-- **Stitch Design System**:
-  - **Typography**: **Geist** for headings, navigation, and conversational text; **JetBrains Mono** (`tabular-nums`) for monetary values, tickers, trade quantities, and audit IDs.
-  - **Desktop layout**: Responsive split layout (`>=1024px`) — 40% conversational stream / live governance on the left, 60% financial canvas on the right.
+- **Fiduciary Editorial Desk Design System** (see [`DESIGN.md`](DESIGN.md)):
+  - **Typography**: Strict 2-font pairing: **Newsreader** for the brand wordmark, page titles, and hero balance figures; **Geist** (`tabular-nums`) for all UI, prose, tables, and numerical figures across a locked 3-size body scale (`13px` / `15px` / `18px`) with sentence-case labels.
+  - **Palette & Surfaces**: Architectural Alabaster (`#F4F6F8`) canvas lifting Pure White (`#FFFFFF`) hairline-divided sheets (`#D5DDE6`), anchored in Deep Maritime Oxford Navy (`#0F2342`) with semantic Forest Emerald, Warm Ochre Amber, and Oxblood Crimson states meeting WCAG AA contrast.
+  - **Responsive Layout**: Workspace-first 12-column desktop split (`>=1024px`) pairing a 5-column Copilot Command & Governance Desk on the left with a 7-column Financial Ledger Canvas on the right, plus a responsive mobile navigation drawer (`<768px`).
   - **Local document processing**: No direct bank connections; documents are processed locally.
 - **Financial Views**:
   - **Dashboard (`/`)**: Combines real-time agent planning messages — including a live analysis progress stepper (`AnalysisProgress`) that tracks each pipeline stage during the minutes-long run and clears to reveal the final output (see [ADR-0018](../docs/adr/0018-streaming-progress-events.md)) — with summary cards (`NetWorthCard`, `AssetAllocationCard`, `TopHoldingsTable`).
@@ -39,8 +40,9 @@ frontend/
 │   ├── middleware.go       # CORS, recovery, structured logging
 │   ├── plan.go             # Orchestrator SSE streaming bridge
 │   └── spa.go              # SPA static asset serving & Vue Router history fallback
+├── DESIGN.md               # Fiduciary Editorial Desk design system specification (tokens, typography, components)
 ├── package.json            # Scripts, Vue 3, Pinia, Vue Router, Tailwind, and Vitest dependencies
-├── tailwind.config.js      # Stitch design system color palette, typography, and spacing
+├── tailwind.config.js      # Design system color palette, 2-font typography scale, and spacing tokens
 ├── vite.config.ts          # Vite build config and local dev proxy to http://localhost:8080
 ├── vitest.config.ts        # Vitest + jsdom test configuration and v8 coverage rules
 ├── public/

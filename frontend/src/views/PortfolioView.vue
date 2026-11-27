@@ -1,69 +1,80 @@
 <template>
   <div class="flex flex-col gap-lg w-full">
-    <div class="flex flex-col gap-sm">
-      <h1 class="font-headline-lg-mobile text-headline-lg-mobile text-on-background">Portfolio</h1>
-      <p class="font-body-base text-body-base text-on-surface-variant max-w-sm">
+    <header class="flex flex-col gap-1">
+      <h1 class="font-display text-page-title font-medium text-on-background">Portfolio</h1>
+      <p class="font-sans text-body text-on-surface-variant max-w-[65ch]">
         Breakdown of your holdings based on uploaded documents.
       </p>
-    </div>
+    </header>
 
-    <!-- Total Value & Allocation Chart Card -->
-    <div class="w-full bg-surface-container-lowest rounded-xl shadow-sm border border-surface-variant flex flex-col p-lg gap-lg relative overflow-hidden">
-      <div class="absolute top-0 right-0 p-md opacity-20 pointer-events-none">
-        <img alt="Portfolio Chart Icon" class="w-24 h-24 object-contain" src="/images/chart_icon.png" />
-      </div>
-      <div class="flex flex-col gap-xs z-10">
-        <span class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">Total Value</span>
-        <h2 class="font-display-lg text-display-lg text-on-background tabular-nums">${{ totalValueFormatted }}</h2>
-        <p v-if="formattedAsOf" class="font-body-mono text-xs text-on-surface-variant mt-1">
+    <!-- Total Value & Allocation Sheet -->
+    <section class="w-full bg-surface-container-lowest rounded-xl shadow-sheet border border-outline-variant grid grid-cols-1 md:grid-cols-12 divide-y md:divide-y-0 md:divide-x divide-outline-variant overflow-hidden">
+      <div class="md:col-span-5 p-lg flex flex-col justify-between gap-md">
+        <div class="flex flex-col gap-1">
+          <span class="font-sans text-meta font-medium text-on-surface-variant">Total Value</span>
+          <h2 class="font-display text-display-figure font-medium text-on-surface tabular-nums">
+            ${{ totalValueFormatted }}
+          </h2>
+        </div>
+        <p v-if="formattedAsOf" class="font-sans text-meta text-on-surface-variant tabular-nums">
           {{ formattedAsOf }}
         </p>
       </div>
 
-      <div class="flex items-center gap-md z-10">
-        <div class="w-24 h-24 relative flex-shrink-0">
-          <svg class="w-full h-full transform -rotate-90 drop-shadow-sm" viewBox="0 0 100 100">
-            <circle class="text-surface-variant opacity-30" cx="50" cy="50" fill="transparent" r="40" stroke="currentColor" stroke-width="12"></circle>
+      <div class="md:col-span-7 p-lg flex flex-col sm:flex-row items-center gap-lg">
+        <div class="w-32 h-32 relative shrink-0">
+          <svg class="w-full h-full transform -rotate-90" viewBox="0 0 100 100" aria-label="Asset allocation breakdown">
             <circle
-              v-for="item in allocationBreakdown"
-              :key="item.assetClass"
-              class="drop-shadow-sm transition-all duration-500"
-              :class="item.colorClass.replace('bg-', 'text-')"
+              class="text-surface-container-low"
               cx="50"
               cy="50"
               fill="transparent"
               r="40"
               stroke="currentColor"
+              stroke-width="11"
+            ></circle>
+            <circle
+              v-for="item in allocationBreakdown"
+              :key="item.assetClass"
+              class="transition-[stroke-dasharray,stroke-dashoffset] duration-300 ease-desk"
+              cx="50"
+              cy="50"
+              fill="transparent"
+              r="40"
+              :stroke="item.strokeHex"
               :stroke-dasharray="item.dasharray"
               :stroke-dashoffset="item.dashoffset"
-              stroke-width="12"
+              stroke-width="11"
             ></circle>
           </svg>
         </div>
-        <div class="flex flex-col gap-2 flex-1">
+
+        <div class="flex flex-col divide-y divide-outline-variant/60 flex-1 w-full">
           <div
             v-for="item in allocationBreakdown"
             :key="item.assetClass"
-            class="flex items-center justify-between"
+            class="py-2 first:pt-0 last:pb-0 flex items-center justify-between gap-md"
             data-testid="allocation-row"
           >
-            <div class="flex items-center gap-2">
-              <div :class="['w-2 h-2 rounded-full', item.colorClass]"></div>
-              <span class="font-body-base text-body-base text-on-surface">{{ item.assetClass }}</span>
+            <div class="flex items-center gap-2.5 min-w-0">
+              <span :class="['w-2.5 h-2.5 rounded-sm shrink-0', item.colorClass]" aria-hidden="true"></span>
+              <span class="font-sans text-body text-on-surface truncate">{{ item.assetClass }}</span>
             </div>
-            <span class="font-body-mono text-body-mono text-on-surface">{{ item.percent.toFixed(1) }}%</span>
+            <span class="font-sans text-body font-medium text-on-surface tabular-nums">
+              {{ item.percent.toFixed(1) }}%
+            </span>
           </div>
         </div>
       </div>
-    </div>
+    </section>
 
-    <!-- Portfolio Drift Report Card -->
+    <!-- Portfolio Drift Report -->
     <DriftReportCard v-if="driftReport" :drift-report="driftReport" />
 
-    <!-- Top Holdings Table -->
+    <!-- Top Holdings Ledger -->
     <TopHoldingsTable :positions="holdings.positions" />
 
-    <!-- Advisory equity research (issue #344) -->
+    <!-- Advisory Equity Research -->
     <EquityAnalyzer />
   </div>
 </template>
@@ -81,17 +92,18 @@ interface AllocationItem {
   valueUSD: number;
   percent: number;
   colorClass: string;
+  strokeHex: string;
   dasharray: string;
   dashoffset: string;
 }
 
 const colorPalette = [
-  'bg-primary-fixed',
-  'bg-tertiary-fixed-dim',
-  'bg-secondary',
-  'bg-primary',
-  'bg-tertiary',
-  'bg-surface-variant'
+  { bg: 'bg-primary', hex: '#0f2342' },
+  { bg: 'bg-primary-fixed', hex: '#1e40af' },
+  { bg: 'bg-on-tertiary-container', hex: '#047857' },
+  { bg: 'bg-secondary', hex: '#334e68' },
+  { bg: 'bg-outline', hex: '#64748b' },
+  { bg: 'bg-surface-dim', hex: '#94a3b8' }
 ];
 
 const holdings = ref<HoldingsSnapshot>({
@@ -142,11 +154,11 @@ const allocationBreakdown = computed<AllocationItem[]>(() => {
 
   const total = holdings.value.total_value_usd || Object.values(map).reduce((a, b) => a + b, 0);
 
-  if (total <= 0 || Object.keys(map).length === 0) {
+  if (total <= 0 || Object.keys(map).length === 0 || (holdings.value.positions?.length ?? 0) === 0) {
     return [
-      { assetClass: 'Stocks', valueUSD: 0, percent: 55, colorClass: 'bg-primary-fixed', dasharray: `${0.55 * 251.2} 251.2`, dashoffset: '0' },
-      { assetClass: 'ETFs', valueUSD: 0, percent: 30, colorClass: 'bg-tertiary-fixed-dim', dasharray: `${0.30 * 251.2} 251.2`, dashoffset: `${-0.55 * 251.2}` },
-      { assetClass: 'Cash', valueUSD: 0, percent: 15, colorClass: 'bg-secondary', dasharray: `${0.15 * 251.2} 251.2`, dashoffset: `${-0.85 * 251.2}` }
+      { assetClass: 'Stocks', valueUSD: 0, percent: 55, colorClass: colorPalette[0].bg, strokeHex: colorPalette[0].hex, dasharray: `${0.55 * 251.2} 251.2`, dashoffset: '0' },
+      { assetClass: 'ETFs', valueUSD: 0, percent: 30, colorClass: colorPalette[1].bg, strokeHex: colorPalette[1].hex, dasharray: `${0.30 * 251.2} 251.2`, dashoffset: `${-0.55 * 251.2}` },
+      { assetClass: 'Cash', valueUSD: 0, percent: 15, colorClass: colorPalette[2].bg, strokeHex: colorPalette[2].hex, dasharray: `${0.15 * 251.2} 251.2`, dashoffset: `${-0.85 * 251.2}` }
     ];
   }
 
@@ -156,7 +168,7 @@ const allocationBreakdown = computed<AllocationItem[]>(() => {
 
   entries.forEach(([assetClass, val], idx) => {
     const percent = (val / total) * 100;
-    const colorClass = colorPalette[idx % colorPalette.length];
+    const swatch = colorPalette[idx % colorPalette.length];
     const segmentLength = (percent / 100) * 251.2;
     const offset = (accumulatedPercent / 100) * 251.2;
     accumulatedPercent += percent;
@@ -165,7 +177,8 @@ const allocationBreakdown = computed<AllocationItem[]>(() => {
       assetClass,
       valueUSD: val,
       percent,
-      colorClass,
+      colorClass: swatch.bg,
+      strokeHex: swatch.hex,
       dasharray: `${segmentLength} 251.2`,
       dashoffset: `${-offset}`
     });

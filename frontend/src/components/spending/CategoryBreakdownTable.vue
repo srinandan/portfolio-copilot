@@ -1,35 +1,42 @@
 <template>
-  <div class="bg-surface-container-lowest rounded-xl p-lg shadow-sm border border-surface-variant flex flex-col gap-md" data-testid="category-breakdown-table">
-    <div class="flex items-center justify-between border-b border-surface-variant pb-2">
-      <h3 class="font-title-sm text-title-sm text-on-surface">Spend by Category</h3>
-      <span class="font-label-caps text-label-caps text-on-surface-variant uppercase">30-Day Total</span>
+  <section
+    class="bg-surface-container-lowest rounded-xl shadow-sheet border border-outline-variant overflow-hidden flex flex-col"
+    data-testid="category-breakdown-table"
+  >
+    <div class="px-lg py-4 border-b border-outline-variant flex items-baseline justify-between gap-md">
+      <h3 class="font-sans text-heading font-semibold text-on-surface">Spend by Category</h3>
+      <span class="font-sans text-meta text-on-surface-variant">30-day total</span>
     </div>
-    <div class="flex flex-col gap-sm">
+
+    <div v-if="sortedCategories.length > 0" class="p-lg flex flex-col gap-md">
       <div
         v-for="item in sortedCategories"
         :key="item.category"
-        class="flex flex-col gap-xs py-1"
+        class="flex flex-col gap-1.5"
         data-testid="category-row"
       >
-        <div class="flex items-center justify-between text-sm">
-          <span class="font-body-base text-on-surface font-medium capitalize">{{ item.category }}</span>
-          <div class="flex items-center gap-md tabular-nums">
-            <span class="font-body-base text-on-surface-variant text-xs">{{ item.percent_of_total }}%</span>
-            <span class="font-body-mono text-on-surface font-semibold w-24 text-right">
+        <div class="flex items-baseline justify-between gap-md">
+          <span class="font-sans text-body font-medium text-on-surface capitalize">{{ item.category }}</span>
+          <div class="flex items-baseline gap-lg tabular-nums shrink-0">
+            <span class="font-sans text-meta text-on-surface-variant">{{ item.percent_of_total }}%</span>
+            <span class="font-sans text-body font-semibold text-on-surface w-24 text-right">
               ${{ item.amount_usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
             </span>
           </div>
         </div>
-        <!-- Progress Bar -->
-        <div class="h-2 w-full bg-surface-container rounded-full overflow-hidden">
+        <div class="h-2 w-full bg-surface-container-low rounded-full overflow-hidden">
           <div
-            class="h-full bg-primary-fixed transition-all duration-300 rounded-full"
+            class="h-full bg-primary transition-[width] duration-200 ease-desk rounded-full"
             :style="{ width: `${Math.min(100, item.percent_of_total)}%` }"
           ></div>
         </div>
       </div>
     </div>
-  </div>
+
+    <div v-else class="p-lg text-center font-sans text-body text-on-surface-variant">
+      No category spending data available yet.
+    </div>
+  </section>
 </template>
 
 <script setup lang="ts">

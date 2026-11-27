@@ -1,13 +1,32 @@
 <template>
-  <section class="bg-surface-container rounded-xl p-lg shadow-sm flex flex-col gap-sm relative overflow-hidden border border-outline/10" data-testid="net-worth-card">
-    <div class="flex items-center justify-between relative z-10">
-      <h2 class="font-label-caps text-xs text-on-surface-variant uppercase tracking-wider">Total Net Worth</h2>
+  <section
+    :class="[
+      'flex flex-col gap-2',
+      embedded
+        ? 'p-lg'
+        : 'bg-surface-container-lowest rounded-xl p-lg border border-outline-variant shadow-sheet'
+    ]"
+    data-testid="net-worth-card"
+  >
+    <div class="flex items-baseline justify-between gap-md flex-wrap">
+      <h2 class="font-sans text-meta font-medium text-on-surface-variant">Total Net Worth</h2>
+      <p v-if="formattedAsOf" class="font-sans text-meta text-on-surface-variant tabular-nums">
+        {{ formattedAsOf }}
+      </p>
     </div>
-    <div class="font-body-mono text-3xl sm:text-4xl font-bold text-on-surface relative z-10 tabular-nums" data-testid="net-worth-value">
+
+    <div
+      class="font-display text-display-figure font-medium text-on-surface tabular-nums tracking-tight"
+      data-testid="net-worth-value"
+    >
       ${{ formattedNetWorth }}
     </div>
-    <p v-if="formattedAsOf" class="font-body-mono text-xs text-on-surface-variant relative z-10">
-      {{ formattedAsOf }}
+
+    <p
+      v-if="cashUsd !== undefined && cashUsd > 0"
+      class="font-sans text-meta text-on-surface-variant tabular-nums"
+    >
+      Includes ${{ formattedCash }} in cash and equivalents
     </p>
   </section>
 </template>
@@ -18,16 +37,27 @@ import { computed } from 'vue';
 const props = withDefaults(
   defineProps<{
     totalValue?: number;
+    cashUsd?: number;
     asOf?: string;
+    embedded?: boolean;
   }>(),
   {
     totalValue: 0,
-    asOf: undefined
+    cashUsd: undefined,
+    asOf: undefined,
+    embedded: false
   }
 );
 
 const formattedNetWorth = computed(() => {
   return props.totalValue.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+});
+
+const formattedCash = computed(() => {
+  return (props.cashUsd ?? 0).toLocaleString('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   });

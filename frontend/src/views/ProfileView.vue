@@ -1,183 +1,193 @@
 <template>
-  <div class="flex flex-col gap-lg w-full max-w-5xl mx-auto pb-xl" data-testid="profile-view">
+  <div class="flex flex-col gap-lg w-full" data-testid="profile-view">
     <!-- Header -->
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-md border-b border-outline-variant/30 pb-md">
-      <div class="flex flex-col gap-xs">
-        <div class="flex items-center gap-xs text-primary font-label-caps text-label-caps uppercase tracking-wider">
-          <span class="material-symbols-outlined text-[18px]">verified_user</span>
-          Profile &amp; Governance Policy
-        </div>
-        <h1 class="font-headline-lg-mobile text-headline-lg-mobile text-on-background">User Profile &amp; Policy Settings</h1>
-        <p class="font-body-base text-body-base text-on-surface-variant max-w-2xl">
-          Unified management for personal context, financial goals, risk calibration, liabilities, and autonomous governance guardrails.
+    <header class="flex flex-col md:flex-row md:items-end justify-between gap-md pb-md border-b border-outline-variant">
+      <div class="flex flex-col gap-1">
+        <h1 class="font-display text-page-title font-medium text-on-background">User Profile &amp; Policy Settings</h1>
+        <p class="font-sans text-body text-on-surface-variant max-w-[65ch]">
+          Manage personal context, financial goals, risk calibration, liabilities, and autonomous governance guardrails.
         </p>
       </div>
 
-      <!-- Quick Action / Status Badges -->
-      <div class="flex flex-wrap items-center gap-sm">
-        <div
-          class="px-sm py-1 rounded-full text-xs font-body-mono flex items-center gap-1 border shadow-xs"
+      <div class="flex flex-wrap items-center gap-3 shrink-0">
+        <span
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md font-sans text-meta font-semibold border tabular-nums"
           :class="[
             hasActiveIPS
-              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
-              : 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400'
+              ? 'bg-tertiary-fixed text-on-tertiary-fixed border-tertiary-fixed-dim'
+              : 'bg-secondary-fixed text-on-secondary-fixed border-secondary-fixed-dim'
           ]"
           data-testid="badge-ips-status"
         >
-          <span class="material-symbols-outlined text-[14px]">
-            {{ hasActiveIPS ? 'check_circle' : 'pending' }}
+          <span class="material-symbols-outlined text-[16px]" aria-hidden="true">
+            {{ hasActiveIPS ? 'check_circle' : 'schedule' }}
           </span>
           <span>{{ hasActiveIPS ? `Active IPS (v${ipsVersion})` : 'Draft Policy' }}</span>
-        </div>
+        </span>
 
         <button
           type="button"
-          @click="router.push('/onboarding')"
-          class="px-md py-sm bg-surface-container-high hover:bg-surface-container-highest text-on-surface text-xs font-medium rounded-md border border-outline-variant transition-colors flex items-center gap-xs shadow-xs"
+          class="px-4 py-2 bg-surface-container-lowest hover:bg-surface-container-low text-on-surface font-sans text-meta font-medium rounded-md border border-outline-variant transition-colors duration-150 ease-desk inline-flex items-center gap-1.5"
           data-testid="btn-launch-wizard"
+          @click="router.push('/onboarding')"
         >
-          <span class="material-symbols-outlined text-primary text-[16px]">auto_awesome</span>
+          <span class="material-symbols-outlined text-primary text-[16px]" aria-hidden="true">tune</span>
           Run Guided Setup
         </button>
       </div>
-    </div>
+    </header>
 
-    <!-- Alert / Status Banners -->
+    <!-- Status Banners -->
     <div
       v-if="saveSuccess"
-      class="p-md rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 flex items-center justify-between shadow-xs"
+      class="px-md py-3 rounded-lg bg-tertiary-fixed/50 border border-tertiary-fixed-dim text-on-tertiary-fixed flex items-center justify-between gap-md"
       data-testid="profile-save-success"
     >
-      <div class="flex items-center gap-sm">
-        <span class="material-symbols-outlined text-emerald-600 text-[20px]">check_circle</span>
-        <span class="font-medium text-sm">Profile and Investment Policy Statement successfully saved and synchronized.</span>
+      <div class="flex items-center gap-2.5">
+        <span class="material-symbols-outlined text-on-tertiary-container text-[20px]" aria-hidden="true">check_circle</span>
+        <span class="font-sans text-body font-medium">Profile and Investment Policy Statement saved and synchronized.</span>
       </div>
-      <button class="text-xs text-emerald-600 hover:underline" @click="saveSuccess = false">Dismiss</button>
+      <button type="button" class="font-sans text-meta font-medium hover:underline shrink-0" @click="saveSuccess = false">
+        Dismiss
+      </button>
     </div>
 
     <div
       v-if="saveError"
-      class="p-md rounded-md bg-red-500/10 border border-red-500/30 text-red-600 flex items-center justify-between shadow-xs"
+      class="px-md py-3 rounded-lg bg-error-container border border-error/30 text-on-error-container flex items-center justify-between gap-md"
       data-testid="profile-save-error"
     >
-      <div class="flex items-center gap-sm">
-        <span class="material-symbols-outlined text-red-600 text-[20px]">error</span>
-        <span class="font-medium text-sm">{{ saveError }}</span>
+      <div class="flex items-center gap-2.5">
+        <span class="material-symbols-outlined text-error text-[20px]" aria-hidden="true">error</span>
+        <span class="font-sans text-body font-medium">{{ saveError }}</span>
       </div>
-      <button class="text-xs text-red-600 hover:underline" @click="saveError = null">Dismiss</button>
+      <button type="button" class="font-sans text-meta font-medium hover:underline shrink-0" @click="saveError = null">
+        Dismiss
+      </button>
     </div>
 
-    <!-- Metric Summary Bar -->
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-sm">
-      <div class="bg-surface-container rounded-lg p-sm border border-outline-variant/40 flex flex-col gap-0.5">
-        <span class="font-label-caps text-[10px] text-on-surface-variant uppercase">Risk Tolerance</span>
-        <span class="font-title-sm text-sm capitalize font-bold text-on-surface" data-testid="metric-risk-tolerance">
+    <!-- Unified Summary Strip -->
+    <section class="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sheet grid grid-cols-2 lg:grid-cols-4 divide-y lg:divide-y-0 lg:divide-x divide-outline-variant overflow-hidden">
+      <div class="p-md flex flex-col gap-0.5">
+        <span class="font-sans text-meta text-on-surface-variant">Risk tolerance</span>
+        <span class="font-sans text-body font-semibold capitalize text-on-surface" data-testid="metric-risk-tolerance">
           {{ riskTolerance }}
         </span>
       </div>
-      <div class="bg-surface-container rounded-lg p-sm border border-outline-variant/40 flex flex-col gap-0.5">
-        <span class="font-label-caps text-[10px] text-on-surface-variant uppercase">Planning Horizon</span>
-        <span class="font-title-sm text-sm font-mono text-on-surface" data-testid="metric-time-horizon">
+      <div class="p-md flex flex-col gap-0.5 border-l border-outline-variant lg:border-l-0">
+        <span class="font-sans text-meta text-on-surface-variant">Planning horizon</span>
+        <span class="font-sans text-body font-semibold text-on-surface tabular-nums" data-testid="metric-time-horizon">
           {{ timeHorizonYears }} Years
         </span>
       </div>
-      <div class="bg-surface-container rounded-lg p-sm border border-outline-variant/40 flex flex-col gap-0.5">
-        <span class="font-label-caps text-[10px] text-on-surface-variant uppercase">Reported Liabilities</span>
-        <span class="font-title-sm text-sm font-mono text-on-surface" data-testid="metric-total-liabilities">
+      <div class="p-md flex flex-col gap-0.5">
+        <span class="font-sans text-meta text-on-surface-variant">Reported liabilities</span>
+        <span class="font-sans text-body font-semibold text-on-surface tabular-nums" data-testid="metric-total-liabilities">
           ${{ totalLiabilities.toLocaleString() }}
         </span>
       </div>
-      <div class="bg-surface-container rounded-lg p-sm border border-outline-variant/40 flex flex-col gap-0.5">
-        <span class="font-label-caps text-[10px] text-on-surface-variant uppercase">Concentration Limit</span>
-        <span class="font-title-sm text-sm font-mono text-on-surface" data-testid="metric-concentration-limit">
-          {{ concentrationLimit }}% Max / Ticker
+      <div class="p-md flex flex-col gap-0.5 border-l border-outline-variant lg:border-l-0">
+        <span class="font-sans text-meta text-on-surface-variant">Concentration limit</span>
+        <span class="font-sans text-body font-semibold text-on-surface tabular-nums" data-testid="metric-concentration-limit">
+          {{ concentrationLimit }}% max / ticker
         </span>
       </div>
-    </div>
+    </section>
 
-    <!-- Navigation Tabs -->
-    <div class="flex items-center gap-xs border-b border-outline-variant/40 overflow-x-auto pb-1" data-testid="profile-tabs">
+    <!-- Underline Section Tabs -->
+    <div
+      role="tablist"
+      aria-label="Profile sections"
+      class="flex items-center gap-1 border-b border-outline-variant overflow-x-auto"
+      data-testid="profile-tabs"
+    >
       <button
         v-for="tab in tabs"
         :key="tab.id"
         type="button"
-        class="px-md py-sm font-body-base text-sm rounded-md transition-colors flex items-center gap-xs whitespace-nowrap"
+        role="tab"
+        :aria-selected="activeTab === tab.id"
+        class="relative px-3.5 py-3 font-sans text-meta transition-colors duration-150 ease-desk inline-flex items-center gap-1.5 whitespace-nowrap shrink-0"
         :class="[
           activeTab === tab.id
-            ? 'bg-primary-container text-on-primary font-medium shadow-xs'
-            : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
+            ? 'text-primary font-semibold'
+            : 'text-on-surface-variant hover:text-on-surface font-medium'
         ]"
         :data-testid="`tab-${tab.id}`"
         @click="activeTab = tab.id"
       >
-        <span class="material-symbols-outlined text-[18px]">{{ tab.icon }}</span>
+        <span class="material-symbols-outlined text-[17px]" aria-hidden="true">{{ tab.icon }}</span>
         <span>{{ tab.label }}</span>
+        <span
+          v-if="activeTab === tab.id"
+          class="absolute bottom-0 inset-x-2 h-[2px] bg-primary rounded-t-full"
+          aria-hidden="true"
+        ></span>
       </button>
     </div>
 
     <!-- Main Settings Form -->
-    <form @submit.prevent="handleSave" class="flex flex-col gap-lg">
-      <!-- TAB 1: Personal & Family Information -->
+    <form class="flex flex-col gap-lg" @submit.prevent="handleSave">
+      <!-- TAB 1: Personal & Family -->
       <div v-show="activeTab === 'personal'" class="flex flex-col gap-lg" data-testid="section-personal">
-        <!-- Personal Details -->
-        <div class="bg-surface-container rounded-lg p-lg border border-outline-variant/50 flex flex-col gap-md">
-          <div class="flex items-center gap-sm border-b border-outline-variant/30 pb-sm">
-            <span class="material-symbols-outlined text-primary text-[20px]">person</span>
-            <h2 class="font-title-sm text-on-surface font-semibold">Personal Demographics</h2>
-          </div>
+        <!-- Personal Demographics -->
+        <section class="bg-surface-container-lowest rounded-xl p-lg border border-outline-variant shadow-sheet flex flex-col gap-md">
+          <h2 class="font-sans text-heading font-semibold text-on-surface border-b border-outline-variant pb-3">
+            Personal Demographics
+          </h2>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-md">
-            <div class="flex flex-col gap-xs">
-              <label class="font-label-caps text-xs text-on-surface-variant uppercase font-medium">Full Name</label>
+            <div class="flex flex-col gap-1.5">
+              <label class="font-sans text-meta font-medium text-on-surface-variant">Full name</label>
               <input
                 v-model="userProfile.full_name"
                 type="text"
                 placeholder="e.g. Alex Mercer"
-                class="px-md py-sm rounded-md bg-surface border border-outline-variant text-on-surface focus:outline-none focus:border-primary text-sm"
+                class="px-3.5 py-2 rounded-md bg-surface border border-outline-variant text-on-surface font-sans text-body focus:bg-surface-container-lowest transition-colors duration-150 ease-desk"
                 data-testid="input-full-name"
               />
             </div>
 
-            <div class="flex flex-col gap-xs">
-              <label class="font-label-caps text-xs text-on-surface-variant uppercase font-medium">Email Address</label>
+            <div class="flex flex-col gap-1.5">
+              <label class="font-sans text-meta font-medium text-on-surface-variant">Email address</label>
               <input
                 v-model="userProfile.email"
                 type="email"
                 placeholder="e.g. alex.mercer@example.com"
-                class="px-md py-sm rounded-md bg-surface border border-outline-variant text-on-surface focus:outline-none focus:border-primary text-sm"
+                class="px-3.5 py-2 rounded-md bg-surface border border-outline-variant text-on-surface font-sans text-body focus:bg-surface-container-lowest transition-colors duration-150 ease-desk"
                 data-testid="input-email"
               />
             </div>
 
-            <div class="flex flex-col gap-xs">
-              <label class="font-label-caps text-xs text-on-surface-variant uppercase font-medium">Date of Birth</label>
+            <div class="flex flex-col gap-1.5">
+              <label class="font-sans text-meta font-medium text-on-surface-variant">Date of birth</label>
               <input
                 v-model="userProfile.date_of_birth"
                 type="date"
-                @change="calculateAgeFromDOB"
-                class="px-md py-sm rounded-md bg-surface border border-outline-variant text-on-surface focus:outline-none focus:border-primary text-sm"
+                class="px-3.5 py-2 rounded-md bg-surface border border-outline-variant text-on-surface font-sans text-body tabular-nums focus:bg-surface-container-lowest transition-colors duration-150 ease-desk"
                 data-testid="input-dob"
+                @change="calculateAgeFromDOB"
               />
             </div>
 
-            <div class="flex flex-col gap-xs">
-              <label class="font-label-caps text-xs text-on-surface-variant uppercase font-medium">Age</label>
+            <div class="flex flex-col gap-1.5">
+              <label class="font-sans text-meta font-medium text-on-surface-variant">Age</label>
               <input
                 v-model.number="userProfile.age"
                 type="number"
                 min="0"
                 max="150"
                 placeholder="e.g. 46"
-                class="px-md py-sm rounded-md bg-surface border border-outline-variant text-on-surface font-mono focus:outline-none focus:border-primary text-sm"
+                class="px-3.5 py-2 rounded-md bg-surface border border-outline-variant text-on-surface font-sans text-body tabular-nums focus:bg-surface-container-lowest transition-colors duration-150 ease-desk"
                 data-testid="input-age"
               />
             </div>
 
-            <div class="flex flex-col gap-xs md:col-span-2">
-              <label class="font-label-caps text-xs text-on-surface-variant uppercase font-medium">Marital Status</label>
+            <div class="flex flex-col gap-1.5 md:col-span-2">
+              <label class="font-sans text-meta font-medium text-on-surface-variant">Marital status</label>
               <select
                 v-model="userProfile.marital_status"
-                class="px-md py-sm rounded-md bg-surface border border-outline-variant text-on-surface focus:outline-none focus:border-primary text-sm"
+                class="px-3.5 py-2 rounded-md bg-surface border border-outline-variant text-on-surface font-sans text-body focus:bg-surface-container-lowest transition-colors duration-150 ease-desk"
                 data-testid="select-marital-status"
               >
                 <option value="single">Single</option>
@@ -189,60 +199,59 @@
               </select>
             </div>
           </div>
-        </div>
+        </section>
 
         <!-- Family & Dependents -->
-        <div class="bg-surface-container rounded-lg p-lg border border-outline-variant/50 flex flex-col gap-md">
-          <div class="flex items-center justify-between border-b border-outline-variant/30 pb-sm">
-            <div class="flex items-center gap-sm">
-              <span class="material-symbols-outlined text-primary text-[20px]">group</span>
-              <h2 class="font-title-sm text-on-surface font-semibold">Family &amp; Dependents</h2>
-            </div>
+        <section class="bg-surface-container-lowest rounded-xl p-lg border border-outline-variant shadow-sheet flex flex-col gap-md">
+          <div class="flex items-center justify-between border-b border-outline-variant pb-3 gap-md">
+            <h2 class="font-sans text-heading font-semibold text-on-surface">Family &amp; Dependents</h2>
             <button
               type="button"
-              @click="addFamilyMember"
-              class="px-sm py-xs text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 rounded-md flex items-center gap-xs transition-colors"
+              class="px-3 py-1.5 font-sans text-meta font-medium text-primary hover:bg-surface-container-low rounded-md border border-outline-variant inline-flex items-center gap-1 transition-colors duration-150 ease-desk"
               data-testid="btn-add-family-member"
+              @click="addFamilyMember"
             >
-              <span class="material-symbols-outlined text-[16px]">add</span>
-              Add Member
+              <span class="material-symbols-outlined text-[16px]" aria-hidden="true">add</span>
+              Add member
             </button>
           </div>
 
-          <div class="flex flex-col gap-sm">
-            <div class="flex items-center gap-md">
-              <label class="font-label-caps text-xs text-on-surface-variant uppercase font-medium">Number of Financial Dependents</label>
+          <div class="flex flex-col gap-md">
+            <div class="flex items-center gap-md flex-wrap">
+              <label class="font-sans text-meta font-medium text-on-surface-variant">Number of financial dependents</label>
               <input
                 v-model.number="userProfile.dependents_count"
                 type="number"
                 min="0"
-                class="w-24 px-md py-xs rounded-md bg-surface border border-outline-variant text-on-surface font-mono focus:outline-none focus:border-primary text-sm"
+                class="w-24 px-3 py-1.5 rounded-md bg-surface border border-outline-variant text-on-surface font-sans text-body tabular-nums focus:bg-surface-container-lowest"
                 data-testid="input-dependents-count"
               />
             </div>
 
-            <!-- Family Members Table -->
-            <div v-if="userProfile.family_members && userProfile.family_members.length > 0" class="flex flex-col gap-xs mt-sm">
+            <div
+              v-if="userProfile.family_members && userProfile.family_members.length > 0"
+              class="divide-y divide-outline-variant/70 border-t border-outline-variant/70"
+            >
               <div
                 v-for="(member, idx) in userProfile.family_members"
                 :key="idx"
-                class="grid grid-cols-12 gap-sm items-center bg-surface p-sm rounded-md border border-outline-variant/30"
+                class="grid grid-cols-12 gap-3 items-end py-3"
                 data-testid="family-member-row"
               >
-                <div class="col-span-5 flex flex-col gap-xs">
-                  <span class="text-[10px] uppercase font-label-caps text-on-surface-variant">Name</span>
+                <div class="col-span-12 sm:col-span-5 flex flex-col gap-1">
+                  <span class="font-sans text-meta text-on-surface-variant">Name</span>
                   <input
                     v-model="member.name"
                     type="text"
                     placeholder="Name"
-                    class="px-sm py-xs text-xs bg-surface-container border border-outline-variant rounded focus:outline-none focus:border-primary text-on-surface"
+                    class="px-3 py-1.5 font-sans text-body bg-surface border border-outline-variant rounded-md text-on-surface focus:bg-surface-container-lowest"
                   />
                 </div>
-                <div class="col-span-4 flex flex-col gap-xs">
-                  <span class="text-[10px] uppercase font-label-caps text-on-surface-variant">Relationship</span>
+                <div class="col-span-7 sm:col-span-4 flex flex-col gap-1">
+                  <span class="font-sans text-meta text-on-surface-variant">Relationship</span>
                   <select
                     v-model="member.relationship"
-                    class="px-sm py-xs text-xs bg-surface-container border border-outline-variant rounded focus:outline-none focus:border-primary text-on-surface"
+                    class="px-3 py-1.5 font-sans text-body bg-surface border border-outline-variant rounded-md text-on-surface focus:bg-surface-container-lowest"
                   >
                     <option value="spouse">Spouse</option>
                     <option value="child">Child</option>
@@ -252,48 +261,47 @@
                     <option value="other">Other</option>
                   </select>
                 </div>
-                <div class="col-span-2 flex flex-col gap-xs">
-                  <span class="text-[10px] uppercase font-label-caps text-on-surface-variant">Age</span>
+                <div class="col-span-3 sm:col-span-2 flex flex-col gap-1">
+                  <span class="font-sans text-meta text-on-surface-variant">Age</span>
                   <input
                     v-model.number="member.age"
                     type="number"
                     min="0"
                     max="150"
-                    class="px-sm py-xs text-xs font-mono bg-surface-container border border-outline-variant rounded focus:outline-none focus:border-primary text-on-surface"
+                    class="px-3 py-1.5 font-sans text-body tabular-nums bg-surface border border-outline-variant rounded-md text-on-surface focus:bg-surface-container-lowest"
                   />
                 </div>
-                <div class="col-span-1 flex justify-end pt-3">
+                <div class="col-span-2 sm:col-span-1 flex justify-end pb-1">
                   <button
                     type="button"
-                    @click="removeFamilyMember(idx)"
-                    class="text-on-surface-variant hover:text-red-500 p-1"
+                    class="text-on-surface-variant hover:text-error p-1.5 rounded-md hover:bg-error-container/40 transition-colors duration-150 ease-desk"
                     title="Remove family member"
                     data-testid="btn-remove-family-member"
+                    @click="removeFamilyMember(idx)"
                   >
-                    <span class="material-symbols-outlined text-[18px]">delete</span>
+                    <span class="material-symbols-outlined text-[18px]" aria-hidden="true">delete</span>
                   </button>
                 </div>
               </div>
             </div>
-            <div v-else class="text-xs text-on-surface-variant italic py-sm text-center">
+            <div v-else class="font-sans text-meta text-on-surface-variant py-2">
               No additional family members configured.
             </div>
           </div>
-        </div>
+        </section>
 
-        <!-- Career & Financial Context -->
-        <div class="bg-surface-container rounded-lg p-lg border border-outline-variant/50 flex flex-col gap-md">
-          <div class="flex items-center gap-sm border-b border-outline-variant/30 pb-sm">
-            <span class="material-symbols-outlined text-primary text-[20px]">work</span>
-            <h2 class="font-title-sm text-on-surface font-semibold">Career &amp; Income Parameters</h2>
-          </div>
+        <!-- Career & Income Parameters -->
+        <section class="bg-surface-container-lowest rounded-xl p-lg border border-outline-variant shadow-sheet flex flex-col gap-md">
+          <h2 class="font-sans text-heading font-semibold text-on-surface border-b border-outline-variant pb-3">
+            Career &amp; Income Parameters
+          </h2>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-md">
-            <div class="flex flex-col gap-xs">
-              <label class="font-label-caps text-xs text-on-surface-variant uppercase font-medium">Employment Status</label>
+            <div class="flex flex-col gap-1.5">
+              <label class="font-sans text-meta font-medium text-on-surface-variant">Employment status</label>
               <select
                 v-model="userProfile.employment_status"
-                class="px-md py-sm rounded-md bg-surface border border-outline-variant text-on-surface focus:outline-none focus:border-primary text-sm"
+                class="px-3.5 py-2 rounded-md bg-surface border border-outline-variant text-on-surface font-sans text-body focus:bg-surface-container-lowest"
                 data-testid="select-employment-status"
               >
                 <option value="employed">Employed (Full-Time / Part-Time)</option>
@@ -305,128 +313,124 @@
               </select>
             </div>
 
-            <div class="flex flex-col gap-xs">
-              <label class="font-label-caps text-xs text-on-surface-variant uppercase font-medium">Occupation / Title</label>
+            <div class="flex flex-col gap-1.5">
+              <label class="font-sans text-meta font-medium text-on-surface-variant">Occupation / title</label>
               <input
                 v-model="userProfile.occupation"
                 type="text"
                 placeholder="e.g. Staff Systems Engineer"
-                class="px-md py-sm rounded-md bg-surface border border-outline-variant text-on-surface focus:outline-none focus:border-primary text-sm"
+                class="px-3.5 py-2 rounded-md bg-surface border border-outline-variant text-on-surface font-sans text-body focus:bg-surface-container-lowest"
                 data-testid="input-occupation"
               />
             </div>
 
-            <div class="flex flex-col gap-xs">
-              <label class="font-label-caps text-xs text-on-surface-variant uppercase font-medium">Gross Annual Income (USD)</label>
+            <div class="flex flex-col gap-1.5">
+              <label class="font-sans text-meta font-medium text-on-surface-variant">Gross annual income (USD)</label>
               <div class="relative">
-                <span class="absolute left-3 top-2.5 text-on-surface-variant text-sm font-mono">$</span>
+                <span class="absolute left-3.5 top-2 text-on-surface-variant font-sans text-body">$</span>
                 <input
                   v-model.number="userProfile.annual_income_usd"
                   type="number"
                   min="0"
                   step="1000"
                   placeholder="220000"
-                  class="w-full pl-7 pr-md py-sm rounded-md bg-surface border border-outline-variant text-on-surface font-mono focus:outline-none focus:border-primary text-sm"
+                  class="w-full pl-8 pr-3.5 py-2 rounded-md bg-surface border border-outline-variant text-on-surface font-sans text-body tabular-nums focus:bg-surface-container-lowest"
                   data-testid="input-annual-income"
                 />
               </div>
             </div>
 
-            <div class="flex flex-col gap-xs">
-              <label class="font-label-caps text-xs text-on-surface-variant uppercase font-medium">Monthly Housing Payment (USD)</label>
+            <div class="flex flex-col gap-1.5">
+              <label class="font-sans text-meta font-medium text-on-surface-variant">Monthly housing payment (USD)</label>
               <div class="relative">
-                <span class="absolute left-3 top-2.5 text-on-surface-variant text-sm font-mono">$</span>
+                <span class="absolute left-3.5 top-2 text-on-surface-variant font-sans text-body">$</span>
                 <input
                   v-model.number="userProfile.monthly_housing_payment_usd"
                   type="number"
                   min="0"
                   step="100"
                   placeholder="4200"
-                  class="w-full pl-7 pr-md py-sm rounded-md bg-surface border border-outline-variant text-on-surface font-mono focus:outline-none focus:border-primary text-sm"
+                  class="w-full pl-8 pr-3.5 py-2 rounded-md bg-surface border border-outline-variant text-on-surface font-sans text-body tabular-nums focus:bg-surface-container-lowest"
                   data-testid="input-housing-payment"
                 />
               </div>
             </div>
           </div>
-        </div>
+        </section>
       </div>
 
       <!-- TAB 2: Financial Goals & Timeline -->
       <div v-show="activeTab === 'goals'" class="flex flex-col gap-lg" data-testid="section-goals">
-        <div class="bg-surface-container rounded-lg p-lg border border-outline-variant/50 flex flex-col gap-md">
-          <div class="flex items-center justify-between border-b border-outline-variant/30 pb-sm">
-            <div class="flex items-center gap-sm">
-              <span class="material-symbols-outlined text-primary text-[20px]">flag</span>
-              <h2 class="font-title-sm text-on-surface font-semibold">Financial Objectives &amp; Capital Goals</h2>
-            </div>
+        <section class="bg-surface-container-lowest rounded-xl p-lg border border-outline-variant shadow-sheet flex flex-col gap-md">
+          <div class="flex items-center justify-between border-b border-outline-variant pb-3 gap-md">
+            <h2 class="font-sans text-heading font-semibold text-on-surface">Financial Objectives &amp; Capital Goals</h2>
             <button
               type="button"
-              @click="addGoal"
-              class="px-sm py-xs text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 rounded-md flex items-center gap-xs transition-colors"
+              class="px-3 py-1.5 font-sans text-meta font-medium text-primary hover:bg-surface-container-low rounded-md border border-outline-variant inline-flex items-center gap-1 transition-colors duration-150 ease-desk"
               data-testid="btn-add-goal"
+              @click="addGoal"
             >
-              <span class="material-symbols-outlined text-[16px]">add</span>
-              Add Goal
+              <span class="material-symbols-outlined text-[16px]" aria-hidden="true">add</span>
+              Add goal
             </button>
           </div>
 
-          <!-- Goals List -->
-          <div class="flex flex-col gap-md">
+          <div class="divide-y divide-outline-variant">
             <div
               v-for="(g, idx) in goals"
               :key="idx"
-              class="bg-surface p-md rounded-lg border border-outline-variant/40 flex flex-col gap-sm relative"
+              class="py-md first:pt-0 flex flex-col gap-3"
               data-testid="goal-item-row"
             >
-              <div class="flex items-center justify-between border-b border-outline-variant/20 pb-xs">
-                <span class="font-label-caps text-[11px] text-on-surface-variant uppercase font-medium">
-                  {{ idx === 0 ? 'Primary Goal (IPS Anchor)' : `Secondary Goal #${idx + 1}` }}
+              <div class="flex items-center justify-between">
+                <span class="font-sans text-meta font-semibold text-on-surface">
+                  {{ idx === 0 ? 'Primary goal (IPS anchor)' : `Secondary goal #${idx + 1}` }}
                 </span>
                 <button
                   v-if="goals.length > 1"
                   type="button"
-                  @click="removeGoal(idx)"
-                  class="text-on-surface-variant hover:text-red-500 text-xs flex items-center gap-1"
+                  class="text-on-surface-variant hover:text-error font-sans text-meta inline-flex items-center gap-1 transition-colors duration-150 ease-desk"
                   data-testid="btn-remove-goal"
+                  @click="removeGoal(idx)"
                 >
-                  <span class="material-symbols-outlined text-[16px]">delete</span>
+                  <span class="material-symbols-outlined text-[16px]" aria-hidden="true">delete</span>
                   <span>Remove</span>
                 </button>
               </div>
 
-              <div class="flex flex-col gap-xs">
-                <label class="font-label-caps text-xs text-on-surface-variant uppercase">Goal Description / Title</label>
+              <div class="flex flex-col gap-1.5">
+                <label class="font-sans text-meta font-medium text-on-surface-variant">Goal description</label>
                 <input
                   v-model="g.name"
                   type="text"
                   placeholder="e.g. Retirement Compounding & Financial Independence"
-                  class="px-md py-sm rounded-md bg-surface-container border border-outline-variant text-on-surface text-sm focus:outline-none focus:border-primary"
+                  class="px-3.5 py-2 rounded-md bg-surface border border-outline-variant text-on-surface font-sans text-body focus:bg-surface-container-lowest"
                   data-testid="input-goal-title"
                 />
               </div>
 
               <div class="grid grid-cols-1 md:grid-cols-2 gap-md">
-                <div class="flex flex-col gap-xs">
-                  <label class="font-label-caps text-xs text-on-surface-variant uppercase">Target Amount ($ USD)</label>
+                <div class="flex flex-col gap-1.5">
+                  <label class="font-sans text-meta font-medium text-on-surface-variant">Target amount (USD)</label>
                   <div class="relative">
-                    <span class="absolute left-3 top-2.5 text-on-surface-variant text-sm font-mono">$</span>
+                    <span class="absolute left-3.5 top-2 text-on-surface-variant font-sans text-body">$</span>
                     <input
                       v-model.number="g.target_amount_usd"
                       type="number"
                       min="0"
                       step="1000"
-                      class="w-full pl-7 pr-md py-sm rounded-md bg-surface-container border border-outline-variant text-on-surface font-mono text-sm focus:outline-none focus:border-primary"
+                      class="w-full pl-8 pr-3.5 py-2 rounded-md bg-surface border border-outline-variant text-on-surface font-sans text-body tabular-nums focus:bg-surface-container-lowest"
                       data-testid="input-goal-target-amount"
                     />
                   </div>
                 </div>
 
-                <div class="flex flex-col gap-xs">
-                  <label class="font-label-caps text-xs text-on-surface-variant uppercase">Target Date</label>
+                <div class="flex flex-col gap-1.5">
+                  <label class="font-sans text-meta font-medium text-on-surface-variant">Target date</label>
                   <input
                     v-model="g.target_date"
                     type="date"
-                    class="px-md py-sm rounded-md bg-surface-container border border-outline-variant text-on-surface font-mono text-sm focus:outline-none focus:border-primary"
+                    class="px-3.5 py-2 rounded-md bg-surface border border-outline-variant text-on-surface font-sans text-body tabular-nums focus:bg-surface-container-lowest"
                     data-testid="input-goal-target-date"
                   />
                 </div>
@@ -434,116 +438,123 @@
             </div>
           </div>
 
-          <!-- Timeline & Near-Term Liquidity -->
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-md pt-sm border-t border-outline-variant/30">
-            <div class="flex flex-col gap-xs">
-              <div class="flex justify-between items-center">
-                <label class="font-label-caps text-xs text-on-surface-variant uppercase font-medium">Time Horizon (Years)</label>
-                <span class="font-mono text-sm font-bold text-on-surface" data-testid="val-time-horizon">{{ timeHorizonYears }} years</span>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-md pt-md border-t border-outline-variant">
+            <div class="flex flex-col gap-1.5">
+              <div class="flex justify-between items-baseline">
+                <label class="font-sans text-meta font-medium text-on-surface-variant">Time horizon</label>
+                <span class="font-sans text-body font-semibold text-on-surface tabular-nums" data-testid="val-time-horizon">
+                  {{ timeHorizonYears }} years
+                </span>
               </div>
               <input
                 v-model.number="timeHorizonYears"
                 type="range"
                 min="1"
                 max="40"
-                class="w-full h-2 bg-surface-variant rounded-lg appearance-none cursor-pointer accent-primary mt-1"
+                class="w-full h-2 bg-surface-container rounded-lg appearance-none cursor-pointer accent-primary mt-2"
                 data-testid="slider-time-horizon"
               />
             </div>
 
-            <div class="flex flex-col gap-xs">
-              <label class="font-label-caps text-xs text-on-surface-variant uppercase font-medium">Target Retirement Age</label>
+            <div class="flex flex-col gap-1.5">
+              <label class="font-sans text-meta font-medium text-on-surface-variant">Target retirement age</label>
               <input
                 v-model.number="targetRetirementAge"
                 type="number"
                 min="30"
                 max="100"
                 placeholder="62"
-                class="px-md py-sm rounded-md bg-surface border border-outline-variant text-on-surface font-mono focus:outline-none focus:border-primary text-sm"
+                class="px-3.5 py-2 rounded-md bg-surface border border-outline-variant text-on-surface font-sans text-body tabular-nums focus:bg-surface-container-lowest"
                 data-testid="input-target-retirement-age"
               />
             </div>
 
-            <div class="flex flex-col gap-xs md:col-span-2">
-              <label class="font-label-caps text-xs text-on-surface-variant uppercase font-medium">Known Near-Term Capital Outlays ($ USD)</label>
+            <div class="flex flex-col gap-1.5 md:col-span-2">
+              <label class="font-sans text-meta font-medium text-on-surface-variant">Known near-term capital outlays (USD)</label>
               <div class="relative">
-                <span class="absolute left-3 top-2.5 text-on-surface-variant text-sm font-mono">$</span>
+                <span class="absolute left-3.5 top-2 text-on-surface-variant font-sans text-body">$</span>
                 <input
                   v-model.number="upcomingExpenses"
                   type="number"
                   min="0"
                   placeholder="0"
-                  class="w-full pl-7 pr-md py-sm rounded-md bg-surface border border-outline-variant text-on-surface font-mono focus:outline-none focus:border-primary text-sm"
+                  class="w-full pl-8 pr-3.5 py-2 rounded-md bg-surface border border-outline-variant text-on-surface font-sans text-body tabular-nums focus:bg-surface-container-lowest"
                   data-testid="input-upcoming-expenses"
                 />
               </div>
-              <span class="text-xs text-on-surface-variant">Anticipated capital needs in next 12 months (e.g. tuition, renovations).</span>
+              <span class="font-sans text-meta text-on-surface-variant">
+                Anticipated capital needs in the next 12 months (tuition, home renovations).
+              </span>
             </div>
 
-            <div class="flex flex-col gap-xs md:col-span-2">
-              <label class="font-label-caps text-xs text-on-surface-variant uppercase font-medium">Long-Term Milestones &amp; Family Objectives (Notes)</label>
+            <div class="flex flex-col gap-1.5 md:col-span-2">
+              <label class="font-sans text-meta font-medium text-on-surface-variant">Long-term milestones and family notes</label>
               <textarea
                 v-model="financialGoalsNotes"
                 rows="2"
                 placeholder="Describe your qualitative goals and family milestones..."
-                class="px-md py-sm rounded-md bg-surface border border-outline-variant text-on-surface focus:outline-none focus:border-primary text-sm resize-none"
+                class="px-3.5 py-2 rounded-md bg-surface border border-outline-variant text-on-surface font-sans text-body resize-none focus:bg-surface-container-lowest"
                 data-testid="textarea-goals-notes"
               ></textarea>
             </div>
           </div>
-        </div>
+        </section>
       </div>
 
-      <!-- TAB 3: Risk Calibration & Target Allocation Bands -->
+      <!-- TAB 3: Risk Calibration & Allocation -->
       <div v-show="activeTab === 'risk'" class="flex flex-col gap-lg" data-testid="section-risk">
-        <div class="bg-surface-container rounded-lg p-lg border border-outline-variant/50 flex flex-col gap-md">
-          <div class="flex items-center gap-sm border-b border-outline-variant/30 pb-sm">
-            <span class="material-symbols-outlined text-primary text-[20px]">pie_chart</span>
-            <h2 class="font-title-sm text-on-surface font-semibold">Risk Calibration &amp; Target Allocation Bands</h2>
-          </div>
+        <section class="bg-surface-container-lowest rounded-xl p-lg border border-outline-variant shadow-sheet flex flex-col gap-md">
+          <h2 class="font-sans text-heading font-semibold text-on-surface border-b border-outline-variant pb-3">
+            Risk Calibration &amp; Target Allocation Bands
+          </h2>
 
-          <!-- Risk Reaction Options -->
-          <div class="flex flex-col gap-xs">
-            <label class="font-label-caps text-xs text-on-surface-variant uppercase font-medium">
-              Market Drawdown Psychological Reaction (20% Drop)
+          <!-- Drawdown Reaction Selector -->
+          <div class="flex flex-col gap-2">
+            <label class="font-sans text-meta font-medium text-on-surface-variant">
+              Reaction to a sudden 20% market drawdown
             </label>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-sm mt-1">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
               <button
                 v-for="opt in reactionOptions"
                 :key="opt.id"
                 type="button"
-                class="p-md rounded-lg border text-left flex flex-col gap-1 transition-all"
+                class="p-md rounded-lg border text-left flex flex-col gap-1.5 transition-[border-color,background-color] duration-150 ease-desk"
                 :class="[
                   drawdownReaction === opt.id
-                    ? 'border-primary ring-2 ring-primary/20 bg-surface'
-                    : 'border-outline-variant bg-surface/50 hover:border-primary/50'
+                    ? 'border-primary bg-surface-container-low/70'
+                    : 'border-outline-variant bg-surface-container-lowest hover:border-primary/50'
                 ]"
                 :data-testid="`reaction-opt-${opt.id}`"
                 @click="onReactionSelect(opt.id)"
               >
-                <div class="flex items-center justify-between">
-                  <span class="font-title-sm text-xs font-semibold text-on-surface">{{ opt.title }}</span>
-                  <div
-                    class="w-3 h-3 rounded-full border"
-                    :class="drawdownReaction === opt.id ? 'bg-primary border-primary' : 'border-outline'"
-                  ></div>
+                <div class="flex items-center justify-between gap-2">
+                  <span class="font-sans text-body font-semibold text-on-surface">{{ opt.title }}</span>
+                  <span
+                    class="w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0"
+                    :class="drawdownReaction === opt.id ? 'border-primary' : 'border-outline'"
+                  >
+                    <span
+                      v-if="drawdownReaction === opt.id"
+                      class="w-2 h-2 rounded-full bg-primary"
+                    ></span>
+                  </span>
                 </div>
-                <span class="text-[11px] text-on-surface-variant leading-tight">{{ opt.description }}</span>
+                <span class="font-sans text-meta text-on-surface-variant">{{ opt.description }}</span>
               </button>
             </div>
           </div>
 
-          <!-- Derived Tier Badge -->
-          <div class="flex items-center justify-between p-sm bg-surface rounded-md border border-outline-variant/30">
-            <div class="flex items-center gap-sm">
-              <span class="font-label-caps text-xs text-on-surface-variant uppercase">Calibrated Risk Tier:</span>
-              <span class="font-title-sm text-sm capitalize font-bold text-on-surface" data-testid="derived-risk-tier">
+          <!-- Derived Tier Bar -->
+          <div class="flex items-center justify-between gap-md py-3 border-y border-outline-variant flex-wrap">
+            <div class="flex items-baseline gap-2">
+              <span class="font-sans text-meta text-on-surface-variant">Calibrated risk tier:</span>
+              <span class="font-sans text-body capitalize font-semibold text-on-surface" data-testid="derived-risk-tier">
                 {{ riskTolerance }}
               </span>
             </div>
             <select
               v-model="riskTolerance"
-              class="px-sm py-1 text-xs rounded bg-surface-container border border-outline-variant font-medium text-on-surface"
+              class="px-3 py-1.5 font-sans text-meta font-medium rounded-md bg-surface border border-outline-variant text-on-surface"
               data-testid="select-risk-tier"
             >
               <option value="conservative">Conservative</option>
@@ -552,10 +563,9 @@
             </select>
           </div>
 
-          <!-- Allocation Visual & Sliders -->
-          <div class="grid grid-cols-1 lg:grid-cols-12 gap-md items-center pt-sm border-t border-outline-variant/30">
-            <!-- Donut Chart & Projected Return (5 cols) -->
-            <div class="lg:col-span-5 flex flex-col items-center justify-center p-md bg-surface rounded-lg border border-outline-variant/30">
+          <!-- Allocation Visual & Controls -->
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-lg items-center pt-2">
+            <div class="lg:col-span-5 flex flex-col items-center justify-center p-md bg-surface rounded-lg border border-outline-variant/80">
               <div class="relative w-36 h-36 flex items-center justify-center">
                 <svg aria-label="Asset Allocation Chart" class="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
                   <circle
@@ -566,43 +576,44 @@
                     r="40"
                     fill="transparent"
                     :stroke="arc.color"
-                    stroke-width="12"
+                    stroke-width="11"
                     :stroke-dasharray="`${arc.len} 251.2`"
                     :stroke-dashoffset="arc.offset"
-                    class="transition-all duration-500 ease-out"
+                    class="transition-[stroke-dasharray,stroke-dashoffset] duration-300 ease-desk"
                   ></circle>
                 </svg>
                 <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                  <span class="font-title-sm text-sm text-on-surface font-mono font-bold" data-testid="total-percent-display">{{ totalTargetPercent }}%</span>
-                  <span class="text-[9px] uppercase font-label-caps text-on-surface-variant">Target</span>
+                  <span class="font-sans text-heading font-semibold text-on-surface tabular-nums" data-testid="total-percent-display">
+                    {{ totalTargetPercent }}%
+                  </span>
+                  <span class="font-sans text-meta text-on-surface-variant">Target</span>
                 </div>
               </div>
-              <div class="mt-sm flex items-center gap-sm text-xs">
-                <span class="text-on-surface-variant">Projected Return:</span>
-                <span class="font-mono font-bold text-on-surface" data-testid="projected-return">{{ projectedReturn }}</span>
+              <div class="mt-3 flex items-baseline gap-2 font-sans text-meta">
+                <span class="text-on-surface-variant">Projected return:</span>
+                <span class="font-semibold text-on-surface tabular-nums" data-testid="projected-return">{{ projectedReturn }}</span>
               </div>
             </div>
 
-            <!-- Sliders and Min/Max Bounds (7 cols) -->
-            <div class="lg:col-span-7 flex flex-col gap-sm">
+            <div class="lg:col-span-7 divide-y divide-outline-variant/70">
               <div
                 v-for="(band, idx) in bands"
                 :key="band.asset_class"
-                class="p-sm rounded-md bg-surface border border-outline-variant/30 flex flex-col gap-1"
+                class="py-3 first:pt-0 last:pb-0 flex flex-col gap-2"
                 data-testid="band-row"
               >
-                <div class="flex justify-between items-center text-xs">
-                  <span class="font-medium text-on-surface">{{ band.asset_class }}</span>
-                  <div class="flex items-center gap-1 font-mono">
+                <div class="flex justify-between items-center gap-md">
+                  <span class="font-sans text-body font-medium text-on-surface">{{ band.asset_class }}</span>
+                  <div class="flex items-center gap-1.5 tabular-nums">
                     <input
                       v-model.number="band.target_percent"
                       type="number"
                       min="0"
                       max="100"
-                      class="w-12 text-center bg-surface-container py-0.5 rounded border border-outline-variant text-xs"
+                      class="w-16 text-center bg-surface py-1 rounded-md border border-outline-variant font-sans text-body text-on-surface"
                       :data-testid="`input-target-${idx}`"
                     />
-                    <span>%</span>
+                    <span class="font-sans text-meta text-on-surface-variant">%</span>
                   </div>
                 </div>
 
@@ -611,29 +622,29 @@
                   type="range"
                   min="0"
                   max="100"
-                  class="w-full h-1.5 bg-surface-variant rounded-lg appearance-none cursor-pointer accent-primary"
+                  class="w-full h-1.5 bg-surface-container rounded-lg appearance-none cursor-pointer accent-primary"
                   :data-testid="`slider-target-${idx}`"
                 />
 
-                <div class="flex items-center justify-between text-[11px] text-on-surface-variant font-mono pt-1">
-                  <span>Drift Bounds:</span>
-                  <div class="flex items-center gap-1">
-                    <span>Min:</span>
+                <div class="flex items-center justify-between font-sans text-meta text-on-surface-variant tabular-nums">
+                  <span>Drift bounds</span>
+                  <div class="flex items-center gap-1.5">
+                    <span>Min</span>
                     <input
                       v-model.number="band.min_percent"
                       type="number"
                       min="0"
                       max="100"
-                      class="w-10 text-center bg-surface-container py-0.5 rounded border border-outline-variant text-[11px]"
+                      class="w-14 text-center bg-surface py-0.5 rounded border border-outline-variant text-meta text-on-surface"
                       :data-testid="`input-min-${idx}`"
                     />
-                    <span>% – Max:</span>
+                    <span>% to Max</span>
                     <input
                       v-model.number="band.max_percent"
                       type="number"
                       min="0"
                       max="100"
-                      class="w-10 text-center bg-surface-container py-0.5 rounded border border-outline-variant text-[11px]"
+                      class="w-14 text-center bg-surface py-0.5 rounded border border-outline-variant text-meta text-on-surface"
                       :data-testid="`input-max-${idx}`"
                     />
                     <span>%</span>
@@ -643,101 +654,99 @@
 
               <div
                 v-if="totalTargetPercent !== 100"
-                class="p-2 rounded bg-amber-500/10 border border-amber-500/30 text-amber-600 text-xs flex items-center gap-1.5"
+                class="mt-3 p-3 rounded-md bg-secondary-fixed border border-secondary-fixed-dim text-on-secondary-fixed font-sans text-meta font-medium flex items-center gap-2"
                 data-testid="allocation-warning"
               >
-                <span class="material-symbols-outlined text-[16px]">warning</span>
+                <span class="material-symbols-outlined text-[18px]" aria-hidden="true">warning</span>
                 <span>Total allocation must equal 100% (currently {{ totalTargetPercent }}%).</span>
               </div>
             </div>
           </div>
 
-          <!-- Risk Notes -->
-          <div class="flex flex-col gap-xs pt-sm border-t border-outline-variant/30">
-            <label class="font-label-caps text-xs text-on-surface-variant uppercase font-medium">Risk Tolerance &amp; Market Volatility Comfort (Notes)</label>
+          <div class="flex flex-col gap-1.5 pt-md border-t border-outline-variant">
+            <label class="font-sans text-meta font-medium text-on-surface-variant">
+              Volatility comfort and drawdown notes
+            </label>
             <textarea
               v-model="riskToleranceNotes"
               rows="2"
-              placeholder="Describe your personal comfort with market volatility and drawdown scenarios..."
-              class="px-md py-sm rounded-md bg-surface border border-outline-variant text-on-surface focus:outline-none focus:border-primary text-sm resize-none"
+              placeholder="Describe your comfort with market volatility and drawdown scenarios..."
+              class="px-3.5 py-2 rounded-md bg-surface border border-outline-variant text-on-surface font-sans text-body resize-none focus:bg-surface-container-lowest"
               data-testid="textarea-risk-notes"
             ></textarea>
           </div>
-        </div>
+        </section>
       </div>
 
       <!-- TAB 4: Liabilities & Debt -->
       <div v-show="activeTab === 'liabilities'" class="flex flex-col gap-lg" data-testid="section-liabilities">
-        <div class="bg-surface-container rounded-lg p-lg border border-outline-variant/50 flex flex-col gap-md">
-          <div class="flex items-center justify-between border-b border-outline-variant/30 pb-sm">
-            <div class="flex items-center gap-sm">
-              <span class="material-symbols-outlined text-primary text-[20px]">credit_card</span>
-              <h2 class="font-title-sm text-on-surface font-semibold">Current Liabilities &amp; Outstanding Debt</h2>
-            </div>
+        <section class="bg-surface-container-lowest rounded-xl p-lg border border-outline-variant shadow-sheet flex flex-col gap-md">
+          <div class="flex items-center justify-between border-b border-outline-variant pb-3 gap-md">
+            <h2 class="font-sans text-heading font-semibold text-on-surface">Current Liabilities &amp; Outstanding Debt</h2>
             <button
               v-if="!hasNoDebt"
               type="button"
-              @click="addLiability"
-              class="px-sm py-xs text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 rounded-md flex items-center gap-xs transition-colors"
+              class="px-3 py-1.5 font-sans text-meta font-medium text-primary hover:bg-surface-container-low rounded-md border border-outline-variant inline-flex items-center gap-1 transition-colors duration-150 ease-desk"
               data-testid="btn-add-liability"
+              @click="addLiability"
             >
-              <span class="material-symbols-outlined text-[16px]">add</span>
-              Add Liability
+              <span class="material-symbols-outlined text-[16px]" aria-hidden="true">add</span>
+              Add liability
             </button>
           </div>
 
-          <!-- Zero Debt Toggle -->
-          <div class="flex items-center justify-between p-sm bg-surface rounded-md border border-outline-variant/30">
+          <label class="flex items-center justify-between gap-md py-2 cursor-pointer">
             <div>
-              <span class="font-title-sm text-xs font-semibold text-on-surface block">Zero Outstanding Debt</span>
-              <span class="text-xs text-on-surface-variant">Check if you carry no loans, mortgages, or credit card balances.</span>
+              <span class="font-sans text-body font-semibold text-on-surface block">Zero outstanding debt</span>
+              <span class="font-sans text-meta text-on-surface-variant">
+                Check if you carry no loans, mortgages, or credit card balances.
+              </span>
             </div>
             <input
               v-model="hasNoDebt"
               type="checkbox"
-              class="w-5 h-5 accent-primary cursor-pointer"
+              class="w-5 h-5 accent-primary cursor-pointer shrink-0"
               data-testid="toggle-no-debt"
             />
-          </div>
+          </label>
 
-          <!-- Debt Items List -->
-          <div v-if="!hasNoDebt" class="flex flex-col gap-md">
+          <div v-if="!hasNoDebt" class="divide-y divide-outline-variant border-t border-outline-variant">
             <div
               v-for="(item, idx) in liabilities"
               :key="item.liability_id || idx"
-              class="bg-surface p-md rounded-lg border border-outline-variant/40 flex flex-col gap-sm"
+              class="py-md flex flex-col gap-3"
               data-testid="liability-item-row"
             >
-              <div class="flex items-center justify-between border-b border-outline-variant/20 pb-xs">
-                <span class="font-label-caps text-xs text-on-surface-variant uppercase font-medium">Liability #{{ idx + 1 }}</span>
+              <div class="flex items-center justify-between">
+                <span class="font-sans text-meta font-semibold text-on-surface">Liability #{{ idx + 1 }}</span>
                 <button
                   type="button"
-                  @click="removeLiability(idx)"
-                  class="text-on-surface-variant hover:text-red-500 text-xs flex items-center gap-1"
+                  class="text-on-surface-variant hover:text-error font-sans text-meta inline-flex items-center gap-1 transition-colors duration-150 ease-desk"
                   data-testid="btn-remove-liability"
+                  @click="removeLiability(idx)"
                 >
-                  <span class="material-symbols-outlined text-[16px]">delete</span>
+                  <span class="material-symbols-outlined text-[16px]" aria-hidden="true">delete</span>
                   <span>Remove</span>
                 </button>
               </div>
 
               <div class="grid grid-cols-1 md:grid-cols-2 gap-md">
-                <div class="flex flex-col gap-xs">
-                  <label class="font-label-caps text-xs text-on-surface-variant uppercase">Description</label>
+                <div class="flex flex-col gap-1.5">
+                  <label class="font-sans text-meta font-medium text-on-surface-variant">Description</label>
                   <input
                     v-model="item.description"
                     type="text"
                     placeholder="e.g. Premium Rewards Card, Mortgage"
-                    class="px-md py-sm rounded-md bg-surface-container border border-outline-variant text-on-surface text-sm focus:outline-none focus:border-primary"
+                    class="px-3.5 py-2 rounded-md bg-surface border border-outline-variant text-on-surface font-sans text-body focus:bg-surface-container-lowest"
                     data-testid="input-liability-desc"
                   />
                 </div>
 
-                <div class="flex flex-col gap-xs">
-                  <label class="font-label-caps text-xs text-on-surface-variant uppercase">Category</label>
+                <div class="flex flex-col gap-1.5">
+                  <label class="font-sans text-meta font-medium text-on-surface-variant">Category</label>
                   <select
                     v-model="item.type"
-                    class="px-md py-sm rounded-md bg-surface-container border border-outline-variant text-on-surface text-sm focus:outline-none focus:border-primary"
+                    class="px-3.5 py-2 rounded-md bg-surface border border-outline-variant text-on-surface font-sans text-body focus:bg-surface-container-lowest"
                     data-testid="select-liability-type"
                   >
                     <option value="credit_card">Credit Card</option>
@@ -751,20 +760,20 @@
               </div>
 
               <div class="grid grid-cols-1 md:grid-cols-3 gap-md">
-                <div class="flex flex-col gap-xs">
-                  <label class="font-label-caps text-xs text-on-surface-variant uppercase">Balance ($ USD)</label>
+                <div class="flex flex-col gap-1.5">
+                  <label class="font-sans text-meta font-medium text-on-surface-variant">Balance (USD)</label>
                   <input
                     v-model.number="item.balance_usd"
                     type="number"
                     min="0"
                     placeholder="0"
-                    class="px-md py-sm rounded-md bg-surface-container border border-outline-variant text-on-surface font-mono text-sm focus:outline-none focus:border-primary"
+                    class="px-3.5 py-2 rounded-md bg-surface border border-outline-variant text-on-surface font-sans text-body tabular-nums focus:bg-surface-container-lowest"
                     data-testid="input-liability-balance"
                   />
                 </div>
 
-                <div class="flex flex-col gap-xs">
-                  <label class="font-label-caps text-xs text-on-surface-variant uppercase">Interest APR (%)</label>
+                <div class="flex flex-col gap-1.5">
+                  <label class="font-sans text-meta font-medium text-on-surface-variant">Interest APR (%)</label>
                   <input
                     v-model.number="item.interest_rate_percent"
                     type="number"
@@ -772,19 +781,19 @@
                     max="100"
                     step="0.01"
                     placeholder="0"
-                    class="px-md py-sm rounded-md bg-surface-container border border-outline-variant text-on-surface font-mono text-sm focus:outline-none focus:border-primary"
+                    class="px-3.5 py-2 rounded-md bg-surface border border-outline-variant text-on-surface font-sans text-body tabular-nums focus:bg-surface-container-lowest"
                     data-testid="input-liability-apr"
                   />
                 </div>
 
-                <div class="flex flex-col gap-xs">
-                  <label class="font-label-caps text-xs text-on-surface-variant uppercase">Min Monthly Payment ($)</label>
+                <div class="flex flex-col gap-1.5">
+                  <label class="font-sans text-meta font-medium text-on-surface-variant">Min monthly payment (USD)</label>
                   <input
                     v-model.number="item.minimum_payment_usd"
                     type="number"
                     min="0"
                     placeholder="0"
-                    class="px-md py-sm rounded-md bg-surface-container border border-outline-variant text-on-surface font-mono text-sm focus:outline-none focus:border-primary"
+                    class="px-3.5 py-2 rounded-md bg-surface border border-outline-variant text-on-surface font-sans text-body tabular-nums focus:bg-surface-container-lowest"
                     data-testid="input-liability-min-payment"
                   />
                 </div>
@@ -792,66 +801,66 @@
 
               <div
                 v-if="item.interest_rate_percent >= 15"
-                class="p-2 rounded bg-amber-500/10 border border-amber-500/30 text-amber-600 text-xs flex items-center gap-1.5"
+                class="p-3 rounded-md bg-secondary-fixed/70 border border-secondary-fixed-dim text-on-secondary-fixed font-sans text-meta flex items-center gap-2"
               >
-                <span class="material-symbols-outlined text-[16px]">warning</span>
-                <span>High-interest debt ({{ item.interest_rate_percent }}% APR) is flagged for debt-paydown prioritization before aggressive equity allocation.</span>
+                <span class="material-symbols-outlined text-[18px] shrink-0" aria-hidden="true">warning</span>
+                <span>
+                  High-interest debt ({{ item.interest_rate_percent }}% APR) is flagged for debt-paydown prioritization before aggressive equity allocation.
+                </span>
               </div>
             </div>
           </div>
 
-          <!-- Total Liabilities Display -->
-          <div class="flex justify-between items-center p-sm bg-surface rounded-md border border-outline-variant/30 font-mono text-xs">
-            <span class="text-on-surface-variant">Total Reported Liabilities:</span>
-            <span class="font-bold text-on-surface" data-testid="total-liabilities-display">
+          <div class="flex justify-between items-center pt-3 border-t border-outline-variant font-sans text-body tabular-nums">
+            <span class="text-on-surface-variant">Total reported liabilities</span>
+            <span class="font-semibold text-on-surface" data-testid="total-liabilities-display">
               ${{ totalLiabilities.toLocaleString() }}
             </span>
           </div>
-        </div>
+        </section>
       </div>
 
       <!-- TAB 5: Policy Guardrails & Constraints -->
       <div v-show="activeTab === 'policy'" class="flex flex-col gap-lg" data-testid="section-policy">
-        <div class="bg-surface-container rounded-lg p-lg border border-outline-variant/50 flex flex-col gap-md">
-          <div class="flex items-center gap-sm border-b border-outline-variant/30 pb-sm">
-            <span class="material-symbols-outlined text-primary text-[20px]">gavel</span>
-            <h2 class="font-title-sm text-on-surface font-semibold">Policy Guardrails &amp; HITL Sign-offs</h2>
-          </div>
+        <section class="bg-surface-container-lowest rounded-xl p-lg border border-outline-variant shadow-sheet flex flex-col gap-md">
+          <h2 class="font-sans text-heading font-semibold text-on-surface border-b border-outline-variant pb-3">
+            Policy Guardrails &amp; HITL Sign-offs
+          </h2>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-md">
-            <div class="flex flex-col gap-xs">
-              <label class="font-label-caps text-xs text-on-surface-variant uppercase font-medium">Emergency Reserve (Months)</label>
+            <div class="flex flex-col gap-1.5">
+              <label class="font-sans text-meta font-medium text-on-surface-variant">Emergency reserve (months)</label>
               <input
                 v-model.number="reserveMonths"
                 type="number"
                 min="1"
                 max="36"
                 placeholder="6"
-                class="px-md py-sm rounded-md bg-surface border border-outline-variant text-on-surface font-mono text-sm focus:outline-none focus:border-primary"
+                class="px-3.5 py-2 rounded-md bg-surface border border-outline-variant text-on-surface font-sans text-body tabular-nums focus:bg-surface-container-lowest"
                 data-testid="input-reserve-months"
               />
-              <span class="text-[11px] text-on-surface-variant">Recommended: 3–6 months of living expenses.</span>
+              <span class="font-sans text-meta text-on-surface-variant">Recommended: 3 to 6 months of living expenses.</span>
             </div>
 
-            <div class="flex flex-col gap-xs">
-              <label class="font-label-caps text-xs text-on-surface-variant uppercase font-medium">Max Single-Stock Concentration (%)</label>
+            <div class="flex flex-col gap-1.5">
+              <label class="font-sans text-meta font-medium text-on-surface-variant">Max single-stock concentration (%)</label>
               <input
                 v-model.number="concentrationLimit"
                 type="number"
                 min="1"
                 max="50"
                 placeholder="15"
-                class="px-md py-sm rounded-md bg-surface border border-outline-variant text-on-surface font-mono text-sm focus:outline-none focus:border-primary"
+                class="px-3.5 py-2 rounded-md bg-surface border border-outline-variant text-on-surface font-sans text-body tabular-nums focus:bg-surface-container-lowest"
                 data-testid="input-concentration-limit"
               />
-              <span class="text-[11px] text-on-surface-variant">Default limit: 15% per holding.</span>
+              <span class="font-sans text-meta text-on-surface-variant">Default limit: 15% per holding.</span>
             </div>
 
-            <div class="flex flex-col gap-xs">
-              <label class="font-label-caps text-xs text-on-surface-variant uppercase font-medium">Account Type</label>
+            <div class="flex flex-col gap-1.5">
+              <label class="font-sans text-meta font-medium text-on-surface-variant">Account type</label>
               <select
                 v-model="accountType"
-                class="px-md py-sm rounded-md bg-surface border border-outline-variant text-on-surface text-sm focus:outline-none focus:border-primary"
+                class="px-3.5 py-2 rounded-md bg-surface border border-outline-variant text-on-surface font-sans text-body focus:bg-surface-container-lowest"
                 data-testid="select-account-type"
               >
                 <option value="taxable">Individual Taxable Brokerage</option>
@@ -859,101 +868,97 @@
               </select>
             </div>
 
-            <div class="flex flex-col justify-center gap-xs">
-              <label class="font-label-caps text-xs text-on-surface-variant uppercase font-medium">Tax-Loss Harvesting</label>
-              <label class="flex items-center gap-2 cursor-pointer mt-1">
+            <div class="flex flex-col justify-center gap-1.5">
+              <span class="font-sans text-meta font-medium text-on-surface-variant">Tax-loss harvesting</span>
+              <label class="flex items-center gap-2.5 cursor-pointer py-1.5">
                 <input
                   v-model="taxLossHarvesting"
                   type="checkbox"
                   class="w-5 h-5 accent-primary cursor-pointer"
                   data-testid="toggle-tax-loss"
                 />
-                <span class="text-sm text-on-surface">Enable automated TLH scans</span>
+                <span class="font-sans text-body text-on-surface">Enable automated TLH scans</span>
               </label>
             </div>
 
-            <div class="flex flex-col gap-xs md:col-span-2 pt-sm border-t border-outline-variant/30">
-              <label class="font-label-caps text-xs text-on-surface-variant uppercase font-medium">Excluded Tickers (Comma-separated)</label>
+            <div class="flex flex-col gap-1.5 md:col-span-2 pt-md border-t border-outline-variant">
+              <label class="font-sans text-meta font-medium text-on-surface-variant">Excluded tickers (comma-separated)</label>
               <input
                 v-model="excludedTickersStr"
                 type="text"
                 placeholder="e.g. TSLA, XOM, BABA"
-                class="px-md py-sm rounded-md bg-surface border border-outline-variant text-on-surface font-mono text-sm focus:outline-none focus:border-primary"
+                class="px-3.5 py-2 rounded-md bg-surface border border-outline-variant text-on-surface font-sans text-body focus:bg-surface-container-lowest"
                 data-testid="input-excluded-tickers"
               />
             </div>
 
-            <div class="flex flex-col gap-xs md:col-span-2">
-              <label class="font-label-caps text-xs text-on-surface-variant uppercase font-medium">Excluded Sectors (Comma-separated)</label>
+            <div class="flex flex-col gap-1.5 md:col-span-2">
+              <label class="font-sans text-meta font-medium text-on-surface-variant">Excluded sectors (comma-separated)</label>
               <input
                 v-model="excludedSectorsStr"
                 type="text"
                 placeholder="e.g. tobacco, defense, fossil_fuels"
-                class="px-md py-sm rounded-md bg-surface border border-outline-variant text-on-surface font-mono text-sm focus:outline-none focus:border-primary"
+                class="px-3.5 py-2 rounded-md bg-surface border border-outline-variant text-on-surface font-sans text-body focus:bg-surface-container-lowest"
                 data-testid="input-excluded-sectors"
               />
             </div>
 
-            <!-- HITL Sign-off Thresholds -->
-            <div class="flex flex-col gap-xs md:col-span-2 pt-sm border-t border-outline-variant/30">
-              <label class="font-title-sm text-sm text-on-surface font-semibold">Autonomous Trade Governance (HITL Thresholds)</label>
-              <span class="text-xs text-on-surface-variant mb-1">Trades exceeding either threshold require explicit human approval.</span>
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-md mt-1">
-                <div class="flex flex-col gap-xs">
-                  <label class="font-label-caps text-xs text-on-surface-variant uppercase">Require Approval Above ($ USD)</label>
+            <div class="flex flex-col gap-3 md:col-span-2 pt-md border-t border-outline-variant">
+              <div>
+                <h3 class="font-sans text-body font-semibold text-on-surface">Autonomous Trade Governance (HITL Thresholds)</h3>
+                <p class="font-sans text-meta text-on-surface-variant">
+                  Trades exceeding either threshold require explicit human approval before execution.
+                </p>
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-md">
+                <div class="flex flex-col gap-1.5">
+                  <label class="font-sans text-meta font-medium text-on-surface-variant">Require approval above (USD)</label>
                   <input
                     v-model.number="approvalAboveUsd"
                     type="number"
                     min="0"
                     placeholder="1000"
-                    class="px-md py-sm rounded-md bg-surface border border-outline-variant text-on-surface font-mono text-sm focus:outline-none focus:border-primary"
+                    class="px-3.5 py-2 rounded-md bg-surface border border-outline-variant text-on-surface font-sans text-body tabular-nums focus:bg-surface-container-lowest"
                     data-testid="input-approval-usd"
                   />
                 </div>
-                <div class="flex flex-col gap-xs">
-                  <label class="font-label-caps text-xs text-on-surface-variant uppercase">Require Approval Above (% of Portfolio)</label>
+                <div class="flex flex-col gap-1.5">
+                  <label class="font-sans text-meta font-medium text-on-surface-variant">Require approval above (% of portfolio)</label>
                   <input
                     v-model.number="approvalAbovePct"
                     type="number"
                     min="0.1"
                     max="100"
                     placeholder="5"
-                    class="px-md py-sm rounded-md bg-surface border border-outline-variant text-on-surface font-mono text-sm focus:outline-none focus:border-primary"
+                    class="px-3.5 py-2 rounded-md bg-surface border border-outline-variant text-on-surface font-sans text-body tabular-nums focus:bg-surface-container-lowest"
                     data-testid="input-approval-pct"
                   />
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        </section>
       </div>
 
       <!-- TAB 6: Income & Tax Documents -->
       <div v-show="activeTab === 'income'" class="flex flex-col gap-lg" data-testid="section-income">
-        <!-- W-2 Upload & Document AI Processing Card -->
-        <div class="bg-surface-container rounded-lg p-lg border border-outline-variant/50 flex flex-col gap-md">
-          <div class="flex items-center justify-between border-b border-outline-variant/30 pb-sm">
-            <div class="flex items-center gap-sm">
-              <span class="material-symbols-outlined text-primary text-[20px]">document_scanner</span>
-              <h2 class="font-title-sm text-on-surface font-semibold">IRS Form W-2 Statement Ingestion</h2>
-            </div>
-            <span class="text-xs text-on-surface-variant font-mono bg-surface-container-high px-2 py-0.5 rounded">
-              Powered by Google Cloud Document AI
-            </span>
+        <!-- W-2 Upload Sheet -->
+        <section class="bg-surface-container-lowest rounded-xl p-lg border border-outline-variant shadow-sheet flex flex-col gap-md">
+          <div class="flex items-baseline justify-between border-b border-outline-variant pb-3 gap-md flex-wrap">
+            <h2 class="font-sans text-heading font-semibold text-on-surface">IRS Form W-2 Statement Ingestion</h2>
+            <span class="font-sans text-meta text-on-surface-variant">Google Cloud Document AI</span>
           </div>
 
-          <p class="text-xs text-on-surface-variant">
-            Upload your official IRS Form W-2 (Wage and Tax Statement) in PDF, PNG, or JPG formats (max 10MB).
-            Document AI will automatically extract gross compensation, federal/state withholdings, and Box 12 retirement deferrals.
+          <p class="font-sans text-body text-on-surface-variant max-w-[65ch]">
+            Upload your IRS Form W-2 in PDF, PNG, or JPG format (up to 10 MB). Document AI extracts gross compensation, withholdings, and Box 12 retirement deferrals while masking SSNs.
           </p>
 
-          <!-- Upload Dropzone -->
           <div
-            class="border-2 border-dashed rounded-lg p-lg flex flex-col items-center justify-center text-center cursor-pointer transition-colors"
+            class="border-2 border-dashed rounded-lg p-lg flex flex-col items-center justify-center text-center cursor-pointer transition-[border-color,background-color] duration-200 ease-desk"
             :class="[
               isDraggingW2
-                ? 'border-primary bg-primary/5'
-                : 'border-outline-variant hover:border-primary/60 hover:bg-surface-container-high/40'
+                ? 'border-on-tertiary-container bg-tertiary-fixed/30'
+                : 'border-outline-variant bg-surface/60 hover:border-primary/60 hover:bg-surface-container-low/60'
             ]"
             data-testid="w2-dropzone"
             @dragover.prevent="isDraggingW2 = true"
@@ -970,200 +975,186 @@
               @change="onW2FileSelected"
             />
 
-            <div v-if="isUploadingW2" class="flex flex-col items-center gap-sm py-md">
-              <span class="material-symbols-outlined text-primary text-[32px] animate-spin">progress_activity</span>
-              <span class="text-sm font-medium text-on-surface">Parsing W-2 with Google Cloud Document AI...</span>
-              <span class="text-xs text-on-surface-variant">Extracting Boxes 1–20 and verifying employer records</span>
+            <div v-if="isUploadingW2" class="flex flex-col items-center gap-2 py-md">
+              <span class="material-symbols-outlined text-primary-fixed text-[32px] animate-spin" aria-hidden="true">
+                progress_activity
+              </span>
+              <span class="font-sans text-body font-medium text-on-surface">Parsing W-2 with Document AI...</span>
+              <span class="font-sans text-meta text-on-surface-variant">Extracting Boxes 1 to 20 and verifying employer records</span>
             </div>
 
-            <div v-else class="flex flex-col items-center gap-xs py-sm">
-              <span class="material-symbols-outlined text-primary text-[36px]">upload_file</span>
-              <span class="text-sm font-medium text-on-surface">
-                Drag &amp; drop your W-2 here, or <span class="text-primary underline">browse files</span>
+            <div v-else class="flex flex-col items-center gap-1.5 py-sm">
+              <span class="material-symbols-outlined text-primary text-[32px]" aria-hidden="true">upload_file</span>
+              <span class="font-sans text-body font-medium text-on-surface">
+                Drop your W-2 here, or <span class="text-primary-fixed underline">browse files</span>
               </span>
-              <span class="text-xs text-on-surface-variant">
-                Supported formats: PDF, PNG, JPG (up to 10MB)
+              <span class="font-sans text-meta text-on-surface-variant">
+                Supported formats: PDF, PNG, JPG (up to 10 MB)
               </span>
             </div>
           </div>
 
-          <!-- Status Banners for W-2 -->
           <div
             v-if="w2UploadSuccess"
-            class="p-sm rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 flex items-center justify-between text-xs"
+            class="px-3.5 py-2.5 rounded-md bg-tertiary-fixed/50 border border-tertiary-fixed-dim text-on-tertiary-fixed flex items-center justify-between gap-md font-sans text-meta"
             data-testid="w2-upload-success"
           >
-            <div class="flex items-center gap-xs">
-              <span class="material-symbols-outlined text-[16px]">check_circle</span>
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-[18px]" aria-hidden="true">check_circle</span>
               <span>{{ w2UploadSuccess }}</span>
             </div>
-            <button type="button" class="underline hover:opacity-80" @click="w2UploadSuccess = null">Dismiss</button>
+            <button type="button" class="font-medium hover:underline shrink-0" @click="w2UploadSuccess = null">Dismiss</button>
           </div>
 
           <div
             v-if="w2UploadError"
-            class="p-sm rounded-md bg-red-500/10 border border-red-500/30 text-red-600 flex items-center justify-between text-xs"
+            class="px-3.5 py-2.5 rounded-md bg-error-container border border-error/30 text-on-error-container flex items-center justify-between gap-md font-sans text-meta"
             data-testid="w2-upload-error"
           >
-            <div class="flex items-center gap-xs">
-              <span class="material-symbols-outlined text-[16px]">error</span>
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-[18px]" aria-hidden="true">error</span>
               <span>{{ w2UploadError }}</span>
             </div>
-            <button type="button" class="underline hover:opacity-80" @click="w2UploadError = null">Dismiss</button>
+            <button type="button" class="font-medium hover:underline shrink-0" @click="w2UploadError = null">Dismiss</button>
           </div>
-        </div>
+        </section>
 
-        <!-- Ingested W-2 Statements List & Breakdowns -->
-        <div class="bg-surface-container rounded-lg p-lg border border-outline-variant/50 flex flex-col gap-md">
-          <div class="flex items-center justify-between border-b border-outline-variant/30 pb-sm">
-            <div class="flex items-center gap-sm">
-              <span class="material-symbols-outlined text-primary text-[20px]">receipt_long</span>
-              <h2 class="font-title-sm text-on-surface font-semibold">Verified Tax Statements History</h2>
-            </div>
+        <!-- Verified Tax Statements -->
+        <section class="bg-surface-container-lowest rounded-xl p-lg border border-outline-variant shadow-sheet flex flex-col gap-md">
+          <div class="flex items-center justify-between border-b border-outline-variant pb-3 gap-md">
+            <h2 class="font-sans text-heading font-semibold text-on-surface">Verified Tax Statements History</h2>
             <button
               type="button"
-              class="text-xs text-primary hover:underline flex items-center gap-xs"
+              class="font-sans text-meta font-medium text-primary hover:bg-surface-container-low px-3 py-1.5 rounded-md inline-flex items-center gap-1.5 transition-colors duration-150 ease-desk"
               data-testid="btn-refresh-w2"
               @click="loadW2Documents"
             >
-              <span class="material-symbols-outlined text-[14px]">refresh</span>
+              <span class="material-symbols-outlined text-[16px]" aria-hidden="true">refresh</span>
               Refresh
             </button>
           </div>
 
-          <div v-if="loadingW2" class="p-lg text-center text-sm text-on-surface-variant">
+          <div v-if="loadingW2" class="py-lg text-center font-sans text-body text-on-surface-variant">
             Loading verified statements...
           </div>
 
-          <div v-else-if="w2Documents.length === 0" class="p-lg text-center text-sm text-on-surface-variant flex flex-col items-center gap-xs">
-            <span class="material-symbols-outlined text-outline text-[32px]">folder_open</span>
-            <span>No W-2 statements uploaded yet. Upload a tax statement above to verify your income.</span>
+          <div v-else-if="w2Documents.length === 0" class="py-lg text-center font-sans text-body text-on-surface-variant">
+            No W-2 statements uploaded yet. Upload a tax statement above to verify your income.
           </div>
 
-          <div v-else class="flex flex-col gap-md">
-            <div
+          <div v-else class="divide-y divide-outline-variant">
+            <article
               v-for="w2 in w2Documents"
               :key="w2.id"
-              class="border border-outline-variant/60 rounded-lg p-md bg-surface flex flex-col gap-sm shadow-xs"
+              class="py-md first:pt-0 last:pb-0 flex flex-col gap-3"
               data-testid="w2-card"
             >
-              <!-- Card Header -->
-              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-sm border-b border-outline-variant/30 pb-xs">
-                <div class="flex items-center gap-sm">
-                  <span class="px-2 py-0.5 rounded text-xs font-mono font-bold bg-primary-container text-on-primary">
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-sm">
+                <div class="flex flex-wrap items-baseline gap-2.5">
+                  <span class="font-sans text-body font-semibold text-primary tabular-nums">
                     Tax Year {{ w2.tax_year }}
                   </span>
-                  <span class="font-semibold text-sm text-on-surface">{{ w2.employer?.name || 'Employer' }}</span>
-                  <span v-if="w2.employer?.ein" class="text-xs text-on-surface-variant font-mono">
-                    EIN: {{ w2.employer.ein }}
+                  <span class="font-sans text-body font-medium text-on-surface">
+                    {{ w2.employer?.name || 'Employer' }}
+                  </span>
+                  <span v-if="w2.employer?.ein" class="font-sans text-meta text-on-surface-variant tabular-nums">
+                    EIN {{ w2.employer.ein }}
                   </span>
                 </div>
 
-                <div class="flex items-center gap-xs">
+                <div class="flex items-center gap-2">
                   <button
                     type="button"
-                    class="px-sm py-1 rounded bg-primary/10 hover:bg-primary/20 text-primary text-xs font-medium transition flex items-center gap-1"
+                    class="px-3 py-1.5 rounded-md bg-surface-container-lowest hover:bg-surface-container-low text-primary border border-outline-variant font-sans text-meta font-medium transition-colors duration-150 ease-desk inline-flex items-center gap-1.5"
                     data-testid="btn-apply-w2"
                     :disabled="applyingW2Id === w2.id"
                     @click="handleApplyW2(w2)"
                   >
-                    <span class="material-symbols-outlined text-[14px]">sync_alt</span>
+                    <span class="material-symbols-outlined text-[16px]" aria-hidden="true">sync_alt</span>
                     {{ applyingW2Id === w2.id ? 'Applying...' : 'Apply to Profile Income' }}
                   </button>
 
                   <button
                     type="button"
-                    class="p-1 rounded text-on-surface-variant hover:text-red-600 hover:bg-surface-container transition"
+                    class="p-1.5 rounded-md text-on-surface-variant hover:text-error hover:bg-error-container/40 transition-colors duration-150 ease-desk"
                     title="Delete W-2"
                     data-testid="btn-delete-w2"
                     @click="handleDeleteW2(w2.id)"
                   >
-                    <span class="material-symbols-outlined text-[16px]">delete</span>
+                    <span class="material-symbols-outlined text-[18px]" aria-hidden="true">delete</span>
                   </button>
                 </div>
               </div>
 
-              <!-- Main Financial Metrics Grid -->
-              <div class="grid grid-cols-2 sm:grid-cols-4 gap-sm pt-xs">
-                <div class="flex flex-col bg-surface-container/60 p-xs rounded">
-                  <span class="text-[10px] uppercase font-label-caps text-on-surface-variant">Box 1: Wages &amp; Tips</span>
-                  <span class="text-sm font-bold font-mono text-on-surface" data-testid="w2-box1-wages">
+              <div class="grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-outline-variant rounded-md border border-outline-variant bg-surface/60 tabular-nums">
+                <div class="p-3 flex flex-col gap-0.5">
+                  <span class="font-sans text-meta text-on-surface-variant">Box 1: Wages</span>
+                  <span class="font-sans text-body font-semibold text-on-surface" data-testid="w2-box1-wages">
                     ${{ (w2.wages_and_compensation?.box1_wages_tips_other_comp_usd ?? 0).toLocaleString() }}
                   </span>
                 </div>
-
-                <div class="flex flex-col bg-surface-container/60 p-xs rounded">
-                  <span class="text-[10px] uppercase font-label-caps text-on-surface-variant">Box 2: Federal Tax</span>
-                  <span class="text-sm font-mono text-on-surface">
+                <div class="p-3 flex flex-col gap-0.5">
+                  <span class="font-sans text-meta text-on-surface-variant">Box 2: Federal tax</span>
+                  <span class="font-sans text-body font-medium text-on-surface">
                     ${{ (w2.wages_and_compensation?.box2_federal_income_tax_withheld_usd ?? 0).toLocaleString() }}
                   </span>
                 </div>
-
-                <div class="flex flex-col bg-surface-container/60 p-xs rounded">
-                  <span class="text-[10px] uppercase font-label-caps text-on-surface-variant">Box 3: SS Wages</span>
-                  <span class="text-sm font-mono text-on-surface">
+                <div class="p-3 flex flex-col gap-0.5">
+                  <span class="font-sans text-meta text-on-surface-variant">Box 3: SS wages</span>
+                  <span class="font-sans text-body font-medium text-on-surface">
                     ${{ (w2.wages_and_compensation?.box3_social_security_wages_usd ?? 0).toLocaleString() }}
                   </span>
                 </div>
-
-                <div class="flex flex-col bg-surface-container/60 p-xs rounded">
-                  <span class="text-[10px] uppercase font-label-caps text-on-surface-variant">Box 5: Medicare Wages</span>
-                  <span class="text-sm font-mono text-on-surface">
+                <div class="p-3 flex flex-col gap-0.5">
+                  <span class="font-sans text-meta text-on-surface-variant">Box 5: Medicare</span>
+                  <span class="font-sans text-body font-medium text-on-surface">
                     ${{ (w2.wages_and_compensation?.box5_medicare_wages_and_tips_usd ?? 0).toLocaleString() }}
                   </span>
                 </div>
               </div>
 
-              <!-- Box 12 Items (e.g. 401(k), HSA) if present -->
-              <div v-if="w2.box12_items && w2.box12_items.length > 0" class="flex flex-wrap items-center gap-xs pt-xs">
-                <span class="text-[10px] uppercase font-label-caps text-on-surface-variant mr-1">Box 12 Benefits:</span>
-                <span
-                  v-for="(item, idx) in w2.box12_items"
-                  :key="idx"
-                  class="px-2 py-0.5 rounded-full text-xs font-mono bg-surface-container-high border border-outline-variant/40"
-                >
+              <div v-if="w2.box12_items && w2.box12_items.length > 0" class="flex flex-wrap items-baseline gap-x-4 gap-y-1 font-sans text-meta tabular-nums">
+                <span class="font-medium text-on-surface-variant">Box 12 benefits:</span>
+                <span v-for="(item, idx) in w2.box12_items" :key="idx" class="text-on-surface">
                   Code {{ item.code }}: ${{ item.amount_usd.toLocaleString() }}
-                  <span v-if="item.description" class="text-[10px] text-on-surface-variant font-sans">({{ item.description }})</span>
+                  <span v-if="item.description" class="text-on-surface-variant">({{ item.description }})</span>
                 </span>
               </div>
 
-              <!-- State Taxes if present -->
-              <div v-if="w2.state_taxes && w2.state_taxes.length > 0" class="flex flex-wrap items-center gap-xs pt-xs">
-                <span class="text-[10px] uppercase font-label-caps text-on-surface-variant mr-1">State Taxes:</span>
-                <span
-                  v-for="(st, sIdx) in w2.state_taxes"
-                  :key="sIdx"
-                  class="px-2 py-0.5 rounded text-xs font-mono bg-surface-container-high"
-                >
+              <div v-if="w2.state_taxes && w2.state_taxes.length > 0" class="flex flex-wrap items-baseline gap-x-4 gap-y-1 font-sans text-meta tabular-nums">
+                <span class="font-medium text-on-surface-variant">State taxes:</span>
+                <span v-for="(st, sIdx) in w2.state_taxes" :key="sIdx" class="text-on-surface">
                   {{ st.state }}: Wages ${{ st.state_wages_usd.toLocaleString() }}, Tax ${{ st.state_income_tax_usd.toLocaleString() }}
                 </span>
               </div>
-            </div>
+            </article>
           </div>
-        </div>
+        </section>
       </div>
 
       <!-- Action Footer -->
-      <div class="flex items-center justify-between pt-sm border-t border-outline-variant/40">
+      <div class="flex items-center justify-between pt-md border-t border-outline-variant gap-md">
         <button
           type="button"
-          @click="resetAllForms"
-          class="px-md py-sm text-sm font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-md transition"
+          class="px-4 py-2 font-sans text-body font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low rounded-md transition-colors duration-150 ease-desk"
           :disabled="isSaving"
           data-testid="btn-reset-profile"
+          @click="resetAllForms"
         >
           Reset to Saved
         </button>
 
         <button
           type="submit"
-          class="px-lg py-sm text-sm font-medium bg-primary text-on-primary hover:bg-primary/90 rounded-md transition flex items-center gap-xs shadow-sm disabled:opacity-50"
+          class="px-5 py-2.5 font-sans text-body font-medium bg-primary text-on-primary hover:bg-primary-container rounded-md transition-colors duration-150 ease-desk inline-flex items-center gap-2 disabled:opacity-50"
           :disabled="isSaving"
           data-testid="btn-save-profile"
           @click.prevent="handleSave"
         >
-          <span v-if="isSaving" class="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
-          <span v-else class="material-symbols-outlined text-[16px]">save</span>
+          <span v-if="isSaving" class="material-symbols-outlined animate-spin text-[18px]" aria-hidden="true">
+            progress_activity
+          </span>
+          <span v-else class="material-symbols-outlined text-[18px]" aria-hidden="true">save</span>
           {{ isSaving ? 'Saving Profile & Policy...' : 'Save Profile & Policy' }}
         </button>
       </div>
@@ -1215,7 +1206,6 @@ const tabs: { id: TabId; label: string; icon: string }[] = [
   { id: 'income', label: 'Income & Tax', icon: 'receipt_long' }
 ];
 
-// 1. Personal & Family State
 const userProfile = reactive<UserProfile>({
   user_id: 'demo_user',
   full_name: '',
@@ -1235,7 +1225,6 @@ const userProfile = reactive<UserProfile>({
   updated_at: ''
 });
 
-// 2. Goals & Timeline State
 const goals = ref<Goal[]>([
   {
     name: 'Retirement Compounding & Financial Independence',
@@ -1248,7 +1237,6 @@ const targetRetirementAge = ref<number | undefined>(62);
 const upcomingExpenses = ref(0);
 const financialGoalsNotes = ref('');
 
-// 3. Risk Calibration & Allocation State
 const drawdownReaction = ref<DrawdownReaction>('hold');
 const riskTolerance = ref<RiskToleranceTier>('aggressive');
 const bands = ref<AllocationBand[]>(getDefaultAllocationBands('aggressive'));
@@ -1268,11 +1256,10 @@ const reactionOptions: ReactionOption[] = [
   {
     id: 'sell',
     title: 'Sell to Capital Preservation',
-    description: 'Liquidate equities to cash / treasuries to prevent further portfolio drawdown.'
+    description: 'Liquidate equities to cash or treasuries to limit further portfolio drawdown.'
   }
 ];
 
-// 4. Liabilities & Debt State
 const hasNoDebt = ref(false);
 const liabilities = ref<LiabilityItem[]>([
   {
@@ -1285,7 +1272,6 @@ const liabilities = ref<LiabilityItem[]>([
   }
 ]);
 
-// 5. Policy Guardrails & HITL Sign-offs State
 const reserveMonths = ref(6);
 const concentrationLimit = ref(15);
 const accountType = ref<'taxable' | 'retirement'>('taxable');
@@ -1295,11 +1281,9 @@ const excludedSectorsStr = ref('');
 const approvalAboveUsd = ref(1000);
 const approvalAbovePct = ref(5);
 
-// Snapshots for reset
 const initialProfileSnapshot = ref<UserProfile | null>(null);
 const initialOnboardingSnapshot = ref<OnboardingProfile | null>(null);
 
-// Computed Calculations
 const totalLiabilities = computed(() => {
   if (hasNoDebt.value) return 0;
   return liabilities.value.reduce((acc, l) => acc + (Number(l.balance_usd) || 0), 0);
@@ -1310,7 +1294,7 @@ const totalTargetPercent = computed(() => {
 });
 
 const CIRCUMFERENCE = 251.2;
-const arcColors = ['#131b2e', '#b9c7e0', '#565e74', '#7890cd', '#e2e8f0'];
+const arcColors = ['#0f2342', '#1e40af', '#047857', '#334e68', '#64748b'];
 
 const chartArcs = computed(() => {
   let accumulatedOffset = 0;
@@ -1335,7 +1319,6 @@ const projectedReturn = computed(() => {
   return ret.toFixed(1) + '%';
 });
 
-// Methods
 function calculateAgeFromDOB() {
   if (!userProfile.date_of_birth) return;
   const dob = new Date(userProfile.date_of_birth);
@@ -1508,12 +1491,11 @@ async function loadData() {
       populateOnboardingProfile(onboardingData);
     }
     await loadW2Documents();
-  } catch (err: any) {
+  } catch {
     saveError.value = 'Failed to load initial settings.';
   }
 }
 
-// 6. Income & Tax (W-2) State & Handlers
 const w2Documents = ref<W2Document[]>([]);
 const loadingW2 = ref(false);
 const isUploadingW2 = ref(false);
@@ -1548,7 +1530,7 @@ async function uploadW2File(file: File) {
 
   try {
     const doc = await apiService.uploadW2(file, userProfile.user_id || 'demo_user');
-    w2UploadSuccess.value = `Successfully parsed Form W-2 (${doc.tax_year}) for ${doc.employer?.name || 'employer'} with Document AI! Box 1 Wages: $${doc.wages_and_compensation.box1_wages_tips_other_comp_usd.toLocaleString()}`;
+    w2UploadSuccess.value = `Parsed Form W-2 (${doc.tax_year}) for ${doc.employer?.name || 'employer'}. Box 1 Wages: $${doc.wages_and_compensation.box1_wages_tips_other_comp_usd.toLocaleString()}`;
     await loadW2Documents();
   } catch (err: any) {
     w2UploadError.value = err?.message || 'Failed to upload and parse W-2';
@@ -1586,7 +1568,7 @@ async function handleApplyW2(doc: W2Document) {
       if (res.profile.occupation) {
         userProfile.occupation = res.profile.occupation;
       }
-      w2UploadSuccess.value = `Successfully synchronized Box 1 wages ($${doc.wages_and_compensation.box1_wages_tips_other_comp_usd.toLocaleString()}) to Profile Annual Income!`;
+      w2UploadSuccess.value = `Successfully synchronized Box 1 wages ($${doc.wages_and_compensation.box1_wages_tips_other_comp_usd.toLocaleString()}) to Profile Annual Income.`;
     }
   } catch (err: any) {
     w2UploadError.value = err?.message || 'Failed to apply W-2 income to profile';
@@ -1614,7 +1596,6 @@ async function handleSave() {
   saveError.value = null;
 
   try {
-    // 1. Save User Profile
     const profilePayload: UserProfile = {
       ...userProfile,
       user_id: userProfile.user_id || 'demo_user',
@@ -1629,7 +1610,6 @@ async function handleSave() {
       populateUserProfile(profileRes.profile);
     }
 
-    // 2. Save Active IPS & Liabilities
     const [primaryGoal, ...additionalGoals] = goals.value;
     const ipsResult: Record<string, unknown> = {
       user_id: userProfile.user_id || 'demo_user',

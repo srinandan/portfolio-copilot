@@ -1,104 +1,142 @@
 <template>
-  <div class="flex flex-col lg:flex-row gap-lg lg:gap-xl w-full">
-    <!-- Left Panel (40%): Agent Activity & Conversational Stream -->
-    <div class="flex flex-col gap-md lg:w-[40%] lg:flex-shrink-0">
-      <!-- Action / Prompt Trigger -->
-      <div class="bg-surface-container-lowest rounded-xl p-sm border border-surface-variant shadow-sm flex flex-col gap-sm">
-        <textarea
-          v-model="inputPrompt"
-          rows="4"
-          placeholder="Ask Copilot (e.g. Analyze portfolio drift)..."
-          class="w-full px-3 py-2 text-sm rounded bg-surface border border-surface-variant font-body-base text-on-surface focus:outline-none focus:border-primary resize-y min-h-[96px]"
-          :disabled="isStreaming"
-          @keydown.enter.exact.prevent="triggerPlan(inputPrompt)"
-        ></textarea>
-        <div class="flex items-center justify-between gap-sm">
-          <span class="text-xs text-on-surface-variant hidden sm:block">
-            Enter to send · Shift+Enter for a new line
-          </span>
-          <Button
-            variant="primary"
-            :disabled="isStreaming"
-            data-testid="btn-trigger-plan"
-            @click="triggerPlan(inputPrompt)"
-          >
-            {{ isStreaming ? 'Running...' : 'Run' }}
-          </Button>
-        </div>
+  <div class="flex flex-col gap-lg w-full">
+    <h1 class="sr-only">Portfolio Copilot Workspace</h1>
 
-        <!-- Suggestion chips: always available, not just on the empty state -->
-        <div class="flex flex-wrap items-center gap-xs pt-xs border-t border-surface-variant">
-          <span class="text-xs text-on-surface-variant mr-1">Try:</span>
-          <button
-            v-for="prompt in examplePrompts"
-            :key="prompt"
-            type="button"
-            class="text-xs font-body-mono px-sm py-1 rounded-full bg-surface-container hover:bg-surface-container-high border border-surface-variant text-on-surface disabled:opacity-50"
-            data-testid="example-prompt"
-            :disabled="isStreaming"
-            @click="triggerPlan(prompt)"
-          >
-            {{ prompt }}
-          </button>
-        </div>
-      </div>
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-lg items-start w-full">
+      <!-- Left Desk (5 cols / ~42%): Copilot Command & Governance Stream -->
+      <section class="lg:col-span-5 flex flex-col gap-md">
+        <div class="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sheet overflow-hidden">
+          <!-- Prompt Composer -->
+          <div class="p-md flex flex-col gap-3">
+            <div class="flex items-baseline justify-between gap-sm">
+              <h2 class="font-sans text-heading font-semibold text-on-surface">Copilot desk</h2>
+              <span class="font-sans text-meta text-on-surface-variant hidden sm:inline">
+                Enter to run
+              </span>
+            </div>
 
-      <!-- Messages Stream -->
-      <div class="flex flex-col gap-sm">
-        <!-- Empty state: shown before the user runs anything -->
-        <div
-          v-if="messages.length === 0"
-          class="bg-surface-container-lowest rounded-xl p-lg border border-dashed border-surface-variant text-center flex flex-col items-center gap-sm"
-          data-testid="dashboard-empty-state"
-        >
-          <span class="material-symbols-outlined text-outline text-[28px]">chat</span>
-          <p class="font-body-base text-sm text-on-surface-variant">
-            Ask Portfolio Copilot something to get started, or pick a suggestion above. Nothing has run yet.
-          </p>
-        </div>
+            <textarea
+              v-model="inputPrompt"
+              rows="3"
+              placeholder="Ask Copilot (e.g. Analyze portfolio drift)..."
+              class="w-full px-3.5 py-2.5 text-body rounded-md bg-surface border border-outline-variant font-sans text-on-surface placeholder:text-on-surface-variant/70 resize-y min-h-[88px] transition-colors duration-200 ease-desk focus:border-primary-fixed focus:bg-surface-container-lowest"
+              :disabled="isStreaming"
+              @keydown.enter.exact.prevent="triggerPlan(inputPrompt)"
+            ></textarea>
 
-        <div
-          v-for="msg in messages"
-          :key="msg.id"
-          class="bg-surface-container-lowest rounded-xl p-md border border-surface-variant shadow-sm flex flex-col gap-sm"
-          data-testid="chat-message"
-        >
-          <div class="flex items-center justify-between text-xs text-on-surface-variant">
-            <span class="font-bold text-on-surface">{{ msg.sender === 'agent' ? 'Portfolio Copilot Agent' : 'User' }}</span>
-            <span class="font-body-mono">{{ msg.timestamp }}</span>
+            <div class="flex items-center justify-between gap-sm">
+              <span class="font-sans text-meta text-on-surface-variant hidden sm:inline">
+                Shift+Enter for a new line
+              </span>
+              <Button
+                variant="primary"
+                class="w-full sm:w-auto sm:ml-auto"
+                :disabled="isStreaming"
+                data-testid="btn-trigger-plan"
+                @click="triggerPlan(inputPrompt)"
+              >
+                {{ isStreaming ? 'Running...' : 'Run' }}
+              </Button>
+            </div>
           </div>
-          <!-- Live analysis progress: shown while the run is in flight, then
-               cleared and replaced by the final output below. -->
-          <AnalysisProgress
-            v-if="msg.sender === 'agent' && msg.progressActive && msg.progress && msg.progress.length"
-            :stages="msg.progress"
-            :started-at="msg.startedAt"
-          />
-          <p
-            v-else
-            class="font-body-base text-sm text-on-surface whitespace-pre-wrap"
-          >
-            {{ msg.text }}
-          </p>
 
-          <!-- Render Approval Card if action is attached -->
-          <ApprovalCard
-            v-if="msg.action"
-            :action="msg.action"
-            :verdict="msg.verdict"
-            @approve="onApproveAction(msg)"
-            @reject="onRejectAction(msg)"
-            @update="onUpdateAction(msg, $event)"
-          />
+          <!-- Suggested Prompts Directory (hairline-divided list, zero pill clutter) -->
+          <div class="border-t border-outline-variant bg-surface-container-low/40 px-md py-3">
+            <span class="font-sans text-meta font-medium text-on-surface-variant block mb-2">
+              Suggested inquiries
+            </span>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 divide-y divide-outline-variant/60 border-t border-outline-variant/60">
+              <button
+                v-for="prompt in examplePrompts"
+                :key="prompt"
+                type="button"
+                class="group py-2 px-1 text-left font-sans text-meta text-on-surface hover:text-primary flex items-center justify-between gap-2 transition-colors duration-150 ease-desk disabled:opacity-50"
+                data-testid="example-prompt"
+                :disabled="isStreaming"
+                @click="triggerPlan(prompt)"
+              >
+                <span class="truncate">{{ prompt }}</span>
+                <span
+                  class="material-symbols-outlined text-[16px] text-outline group-hover:text-primary group-hover:translate-x-0.5 transition-[color,transform] duration-150 ease-desk shrink-0"
+                  aria-hidden="true"
+                >
+                  arrow_forward
+                </span>
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
 
-    <!-- Right Panel (60%): Financial Canvas -->
-    <div class="flex flex-col gap-lg flex-1">
-      <NetWorthCard :total-value="holdings.total_value_usd" :as-of="holdings.as_of" />
-      <AssetAllocationCard />
-      <TopHoldingsTable :positions="holdings.positions" />
+        <!-- Messages Stream -->
+        <div class="flex flex-col gap-3">
+          <div
+            v-if="messages.length === 0"
+            class="bg-surface-container-lowest rounded-xl p-lg border border-dashed border-outline-variant text-center flex flex-col items-center gap-2"
+            data-testid="dashboard-empty-state"
+          >
+            <span class="material-symbols-outlined text-outline text-[24px]" aria-hidden="true">forum</span>
+            <p class="font-sans text-body text-on-surface-variant max-w-[44ch]">
+              Ask Portfolio Copilot something to get started, or pick a suggestion above. Nothing has run yet.
+            </p>
+          </div>
+
+          <article
+            v-for="msg in messages"
+            :key="msg.id"
+            :class="[
+              'rounded-xl p-md border flex flex-col gap-3',
+              msg.sender === 'agent'
+                ? 'bg-surface-container-lowest border-outline-variant shadow-sheet'
+                : 'bg-surface-container-low/80 border-outline-variant/80'
+            ]"
+            data-testid="chat-message"
+          >
+            <div class="flex items-baseline justify-between gap-sm text-meta">
+              <span class="font-semibold text-on-surface">
+                {{ msg.sender === 'agent' ? 'Portfolio Copilot Agent' : 'User' }}
+              </span>
+              <span class="text-on-surface-variant tabular-nums">{{ msg.timestamp }}</span>
+            </div>
+
+            <AnalysisProgress
+              v-if="msg.sender === 'agent' && msg.progressActive && msg.progress && msg.progress.length"
+              :stages="msg.progress"
+              :started-at="msg.startedAt"
+            />
+            <p
+              v-else
+              class="font-sans text-body text-on-surface whitespace-pre-wrap max-w-[65ch]"
+            >
+              {{ msg.text }}
+            </p>
+
+            <ApprovalCard
+              v-if="msg.action"
+              :action="msg.action"
+              :verdict="msg.verdict"
+              @approve="onApproveAction(msg)"
+              @reject="onRejectAction(msg)"
+              @update="onUpdateAction(msg, $event)"
+            />
+          </article>
+        </div>
+      </section>
+
+      <!-- Right Canvas (7 cols / ~58%): Financial Ledger -->
+      <section class="lg:col-span-7 flex flex-col gap-lg">
+        <!-- Unified Balance & Allocation Sheet -->
+        <div class="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sheet divide-y divide-outline-variant">
+          <NetWorthCard
+            :total-value="holdings.total_value_usd"
+            :cash-usd="holdings.cash_usd"
+            :as-of="holdings.as_of"
+            embedded
+          />
+          <AssetAllocationCard :holdings="holdings" embedded />
+        </div>
+
+        <TopHoldingsTable :positions="holdings.positions" />
+      </section>
     </div>
   </div>
 </template>
@@ -128,8 +166,6 @@ const isStreaming = ref(false);
 const currentSessionId = ref<string | undefined>(undefined);
 const currentUserId = ref('demo_user');
 
-// Start empty so we don't show a fake demo message. Real events populate this
-// on the first triggerPlan call, either from typed input or an example prompt.
 const messages = ref<ChatMessage[]>([]);
 
 const examplePrompts = [
@@ -185,13 +221,8 @@ function extractHITLPayload(event: Record<string, any>): {
 
   if (!raw && event.content?.parts) {
     for (const part of event.content.parts) {
-      // Plain text part carrying the JSON payload.
       raw = asHitlRequest(part.text);
       if (raw) break;
-      // ADK RequestInput surfaces the approval request as an `adk_request_input`
-      // function-call whose args.message holds the JSON payload; the interrupt
-      // id is the function-call id. Without this the ApprovalCard never mounts
-      // and the raw action+verdict JSON leaks into the chat.
       const fc = part.function_call;
       if (fc?.args) {
         raw = asHitlRequest(fc.args.message) || asHitlRequest(fc.args);
@@ -214,8 +245,6 @@ function extractHITLPayload(event: Record<string, any>): {
 
   if (raw && raw.action) {
     const action = { ...raw.action };
-    // The rationale occasionally arrives as a JSON-encoded ProposedActionRationale
-    // string; show the inner text, not the raw JSON.
     if (action.rationale !== undefined && action.rationale !== null) {
       action.rationale = unwrapRationale(action.rationale);
     }
@@ -228,11 +257,6 @@ function extractHITLPayload(event: Record<string, any>): {
   return null;
 }
 
-/**
- * Upsert a live progress stage into a message's stepper, keyed by stage id so
- * repeated events (running -> done, or re-emitted stages on HITL resume) update
- * the same row in place while preserving arrival order.
- */
 function upsertProgress(msg: ChatMessage, event: Record<string, any>) {
   const incoming: ProgressStage = {
     stage: String(event.stage ?? ''),
@@ -250,7 +274,6 @@ function upsertProgress(msg: ChatMessage, event: Record<string, any>) {
 }
 
 function handleStreamEvent(event: Record<string, any>, currentMsg: ChatMessage) {
-  // Live pipeline progress: update the stepper and stop — never touch text.
   if (event.kind === 'progress' && event.stage) {
     upsertProgress(currentMsg, event);
     return;
@@ -263,8 +286,6 @@ function handleStreamEvent(event: Record<string, any>, currentMsg: ChatMessage) 
 
   const hitl = extractHITLPayload(event);
   if (hitl) {
-    // The approval card is the point of interaction now — clear the stepper so
-    // the card replaces it.
     currentMsg.progressActive = false;
     currentMsg.action = hitl.action;
     currentMsg.verdict = hitl.verdict;
@@ -301,13 +322,11 @@ function handleStreamEvent(event: Record<string, any>, currentMsg: ChatMessage) 
   }
 }
 
-
 async function triggerPlan(promptText?: string) {
   const text = (promptText || 'Analyze my portfolio drift and suggest rebalancing').trim();
   if (!text) return;
   inputPrompt.value = '';
 
-  // Clear previous agent messages/responses for the new interaction
   messages.value = [];
 
   const userMsg: ChatMessage = {
@@ -326,17 +345,10 @@ async function triggerPlan(promptText?: string) {
     session_id: currentSessionId.value
   };
   messages.value.push(newAgentMsg);
-  // Drive streaming mutations through the REACTIVE array element, not the raw
-  // object. Mutating the raw object bypasses Vue's proxy set-trap, so per-event
-  // updates (notably the live progress stepper) would never re-render until some
-  // other reactive change forced it. The resume handlers already receive the
-  // reactive proxy via the template, which is why they were never affected.
   const agentMsg = messages.value[messages.value.length - 1];
 
   isStreaming.value = true;
   try {
-    // User-action span: the API client span for POST /api/plan nests under this,
-    // and the whole trace continues into the Go server and orchestrator.
     await runWithSpan(
       startSpan('planning_turn_triggered', {
         'user.id': currentUserId.value,
@@ -360,7 +372,6 @@ async function triggerPlan(promptText?: string) {
     agentMsg.text += `\n[Request Failed]: ${err.message || err}`;
   } finally {
     isStreaming.value = false;
-    // Run complete: clear the stepper so the final output replaces it.
     agentMsg.progressActive = false;
   }
 }
@@ -391,8 +402,7 @@ async function onApproveAction(msg: ChatMessage) {
           }
         )
     );
-  } catch (err: any) {
-    // If orchestrator is not running or mock test environment, status remains updated
+  } catch {
     msg.text += `\n[Approval Recorded]`;
   } finally {
     isStreaming.value = false;
@@ -427,7 +437,7 @@ async function onRejectAction(msg: ChatMessage) {
           }
         )
     );
-  } catch (err: any) {
+  } catch {
     msg.text += `\n[Rejection Recorded]`;
   } finally {
     isStreaming.value = false;
@@ -463,7 +473,7 @@ async function onUpdateAction(msg: ChatMessage, updated: ProposedAction) {
           }
         )
     );
-  } catch (err: any) {
+  } catch {
     msg.text += `\n[Edit Saved]`;
   } finally {
     isStreaming.value = false;

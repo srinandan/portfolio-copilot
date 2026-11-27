@@ -1,41 +1,44 @@
 <template>
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-md w-full" data-testid="spending-summary-card">
+  <section
+    class="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sheet grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-outline-variant w-full overflow-hidden"
+    data-testid="spending-summary-card"
+  >
     <!-- Total Income -->
-    <div class="bg-surface-container rounded-xl p-md border border-outline/10 flex flex-col gap-xs shadow-sm">
-      <span class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">Total Income</span>
-      <span class="font-body-mono text-xl text-on-surface tabular-nums font-bold">
+    <div class="p-lg flex flex-col gap-1">
+      <span class="font-sans text-meta font-medium text-on-surface-variant">Total income</span>
+      <span class="font-sans text-heading font-semibold text-on-surface tabular-nums">
         ${{ formatCurrency(report.total_income_usd) }}
       </span>
-      <span class="font-body-base text-xs text-on-surface-variant">Trailing 30 Days</span>
+      <span class="font-sans text-meta text-on-surface-variant">Trailing 30 days</span>
     </div>
 
     <!-- Total Outflow -->
-    <div class="bg-surface-container rounded-xl p-md border border-outline/10 flex flex-col gap-xs shadow-sm">
-      <span class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">Total Outflow</span>
-      <span class="font-body-mono text-xl text-on-surface tabular-nums font-bold">
+    <div class="p-lg flex flex-col gap-1">
+      <span class="font-sans text-meta font-medium text-on-surface-variant">Total outflow</span>
+      <span class="font-sans text-heading font-semibold text-on-surface tabular-nums">
         ${{ formatCurrency(report.total_outflow_usd) }}
       </span>
-      <span class="font-body-base text-xs text-on-surface-variant">Trailing 30 Days</span>
+      <span class="font-sans text-meta text-on-surface-variant">Trailing 30 days</span>
     </div>
 
     <!-- Savings Rate -->
-    <div class="bg-surface-container rounded-xl p-md border border-outline/10 flex flex-col gap-xs shadow-sm">
-      <span class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">Savings Rate</span>
-      <span class="font-body-mono text-xl text-tertiary-container tabular-nums font-bold">
+    <div class="p-lg flex flex-col gap-1 sm:border-t lg:border-t-0 border-outline-variant">
+      <span class="font-sans text-meta font-medium text-on-surface-variant">Savings rate</span>
+      <span class="font-sans text-heading font-semibold text-on-tertiary-container tabular-nums">
         {{ (report.savings_rate * 100).toFixed(1) }}%
       </span>
-      <span class="font-body-base text-xs text-on-surface-variant">Net Savings / Income</span>
+      <span class="font-sans text-meta text-on-surface-variant">Net savings / income</span>
     </div>
 
     <!-- Reserve Months -->
-    <div class="bg-surface-container rounded-xl p-md border border-outline/10 flex flex-col gap-xs shadow-sm">
-      <span class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">Liquidity Reserve</span>
-      <span class="font-body-mono text-xl text-primary tabular-nums font-bold">
+    <div class="p-lg flex flex-col gap-1 sm:border-t lg:border-t-0 border-outline-variant">
+      <span class="font-sans text-meta font-medium text-on-surface-variant">Liquidity reserve</span>
+      <span class="font-sans text-heading font-semibold text-primary tabular-nums">
         {{ report.reserve_months.toFixed(1) }} mo
       </span>
-      <span class="font-body-base text-xs text-on-surface-variant">Cash / Avg Monthly Spend</span>
+      <span class="font-sans text-meta text-on-surface-variant">Cash / avg monthly spend</span>
     </div>
-  </div>
+  </section>
 </template>
 
 <script setup lang="ts">

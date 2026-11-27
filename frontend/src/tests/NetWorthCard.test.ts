@@ -7,13 +7,19 @@ describe('NetWorthCard.vue', () => {
     cleanup();
   });
 
-  it('renders default zero net worth with consistent typography', () => {
+  it('renders default zero net worth with display tabular typography', () => {
     render(NetWorthCard);
     const valueEl = screen.getByTestId('net-worth-value');
     expect(valueEl.textContent?.trim()).toBe('$0.00');
-    expect(valueEl.className).toContain('font-body-mono');
-    expect(valueEl.className).toContain('text-3xl');
-    expect(valueEl.className).toContain('font-bold');
+    expect(valueEl.className).toContain('font-display');
+    expect(valueEl.className).toContain('tabular-nums');
+  });
+
+  it('renders optional cash balance breakdown when cashUsd is positive', () => {
+    render(NetWorthCard, {
+      props: { totalValue: 100000, cashUsd: 12500.5 }
+    });
+    expect(screen.getByText(/Includes \$12,500\.50 in cash and equivalents/)).toBeDefined();
   });
 
   it('renders formatted net worth with commas and 2 decimal places', () => {

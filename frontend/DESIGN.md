@@ -1,102 +1,99 @@
 ---
 name: Portfolio Copilot
+aesthetic: Fiduciary Editorial Desk
 colors:
-  surface: '#f7f9fb'
-  surface-dim: '#d8dadc'
-  surface-bright: '#f7f9fb'
+  background: '#f4f6f8'
+  on-background: '#0b1320'
+  surface: '#f4f6f8'
+  surface-bright: '#f9fafb'
+  surface-dim: '#dfe5ec'
+  surface-variant: '#d5dde6'
   surface-container-lowest: '#ffffff'
-  surface-container-low: '#f2f4f6'
-  surface-container: '#eceef0'
-  surface-container-high: '#e6e8ea'
-  surface-container-highest: '#e0e3e5'
-  on-surface: '#191c1e'
-  on-surface-variant: '#45464d'
-  inverse-surface: '#2d3133'
-  inverse-on-surface: '#eff1f3'
-  outline: '#76777d'
-  outline-variant: '#c6c6cd'
-  surface-tint: '#565e74'
-  primary: '#000000'
+  surface-container-low: '#edf1f5'
+  surface-container: '#e6ecf2'
+  surface-container-high: '#dce4ec'
+  surface-container-highest: '#d1dce7'
+  on-surface: '#0b1320'
+  on-surface-variant: '#475569'
+  inverse-surface: '#0f2342'
+  inverse-on-surface: '#f4f6f8'
+  outline: '#64748b'
+  outline-variant: '#d5dde6'
+  surface-tint: '#334e68'
+  primary: '#0f2342'
   on-primary: '#ffffff'
-  primary-container: '#131b2e'
-  on-primary-container: '#7c839b'
-  inverse-primary: '#bec6e0'
-  secondary: '#515f74'
+  primary-container: '#162e54'
+  on-primary-container: '#e2eaf6'
+  inverse-primary: '#93b4f0'
+  primary-fixed: '#1e40af'
+  primary-fixed-dim: '#3b5fc0'
+  on-primary-fixed: '#ffffff'
+  on-primary-fixed-variant: '#dbeafe'
+  secondary: '#334e68'
   on-secondary: '#ffffff'
-  secondary-container: '#d5e3fd'
-  on-secondary-container: '#57657b'
-  tertiary: '#000000'
+  secondary-container: '#dbeafe'
+  on-secondary-container: '#1e3a8a'
+  secondary-fixed: '#fef3c7'
+  secondary-fixed-dim: '#fde68a'
+  on-secondary-fixed: '#92400e'
+  on-secondary-fixed-variant: '#78350f'
+  tertiary: '#065f46'
   on-tertiary: '#ffffff'
-  tertiary-container: '#002114'
-  on-tertiary-container: '#069669'
-  error: '#ba1a1a'
+  tertiary-container: '#065f46'
+  on-tertiary-container: '#047857'
+  tertiary-fixed: '#d1fae5'
+  tertiary-fixed-dim: '#a7f3d0'
+  on-tertiary-fixed: '#064e3b'
+  on-tertiary-fixed-variant: '#047857'
+  error: '#b91c1c'
   on-error: '#ffffff'
-  error-container: '#ffdad6'
-  on-error-container: '#93000a'
-  primary-fixed: '#dae2fd'
-  primary-fixed-dim: '#bec6e0'
-  on-primary-fixed: '#131b2e'
-  on-primary-fixed-variant: '#3f465c'
-  secondary-fixed: '#d5e3fd'
-  secondary-fixed-dim: '#b9c7e0'
-  on-secondary-fixed: '#0d1c2f'
-  on-secondary-fixed-variant: '#3a485c'
-  tertiary-fixed: '#85f8c4'
-  tertiary-fixed-dim: '#68dba9'
-  on-tertiary-fixed: '#002114'
-  on-tertiary-fixed-variant: '#005137'
-  background: '#f7f9fb'
-  on-background: '#191c1e'
-  surface-variant: '#e0e3e5'
+  error-container: '#fee2e2'
+  on-error-container: '#991b1b'
 typography:
-  display-lg:
-    fontFamily: Geist
-    fontSize: 40px
-    fontWeight: '700'
-    lineHeight: 48px
-    letterSpacing: -0.02em
-  headline-md:
-    fontFamily: Geist
-    fontSize: 24px
-    fontWeight: '600'
-    lineHeight: 32px
-    letterSpacing: -0.01em
-  title-sm:
-    fontFamily: Geist
-    fontSize: 18px
-    fontWeight: '600'
-    lineHeight: 24px
-    letterSpacing: '0'
-  body-base:
-    fontFamily: Geist
-    fontSize: 14px
-    fontWeight: '400'
-    lineHeight: 20px
-    letterSpacing: '0'
-  body-mono:
-    fontFamily: JetBrains Mono
-    fontSize: 13px
+  # Strict 2-font pairing: Newsreader (editorial display) + Geist (UI & tabular numbers)
+  # Strict 3 body sizes (meta, body, heading) + exempt display sizes (brand, page-title, display-figure)
+  display-figure:
+    fontFamily: Newsreader
+    fontSize: clamp(2.125rem, 3.4vw, 3rem)
     fontWeight: '500'
-    lineHeight: 18px
-    letterSpacing: '0'
-  label-caps:
-    fontFamily: Geist
-    fontSize: 11px
-    fontWeight: '700'
-    lineHeight: 16px
-    letterSpacing: 0.08em
-  headline-lg-mobile:
-    fontFamily: Geist
-    fontSize: 32px
-    fontWeight: '700'
-    lineHeight: 40px
+    lineHeight: '1.06'
+    letterSpacing: -0.03em
+  page-title:
+    fontFamily: Newsreader
+    fontSize: clamp(1.75rem, 2.5vw, 2.25rem)
+    fontWeight: '500'
+    lineHeight: '1.15'
+    letterSpacing: -0.025em
+  brand:
+    fontFamily: Newsreader
+    fontSize: 1.25rem
+    fontWeight: '600'
+    lineHeight: '1.2'
     letterSpacing: -0.02em
+  heading:
+    fontFamily: Geist
+    fontSize: 1.125rem
+    fontWeight: '600'
+    lineHeight: '1.35'
+    letterSpacing: -0.015em
+  body:
+    fontFamily: Geist
+    fontSize: 0.9375rem
+    fontWeight: '400'
+    lineHeight: '1.55'
+    letterSpacing: '0'
+  meta:
+    fontFamily: Geist
+    fontSize: 0.8125rem
+    fontWeight: '500'
+    lineHeight: '1.45'
+    letterSpacing: '0'
 rounded:
   sm: 0.25rem
   DEFAULT: 0.5rem
-  md: 0.75rem
-  lg: 1rem
-  xl: 1.5rem
+  md: 0.5rem
+  lg: 0.625rem
+  xl: 0.75rem
   full: 9999px
 spacing:
   unit: 4px
@@ -105,109 +102,118 @@ spacing:
   md: 16px
   lg: 24px
   xl: 32px
-  gutter: 20px
+  gutter: 24px
   margin-mobile: 16px
   margin-desktop: 32px
-  panel-split: 40% 60%
+  panel-split: 5 cols (42%) / 7 cols (58%)
+motion:
+  easing: cubic-bezier(0.22, 1, 0.36, 1)
+  fast: 150ms
+  base: 200ms
+  progress: 300ms
 ---
 
-## Brand & Style
+## Brand & Visual Direction
 
-The brand personality is **authoritative, clinical, and reassuring**. It operates as a high-end financial assistant that balances the precision of an institutional trading desk with the transparency of a developer tool. The UI must evoke a sense of absolute security and intellectual rigor, moving away from "friendly" consumer fintech toward "powerful" professional governance.
+Portfolio Copilot uses a **Fiduciary Editorial Desk** visual language: authoritative, calm, and legible under dense financial review. It combines the typographic composure of an institutional investment memorandum with the immediate clarity of a live governance workbench.
 
-The design style is **Corporate Modern with a Minimalist/Technical edge**. It utilizes a structured "Dual-Panel" layout to separate human-centric conversation from data-centric analysis. Key characteristics include:
-- **Hairline Precision:** Use of 1px borders to define containment without visual weight.
-- **Data Density:** High information density handled through clear typographic hierarchy and monospaced accents.
-- **State Clarity:** Explicit color-coding for financial health (Emerald), risk (Amber), and violation (Crimson).
-- **Institutional Canvas:** A "Cool Ice" background that provides a glare-free, professional environment for long-form data auditing.
+Core principles:
+- **Workspace-first opening:** Every route opens directly into live controls, balances, and ledgers with zero marketing hero banners or decorative splash sections.
+- **Architectural hairlines over nested card cages:** Content is grouped on crisp pure-white sheets (`#FFFFFF`) over a cool alabaster canvas (`#F4F6F8`), subdivided internally by `1px` structural hairlines (`#D5DDE6`) and quiet recessed bands (`#EDF1F5`) instead of bordered boxes nested inside bordered boxes.
+- **Signal without visual noise:** Sections open directly with their `<h1>` or `<h2>`. The UI omits pre-heading eyebrows, tracked-out `ALL CAPS` micro-labels, decorative pills or badges, background watermarks, and synthetic pulsing telemetry dots.
+- **State clarity:** Semantic color is reserved strictly for financial or governance state: Deep Forest Emerald for compliance and approvals, Warm Ochre Amber for portfolio drift and pending sign-offs, Oxblood Crimson for policy violations, sells, and destructive actions, and Cobalt Blue for active agent execution and focus rings.
 
-## Colors
+## Color System
 
-The palette is anchored in **Deep Navy (#0F172A)** to signify stability and institutional trust. 
+All foreground/background pairings meet WCAG AA (`>= 4.5:1`) contrast:
 
-- **Primary & Neutral:** The interface relies on a "High-Contrast White-on-Ice" foundation. Surfaces are Pure White (#FFFFFF), while the background is a subtle Cool Ice (#F8FAFC). Borders use a slate hairline (#E2E8F0) to maintain structure.
-- **Action & Health (Emerald):** Emerald Green is used strictly for "Growth" and "Compliance." It signals successful document parsing, approved trades, and healthy portfolio targets.
-- **Technical Blue (Electric):** Electric Blue highlights "Agent Activity." It is used for tool execution, research links, and the dynamic planning stream.
-- **Alert System:** Amber is reserved for "Portfolio Drift" and "Pending Approvals." Crimson is used exclusively for "Policy Violations" and "Trade Rejections."
+- **Canvas & Sheets:** Architectural Alabaster (`#F4F6F8`) serves as the page canvas, lifting Pure White (`#FFFFFF`) elevated sheets separated by `#D5DDE6` hairlines and `#EDF1F5` recessed bands.
+- **Ink:** Deep Maritime Ink (`#0B1320`) for primary copy and figures; Slate Ink (`#475569`) for secondary copy, table headers, and metadata (`> 6.3:1` on both canvas and white sheets).
+- **Brand Anchor (Deep Maritime Oxford Navy):** `#0F2342` (`primary`) and `#162E54` (`primary-container`) ground primary actions, active navigation indicators, chart anchors, and the bespoke shield mark.
+- **Deliberate Accent (Cobalt Blue):** `#1E40AF` (`primary-fixed`) highlights active agent spinners, secondary chart series, inline links, and `2px` offset focus-visible rings.
+- **Compliance & Approval (Deep Forest Emerald):** `#065F46` (`tertiary`) for Approve Trade CTAs; `#047857` (`on-tertiary-container`) for positive deltas and completed pipeline steps; `#D1FAE5` / `#064E3B` (`tertiary-fixed` / `on-tertiary-fixed`) for `PASS` and `APPROVED` status indicators.
+- **Drift & Caution (Warm Ochre Amber):** `#FEF3C7` / `#92400E` (`secondary-fixed` / `on-secondary-fixed`) for `PENDING`, `DRIFTED`, rebalance alerts, and high-APR debt notices.
+- **Violation & Danger (Oxblood Crimson):** `#B91C1C` (`error`) for sell sides, negative drift, and Reject controls; `#FEE2E2` / `#991B1B` (`error-container` / `on-error-container`) for `VIOLATION`, `REJECTED`, and `FAILED` states.
+- **Chart Series Ramp:** `#0F2342` (Maritime Navy), `#1E40AF` (Cobalt), `#047857` (Forest Emerald), `#334E68` (Steel Slate), `#64748B` (Muted Slate).
 
 ## Typography
 
-This system employs a **dual-font strategy** to separate narrative from data.
+Portfolio Copilot uses a strict **2-font pairing** loaded with `<link rel="preconnect">` from Google Fonts, without loading a third monospace family:
 
-- **UI & Conversation (Geist):** Used for all interface labels, agent messages, and headings. Its geometric nature provides a modern, clean look that feels contemporary yet serious.
-- **Financial & Audit Data (JetBrains Mono):** Crucial for "Portfolio Copilot." All monetary figures, ticker symbols (e.g., AAPL), trade quantities, and audit IDs must use this monospaced font. This ensures tabular alignment of numbers, making it easier for users to compare values vertically.
-- **Case Usage:** Use `label-caps` for table headers and category tags to create clear visual separation from content.
-- **Numerical Alignment:** Always use `font-variant-numeric: tabular-nums` for data tables to prevent shifting when values update.
+- **Editorial Display (`Newsreader`, optical size 6-72, weights 400-600):** Used exclusively for the navbar brand wordmark (`brand`), page-level `<h1>` titles (`page-title`), and hero monetary totals (`display-figure`) with tight negative display tracking (`-0.02em` to `-0.03em`).
+- **UI, Prose & Tabular Figures (`Geist`, weights 400-700):** Used for all navigation, section headings, conversational text, forms, buttons, tables, and numerical data. All dollar amounts, percentages, tickers, timestamps, and timers apply `font-variant-numeric: tabular-nums lining-nums` so columns align vertically without introducing a third font family.
 
-## Layout & Spacing
+### 3-Size Body Discipline
 
-The system follows a **12-column grid** on desktop, but the primary structure is defined by a **Dual-Panel Split**.
+Below the exempt display tokens (`brand`, `page-title`, `display-figure`), the entire interface locks to **3 consistent font sizes** with zero text smaller than `13px` (`0.8125rem`):
 
-- **Desktop (>=1024px):** A fixed split layout. The Left Panel (40%) handles the conversational stream and agent planning. The Right Panel (60%) serves as the primary "Financial Canvas" for cards and data tables.
-- **Spacing Rhythm:** Based on an 8px scale. Use 24px (lg) for internal card padding and 32px (xl) for page margins to create a "High-End" breathable feel.
-- **Data Density:** In data-heavy tables, reduce vertical cell padding to 10px to maximize information visibility without compromising touch targets.
-- **Reflow:** On mobile (<768px), the layout stacks into a single column. The agent chat becomes a collapsible bottom-sheet or a dedicated tab to prioritize the financial data view.
+| Token | Size / Line-Height | Usage |
+| :--- | :--- | :--- |
+| `text-heading` | `1.125rem` (`18px`) / `1.35` | Section headings (`<h2>`, `<h3>`), summary strip metrics |
+| `text-body` | `0.9375rem` (`15px`) / `1.55` | Prose, lists, inputs, buttons, nav links, table values (`<= 65ch` for paragraphs) |
+| `text-meta` | `0.8125rem` (`13px`) / `1.45` | Field labels, table column headers, timestamps, helper text, status indicators |
 
-## Elevation & Depth
+- **Sentence case:** UI labels, field labels, buttons, and table headers use sentence case rather than tracked-out uppercase strings. Acronyms (`IPS`, `DCF`, `APR`, `W-2`), ticker symbols (`AAPL`), and explicit governance status tokens (`PASS`, `DRIFTED`, `APPROVED`, `REJECTED`) retain their standard casing.
 
-To maintain a "Clinical" and "Secure" aesthetic, the system avoids heavy shadows in favor of **Tonal Layers and Hairline Borders**.
+## Layout, Navigation & Elevation
 
-- **Surfaces:** Use `#FFFFFF` for all primary containers (cards, modals). These sit atop the `#F8FAFC` background.
-- **Shadows:** Use a single, extremely subtle "Ambient Shadow" for cards: `0 1px 3px rgba(15, 23, 42, 0.06)`. It should look like the card is barely lifted from the surface.
-- **Separation:** Rely on 1px solid borders (`#E2E8F0`) for structural definition.
-- **Focus States:** Use a 2px offset ring in Electric Blue (#2563EB) to indicate active input or interactive agent nodes.
-- **Depth via Color:** Use the "Deep Navy" (#0F172A) for the most elevated global elements (like the Primary Navigation) to ground the interface.
+- **Top Masthead (`Navbar.vue`):** Fixed `64px` single-line header (`max-w-7xl`) featuring a bespoke inline geometric SVG shield mark and `Newsreader` brand wordmark on the left, clean underline-indicated navigation links (`Dashboard`, `Portfolio`, `Spending`, `Documents`, `Profile`) on desktop (`>= 768px`), and a toggleable single-column mobile drawer on `< 768px`. Scroll state (`window.scrollY > 8`) adds crisp bottom separation (`shadow-nav-scrolled`). On `/onboarding`, the global navbar yields to the dedicated fixed onboarding header.
+- **Dashboard Workbench (`/`):** 12-column responsive grid on desktop (`>= 1024px`) split **5 columns (~42%)** for the Copilot Command & Governance Desk on the left and **7 columns (~58%)** for the Financial Ledger Canvas on the right. Stacks cleanly into a single column on tablet and mobile without horizontal overflow.
+- **Elevation:** Primary sheets use `1px solid #D5DDE6` borders and a quiet hairline shadow (`0 1px 2px rgba(11, 19, 32, 0.04)`). Interactive elements expose a `2px` Cobalt (`#1E40AF`) `focus-visible` outline with `2px` offset.
 
-## Shapes
+## Motion & Accessibility
 
-The shape language is **Rounded**, using `0.5rem` (8px) as the base radius for standard components like buttons and input fields.
-
-- **Standard Cards:** Use `rounded-lg` (16px) to provide a soft, modern container for complex data.
-- **Status Chips:** Use a full "Pill" shape for status indicators (e.g., "PASS", "DRIFTED") to distinguish them from interactive buttons.
-- **Upload Dropzones:** Use `rounded-lg` with a dashed border to signify a temporary, interactive area.
+- **Explicit transitions only:** CSS transitions name explicit properties (`transition-colors`, `transition-transform`, `transition-[width]`, `transition-[stroke-dasharray,stroke-dashoffset]`) with brisk durations (`150ms`-`300ms`) and ease-out curve `cubic-bezier(0.22, 1, 0.36, 1)` (`ease-desk`). `transition-all` is prohibited.
+- **Reduced motion:** `@media (prefers-reduced-motion: reduce)` collapses all animations and transitions globally in `src/style.css`.
+- **No idle loops:** Decorative pulsing dots and ambient glows are omitted. Spin animations appear solely on active loading or streaming indicators (`progress_activity`).
 
 ## Components
 
-### Buttons
-- **Primary:** Deep Navy background, white text. Bold and authoritative.
-- **Approval:** Emerald Green background. Exclusive to human-in-the-loop confirmations.
-- **Reject/Danger:** Crimson outline or text. Used for "Reject Proposal."
+### Buttons (`Button.vue`)
+- **Primary:** Deep Maritime Navy (`#0F2342`) with white text (`hover:bg-primary-container`).
+- **Approval:** Deep Forest Emerald (`#065F46`) with white text, reserved exclusively for human-in-the-loop confirmations.
+- **Danger:** Crisp white surface with Oxblood Crimson border and text (`hover:bg-error-container/60`) for Reject actions.
+- **Secondary:** Crisp white surface with hairline border (`#D5DDE6`) and slate hover fill for Edit and Cancel controls.
 
-### Secure File Upload
-- **Dropzone:** 2px dashed Slate (#94A3B8) border. On drag-over, the border turns Emerald Green and the background becomes a light Emerald tint (#D1FAE5 at 30%).
-- **Validation Card:** Displays filename, size, and a monospaced "Parsed Record Count." Includes a "Secure Processing" badge with a lock icon.
+### Status Indicators (`StatusPill.vue`)
+- Compact rounded-md (`6px`) hairline-bordered semantic indicators used only for genuine governance, drift, and ingestion statuses (`PASS`, `APPROVED`, `SUCCESS`, `PENDING`, `DRIFTED`, `VIOLATION`, `REJECTED`, `FAILED`).
 
-### Human-in-the-Loop Approval Card
-- **Header:** Contains a monospaced Action ID and a timestamp.
-- **Body:** A structured grid showing the trade details (Ticker, Side, Amount). Side must be color-coded (BUY: Emerald, SELL: Crimson).
-- **Verdict Section:** An itemized list of policy rules with "PASS/FAIL" badges. This creates a "Checklist" of safety before the user clicks execute.
+### Copilot Desk & Prompt Directory (`DashboardView.vue`)
+- Single elevated sheet combining the prompt composer (`Enter` to run, `Shift+Enter` for newline, single primary `Run` button) above a hairline-divided **Suggested inquiries** list of clickable prompt rows with subtle arrow motion (replacing clustered pill chips).
+- Streaming responses appear in clean single-level turns below; active runs render `AnalysisProgress` and clear it once the final reply or `ApprovalCard` arrives.
 
-### Analysis Progress Stepper
-Surfaces the agent's live pipeline in the conversational stream during a minutes-long analysis, so the wait reads as visible progress rather than a frozen line.
-- **Rows:** One per stage (skill discovery, spending, portfolio drift, research, drafting, review, approval, execution). Each advances `running` → `done` / `skipped` / `failed`, with an optional monospaced detail line and a header-level elapsed timer.
-- **State Clarity:** `running` uses the "Agent Activity" accent with a spinning glyph; `done` uses Emerald (compliance/success); `skipped` is muted (Outline); `failed` is Crimson — matching the system's financial-health color-coding.
-- **Lifecycle:** Renders only while a run is streaming; on completion (or when it pauses for approval) it clears and is replaced by the final output or the Approval Card — replace, don't stack.
+### Unified Balance & Allocation Sheet (`NetWorthCard.vue`, `AssetAllocationCard.vue`)
+- On the Dashboard, `NetWorthCard` and `AssetAllocationCard` compose inside one hairline-divided white sheet (`embedded` mode) so balances and allocation read as one ledger.
+- `NetWorthCard` sets the balance in `Newsreader` `text-display-figure` with `tabular-nums`, optional cash summary, and updated timestamp.
+- `AssetAllocationCard` dynamically computes the mix from live `holdings` when available (falling back to baseline weights when empty), pairing a segmented proportion bar with a hairline-divided tabular breakdown.
 
-### Financial Visualizations
-- **Drift Bars:** A horizontal track (#E2E8F0) with a "Target Range" bracket. The actual value is a solid bar that turns Amber if it falls outside the bracket.
-- **Status Pills:** Small, bold, uppercase labels. Use emerald backgrounds for "PASS" and "APPROVED", amber for "PENDING" or "DRIFTED", and crimson for "VIOLATION".
+### Top Holdings Ledger (`TopHoldingsTable.vue`)
+- Institutional HTML `<table>` inside a single hairline-bordered sheet with square ticker monograms, sentence-case column headers (`Holding`, `Asset class`, `Shares`, `Market value`), and right-aligned tabular figures.
 
-### Input Fields
-- White background, 1px Slate border. 
-- **Monospaced Inputs:** Any input field for dollar amounts or ticker symbols must use JetBrains Mono.
+### Portfolio Drift Report (`DriftReportCard.vue`)
+- Tabular IPS drift audit featuring an inline **Band position** visual track per asset class: a subtle shaded `[min%, max%]` target bracket overlaid with the actual allocation fill bar (Maritime Navy when in-band, Warm Ochre Amber when drifted), paired with right-aligned percentages and semantic `PASS` / `DRIFTED` status pills.
 
-### Onboarding & Calibration Flow (`/onboarding`)
-- **Step Progress Bar:** Header-level animated progress bar showing fractional completion across the 4 setup turns (0% -> 33% -> 66% -> 100%).
-- **Interactive Objective Cards:** Single-select objective vectors (Aggressive Capital Appreciation, Balanced Growth & Income, Capital Preservation) with primary-bordered active states.
-- **Real-Time Telemetry Canvas:** Desktop 60% right panel dynamically updates model-generated allocation forecasts (Equities, Fixed Income, Cash) and Projected Return metrics as the user explores risk profiles.
+### Advisory Equity Research (`EquityAnalyzer.vue`, `EquityRecommendationCard.vue`)
+- Single-ticker lookup panel integrated with an embedded hairline-separated recommendation sheet showing direction indicator, 3-column hairline-divided DCF valuation strip (`Price`, `Intrinsic (DCF)`, `Upside`), rationale prose (`<= 65ch`), side-by-side Suitability and Key risks columns, and advisory disclaimers.
 
-### Target Allocation Donut Chart & Sliders
-- **SVG Donut Chart:** Inline vector chart computed via stroke-dasharray and stroke-dashoffset based on the circle's circumference ($2\pi r = 251.2$). Segmented by Equities (`#131B2E`), Fixed Income (`#B9C7E0`), and Cash (`#565E74`).
-- **Synchronized Sliders & Inputs:** Dual-control range sliders and monospaced number inputs for granular target band overrides.
-- **100% Total Validation:** Fail-closed error toast (`bg-error-container text-on-error-container`) warning the user whenever allocations sum to $\ne 100\%$, disabling the "Confirm Allocation" CTA until balanced.
+### Human-in-the-Loop Approval Card (`ApprovalCard.vue`)
+- Elevated governance sheet accented with a `4px` Maritime Navy left border (`border-l-primary`), displaying Action ID, status indicator, a 3-column hairline-divided trade ticket (`Ticker`, `Side`, `Quantity`), rationale, hairline-divided Policy safety checklist (`PASS`/`FAIL`), inline Edit form, and Approve / Reject / Edit footer controls.
+
+### Analysis Progress Stepper (`AnalysisProgress.vue`)
+- Live pipeline list rendered inside an active agent turn with a Cobalt spinning indicator, tabular elapsed timer, and per-stage rows (`running`, `done`, `skipped`, `failed`, `pending`). Clears automatically when the turn completes or pauses for approval.
+
+### Spending Overview (`SpendingSummaryCard.vue`, `AnomalyAlertCard.vue`, `CategoryBreakdownTable.vue`)
+- **Cash-flow summary strip:** One hairline-divided 4-column white sheet (`Total income`, `Total outflow`, `Savings rate`, `Liquidity reserve`).
+- **Anomaly band:** Left-accented Oxblood Crimson alert sheet (`border-l-4 border-l-error`) with hairline-divided anomaly rows and optional narrative summary.
+- **Category breakdown:** Horizontal Maritime Navy progress bars (`transition-[width]`) paired with right-aligned shares and currency totals.
+
+### Document Ingestion (`UploadDropzone.vue`, `DocumentsView.vue`)
+- Dropzone with bespoke inline geometric SVG upload emblem, document type & BigQuery table selectors, sentence-case primary CTA (`Browse files` / `Change file`), and a flat hairline-separated privacy footer, paired with a full-width ingestion history table.
 
 ### Unified Profile & Policy Hub (`/profile`)
-- **5-Tab Navigation Layout:** Horizontal pill/tab selector switching cleanly between Personal & Family, Goals & Timeline, Risk Calibration & Allocation, Liabilities & Debt, and Policy Guardrails without page reload.
-- **Personal & Family Canvas:** Dynamic table allowing inline addition and removal of family members (Spouse, Child, Dependent Parent) with auto-computed household dependent counters.
-- **Debt Obligations Ledger:** Tabular list of debts featuring monospaced APRs, balances, and minimum payments with automatic aggregated debt computation.
-- **Policy Guardrails Surface:** Dedicated inputs for concentration limits, liquidity floors, trade approval thresholds, and excluded tickers/sectors.
+- Direct `Newsreader` page header with IPS version indicator and `Run Guided Setup` trigger, a unified 4-column hairline summary strip, and an underline tab bar switching across 6 tabs: **Personal & Family**, **Goals & Timeline**, **Risk & Allocation**, **Liabilities & Debt**, **Policy Guardrails**, and **Income & Tax (W-2 Document AI)**.
+- All form groups sit on clean white elevated sheets with soft alabaster (`#F4F6F8`) inputs and hairline internal row dividers.
+
+### Guided Onboarding Flow (`/onboarding`)
+- Dedicated fixed progress header (`transition-[width]`) with bespoke SVG shield mark, back button, step title, and quick link to `/profile`.
+- 7 turns (`WelcomeStep`, `GoalsStep`, `LiabilitiesStep`, `RiskCalibrationStep`, `TargetAllocationStep`, `ConstraintsStep`, `SubmissionStep`) featuring clean hairline cards, accessible radio groups, interactive SVG target allocation donut chart (`2πr = 251.2`) with fail-closed 100% validation, and zero pre-heading eyebrows or fake telemetry animations.

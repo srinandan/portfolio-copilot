@@ -1,153 +1,121 @@
 <template>
-  <div class="flex flex-col lg:flex-row gap-gutter w-full max-w-7xl mx-auto" data-testid="risk-calibration-step">
-    <!-- Left Panel: Conversational Stream (40%) -->
-    <div class="w-full lg:w-[40%] flex flex-col gap-md">
-      <!-- Trust Header -->
-      <div class="flex items-center gap-sm mb-sm mt-xs opacity-80">
-        <span class="material-symbols-outlined text-[16px] text-tertiary-fixed-dim" style="font-variation-settings: 'FILL' 1;">
-          shield_lock
-        </span>
-        <span class="font-body-mono text-label-caps text-on-surface-variant tracking-wider uppercase">
-          Deterministic Risk Calibration • Turn 3 of 5
-        </span>
-      </div>
-
-      <!-- Agent Message -->
-      <div class="bg-surface-container rounded-xl rounded-tl-sm p-lg relative group shadow-sm border border-outline-variant">
-        <div class="absolute -left-[1px] top-lg bottom-lg w-[3px] bg-secondary-fixed rounded-r-full"></div>
-        <div class="flex items-center gap-3 mb-md">
-          <div class="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center border border-outline-variant">
-            <span class="material-symbols-outlined text-[16px] text-on-primary" style="font-variation-settings: 'FILL' 1;">
-              smart_toy
-            </span>
-          </div>
-          <div>
-            <div class="font-title-sm text-body-base text-on-surface">Portfolio Copilot</div>
-            <div class="font-body-mono text-[10px] text-on-surface-variant uppercase tracking-widest">System Agent</div>
-          </div>
-        </div>
-        <p class="font-body-base text-on-surface-variant leading-relaxed mb-md">
-          Per institutional fiduciary governance, your risk profile is not a subjective survey guess—it is derived deterministically from your investment timeline and psychological drawdown capacity.
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-lg w-full max-w-6xl mx-auto items-start" data-testid="risk-calibration-step">
+    <!-- Left Column: Calibration Prompt & Choices -->
+    <div class="lg:col-span-6 flex flex-col gap-md">
+      <header class="flex flex-col gap-1">
+        <h1 class="font-display text-page-title font-medium text-on-surface">Risk Calibration</h1>
+        <p class="font-sans text-body text-on-surface-variant max-w-[65ch]">
+          Your risk profile is derived deterministically from your investment horizon and your drawdown reaction.
         </p>
-        <p class="font-body-base text-on-surface font-semibold">
+      </header>
+
+      <div class="bg-surface-container-lowest rounded-xl p-lg border border-outline-variant border-l-4 border-l-primary shadow-sheet flex flex-col gap-2">
+        <span class="font-sans text-meta font-semibold text-primary">Drawdown scenario</span>
+        <p class="font-sans text-body text-on-surface font-medium max-w-[65ch]">
           Suppose market volatility triggers a sudden 20% drawdown across global indices next week. How would you react?
         </p>
       </div>
 
-      <!-- Reaction Options -->
-      <div class="flex flex-col gap-sm mt-sm">
+      <!-- Radio Selection Group -->
+      <div class="flex flex-col gap-2.5" role="radiogroup" aria-label="Drawdown reaction">
         <button
           v-for="opt in reactionOptions"
           :key="opt.id"
           type="button"
-          class="w-full text-left group bg-surface-container-lowest rounded-lg p-md border transition-all duration-200 shadow-sm"
+          role="radio"
+          :aria-checked="selectedReaction === opt.id"
+          class="w-full text-left bg-surface-container-lowest rounded-xl p-md border transition-[border-color,background-color] duration-150 ease-desk shadow-sheet"
           :class="[
             selectedReaction === opt.id
-              ? 'border-primary ring-2 ring-primary/20 bg-surface-container-low'
+              ? 'border-primary bg-surface-container-low/60'
               : 'border-outline-variant hover:border-primary/50'
           ]"
           :data-testid="`reaction-opt-${opt.id}`"
           @click="selectedReaction = opt.id"
         >
-          <div class="flex items-start gap-md">
-            <div
-              class="mt-1 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors"
-              :class="selectedReaction === opt.id ? 'border-primary' : 'border-outline group-hover:border-primary/50'"
+          <div class="flex items-start gap-3">
+            <span
+              class="mt-1 w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors duration-150 ease-desk"
+              :class="selectedReaction === opt.id ? 'border-primary' : 'border-outline'"
             >
-              <div
-                class="w-2.5 h-2.5 rounded-full bg-primary transition-transform"
+              <span
+                class="w-2 h-2 rounded-full bg-primary transition-transform duration-150 ease-desk"
                 :class="selectedReaction === opt.id ? 'scale-100' : 'scale-0'"
-              ></div>
-            </div>
-            <div>
-              <div class="font-title-sm text-body-base text-on-surface group-hover:text-primary transition-colors">
-                {{ opt.title }}
-              </div>
-              <div class="font-body-base text-[13px] text-on-surface-variant mt-1">
-                {{ opt.description }}
-              </div>
+              ></span>
+            </span>
+            <div class="flex flex-col gap-0.5">
+              <span class="font-sans text-body font-semibold text-on-surface">{{ opt.title }}</span>
+              <span class="font-sans text-meta text-on-surface-variant">{{ opt.description }}</span>
             </div>
           </div>
         </button>
       </div>
 
-      <!-- Derived Tier Pill Card -->
-      <div class="bg-surface-container-lowest p-md rounded-xl border border-outline-variant shadow-sm flex items-center justify-between mt-sm">
-        <div>
-          <span class="font-label-caps text-on-surface-variant uppercase text-xs block">Derived Risk Profile</span>
-          <span class="font-title-sm text-on-surface capitalize text-lg" data-testid="derived-tier-display">
+      <!-- Derived Profile Summary -->
+      <div class="bg-surface-container-lowest px-lg py-4 rounded-xl border border-outline-variant shadow-sheet flex items-center justify-between gap-md">
+        <div class="flex flex-col">
+          <span class="font-sans text-meta text-on-surface-variant">Derived risk profile</span>
+          <span class="font-sans text-heading font-semibold capitalize text-on-surface" data-testid="derived-tier-display">
             {{ derivedTier }} Risk Tolerance
           </span>
         </div>
-        <span
-          class="font-label-caps px-3 py-1 rounded-full uppercase font-bold text-xs"
-          :class="[
-            derivedTier === 'aggressive' ? 'bg-primary-container text-on-primary' :
-            derivedTier === 'moderate' ? 'bg-secondary-container text-on-secondary-container' :
-            'bg-surface-container-high text-on-surface'
-          ]"
-        >
+        <span class="font-sans text-meta font-semibold capitalize text-primary">
           {{ derivedTier }}
         </span>
       </div>
 
-      <!-- Action Area -->
-      <div class="mt-lg flex items-center justify-between">
-        <div class="font-body-mono text-[11px] text-on-surface-variant uppercase tracking-widest flex items-center gap-2">
-          <div class="w-2 h-2 rounded-full bg-tertiary-fixed-dim animate-pulse"></div>
-          Deterministic Calibration Active
-        </div>
+      <div class="pt-2">
         <button
-          class="bg-primary-container text-on-primary font-title-sm text-body-base px-xl py-3 rounded-md shadow-sm hover:bg-primary-container/90 transition-colors flex items-center gap-2"
+          type="button"
+          class="w-full bg-primary text-on-primary font-sans text-body font-medium py-3.5 px-lg rounded-md hover:bg-primary-container transition-colors duration-200 ease-desk inline-flex items-center justify-center gap-2"
           data-testid="confirm-risk-calibration-btn"
           @click="submitRiskCalibration"
         >
           <span>Review Target Bands</span>
-          <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+          <span class="material-symbols-outlined text-[18px]" aria-hidden="true">arrow_forward</span>
         </button>
       </div>
     </div>
 
-    <!-- Right Panel: Telemetry Model Canvas (60%) -->
-    <div class="hidden lg:flex w-[60%] flex-col gap-lg sticky top-24">
-      <div class="w-full max-w-md mx-auto my-auto">
-        <div class="mb-lg">
-          <h3 class="font-title-sm text-headline-md text-on-surface mb-2">Policy Calibration Preview</h3>
-          <p class="font-body-base text-on-surface-variant">Deterministic mapping from {{ horizonYears }}-year horizon + {{ selectedReaction }} reaction.</p>
+    <!-- Right Column: Live Policy Model Preview -->
+    <aside class="lg:col-span-6 lg:sticky lg:top-24">
+      <div class="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sheet overflow-hidden flex flex-col">
+        <div class="p-lg border-b border-outline-variant flex flex-col gap-1">
+          <h2 class="font-sans text-heading font-semibold text-on-surface">Policy Calibration Preview</h2>
+          <p class="font-sans text-meta text-on-surface-variant tabular-nums">
+            Deterministic mapping from {{ horizonYears }}-year horizon and "{{ selectedReaction.replace('_', ' ') }}" reaction.
+          </p>
         </div>
 
-        <div class="bg-surface-container-lowest rounded-xl p-lg border border-outline-variant shadow-sm backdrop-blur-md">
-          <div class="flex items-center justify-between border-b border-outline-variant pb-sm mb-md">
-            <span class="font-body-mono text-[11px] text-on-surface-variant tracking-widest uppercase">Target Allocation Bands</span>
-            <span class="font-body-mono text-[11px] text-on-tertiary-container font-semibold tracking-widest uppercase">
-              MODEL GENERATED
-            </span>
-          </div>
-
-          <div class="space-y-4">
-            <div v-for="band in defaultBands" :key="band.asset_class">
-              <div class="flex justify-between font-body-mono text-[12px] text-on-surface mb-1">
-                <span>{{ band.asset_class }}</span>
-                <span class="font-bold">{{ band.target_percent }}% (Band: {{ band.min_percent }}–{{ band.max_percent }}%)</span>
-              </div>
-              <div class="h-2 w-full bg-surface-container rounded-full overflow-hidden">
-                <div
-                  class="h-full bg-primary-container transition-all duration-500"
-                  :style="{ width: `${band.target_percent}%` }"
-                ></div>
-              </div>
+        <div class="p-lg flex flex-col gap-md">
+          <div v-for="band in defaultBands" :key="band.asset_class" class="flex flex-col gap-1.5">
+            <div class="flex justify-between items-baseline font-sans text-body tabular-nums">
+              <span class="font-medium text-on-surface">{{ band.asset_class }}</span>
+              <span class="font-semibold text-on-surface">
+                {{ band.target_percent }}%
+                <span class="text-meta font-normal text-on-surface-variant">
+                  ({{ band.min_percent }}%-{{ band.max_percent }}%)
+                </span>
+              </span>
+            </div>
+            <div class="h-2 w-full bg-surface-container-low rounded-full overflow-hidden">
+              <div
+                class="h-full bg-primary transition-[width] duration-200 ease-desk rounded-full"
+                :style="{ width: `${band.target_percent}%` }"
+              ></div>
             </div>
           </div>
+        </div>
 
-          <div class="mt-lg pt-md border-t border-outline-variant flex items-start gap-3">
-            <span class="material-symbols-outlined text-[20px] text-on-surface-variant">info</span>
-            <p class="font-body-base text-[12px] text-on-surface-variant leading-snug">
-              Per SKILL.md rules, {{ horizonYears }}y horizon with '{{ selectedReaction }}' reaction maps to <strong>{{ derivedTier }}</strong> allocation. You will have the opportunity to override these bounds on the next turn.
-            </p>
-          </div>
+        <div class="px-lg py-4 border-t border-outline-variant bg-surface-container-low/40 flex items-start gap-2.5">
+          <span class="material-symbols-outlined text-[18px] text-outline mt-0.5 shrink-0" aria-hidden="true">info</span>
+          <p class="font-sans text-meta text-on-surface-variant max-w-[65ch]">
+            A {{ horizonYears }}-year horizon with a "{{ selectedReaction.replace('_', ' ') }}" reaction maps to a
+            <strong class="text-on-surface font-semibold">{{ derivedTier }}</strong> allocation. You can adjust target weights and tolerance bands on the next step.
+          </p>
         </div>
       </div>
-    </div>
+    </aside>
   </div>
 </template>
 
