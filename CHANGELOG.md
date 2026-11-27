@@ -7,6 +7,52 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5] - 2026-11-27
+
+### Added
+- **Fiduciary Editorial Desk frontend redesign** ([DESIGN.md](frontend/DESIGN.md), #377):
+  - Redesigned the Vue 3 SPA using the Gemini DemoLab `gemini-frontend-design` system
+    and documented the updated design tokens, typography, and component specs in
+    `frontend/DESIGN.md` and `frontend/README.md`.
+  - Adopted a strict 2-font pairing (**Newsreader** for brand wordmark, page titles,
+    and hero balances + **Geist** with `tabular-nums` for all UI, prose, tables, and
+    financial figures) locked to a 3-size body scale (`13px` / `15px` / `18px`) with
+    sentence-case UI labels.
+  - Replaced the duplicated raster navbar logo with a bespoke inline SVG shield mark
+    and added a toggleable responsive mobile navigation drawer (`<768px`) with
+    scroll-aware header separation.
+  - Added inline visual target-band tracks to `DriftReportCard`, converted
+    `TopHoldingsTable` into a hairline-divided institutional ledger table, wired
+    `AssetAllocationCard` to render live holdings dynamically, moved `ProfileView` to
+    single-row underline tabs, and added global `@media (prefers-reduced-motion: reduce)`
+    support.
+
+### Changed
+- **Dependency and toolchain upgrades across Python, Go, and Frontend** (#376):
+  - Upgraded `orchestrator` dependencies including `google-adk` (`2.12.0` → `2.15.0`),
+    `google-genai` (`2.34.0`), `mcp` (`>=2.3.0,<3`), `fastapi` (`>=0.165.0`),
+    `google-cloud-aiplatform` (`>=2.10.0`), `opentelemetry-*`, `pydantic`, `pytest`,
+    `ruff`, and `pip>=26.3` in `orchestrator/Dockerfile`.
+  - Upgraded Go toolchain to `1.27.4` and updated `cloud.google.com/go/*`,
+    `go.opentelemetry.io/otel` (`v1.47.0`), `google.golang.org/grpc` (`v1.85.0`), and
+    `golang.org/x/crypto` (`v0.59.0`), removing the obsolete `GO-2026-5932` ignore from
+    `osv-scanner.toml`.
+  - Upgraded frontend stack to Node.js 24, `vue ^3.5.46`, `vue-router ^5.5.1`,
+    `vite ^8.3.8`, `vitest ^5.1.1`, `tailwindcss ^4.3.5`, `typescript ~6.0.3`, and
+    `vue-tsc ^3.3.14`, clearing all OSV-Scanner security advisories.
+
+### Fixed
+- **ADK `FunctionResultDelta.call_id` crash and reviewer skill cleanup** (#376):
+  Added idempotent `patch_adk_function_result_delta()` in
+  `orchestrator/src/orchestrator/managed_agents/worker.py` to handle `google-genai >= 2.23.0`
+  removing `call_id` from `FunctionResultDelta`, removed local `.py` path references from
+  `skills/reviewer/SKILL.md`, and ensured `python3-pip` is installed in the orchestrator
+  Cloud Build step.
+- **Onboarding header collision and empty-state allocation chart** (#377):
+  Hid the global navbar on `/onboarding` so the dedicated onboarding progress header renders
+  without overlap, and prevented `PortfolioView` from rendering a partial 5% cash sliver
+  before holdings positions load.
+
 ## [0.4] - 2026-10-19
 
 ### Added
