@@ -1,61 +1,53 @@
 <template>
   <div class="flex flex-col gap-lg max-w-2xl mx-auto w-full" data-testid="constraints-step">
-    <!-- Header -->
-    <div class="flex flex-col gap-sm">
-      <div class="flex items-center gap-xs text-on-surface-variant font-label-caps uppercase tracking-wider">
-        <span class="material-symbols-outlined text-[16px] text-tertiary-fixed-dim">gavel</span>
-        <span>Turn 5 of 5 • Policy Rules &amp; Guardrails</span>
-      </div>
-      <h1 class="font-headline-lg-mobile text-on-surface">Constraints &amp; Guardrails</h1>
-      <p class="font-body-base text-on-surface-variant">
-        Define concentration limits, ethical/sector exclusions, liquidity reserves, and trade sign-off thresholds.
+    <header class="flex flex-col gap-1">
+      <h1 class="font-display text-page-title font-medium text-on-surface">Constraints &amp; Guardrails</h1>
+      <p class="font-sans text-body text-on-surface-variant max-w-[65ch]">
+        Define concentration limits, sector exclusions, liquidity reserves, and trade approval thresholds.
       </p>
-    </div>
+    </header>
 
-    <!-- Constraints Form -->
-    <div class="bg-surface-container-lowest rounded-xl p-lg border border-outline-variant shadow-sm flex flex-col gap-md">
-      <!-- Reserve Months & Concentration Limit -->
+    <section class="bg-surface-container-lowest rounded-xl p-lg border border-outline-variant shadow-sheet flex flex-col gap-md">
       <div class="grid grid-cols-1 md:grid-cols-2 gap-md">
-        <div class="flex flex-col gap-xs">
-          <label class="font-label-caps text-on-surface-variant uppercase">Emergency Liquidity Reserve</label>
+        <div class="flex flex-col gap-1.5">
+          <label class="font-sans text-meta font-medium text-on-surface-variant">Emergency liquidity reserve</label>
           <div class="flex items-center gap-2">
             <input
               v-model.number="reserveMonths"
               type="number"
               min="1"
               max="36"
-              class="w-full bg-surface-container text-on-surface p-sm rounded-lg border border-outline-variant focus:outline-none focus:ring-2 focus:ring-primary-container font-body-mono"
+              class="w-full bg-surface text-on-surface px-3.5 py-2 rounded-md border border-outline-variant font-sans text-body tabular-nums focus:bg-surface-container-lowest"
               data-testid="input-reserve-months"
             />
-            <span class="font-body-base text-xs text-on-surface-variant">months</span>
+            <span class="font-sans text-meta text-on-surface-variant shrink-0">months</span>
           </div>
-          <span class="text-[11px] text-on-surface-variant">Recommended: 3–6 months of living expenses.</span>
+          <span class="font-sans text-meta text-on-surface-variant">Recommended: 3 to 6 months of living expenses.</span>
         </div>
 
-        <div class="flex flex-col gap-xs">
-          <label class="font-label-caps text-on-surface-variant uppercase">Max Single-Stock Concentration</label>
+        <div class="flex flex-col gap-1.5">
+          <label class="font-sans text-meta font-medium text-on-surface-variant">Max single-stock concentration</label>
           <div class="flex items-center gap-2">
             <input
               v-model.number="concentrationLimit"
               type="number"
               min="1"
               max="50"
-              class="w-full bg-surface-container text-on-surface p-sm rounded-lg border border-outline-variant focus:outline-none focus:ring-2 focus:ring-primary-container font-body-mono"
+              class="w-full bg-surface text-on-surface px-3.5 py-2 rounded-md border border-outline-variant font-sans text-body tabular-nums focus:bg-surface-container-lowest"
               data-testid="input-concentration-limit"
             />
-            <span class="font-body-base text-xs text-on-surface-variant">%</span>
+            <span class="font-sans text-meta text-on-surface-variant shrink-0">%</span>
           </div>
-          <span class="text-[11px] text-on-surface-variant">Default limit: 15% per holding.</span>
+          <span class="font-sans text-meta text-on-surface-variant">Default limit: 15% per holding.</span>
         </div>
       </div>
 
-      <!-- Account Type & Tax Loss Harvesting -->
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-md pt-sm border-t border-outline-variant/40">
-        <div class="flex flex-col gap-xs">
-          <label class="font-label-caps text-on-surface-variant uppercase">Account Type</label>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-md pt-md border-t border-outline-variant">
+        <div class="flex flex-col gap-1.5">
+          <label class="font-sans text-meta font-medium text-on-surface-variant">Account type</label>
           <select
             v-model="accountType"
-            class="w-full bg-surface-container text-on-surface p-sm rounded-lg border border-outline-variant focus:outline-none focus:ring-2 focus:ring-primary-container font-body-base text-sm"
+            class="w-full bg-surface text-on-surface px-3.5 py-2 rounded-md border border-outline-variant font-sans text-body focus:bg-surface-container-lowest"
             data-testid="select-account-type"
           >
             <option value="taxable">Individual Taxable Brokerage</option>
@@ -63,68 +55,68 @@
           </select>
         </div>
 
-        <div class="flex flex-col justify-center gap-xs">
-          <label class="font-label-caps text-on-surface-variant uppercase">Tax-Loss Harvesting</label>
-          <label class="flex items-center gap-3 cursor-pointer mt-1">
+        <div class="flex flex-col justify-center gap-1.5">
+          <span class="font-sans text-meta font-medium text-on-surface-variant">Tax-loss harvesting</span>
+          <label class="flex items-center gap-2.5 cursor-pointer py-1.5">
             <input
               v-model="taxLossHarvesting"
               type="checkbox"
-              class="w-5 h-5 accent-primary-container cursor-pointer"
+              class="w-5 h-5 accent-primary cursor-pointer"
               data-testid="toggle-tax-loss"
             />
-            <span class="font-body-base text-sm text-on-surface">Enable automated TLH scans</span>
+            <span class="font-sans text-body text-on-surface">Enable automated TLH scans</span>
           </label>
         </div>
       </div>
 
-      <!-- Ticker & Sector Exclusions -->
-      <div class="flex flex-col gap-xs pt-sm border-t border-outline-variant/40">
-        <label class="font-label-caps text-on-surface-variant uppercase">Excluded Tickers (Comma-separated)</label>
+      <div class="flex flex-col gap-1.5 pt-md border-t border-outline-variant">
+        <label class="font-sans text-meta font-medium text-on-surface-variant">Excluded tickers (comma-separated)</label>
         <input
           v-model="excludedTickersStr"
           type="text"
           placeholder="e.g. TSLA, XOM, BABA"
-          class="w-full bg-surface-container text-on-surface p-sm rounded-lg border border-outline-variant focus:outline-none focus:ring-2 focus:ring-primary-container font-body-mono text-sm"
+          class="w-full bg-surface text-on-surface px-3.5 py-2 rounded-md border border-outline-variant font-sans text-body focus:bg-surface-container-lowest"
           data-testid="input-excluded-tickers"
         />
       </div>
 
-      <div class="flex flex-col gap-xs">
-        <label class="font-label-caps text-on-surface-variant uppercase">Excluded Sectors (Comma-separated)</label>
+      <div class="flex flex-col gap-1.5">
+        <label class="font-sans text-meta font-medium text-on-surface-variant">Excluded sectors (comma-separated)</label>
         <input
           v-model="excludedSectorsStr"
           type="text"
           placeholder="e.g. tobacco, defense, fossil_fuels"
-          class="w-full bg-surface-container text-on-surface p-sm rounded-lg border border-outline-variant focus:outline-none focus:ring-2 focus:ring-primary-container font-body-mono text-sm"
+          class="w-full bg-surface text-on-surface px-3.5 py-2 rounded-md border border-outline-variant font-sans text-body focus:bg-surface-container-lowest"
           data-testid="input-excluded-sectors"
         />
       </div>
 
-      <!-- HITL Trade Approval Thresholds -->
-      <div class="flex flex-col gap-xs pt-sm border-t border-outline-variant/40">
-        <label class="font-title-sm text-on-surface">Human-in-the-Loop Trade Sign-off Thresholds</label>
-        <p class="font-body-base text-xs text-on-surface-variant mb-2">
-          Autonomous trades exceeding these limits will be suspended for explicit Human Sign-off before execution.
-        </p>
+      <div class="flex flex-col gap-3 pt-md border-t border-outline-variant">
+        <div>
+          <h2 class="font-sans text-heading font-semibold text-on-surface">Human-in-the-Loop Trade Sign-off Thresholds</h2>
+          <p class="font-sans text-meta text-on-surface-variant">
+            Autonomous trades exceeding these limits pause for your explicit sign-off before execution.
+          </p>
+        </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-md">
-          <div class="flex flex-col gap-xs">
-            <label class="font-label-caps text-on-surface-variant uppercase">Require Approval Above ($ USD)</label>
+          <div class="flex flex-col gap-1.5">
+            <label class="font-sans text-meta font-medium text-on-surface-variant">Require approval above (USD)</label>
             <div class="relative">
-              <span class="absolute left-3 top-1/2 -translate-y-1/2 font-body-mono text-on-surface-variant">$</span>
+              <span class="absolute left-3.5 top-1/2 -translate-y-1/2 font-sans text-body text-on-surface-variant">$</span>
               <input
                 v-model.number="approvalAboveUsd"
                 type="number"
                 min="0"
                 placeholder="1000"
-                class="w-full bg-surface-container text-on-surface pl-8 p-sm rounded-lg border border-outline-variant focus:outline-none focus:ring-2 focus:ring-primary-container font-body-mono text-sm"
+                class="w-full bg-surface text-on-surface pl-8 pr-3.5 py-2 rounded-md border border-outline-variant font-sans text-body tabular-nums focus:bg-surface-container-lowest"
                 data-testid="input-approval-usd"
               />
             </div>
           </div>
 
-          <div class="flex flex-col gap-xs">
-            <label class="font-label-caps text-on-surface-variant uppercase">Require Approval Above (% of Portfolio)</label>
+          <div class="flex flex-col gap-1.5">
+            <label class="font-sans text-meta font-medium text-on-surface-variant">Require approval above (% of portfolio)</label>
             <div class="relative">
               <input
                 v-model.number="approvalAbovePct"
@@ -132,25 +124,25 @@
                 min="0.1"
                 max="100"
                 placeholder="5"
-                class="w-full bg-surface-container text-on-surface p-sm rounded-lg border border-outline-variant focus:outline-none focus:ring-2 focus:ring-primary-container font-body-mono text-sm"
+                class="w-full bg-surface text-on-surface pl-3.5 pr-8 py-2 rounded-md border border-outline-variant font-sans text-body tabular-nums focus:bg-surface-container-lowest"
                 data-testid="input-approval-pct"
               />
-              <span class="absolute right-3 top-1/2 -translate-y-1/2 font-body-mono text-on-surface-variant">%</span>
+              <span class="absolute right-3.5 top-1/2 -translate-y-1/2 font-sans text-body text-on-surface-variant">%</span>
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </section>
 
-    <!-- CTA -->
-    <div class="mt-md">
+    <div>
       <button
-        class="w-full bg-primary-container text-on-primary py-md px-lg rounded-lg font-title-sm flex items-center justify-center gap-sm transition-colors shadow-md hover:bg-primary-container/90"
+        type="button"
+        class="w-full bg-primary text-on-primary py-3.5 px-lg rounded-md font-sans text-body font-medium inline-flex items-center justify-center gap-2 transition-colors duration-200 ease-desk hover:bg-primary-container"
         data-testid="confirm-constraints-btn"
         @click="submitConstraints"
       >
         <span>Review &amp; Initialize IPS</span>
-        <span class="material-symbols-outlined">arrow_forward</span>
+        <span class="material-symbols-outlined text-[18px]" aria-hidden="true">arrow_forward</span>
       </button>
     </div>
   </div>

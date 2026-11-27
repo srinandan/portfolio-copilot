@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/vue';
+import { render, screen, fireEvent, cleanup } from '@testing-library/vue';
 import Navbar from '../components/layout/Navbar.vue';
 import { createRouter, createWebHistory } from 'vue-router';
 
@@ -48,5 +48,25 @@ describe('Navbar.vue', () => {
 
     expect(screen.queryByTestId('gateway-status')).toBeNull();
     expect(screen.queryByAltText('Profile')).toBeNull();
+  });
+
+  it('toggles the mobile navigation drawer when the mobile menu button is clicked', async () => {
+    render(Navbar, {
+      global: {
+        plugins: [router]
+      }
+    });
+
+    expect(screen.queryByTestId('mobile-nav-drawer')).toBeNull();
+    const toggle = screen.getByTestId('mobile-nav-toggle');
+    await fireEvent.click(toggle);
+
+    const drawer = screen.getByTestId('mobile-nav-drawer');
+    expect(drawer.textContent).toContain('Dashboard');
+    expect(drawer.textContent).toContain('Portfolio');
+    expect(drawer.textContent).toContain('Profile');
+
+    await fireEvent.click(toggle);
+    expect(screen.queryByTestId('mobile-nav-drawer')).toBeNull();
   });
 });

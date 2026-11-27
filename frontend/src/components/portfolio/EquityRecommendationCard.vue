@@ -1,83 +1,104 @@
 <template>
   <div
-    class="w-full bg-surface-container-lowest rounded-xl shadow-sm border border-surface-variant flex flex-col p-lg gap-md"
+    :class="[
+      'w-full flex flex-col p-lg gap-md',
+      embedded
+        ? 'bg-surface-container-low/30'
+        : 'bg-surface-container-lowest rounded-xl shadow-sheet border border-outline-variant'
+    ]"
     data-testid="equity-recommendation-card"
   >
-    <!-- Header: ticker + direction badge -->
-    <div class="flex items-center justify-between gap-md flex-wrap">
-      <div class="flex flex-col">
-        <h3 class="font-headline-sm text-headline-sm text-on-background" data-testid="equity-ticker">
-          {{ rec.ticker }}<span v-if="assess.company_name" class="text-on-surface-variant font-body-base">
-            &nbsp;· {{ assess.company_name }}</span>
+    <!-- Header: Ticker & Recommendation -->
+    <div class="flex items-start justify-between gap-md flex-wrap">
+      <div class="flex flex-col gap-0.5">
+        <h3 class="font-sans text-heading font-semibold text-on-surface" data-testid="equity-ticker">
+          {{ rec.ticker }}<span v-if="assess.company_name" class="text-on-surface-variant font-normal">
+            &middot; {{ assess.company_name }}
+          </span>
         </h3>
-        <span class="font-body-mono text-xs text-on-surface-variant uppercase tracking-wider">
-          {{ verdictLabel }} · {{ rec.conviction }} conviction
+        <span class="font-sans text-meta text-on-surface-variant capitalize">
+          {{ verdictLabel }} &middot; {{ rec.conviction }} conviction
         </span>
       </div>
       <span
-        :class="['px-3 py-1 rounded-full font-label-caps text-label-caps uppercase tracking-wider', directionClasses]"
+        :class="['px-3 py-1 rounded-md border font-sans text-meta font-semibold uppercase', directionClasses]"
         data-testid="equity-direction"
       >
         {{ rec.direction }}
       </span>
     </div>
 
-    <!-- Valuation snapshot -->
-    <div class="grid grid-cols-3 gap-sm" data-testid="equity-valuation">
-      <div class="flex flex-col">
-        <span class="font-label-caps text-label-caps text-on-surface-variant uppercase">Price</span>
-        <span class="font-body-mono text-body-mono text-on-surface tabular-nums">{{ fmtUsd(assess.dcf?.current_price_usd) }}</span>
+    <!-- Valuation Strip -->
+    <div
+      class="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-outline-variant rounded-md border border-outline-variant bg-surface-container-lowest tabular-nums"
+      data-testid="equity-valuation"
+    >
+      <div class="p-3.5 flex flex-col gap-0.5">
+        <span class="font-sans text-meta text-on-surface-variant">Price</span>
+        <span class="font-sans text-heading font-semibold text-on-surface">{{ fmtUsd(assess.dcf?.current_price_usd) }}</span>
       </div>
-      <div class="flex flex-col">
-        <span class="font-label-caps text-label-caps text-on-surface-variant uppercase">Intrinsic (DCF)</span>
-        <span class="font-body-mono text-body-mono text-on-surface tabular-nums">{{ fmtUsd(assess.dcf?.intrinsic_value_per_share_usd) }}</span>
+      <div class="p-3.5 flex flex-col gap-0.5">
+        <span class="font-sans text-meta text-on-surface-variant">Intrinsic (DCF)</span>
+        <span class="font-sans text-heading font-semibold text-on-surface">{{ fmtUsd(assess.dcf?.intrinsic_value_per_share_usd) }}</span>
       </div>
-      <div class="flex flex-col">
-        <span class="font-label-caps text-label-caps text-on-surface-variant uppercase">Upside</span>
-        <span :class="['font-body-mono text-body-mono tabular-nums', upsideClass]" data-testid="equity-upside">
+      <div class="p-3.5 flex flex-col gap-0.5">
+        <span class="font-sans text-meta text-on-surface-variant">Upside</span>
+        <span :class="['font-sans text-heading font-semibold', upsideClass]" data-testid="equity-upside">
           {{ fmtPct(rec.upside_pct) }}
         </span>
       </div>
     </div>
 
     <!-- Rationale -->
-    <p class="font-body-base text-body-base text-on-surface" data-testid="equity-rationale">{{ rec.rationale }}</p>
+    <p class="font-sans text-body text-on-surface max-w-[65ch]" data-testid="equity-rationale">
+      {{ rec.rationale }}
+    </p>
 
-    <!-- Suitability factors -->
-    <div v-if="rec.suitability_factors.length" class="flex flex-col gap-xs">
-      <span class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">Suitability</span>
-      <ul class="flex flex-col gap-1">
-        <li
-          v-for="(f, i) in rec.suitability_factors"
-          :key="i"
-          class="flex items-start gap-2 font-body-base text-sm text-on-surface"
-          data-testid="equity-factor"
-        >
-          <span class="material-symbols-outlined text-[16px] mt-0.5" :class="factorIconClass(f.favorable)">{{ factorIcon(f.favorable) }}</span>
-          <span>{{ f.detail }}</span>
-        </li>
-      </ul>
-    </div>
+    <!-- Suitability & Risks -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-lg pt-3 border-t border-outline-variant/80">
+      <div v-if="rec.suitability_factors.length" class="flex flex-col gap-2">
+        <span class="font-sans text-meta font-semibold text-on-surface">Suitability</span>
+        <ul class="flex flex-col gap-2">
+          <li
+            v-for="(f, i) in rec.suitability_factors"
+            :key="i"
+            class="flex items-start gap-2 font-sans text-body text-on-surface"
+            data-testid="equity-factor"
+          >
+            <span class="material-symbols-outlined text-[18px] mt-0.5 shrink-0" :class="factorIconClass(f.favorable)" aria-hidden="true">
+              {{ factorIcon(f.favorable) }}
+            </span>
+            <span>{{ f.detail }}</span>
+          </li>
+        </ul>
+      </div>
 
-    <!-- Risks -->
-    <div v-if="rec.key_risks.length" class="flex flex-col gap-xs">
-      <span class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">Key risks</span>
-      <ul class="list-disc pl-5 flex flex-col gap-1">
-        <li v-for="(r, i) in rec.key_risks" :key="i" class="font-body-base text-sm text-on-surface-variant" data-testid="equity-risk">
-          {{ r }}
-        </li>
-      </ul>
+      <div v-if="rec.key_risks.length" class="flex flex-col gap-2">
+        <span class="font-sans text-meta font-semibold text-on-surface">Key risks</span>
+        <ul class="list-disc pl-5 flex flex-col gap-1.5">
+          <li
+            v-for="(r, i) in rec.key_risks"
+            :key="i"
+            class="font-sans text-body text-on-surface-variant"
+            data-testid="equity-risk"
+          >
+            {{ r }}
+          </li>
+        </ul>
+      </div>
     </div>
 
     <!-- Disclaimers -->
-    <p
-      v-for="(d, i) in rec.disclaimers"
-      :key="i"
-      class="font-body-mono text-xs text-on-surface-variant italic"
-      data-testid="equity-disclaimer"
-    >
-      {{ d }}
-    </p>
+    <div v-if="rec.disclaimers.length" class="pt-3 border-t border-outline-variant/60 flex flex-col gap-1">
+      <p
+        v-for="(d, i) in rec.disclaimers"
+        :key="i"
+        class="font-sans text-meta text-on-surface-variant"
+        data-testid="equity-disclaimer"
+      >
+        {{ d }}
+      </p>
+    </div>
   </div>
 </template>
 
@@ -85,7 +106,13 @@
 import { computed } from 'vue';
 import type { EquityAnalysisResult } from '../../types';
 
-const props = defineProps<{ result: EquityAnalysisResult }>();
+const props = withDefaults(
+  defineProps<{
+    result: EquityAnalysisResult;
+    embedded?: boolean;
+  }>(),
+  { embedded: false }
+);
 
 const rec = computed(() => props.result.recommendation);
 const assess = computed(() => props.result.assessment);
@@ -96,28 +123,28 @@ const directionClasses = computed(() => {
   switch (rec.value.direction) {
     case 'buy':
     case 'add':
-      return 'bg-emerald-100 text-emerald-800';
+      return 'bg-tertiary-fixed text-on-tertiary-fixed border-tertiary-fixed-dim';
     case 'trim':
     case 'avoid':
-      return 'bg-red-100 text-red-800';
+      return 'bg-error-container text-on-error-container border-error/25';
     default:
-      return 'bg-amber-100 text-amber-800';
+      return 'bg-secondary-fixed text-on-secondary-fixed border-secondary-fixed-dim';
   }
 });
 
 const upsideClass = computed(() => {
   const u = rec.value.upside_pct;
   if (u === null || u === undefined) return 'text-on-surface-variant';
-  return u >= 0 ? 'text-emerald-700' : 'text-red-700';
+  return u >= 0 ? 'text-on-tertiary-container' : 'text-error';
 });
 
 function fmtUsd(v: number | null | undefined): string {
-  if (v === null || v === undefined) return '—';
+  if (v === null || v === undefined) return '--';
   return `$${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function fmtPct(v: number | null | undefined): string {
-  if (v === null || v === undefined) return '—';
+  if (v === null || v === undefined) return '--';
   const sign = v >= 0 ? '+' : '';
   return `${sign}${v.toFixed(1)}%`;
 }
@@ -129,8 +156,8 @@ function factorIcon(favorable?: boolean | null): string {
 }
 
 function factorIconClass(favorable?: boolean | null): string {
-  if (favorable === true) return 'text-emerald-600';
-  if (favorable === false) return 'text-red-600';
-  return 'text-on-surface-variant';
+  if (favorable === true) return 'text-on-tertiary-container';
+  if (favorable === false) return 'text-error';
+  return 'text-outline';
 }
 </script>

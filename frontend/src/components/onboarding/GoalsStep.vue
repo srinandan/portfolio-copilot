@@ -1,111 +1,103 @@
 <template>
   <div class="flex flex-col gap-lg max-w-2xl mx-auto w-full" data-testid="goals-step">
-    <!-- Header -->
-    <div class="flex flex-col gap-sm">
-      <div class="flex items-center gap-xs text-on-surface-variant font-label-caps uppercase tracking-wider">
-        <span class="material-symbols-outlined text-[16px] text-tertiary-fixed-dim">flag</span>
-        <span>Turn 1 of 5</span>
-      </div>
-      <h1 class="font-headline-lg-mobile text-on-surface">Financial Goals &amp; Horizon</h1>
-      <p class="font-body-base text-on-surface-variant">
-        Define your primary objectives, target timelines, and liquidity buffer requirements.
+    <header class="flex flex-col gap-1">
+      <h1 class="font-display text-page-title font-medium text-on-surface">Financial Goals &amp; Horizon</h1>
+      <p class="font-sans text-body text-on-surface-variant max-w-[65ch]">
+        Define your primary objective, target timeline, and near-term liquidity requirements.
       </p>
-    </div>
+    </header>
 
-    <!-- Goals Card -->
-    <div class="bg-surface-container-lowest rounded-xl p-lg border border-outline-variant shadow-sm flex flex-col gap-md">
-      <div class="flex items-center justify-between border-b border-outline-variant pb-sm">
-        <h3 class="font-title-sm text-on-surface">Primary Goal</h3>
-        <span class="font-label-caps text-on-surface-variant uppercase">Required for IPS</span>
+    <section class="bg-surface-container-lowest rounded-xl p-lg border border-outline-variant shadow-sheet flex flex-col gap-md">
+      <div class="flex items-baseline justify-between border-b border-outline-variant pb-3">
+        <h2 class="font-sans text-heading font-semibold text-on-surface">Primary goal</h2>
+        <span class="font-sans text-meta text-on-surface-variant">Required for IPS</span>
       </div>
 
-      <!-- Goal Name -->
-      <div class="flex flex-col gap-xs">
-        <label class="font-label-caps text-on-surface-variant uppercase">Goal Name / Description</label>
+      <div class="flex flex-col gap-1.5">
+        <label class="font-sans text-meta font-medium text-on-surface-variant">Goal name or description</label>
         <input
           v-model="goalName"
           type="text"
           placeholder="e.g. Retirement Compounding & Financial Independence"
-          class="w-full bg-surface-container text-on-surface p-md rounded-lg border border-outline-variant focus:outline-none focus:ring-2 focus:ring-primary-container font-body-base"
+          class="w-full bg-surface text-on-surface px-3.5 py-2.5 rounded-md border border-outline-variant font-sans text-body focus:bg-surface-container-lowest transition-colors duration-150 ease-desk"
           data-testid="input-goal-name"
         />
       </div>
 
-      <!-- Target Amount & Date Grid -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-md">
-        <div class="flex flex-col gap-xs">
-          <label class="font-label-caps text-on-surface-variant uppercase">Target Amount ($ USD)</label>
+        <div class="flex flex-col gap-1.5">
+          <label class="font-sans text-meta font-medium text-on-surface-variant">Target amount (USD)</label>
           <div class="relative">
-            <span class="absolute left-3 top-1/2 -translate-y-1/2 font-body-mono text-on-surface-variant">$</span>
+            <span class="absolute left-3.5 top-1/2 -translate-y-1/2 font-sans text-body text-on-surface-variant">$</span>
             <input
               v-model.number="targetAmount"
               type="number"
               min="0"
               placeholder="1000000"
-              class="w-full bg-surface-container text-on-surface pl-8 p-md rounded-lg border border-outline-variant focus:outline-none focus:ring-2 focus:ring-primary-container font-body-mono tabular-nums"
+              class="w-full bg-surface text-on-surface pl-8 pr-3.5 py-2.5 rounded-md border border-outline-variant font-sans text-body tabular-nums focus:bg-surface-container-lowest transition-colors duration-150 ease-desk"
               data-testid="input-target-amount"
             />
           </div>
         </div>
 
-        <div class="flex flex-col gap-xs">
-          <label class="font-label-caps text-on-surface-variant uppercase">Target Date</label>
+        <div class="flex flex-col gap-1.5">
+          <label class="font-sans text-meta font-medium text-on-surface-variant">Target date</label>
           <input
             v-model="targetDate"
             type="date"
-            class="w-full bg-surface-container text-on-surface p-md rounded-lg border border-outline-variant focus:outline-none focus:ring-2 focus:ring-primary-container font-body-mono"
+            class="w-full bg-surface text-on-surface px-3.5 py-2.5 rounded-md border border-outline-variant font-sans text-body tabular-nums focus:bg-surface-container-lowest transition-colors duration-150 ease-desk"
             data-testid="input-target-date"
             @change="updateHorizonFromDate"
           />
         </div>
       </div>
 
-      <!-- Time Horizon in Years -->
-      <div class="flex flex-col gap-xs mt-sm">
-        <div class="flex justify-between items-center">
-          <label class="font-label-caps text-on-surface-variant uppercase">Time Horizon (Years)</label>
-          <span class="font-body-mono text-on-surface font-bold" data-testid="time-horizon-val">{{ timeHorizonYears }} years</span>
+      <div class="flex flex-col gap-2 pt-2">
+        <div class="flex justify-between items-baseline">
+          <label class="font-sans text-meta font-medium text-on-surface-variant">Time horizon</label>
+          <span class="font-sans text-body font-semibold text-on-surface tabular-nums" data-testid="time-horizon-val">
+            {{ timeHorizonYears }} years
+          </span>
         </div>
         <input
           v-model.number="timeHorizonYears"
           type="range"
           min="1"
           max="40"
-          class="w-full h-2 bg-surface-variant rounded-lg appearance-none cursor-pointer accent-primary-container"
+          class="w-full h-2 bg-surface-container rounded-lg appearance-none cursor-pointer accent-primary"
           data-testid="slider-time-horizon"
         />
       </div>
 
-      <!-- Near-Term Liquidity / Upcoming Expenses -->
-      <div class="flex flex-col gap-xs mt-sm pt-md border-t border-outline-variant/50">
-        <label class="font-label-caps text-on-surface-variant uppercase">Known Near-Term Expenses ($ USD)</label>
+      <div class="flex flex-col gap-1.5 pt-md border-t border-outline-variant">
+        <label class="font-sans text-meta font-medium text-on-surface-variant">Known near-term expenses (USD)</label>
         <div class="relative">
-          <span class="absolute left-3 top-1/2 -translate-y-1/2 font-body-mono text-on-surface-variant">$</span>
+          <span class="absolute left-3.5 top-1/2 -translate-y-1/2 font-sans text-body text-on-surface-variant">$</span>
           <input
             v-model.number="upcomingExpenses"
             type="number"
             min="0"
             placeholder="0"
-            class="w-full bg-surface-container text-on-surface pl-8 p-md rounded-lg border border-outline-variant focus:outline-none focus:ring-2 focus:ring-primary-container font-body-mono tabular-nums"
+            class="w-full bg-surface text-on-surface pl-8 pr-3.5 py-2.5 rounded-md border border-outline-variant font-sans text-body tabular-nums focus:bg-surface-container-lowest transition-colors duration-150 ease-desk"
             data-testid="input-upcoming-expenses"
           />
         </div>
-        <p class="font-body-base text-xs text-on-surface-variant mt-1">
-          Sum of major anticipated capital outlays within the next 12 months (e.g. tuition, home renovation).
+        <p class="font-sans text-meta text-on-surface-variant">
+          Major anticipated capital outlays within the next 12 months (tuition, home renovation).
         </p>
       </div>
-    </div>
+    </section>
 
-    <!-- CTA -->
-    <div class="mt-md">
+    <div>
       <button
-        class="w-full bg-primary-container text-on-primary py-md px-lg rounded-lg font-title-sm flex items-center justify-center gap-sm transition-colors shadow-md hover:bg-primary-container/90 disabled:opacity-50 disabled:cursor-not-allowed"
+        type="button"
+        class="w-full bg-primary text-on-primary py-3.5 px-lg rounded-md font-sans text-body font-medium inline-flex items-center justify-center gap-2 transition-colors duration-200 ease-desk hover:bg-primary-container disabled:opacity-50 disabled:cursor-not-allowed"
         :disabled="!isValid"
         data-testid="confirm-goals-btn"
         @click="submitGoals"
       >
         <span>Continue to Liabilities &amp; Debt</span>
-        <span class="material-symbols-outlined">arrow_forward</span>
+        <span class="material-symbols-outlined text-[18px]" aria-hidden="true">arrow_forward</span>
       </button>
     </div>
   </div>

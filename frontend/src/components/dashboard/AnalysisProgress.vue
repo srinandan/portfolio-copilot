@@ -1,41 +1,45 @@
 <template>
   <div
-    class="flex flex-col gap-sm rounded-lg border border-surface-variant bg-surface-container-lowest p-sm"
+    class="flex flex-col gap-3 rounded-lg border border-outline-variant bg-surface-container-low/60 p-md"
     data-testid="analysis-progress"
     role="status"
     aria-live="polite"
   >
-    <div class="flex items-center justify-between">
-      <span class="flex items-center gap-xs text-xs font-bold uppercase tracking-wider text-on-surface-variant">
-        <span class="material-symbols-outlined animate-spin text-[16px]" aria-hidden="true">progress_activity</span>
+    <div class="flex items-center justify-between border-b border-outline-variant/70 pb-2">
+      <span class="flex items-center gap-2 font-sans text-meta font-semibold text-primary">
+        <span class="material-symbols-outlined animate-spin text-[16px] text-primary-fixed" aria-hidden="true">
+          progress_activity
+        </span>
         Working
       </span>
-      <span class="font-body-mono text-xs text-on-surface-variant" data-testid="analysis-elapsed">{{ elapsed }}</span>
+      <span class="font-sans text-meta text-on-surface-variant tabular-nums" data-testid="analysis-elapsed">
+        {{ elapsed }}
+      </span>
     </div>
 
-    <ul class="flex flex-col gap-1">
+    <ul class="flex flex-col gap-2">
       <li
         v-for="s in stages"
         :key="s.stage"
-        class="flex items-start gap-sm text-sm"
+        class="flex items-start gap-2.5 text-body"
         data-testid="progress-stage"
         :data-stage="s.stage"
         :data-status="s.status"
       >
         <span
-          class="material-symbols-outlined text-[18px] leading-5 shrink-0"
+          class="material-symbols-outlined text-[18px] leading-6 shrink-0"
           :class="[iconClass(s.status), { 'animate-spin': s.status === 'running' }]"
           aria-hidden="true"
         >{{ icon(s.status) }}</span>
         <span class="flex flex-col">
           <span
             :class="[
-              'font-body-base',
+              'font-sans text-body',
               s.status === 'running' ? 'text-on-surface font-medium' : 'text-on-surface-variant',
-              s.status === 'skipped' ? 'line-through opacity-70' : ''
+              s.status === 'skipped' ? 'line-through opacity-75' : ''
             ]"
           >{{ s.label }}</span>
-          <span v-if="s.detail" class="font-body-mono text-xs text-on-surface-variant">{{ s.detail }}</span>
+          <span v-if="s.detail" class="font-sans text-meta text-on-surface-variant tabular-nums">{{ s.detail }}</span>
         </span>
       </li>
     </ul>
@@ -51,7 +55,6 @@ const props = defineProps<{
   startedAt?: number;
 }>();
 
-// Tick a clock so the elapsed timer stays live while the analysis runs.
 const now = ref(Date.now());
 let timer: ReturnType<typeof setInterval> | undefined;
 onMounted(() => {
@@ -89,19 +92,16 @@ function icon(status: ProgressStatus): string {
 
 function iconClass(status: ProgressStatus): string {
   switch (status) {
-    // `tertiary`/`primary` are near-black in this palette; use the green
-    // tertiary-container foreground so a completed step reads as success.
     case 'done':
       return 'text-on-tertiary-container';
     case 'failed':
       return 'text-error';
-    // Not started yet: muted, same as a skipped step's dimmed marker.
     case 'pending':
     case 'skipped':
       return 'text-outline';
     case 'running':
     default:
-      return 'text-primary';
+      return 'text-primary-fixed';
   }
 }
 </script>

@@ -1,38 +1,30 @@
 <template>
   <div class="flex flex-col gap-lg max-w-2xl mx-auto w-full" data-testid="target-allocation-step">
-    <!-- Header Section -->
-    <div class="flex flex-col gap-sm">
-      <div class="flex items-center gap-xs text-secondary">
-        <span class="material-symbols-outlined text-[16px]">pie_chart</span>
-        <span class="font-label-caps uppercase tracking-wider">Turn 4 of 5 • Asset Allocation &amp; Drift Bands</span>
-      </div>
-      <h1 class="font-headline-lg-mobile text-on-surface">Target Allocation &amp; Bands</h1>
-      <p class="font-body-base text-on-surface-variant">
-        Review and override default target weights and tolerance bands (min–max) used downstream for rebalancing alerts.
+    <header class="flex flex-col gap-1">
+      <h1 class="font-display text-page-title font-medium text-on-surface">Target Allocation &amp; Bands</h1>
+      <p class="font-sans text-body text-on-surface-variant max-w-[65ch]">
+        Review and adjust target weights and min-to-max tolerance bands used for portfolio drift checks.
       </p>
-    </div>
+    </header>
 
-    <!-- Active Chart Area (Bento Layout) -->
-    <div class="bg-surface-container rounded-xl p-lg flex flex-col gap-lg relative overflow-hidden shadow-sm border border-outline-variant">
-      <div class="flex justify-between items-end relative z-10">
+    <!-- Chart & Model Readout Sheet -->
+    <section class="bg-surface-container-lowest rounded-xl p-lg border border-outline-variant shadow-sheet flex flex-col gap-lg">
+      <div class="flex justify-between items-end gap-md pb-md border-b border-outline-variant">
         <div>
-          <span class="font-label-caps text-on-surface-variant uppercase tracking-wider block mb-1">Projected Return</span>
-          <div class="flex items-baseline gap-sm">
-            <span class="font-display-lg text-on-surface" data-testid="projected-return">{{ projectedReturn }}</span>
-            <span class="font-body-base text-on-tertiary-container flex items-center bg-tertiary-fixed-dim/20 px-2 py-0.5 rounded-full text-xs">
-              <span class="material-symbols-outlined text-[14px]">trending_up</span>
-              Baseline Model
-            </span>
-          </div>
+          <span class="font-sans text-meta text-on-surface-variant block mb-0.5">Projected annual return</span>
+          <span class="font-display text-display-figure font-medium text-on-surface tabular-nums" data-testid="projected-return">
+            {{ projectedReturn }}
+          </span>
         </div>
         <div class="text-right">
-          <span class="font-label-caps text-on-surface-variant uppercase tracking-wider block mb-1">Risk Profile Tier</span>
-          <span class="font-headline-md text-on-surface capitalize" data-testid="risk-score">{{ computedRiskScore }}</span>
+          <span class="font-sans text-meta text-on-surface-variant block mb-0.5">Risk profile tier</span>
+          <span class="font-sans text-heading font-semibold text-on-surface capitalize" data-testid="risk-score">
+            {{ computedRiskScore }}
+          </span>
         </div>
       </div>
 
-      <!-- Donut Chart Visualization (Inline SVG) -->
-      <div class="relative w-48 h-48 mx-auto flex items-center justify-center z-10">
+      <div class="relative w-44 h-44 mx-auto flex items-center justify-center">
         <svg aria-label="Asset Allocation Chart" class="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
           <circle
             v-for="(arc, idx) in chartArcs"
@@ -42,131 +34,122 @@
             r="40"
             fill="transparent"
             :stroke="arc.color"
-            stroke-width="12"
+            stroke-width="11"
             :stroke-dasharray="`${arc.len} 251.2`"
             :stroke-dashoffset="arc.offset"
-            class="transition-all duration-500 ease-out"
+            class="transition-[stroke-dasharray,stroke-dashoffset] duration-300 ease-desk"
           ></circle>
         </svg>
         <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-          <span class="font-title-sm text-on-surface" data-testid="total-percent-display">{{ totalTargetPercent }}%</span>
-          <span class="font-label-caps text-on-surface-variant">Total Target</span>
+          <span class="font-sans text-heading font-semibold text-on-surface tabular-nums" data-testid="total-percent-display">{{ totalTargetPercent }}%</span>
+          <span class="font-sans text-meta text-on-surface-variant">Total target</span>
         </div>
       </div>
-    </div>
+    </section>
 
-    <!-- Bands & Sliders Section -->
-    <div class="flex flex-col gap-md">
+    <!-- Bands & Sliders -->
+    <section class="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sheet divide-y divide-outline-variant overflow-hidden">
       <div
         v-for="(band, idx) in bands"
         :key="band.asset_class"
-        class="bg-surface-container-lowest rounded-lg p-md shadow-sm border border-outline-variant flex flex-col gap-md"
+        class="p-lg flex flex-col gap-3"
         data-testid="band-row"
       >
-        <!-- Header & Target Input -->
-        <div class="flex justify-between items-center">
-          <div class="flex items-center gap-sm">
-            <div
-              class="w-3 h-3 rounded-full"
-              :class="[
-                idx === 0 ? 'bg-primary-container' :
-                idx === 1 ? 'bg-secondary-fixed' :
-                'bg-surface-tint'
-              ]"
-            ></div>
-            <span class="font-title-sm text-on-surface">{{ band.asset_class }}</span>
+        <div class="flex justify-between items-center gap-md">
+          <div class="flex items-center gap-2.5">
+            <span
+              class="w-3 h-3 rounded-sm shrink-0"
+              :style="{ backgroundColor: arcColors[idx % arcColors.length] }"
+              aria-hidden="true"
+            ></span>
+            <span class="font-sans text-body font-semibold text-on-surface">{{ band.asset_class }}</span>
           </div>
-          <div class="flex items-center gap-2">
-            <label class="font-label-caps text-xs text-on-surface-variant uppercase">Target:</label>
+          <div class="flex items-center gap-1.5 tabular-nums">
+            <label class="font-sans text-meta text-on-surface-variant">Target</label>
             <input
               v-model.number="band.target_percent"
               type="number"
               min="0"
               max="100"
-              class="w-16 bg-surface-container text-center font-body-mono py-1 px-2 rounded focus:outline-none focus:ring-2 focus:ring-primary-container border border-outline-variant"
+              class="w-16 bg-surface text-center font-sans text-body py-1 px-2 rounded-md border border-outline-variant text-on-surface"
               :data-testid="`input-target-${idx}`"
             />
-            <span class="font-body-base text-on-surface-variant">%</span>
+            <span class="font-sans text-meta text-on-surface-variant">%</span>
           </div>
         </div>
 
-        <!-- Target Slider -->
-        <div class="relative w-full h-6 flex items-center">
-          <input
-            v-model.number="band.target_percent"
-            type="range"
-            min="0"
-            max="100"
-            class="w-full h-2 bg-surface-variant rounded-lg appearance-none cursor-pointer accent-primary-container"
-            :data-testid="`slider-target-${idx}`"
-          />
-        </div>
+        <input
+          v-model.number="band.target_percent"
+          type="range"
+          min="0"
+          max="100"
+          class="w-full h-2 bg-surface-container rounded-lg appearance-none cursor-pointer accent-primary"
+          :data-testid="`slider-target-${idx}`"
+        />
 
-        <!-- Tolerance Bands (Min & Max Bounds) -->
-        <div class="bg-surface-container-low p-sm rounded-md flex items-center justify-between gap-md border border-outline-variant/30 text-xs">
-          <span class="font-label-caps text-on-surface-variant uppercase">Drift Bounds:</span>
-          <div class="flex items-center gap-sm">
+        <div class="flex items-center justify-between gap-md font-sans text-meta text-on-surface-variant tabular-nums">
+          <span>Drift bounds</span>
+          <div class="flex items-center gap-2">
             <div class="flex items-center gap-1">
-              <span class="text-on-surface-variant">Min:</span>
+              <span>Min</span>
               <input
                 v-model.number="band.min_percent"
                 type="number"
                 min="0"
                 max="100"
-                class="w-14 bg-surface-container text-center font-body-mono py-0.5 px-1 rounded border border-outline-variant"
+                class="w-14 bg-surface text-center font-sans text-meta py-0.5 px-1 rounded border border-outline-variant text-on-surface"
                 :data-testid="`input-min-${idx}`"
               />
-              <span class="text-on-surface-variant">%</span>
+              <span>%</span>
             </div>
-            <span class="text-outline-variant">–</span>
+            <span>to</span>
             <div class="flex items-center gap-1">
-              <span class="text-on-surface-variant">Max:</span>
+              <span>Max</span>
               <input
                 v-model.number="band.max_percent"
                 type="number"
                 min="0"
                 max="100"
-                class="w-14 bg-surface-container text-center font-body-mono py-0.5 px-1 rounded border border-outline-variant"
+                class="w-14 bg-surface text-center font-sans text-meta py-0.5 px-1 rounded border border-outline-variant text-on-surface"
                 :data-testid="`input-max-${idx}`"
               />
-              <span class="text-on-surface-variant">%</span>
+              <span>%</span>
             </div>
           </div>
         </div>
 
-        <!-- Invalid Band Bounds Warning -->
         <div
           v-if="band.min_percent > band.target_percent || band.target_percent > band.max_percent"
-          class="text-xs text-error font-body-mono flex items-center gap-1"
+          class="font-sans text-meta text-error flex items-center gap-1.5"
         >
-          <span class="material-symbols-outlined text-[14px]">error</span>
+          <span class="material-symbols-outlined text-[16px]" aria-hidden="true">error</span>
           <span>Constraint violation: Min ({{ band.min_percent }}%) &le; Target ({{ band.target_percent }}%) &le; Max ({{ band.max_percent }}%) required.</span>
         </div>
       </div>
+    </section>
 
-      <!-- Warning Toast if total != 100 -->
-      <div
-        v-if="totalTargetPercent !== 100"
-        class="bg-error-container text-on-error-container p-4 rounded-lg flex items-center gap-sm transition-opacity"
-        data-testid="allocation-warning"
-      >
-        <span class="material-symbols-outlined text-error">warning</span>
-        <span class="font-body-base text-body-base">
-          Total target allocation must equal 100%. Currently: <span class="font-body-mono font-bold">{{ totalTargetPercent }}</span>%
-        </span>
-      </div>
+    <!-- Warning if total != 100 -->
+    <div
+      v-if="totalTargetPercent !== 100"
+      class="bg-error-container text-on-error-container border border-error/30 p-md rounded-lg flex items-center gap-2.5"
+      data-testid="allocation-warning"
+    >
+      <span class="material-symbols-outlined text-error text-[20px]" aria-hidden="true">warning</span>
+      <span class="font-sans text-body tabular-nums">
+        Total target allocation must equal 100%. Currently: <span class="font-semibold">{{ totalTargetPercent }}%</span>
+      </span>
     </div>
 
-    <!-- Confirm Button -->
-    <div class="mt-md">
+    <div>
       <button
-        class="w-full bg-primary-container text-on-primary py-md px-lg rounded-lg font-title-sm flex items-center justify-center gap-sm transition-colors shadow-md hover:bg-primary-container/90 disabled:opacity-50 disabled:cursor-not-allowed"
+        type="button"
+        class="w-full bg-primary text-on-primary py-3.5 px-lg rounded-md font-sans text-body font-medium inline-flex items-center justify-center gap-2 transition-colors duration-200 ease-desk hover:bg-primary-container disabled:opacity-50 disabled:cursor-not-allowed"
         :disabled="!isValid"
         data-testid="confirm-allocation-btn"
         @click="confirmAllocation"
       >
         <span>Continue to Policy Constraints</span>
-        <span class="material-symbols-outlined">arrow_forward</span>
+        <span class="material-symbols-outlined text-[18px]" aria-hidden="true">arrow_forward</span>
       </button>
     </div>
   </div>
@@ -210,7 +193,7 @@ const totalTargetPercent = computed(() => {
 });
 
 const CIRCUMFERENCE = 251.2;
-const arcColors = ['#131b2e', '#b9c7e0', '#565e74'];
+const arcColors = ['#0f2342', '#1e40af', '#047857'];
 
 const chartArcs = computed(() => {
   let accumulatedOffset = 0;

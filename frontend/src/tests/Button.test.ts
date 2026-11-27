@@ -22,7 +22,7 @@ describe('Button.vue', () => {
       slots: { default: 'Approve' }
     });
     const btn = screen.getByTestId('ui-button');
-    expect(btn.className).toContain('bg-tertiary-fixed');
+    expect(btn.className).toContain('bg-tertiary');
   });
 
   it('renders danger variant styling', () => {

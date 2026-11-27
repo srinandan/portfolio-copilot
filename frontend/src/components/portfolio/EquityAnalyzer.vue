@@ -1,37 +1,43 @@
 <template>
-  <div
-    class="w-full bg-surface-container-lowest rounded-xl shadow-sm border border-surface-variant flex flex-col p-lg gap-md"
+  <section
+    class="w-full bg-surface-container-lowest rounded-xl shadow-sheet border border-outline-variant flex flex-col overflow-hidden"
     data-testid="equity-analyzer"
   >
-    <div class="flex flex-col gap-xs">
-      <h2 class="font-headline-sm text-headline-sm text-on-background">Research a stock</h2>
-      <p class="font-body-base text-body-base text-on-surface-variant max-w-md">
-        Get an advisory read on a single stock — a DCF valuation plus how it fits your policy and holdings.
-        Advisory only; it never places a trade.
+    <div class="p-lg flex flex-col gap-md">
+      <div class="flex flex-col gap-1">
+        <h2 class="font-sans text-heading font-semibold text-on-surface">Research a stock</h2>
+        <p class="font-sans text-body text-on-surface-variant max-w-[65ch]">
+          Get an advisory read on a single stock combining a DCF valuation with your active policy and holdings.
+          Advisory only; it never places a trade.
+        </p>
+      </div>
+
+      <form class="flex items-end gap-3 flex-wrap" data-testid="equity-analyzer-form" @submit.prevent="analyze">
+        <label class="flex flex-col gap-1.5">
+          <span class="font-sans text-meta font-medium text-on-surface-variant">Ticker symbol</span>
+          <input
+            v-model="ticker"
+            type="text"
+            placeholder="e.g. AAPL"
+            maxlength="6"
+            class="px-3.5 py-2 rounded-md border border-outline-variant bg-surface font-sans text-body font-medium text-on-surface uppercase w-44 tabular-nums focus:bg-surface-container-lowest transition-colors duration-200 ease-desk"
+            data-testid="input-equity-ticker"
+          />
+        </label>
+        <Button type="submit" icon="query_stats" :disabled="loading || !ticker.trim()" data-testid="btn-analyze-equity">
+          {{ loading ? 'Analyzing...' : 'Analyze' }}
+        </Button>
+      </form>
+
+      <p v-if="error" class="font-sans text-meta font-medium text-error" data-testid="equity-analyzer-error">
+        {{ error }}
       </p>
     </div>
 
-    <form class="flex items-end gap-sm flex-wrap" data-testid="equity-analyzer-form" @submit.prevent="analyze">
-      <label class="flex flex-col gap-1">
-        <span class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">Ticker</span>
-        <input
-          v-model="ticker"
-          type="text"
-          placeholder="e.g. AAPL"
-          maxlength="6"
-          class="px-3 py-2 rounded-lg border border-surface-variant bg-surface-container-lowest font-body-mono text-body-mono text-on-surface uppercase w-40 focus:outline-none focus:ring-2 focus:ring-primary"
-          data-testid="input-equity-ticker"
-        />
-      </label>
-      <Button type="submit" icon="query_stats" :disabled="loading || !ticker.trim()" data-testid="btn-analyze-equity">
-        {{ loading ? 'Analyzing…' : 'Analyze' }}
-      </Button>
-    </form>
-
-    <p v-if="error" class="font-body-base text-sm text-red-700" data-testid="equity-analyzer-error">{{ error }}</p>
-
-    <EquityRecommendationCard v-if="result" :result="result" />
-  </div>
+    <div v-if="result" class="border-t border-outline-variant">
+      <EquityRecommendationCard :result="result" embedded />
+    </div>
+  </section>
 </template>
 
 <script setup lang="ts">

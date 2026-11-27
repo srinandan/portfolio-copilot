@@ -1,24 +1,20 @@
 <template>
   <div class="flex flex-col gap-lg w-full">
-    <!-- Title and Subtitle -->
-    <div class="flex flex-col gap-sm">
-      <h1 class="font-headline-lg-mobile text-headline-lg-mobile text-on-background">Spending Analysis</h1>
-      <p class="font-body-base text-body-base text-on-surface-variant max-w-lg">
+    <header class="flex flex-col gap-1">
+      <h1 class="font-display text-page-title font-medium text-on-background">Spending Analysis</h1>
+      <p class="font-sans text-body text-on-surface-variant max-w-[65ch]">
         Analysis of transaction data, monthly spending breakdown, savings rate metrics, and liquidity reserves.
       </p>
-    </div>
+    </header>
 
-    <!-- Spending Summary Metrics -->
     <SpendingSummaryCard v-if="report" :report="report" />
 
-    <!-- Anomaly Alert Card -->
     <AnomalyAlertCard
       v-if="report && report.anomalies.length > 0"
       :anomalies="report.anomalies"
       :narrative-summary="report.narrative_summary"
     />
 
-    <!-- Category Breakdown Table -->
     <CategoryBreakdownTable
       v-if="report && report.category_breakdown"
       :categories="report.category_breakdown"

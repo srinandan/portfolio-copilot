@@ -1,158 +1,162 @@
 <template>
   <div class="flex flex-col gap-lg max-w-2xl mx-auto w-full" data-testid="submission-step">
-    <!-- Header -->
-    <div class="flex flex-col gap-sm">
-      <div class="flex items-center gap-xs text-on-surface-variant font-label-caps uppercase tracking-wider">
-        <span class="material-symbols-outlined text-[16px] text-tertiary-fixed-dim">verified</span>
-        <span>Final Review &amp; Initialization</span>
-      </div>
-      <h1 class="font-headline-lg-mobile text-on-surface">Investment Policy Statement (IPS)</h1>
-      <p class="font-body-base text-on-surface-variant">
+    <header class="flex flex-col gap-1">
+      <h1 class="font-display text-page-title font-medium text-on-surface">Investment Policy Statement (IPS)</h1>
+      <p class="font-sans text-body text-on-surface-variant max-w-[65ch]">
         Review your synthesized reference plan before initializing long-term memory and autonomous governance.
       </p>
-    </div>
+    </header>
 
-    <!-- Summary Bento Card -->
-    <div class="bg-surface-container-lowest rounded-xl p-lg border border-outline-variant shadow-sm flex flex-col gap-md">
-      <!-- Risk Tier & Horizon -->
-      <div class="flex justify-between items-center border-b border-outline-variant/40 pb-sm">
-        <div>
-          <span class="font-label-caps text-xs text-on-surface-variant uppercase">Risk Tolerance</span>
-          <div class="font-title-sm text-on-surface capitalize font-bold text-lg" data-testid="summary-risk-tier">
+    <!-- Summary Sheet -->
+    <section class="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sheet divide-y divide-outline-variant overflow-hidden">
+      <!-- Risk & Horizon -->
+      <div class="p-lg grid grid-cols-2 divide-x divide-outline-variant">
+        <div class="pr-md">
+          <span class="font-sans text-meta text-on-surface-variant block">Risk tolerance</span>
+          <span class="font-sans text-heading font-semibold capitalize text-on-surface" data-testid="summary-risk-tier">
             {{ state.risk_tolerance }}
-          </div>
+          </span>
         </div>
-        <div class="text-right">
-          <span class="font-label-caps text-xs text-on-surface-variant uppercase">Time Horizon</span>
-          <div class="font-title-sm text-on-surface font-mono" data-testid="summary-horizon">
+        <div class="pl-md text-right">
+          <span class="font-sans text-meta text-on-surface-variant block">Time horizon</span>
+          <span class="font-sans text-heading font-semibold text-on-surface tabular-nums" data-testid="summary-horizon">
             {{ state.time_horizon_years }} Years
-          </div>
-        </div>
-      </div>
-
-      <!-- Primary Goal -->
-      <div class="flex flex-col gap-xs">
-        <span class="font-label-caps text-xs text-on-surface-variant uppercase">Primary Goal</span>
-        <div class="flex justify-between items-center text-sm font-body-base bg-surface-container p-sm rounded-lg">
-          <span class="font-medium text-on-surface">{{ state.goals[0]?.name || 'Capital Compounding' }}</span>
-          <span class="font-body-mono font-bold text-on-surface">${{ (state.goals[0]?.target_amount_usd || 0).toLocaleString() }}</span>
-        </div>
-      </div>
-
-      <!-- Target Bands Table -->
-      <div class="flex flex-col gap-xs">
-        <span class="font-label-caps text-xs text-on-surface-variant uppercase">Target Asset Allocation Bands</span>
-        <div class="border border-outline-variant rounded-lg overflow-hidden text-xs">
-          <div class="bg-surface-container-high p-2 grid grid-cols-3 font-label-caps text-on-surface-variant uppercase">
-            <span>Asset Class</span>
-            <span class="text-center">Target</span>
-            <span class="text-right">Tolerance Band</span>
-          </div>
-          <div
-            v-for="band in state.target_bands"
-            :key="band.asset_class"
-            class="p-2 grid grid-cols-3 border-t border-outline-variant/40 items-center font-body-mono"
-            data-testid="summary-band-row"
-          >
-            <span class="font-body-base text-xs text-on-surface font-medium truncate">{{ band.asset_class }}</span>
-            <span class="text-center font-bold text-on-surface">{{ band.target_percent }}%</span>
-            <span class="text-right text-on-surface-variant">{{ band.min_percent }}% – {{ band.max_percent }}%</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Liabilities Summary -->
-      <div class="flex flex-col gap-xs pt-sm border-t border-outline-variant/40">
-        <div class="flex justify-between items-center">
-          <span class="font-label-caps text-xs text-on-surface-variant uppercase">Reported Liabilities</span>
-          <span class="font-body-mono text-xs text-on-surface font-bold">
-            ${{ totalLiabilities.toLocaleString() }} ({{ state.liabilities.length }} debts)
           </span>
         </div>
       </div>
 
-      <!-- Policy Guardrails Summary -->
-      <div class="grid grid-cols-2 gap-md pt-sm border-t border-outline-variant/40 text-xs font-body-mono">
-        <div>
-          <span class="text-on-surface-variant block">Concentration Limit:</span>
-          <span class="font-bold text-on-surface">{{ state.constraints.concentration_limit_percent }}% max / position</span>
+      <!-- Primary Goal -->
+      <div class="p-lg flex items-baseline justify-between gap-md">
+        <div class="flex flex-col">
+          <span class="font-sans text-meta text-on-surface-variant">Primary goal</span>
+          <span class="font-sans text-body font-medium text-on-surface">
+            {{ state.goals[0]?.name || 'Capital Compounding' }}
+          </span>
         </div>
-        <div>
-          <span class="text-on-surface-variant block">Approval Threshold:</span>
-          <span class="font-bold text-on-surface">&gt; ${{ state.approval_thresholds.approval_required_above_usd.toLocaleString() }} ({{ state.approval_thresholds.approval_required_above_percent }}%)</span>
+        <span class="font-sans text-heading font-semibold text-on-surface tabular-nums shrink-0">
+          ${{ (state.goals[0]?.target_amount_usd || 0).toLocaleString() }}
+        </span>
+      </div>
+
+      <!-- Target Bands Table -->
+      <div class="p-lg flex flex-col gap-3">
+        <span class="font-sans text-meta font-semibold text-on-surface">Target asset allocation bands</span>
+        <div class="border border-outline-variant rounded-md overflow-hidden">
+          <div class="bg-surface-container-low/60 px-3 py-2 grid grid-cols-3 font-sans text-meta font-medium text-on-surface-variant">
+            <span>Asset class</span>
+            <span class="text-center">Target</span>
+            <span class="text-right">Tolerance band</span>
+          </div>
+          <div
+            v-for="band in state.target_bands"
+            :key="band.asset_class"
+            class="px-3 py-2.5 grid grid-cols-3 border-t border-outline-variant/70 items-center font-sans text-body tabular-nums"
+            data-testid="summary-band-row"
+          >
+            <span class="font-medium text-on-surface truncate">{{ band.asset_class }}</span>
+            <span class="text-center font-semibold text-on-surface">{{ band.target_percent }}%</span>
+            <span class="text-right text-meta text-on-surface-variant">{{ band.min_percent }}%-{{ band.max_percent }}%</span>
+          </div>
         </div>
       </div>
-    </div>
 
-    <!-- Submission / SSE Stream State -->
+      <!-- Liabilities & Guardrails -->
+      <div class="p-lg grid grid-cols-1 sm:grid-cols-3 gap-md font-sans tabular-nums">
+        <div>
+          <span class="text-meta text-on-surface-variant block">Reported liabilities</span>
+          <span class="text-body font-semibold text-on-surface">
+            ${{ totalLiabilities.toLocaleString() }} ({{ state.liabilities.length }})
+          </span>
+        </div>
+        <div>
+          <span class="text-meta text-on-surface-variant block">Concentration limit</span>
+          <span class="text-body font-semibold text-on-surface">
+            {{ state.constraints.concentration_limit_percent }}% max / position
+          </span>
+        </div>
+        <div>
+          <span class="text-meta text-on-surface-variant block">Approval threshold</span>
+          <span class="text-body font-semibold text-on-surface">
+            &gt; ${{ state.approval_thresholds.approval_required_above_usd.toLocaleString() }} ({{ state.approval_thresholds.approval_required_above_percent }}%)
+          </span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Submission Status Banner -->
     <div
       v-if="submitting || submissionSuccess || submissionError"
-      class="p-md rounded-xl border flex flex-col gap-sm shadow-sm"
+      class="p-md rounded-xl border flex flex-col gap-1.5"
       :class="[
-        submissionSuccess ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-300 text-emerald-900 dark:text-emerald-200' :
-        submissionError ? 'bg-error-container text-on-error-container border-error' :
-        'bg-surface-container border-outline-variant text-on-surface'
+        submissionSuccess ? 'bg-tertiary-fixed/50 border-tertiary-fixed-dim text-on-tertiary-fixed' :
+        submissionError ? 'bg-error-container text-on-error-container border-error/30' :
+        'bg-surface-container-lowest border-outline-variant text-on-surface'
       ]"
       data-testid="submission-status-banner"
     >
       <div class="flex items-center gap-2">
         <span
           v-if="submitting"
-          class="material-symbols-outlined animate-spin text-[20px] text-primary"
+          class="material-symbols-outlined animate-spin text-[20px] text-primary-fixed"
+          aria-hidden="true"
         >
           progress_activity
         </span>
         <span
           v-else-if="submissionSuccess"
-          class="material-symbols-outlined text-[20px] text-emerald-600"
+          class="material-symbols-outlined text-[20px] text-on-tertiary-container"
+          aria-hidden="true"
         >
           check_circle
         </span>
         <span
           v-else
           class="material-symbols-outlined text-[20px] text-error"
+          aria-hidden="true"
         >
           error
         </span>
-        <span class="font-title-sm text-sm">
+        <span class="font-sans text-body font-semibold">
           {{
-            submitting ? 'Initializing Active IPS with Agent Runtime...' :
-            submissionSuccess ? 'Active IPS Initialized & Governance Online!' :
-            'Submission Notice'
+            submitting ? 'Initializing Active IPS...' :
+            submissionSuccess ? 'Active IPS initialized and governance online' :
+            'Submission notice'
           }}
         </span>
       </div>
-      <p class="font-body-base text-xs">
+      <p class="font-sans text-meta max-w-[65ch]">
         {{
-          submitting ? 'Writing InvestmentPolicyStatement v1 and LiabilitiesSnapshot to long-term memory via /api/plan SSE bridge.' :
-          submissionSuccess ? 'Your policy reference plan is now active. All subsequent portfolio reviews, drift scans, and proposed actions will validate against this IPS.' :
+          submitting ? 'Writing InvestmentPolicyStatement and LiabilitiesSnapshot to Firestore.' :
+          submissionSuccess ? 'Your policy reference plan is now active. All portfolio reviews, drift checks, and proposed actions validate against this IPS.' :
           submissionError
         }}
       </p>
     </div>
 
-    <!-- CTA Button -->
-    <div class="mt-md flex flex-col gap-sm">
+    <!-- Primary CTA -->
+    <div>
       <button
         v-if="!submissionSuccess"
-        class="w-full bg-primary-container text-on-primary py-md px-lg rounded-lg font-title-sm flex items-center justify-center gap-sm transition-colors shadow-md hover:bg-primary-container/90 disabled:opacity-50 disabled:cursor-not-allowed"
+        type="button"
+        class="w-full bg-primary text-on-primary py-3.5 px-lg rounded-md font-sans text-body font-medium inline-flex items-center justify-center gap-2 transition-colors duration-200 ease-desk hover:bg-primary-container disabled:opacity-50 disabled:cursor-not-allowed"
         :disabled="submitting"
         data-testid="submit-ips-btn"
         @click="handleSubmit"
       >
         <span v-if="!submitting">Submit Policy &amp; Initialize Governance</span>
-        <span v-else>Communicating with Orchestrator...</span>
-        <span v-if="!submitting" class="material-symbols-outlined">send</span>
+        <span v-else>Saving policy...</span>
+        <span v-if="!submitting" class="material-symbols-outlined text-[18px]" aria-hidden="true">send</span>
       </button>
 
       <button
         v-else
-        class="w-full bg-tertiary-container text-on-tertiary-container py-md px-lg rounded-lg font-title-sm flex items-center justify-center gap-sm transition-colors shadow-md hover:opacity-90"
+        type="button"
+        class="w-full bg-tertiary text-on-tertiary py-3.5 px-lg rounded-md font-sans text-body font-medium inline-flex items-center justify-center gap-2 transition-colors duration-200 ease-desk hover:bg-on-tertiary-fixed"
         data-testid="go-to-dashboard-btn"
         @click="navigateToDashboard"
       >
         <span>Enter Portfolio Dashboard</span>
-        <span class="material-symbols-outlined">dashboard</span>
+        <span class="material-symbols-outlined text-[18px]" aria-hidden="true">dashboard</span>
       </button>
     </div>
   </div>
@@ -195,8 +199,6 @@ async function handleSubmit() {
   const userId = s.user_id || 'demo_user';
   const [primaryGoal, ...additionalGoals] = s.goals;
 
-  // Map the wizard's typed state to the orchestrator's GoalsOnboardingResult contract.
-  // Structured all the way — no LLM re-parsing of prose.
   const result: Record<string, unknown> = {
     user_id: userId,
     primary_goal: primaryGoal ?? null,

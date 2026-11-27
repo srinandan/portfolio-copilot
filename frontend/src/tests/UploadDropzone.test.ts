@@ -27,7 +27,7 @@ describe('UploadDropzone.vue', () => {
     await fireEvent.change(input);
 
     expect(screen.getByText('statement.csv')).toBeDefined();
-    expect(screen.getByText('CHANGE FILE')).toBeDefined();
+    expect(screen.getByText('Change file')).toBeDefined();
     expect(emitted()['file-selected']).toHaveLength(1);
     expect(emitted()['file-selected'][0]).toEqual([file, 'transactions', 'checking_transactions']);
   });

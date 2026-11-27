@@ -317,7 +317,7 @@ describe('Frontend Views', () => {
       expect.any(Function)
     );
 
-    expect(screen.getByText(/APPROVED — Execution Triggered/i)).toBeDefined();
+    expect(screen.getByText(/APPROVED: Execution Triggered/i)).toBeDefined();
   });
 
   it('DashboardView allows rejecting actions and resumes plan via apiService.streamPlanResume', async () => {
@@ -340,7 +340,7 @@ describe('Frontend Views', () => {
       expect.any(Function)
     );
 
-    expect(screen.getByText(/REJECTED — Trade Aborted/i)).toBeDefined();
+    expect(screen.getByText(/REJECTED: Trade Aborted/i)).toBeDefined();
   });
 
   it('DashboardView allows editing actions and saves changes via apiService.streamPlanResume', async () => {

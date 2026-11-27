@@ -1,11 +1,54 @@
 @import "tailwindcss";
 @config "../tailwind.config.js";
 
+:root {
+  --surface-canvas: #f4f6f8;
+  --surface-sheet: #ffffff;
+  --surface-recessed: #edf1f5;
+  --ink-primary: #0b1320;
+  --ink-muted: #475569;
+  --hairline: #d5dde6;
+  --brand-navy: #0f2342;
+  --accent-cobalt: #1e40af;
+  --ease-desk: cubic-bezier(0.22, 1, 0.36, 1);
+  --duration-fast: 180ms;
+  --duration-base: 220ms;
+}
+
 @layer base {
+  html {
+    background-color: var(--surface-canvas);
+    color: var(--ink-primary);
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
   body {
     -webkit-tap-highlight-color: transparent;
+    overflow-x: clip;
   }
-  .tabular-nums {
-    font-variant-numeric: tabular-nums;
+
+  .tabular-nums,
+  .font-body-mono {
+    font-variant-numeric: tabular-nums lining-nums;
+  }
+
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  button:focus-visible,
+  a:focus-visible {
+    outline: 2px solid var(--accent-cobalt);
+    outline-offset: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

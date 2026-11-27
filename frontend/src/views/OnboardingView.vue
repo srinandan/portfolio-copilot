@@ -1,19 +1,47 @@
 <template>
-  <div class="flex flex-col min-h-screen bg-surface text-on-surface" data-testid="onboarding-view">
-    <!-- Header with Back Button, Step Title, and Progress Bar -->
-    <header class="fixed top-0 w-full z-50 pt-safe bg-surface/80 backdrop-blur-xl shadow-sm border-b border-outline-variant/30">
-      <div class="flex items-center justify-between h-16 px-margin-mobile md:px-margin-desktop gap-md">
-        <div class="flex items-center gap-md">
+  <div class="flex flex-col min-h-screen bg-background text-on-background" data-testid="onboarding-view">
+    <!-- Dedicated Onboarding Header & Progress Bar -->
+    <header class="fixed top-0 inset-x-0 z-50 bg-surface-container-lowest/95 backdrop-blur-md border-b border-outline-variant">
+      <div class="max-w-7xl mx-auto flex items-center justify-between h-16 px-4 md:px-8 gap-md">
+        <div class="flex items-center gap-3 min-w-0">
           <button
-            class="w-10 h-10 flex items-center justify-center -ml-2 text-on-surface-variant hover:bg-surface-container rounded-full transition-colors"
+            type="button"
+            class="w-9 h-9 flex items-center justify-center -ml-1 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low rounded-md transition-colors duration-150 ease-desk shrink-0"
+            aria-label="Go back"
             data-testid="onboarding-back-btn"
             @click="goBack"
           >
-            <span class="material-symbols-outlined">arrow_back</span>
+            <span class="material-symbols-outlined text-[20px]" aria-hidden="true">arrow_back</span>
           </button>
-          <div class="flex items-center gap-sm">
-            <img alt="Logo" class="h-6 w-auto object-contain" src="/images/logo.png" />
-            <span class="font-title-sm text-title-sm text-primary tracking-tight" data-testid="step-title">
+
+          <div class="flex items-center gap-2.5 min-w-0">
+            <svg
+              class="w-6 h-6 shrink-0"
+              viewBox="0 0 28 28"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="true"
+            >
+              <path
+                d="M14 2.5L24 6.5V13.8C24 19.6 19.8 24.4 14 26C8.2 24.4 4 19.6 4 13.8V6.5L14 2.5Z"
+                fill="#0F2342"
+              />
+              <path
+                d="M8.75 16.75L12.25 13.25L15 15.75L19.5 10.75"
+                stroke="#D1FAE5"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+              <path
+                d="M16.5 10.75H19.5V13.75"
+                stroke="#D1FAE5"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            <span class="font-sans text-body font-semibold text-primary truncate" data-testid="step-title">
               {{ stepTitle }}
             </span>
           </div>
@@ -21,27 +49,27 @@
 
         <button
           type="button"
-          class="text-xs text-on-surface-variant hover:text-on-surface flex items-center gap-1 font-medium px-2 py-1 rounded hover:bg-surface-container transition-colors"
+          class="font-sans text-meta font-medium text-on-surface-variant hover:text-on-surface inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md hover:bg-surface-container-low transition-colors duration-150 ease-desk shrink-0"
           data-testid="link-to-profile"
           @click="router.push('/profile')"
         >
-          <span class="material-symbols-outlined text-[16px]">settings</span>
+          <span class="material-symbols-outlined text-[16px]" aria-hidden="true">settings</span>
           <span class="hidden sm:inline">Profile &amp; Policy Hub</span>
         </button>
       </div>
-      <!-- Progress Bar -->
-      <div class="h-1 bg-surface-container w-full">
+
+      <!-- Progress Track -->
+      <div class="h-1 bg-surface-container-low w-full">
         <div
-          class="h-full bg-on-tertiary-container transition-all duration-500"
+          class="h-full bg-primary transition-[width] duration-300 ease-desk"
           :style="{ width: `${progressPercent}%` }"
           data-testid="progress-bar"
         ></div>
       </div>
     </header>
 
-    <!-- Main Wizard Content -->
-    <main class="pt-24 pb-16 px-margin-mobile md:px-margin-desktop min-h-screen flex flex-col justify-center">
-      <!-- Step 1: Welcome -->
+    <!-- Wizard Content -->
+    <main class="pt-24 pb-16 px-4 md:px-8 flex-1 flex flex-col justify-center">
       <WelcomeStep
         v-if="currentStep === 1"
         :has-active-profile="hasActiveProfile"
@@ -49,7 +77,6 @@
         @next="goToStep(2)"
       />
 
-      <!-- Step 2: Goals & Timeline -->
       <GoalsStep
         v-else-if="currentStep === 2"
         :initial-goals="state.goals"
@@ -58,14 +85,12 @@
         @next="onGoalsConfirmed"
       />
 
-      <!-- Step 3: Liabilities & Debt -->
       <LiabilitiesStep
         v-else-if="currentStep === 3"
         :initial-liabilities="state.liabilities"
         @next="onLiabilitiesConfirmed"
       />
 
-      <!-- Step 4: Risk Calibration -->
       <RiskCalibrationStep
         v-else-if="currentStep === 4"
         :initial-horizon-years="state.time_horizon_years"
@@ -73,14 +98,12 @@
         @next="onRiskCalibrationConfirmed"
       />
 
-      <!-- Step 5: Target Allocation & Bands -->
       <TargetAllocationStep
         v-else-if="currentStep === 5"
         :initial-bands="state.target_bands"
         @confirm="onAllocationConfirmed"
       />
 
-      <!-- Step 6: Policy Constraints & Guardrails -->
       <ConstraintsStep
         v-else-if="currentStep === 6"
         :initial-reserve-months="state.reserve_months"
@@ -89,7 +112,6 @@
         @next="onConstraintsConfirmed"
       />
 
-      <!-- Step 7: Final Review & Submission -->
       <SubmissionStep
         v-else-if="currentStep === 7"
         :state="state"
