@@ -31,7 +31,7 @@ See [ADR-0003](../docs/adr/0003-standalone-ui-not-agentspace.md) and [ADR-0017](
 
 ```
 frontend/
-├── Dockerfile              # Multi-stage build: Node 22 (SPA) + Go 1.26 (server) -> distroless static
+├── Dockerfile              # Multi-stage build: Node 24 (SPA) + Go 1.27 (server) -> distroless static
 ├── cloudbuild.yaml         # Cloud Build CI/CD pipeline configuration
 ├── Makefile                # Local dev and deployment automation
 ├── server/                 # Go backend server (serves /dist and handles /api/* in-process)
@@ -69,8 +69,8 @@ frontend/
 
 ## Prerequisites
 
-- **Node.js 22+**
-- **Go 1.26+**
+- **Node.js 24+**
+- **Go 1.27+**
 
 ---
 

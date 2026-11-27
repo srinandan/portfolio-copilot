@@ -4,8 +4,8 @@
 
 - `gcloud` CLI, authenticated, with a GCP project you can administer
 - `python3` (3.12+), `pip`, `uv` (recommended for Python packaging)
-- `go` (1.26+, for the Go backend server)
-- `node`/`npm` (Node.js 22+, for the Vue frontend)
+- `go` (1.27+, for the Go backend server)
+- `node`/`npm` (Node.js 24+, for the Vue frontend)
 
 ## First-time setup
 
